@@ -290,6 +290,7 @@ footer.site-footer{border-top:5px solid #3AB1DB;background:#082B5A !important;}
       <p class="card-sub">أضف المعلمين يدوياً، أو استخدم "توليد معلمين تلقائياً" لإنشائهم بعدد كافٍ حسب الاحتياج المقترح لكل تخصص (بنصاب 24 حصة افتراضياً).</p>
       <div id="teachers-table"></div>
     </div>
+    <div id="teacher-tools"></div>
     <div class="card">
       <h2>نقل جدول معلم إلى معلم آخر</h2>
       <p class="card-sub">ينقل كل الحصص المُسندة للمعلم المصدر إلى المعلم الهدف دفعة واحدة (مفيد عند استبدال معلم). أي حصة يتعارض نقلها مع جدول الهدف الحالي تبقى كما هي وتُذكر في رسالة بعد الانتهاء.</p>
@@ -676,7 +677,7 @@ function normalizeStateShape(){
   if(state.constraints.maxSameSubjectPerDay===undefined) state.constraints.maxSameSubjectPerDay = 2;
   if(state.constraints.avoidConsecutive===undefined) state.constraints.avoidConsecutive = true;
   if(!state.settings.periodTimes) state.settings.periodTimes = [];
-  (state.teachers||[]).forEach(t=>{ if(!t.preferred) t.preferred = []; if(!t.unavailable) t.unavailable = []; });
+  (state.teachers||[]).forEach(t=>{ if(t.maxDays===undefined) t.maxDays=0; if(t.maxConsec===undefined) t.maxConsec=0; if(!t.preferred) t.preferred = []; if(!t.unavailable) t.unavailable = []; });
   [state.subjectData.primarySubjects, state.subjectData.middleSubjects, state.subjectData.secondarySubjects].forEach(arr=>{
     (arr||[]).forEach(s=>{ if(!s.blockedSlots) s.blockedSlots = []; if(!s.preferredSlots) s.preferredSlots = []; });
   });
@@ -1307,6 +1308,10 @@ function generateTimetable(){
             if((teacherDayLoad[t.id][d]||0) >= (t.maxDay||state.settings.maxPerDay)) continue;
             const isUnavailable = (t.unavailable||[]).some(u=> Number(u[0])===d && Number(u[1])===p);
             if(isUnavailable) continue;
+            const mDays = Number(t.maxDays)||0;      // أقصى عدد أيام عمل أسبوعياً
+            if(mDays && (teacherDayLoad[t.id][d]||0)===0 && teacherDayLoad[t.id].filter(n=>n>0).length>=mDays) continue;
+            const mCon = Number(t.maxConsec)||0;     // أقصى حصص متتالية
+            if(mCon){ let run=1; for(let q=p-1; q>=0 && teacherBusy[t.id].has(`${d}|${q}`); q--) run++; for(let q=p+1; q<nPer && teacherBusy[t.id].has(`${d}|${q}`); q++) run++; if(run>mCon) continue; }
             const prefersThis = (t.preferred||[]).some(u=> Number(u[0])===d && Number(u[1])===p);
             if(!best || (prefersThis && !bestPrefers) || (prefersThis===bestPrefers && (teacherWeekLoad[t.id]||0) < (teacherWeekLoad[best.id]||0))){
               best = t; bestPrefers = prefersThis;
@@ -1711,7 +1716,8 @@ async function transferTeacherSchedule(sourceId, targetId){
 function renderTeachers(){
   renderSpecDatalistTT();
   populateTransferSelects();
-  let h = '<table><thead><tr><th>الاسم</th><th>التخصص</th><th>الحد الأسبوعي</th><th>الحد اليومي</th><th>مجموع الحصص</th><th>المواد المسندة</th><th>الأوقات غير المتاحة</th><th></th></tr></thead><tbody>';
+  renderTeacherTools();
+  let h = '<table><thead><tr><th>الاسم</th><th>التخصص</th><th>الحد الأسبوعي</th><th>الحد اليومي</th><th title="أقصى عدد أيام عمل (٠ = بلا حد)">أقصى أيام</th><th title="أقصى حصص متتالية (٠ = بلا حد)">أقصى متتالية</th><th>مجموع الحصص</th><th>المواد المسندة</th><th>الأوقات غير المتاحة</th><th></th></tr></thead><tbody>';
   let sumAssigned = 0, sumMax = 0;
   state.teachers.forEach(t=>{
     const r = getTeacherActualAssignments(t.id);
@@ -1723,6 +1729,8 @@ function renderTeachers(){
       <td><input type="text" list="ttSpecDatalist" value="${t.group||''}" style="width:120px;" onchange="updateTeacherField('${t.id}','group',this.value)"></td>
       <td><input type="number" value="${t.maxWeek}" style="width:55px;" onchange="updateTeacherField('${t.id}','maxWeek',Number(this.value))"></td>
       <td><input type="number" value="${t.maxDay}" style="width:50px;" onchange="updateTeacherField('${t.id}','maxDay',Number(this.value))"></td>
+      <td><input type="number" min="0" max="7" value="${t.maxDays||0}" style="width:48px;" onchange="updateTeacherField('${t.id}','maxDays',Number(this.value))"></td>
+      <td><input type="number" min="0" max="8" value="${t.maxConsec||0}" style="width:48px;" onchange="updateTeacherField('${t.id}','maxConsec',Number(this.value))"></td>
       <td class="total-cell" style="${over?'color:#C0392B;':''}">${ar(r.total)} / ${ar(t.maxWeek)}</td>
       <td><button class="print-btn secondary" style="padding:5px 10px;font-size:11px;" onclick="toggleTeacherAssignmentsRow('${t.id}')">📘 ${subjects.length?subjects.slice(0,2).join('، ')+(subjects.length>2?' +'+ar(subjects.length-2):''):'لا مواد'}</button></td>
       <td><button class="print-btn secondary" style="padding:5px 10px;font-size:11px;" onclick="toggleAvailEditor('${t.id}')">تحديد (${ar((t.unavailable||[]).length)})</button></td>
@@ -1732,10 +1740,10 @@ function renderTeachers(){
         <button onclick="deleteTeacher('${t.id}')" style="background:#FBEAEA;color:#C0392B;border:1px solid #E9C7C3;border-radius:6px;padding:5px 9px;cursor:pointer;">✕</button>
       </td>
     </tr>
-    <tr id="assign-summary-row-${t.id}" style="display:none;"><td colspan="8" style="background:#F2F8FD;"><div id="assign-summary-body-${t.id}"></div></td></tr>
-    <tr id="avail-row-${t.id}" style="display:none;"><td colspan="8" style="background:#F7F9FC;">${buildAvailEditor(t)}</td></tr>`;
+    <tr id="assign-summary-row-${t.id}" style="display:none;"><td colspan="10" style="background:#F2F8FD;"><div id="assign-summary-body-${t.id}"></div></td></tr>
+    <tr id="avail-row-${t.id}" style="display:none;"><td colspan="10" style="background:#F7F9FC;">${buildAvailEditor(t)}</td></tr>`;
   });
-  h += `<tr style="background:#082B5A;color:#fff;font-weight:800;"><td colspan="4">الإجمالي</td><td class="total-cell" style="color:#fff;">${ar(sumAssigned)} / ${ar(sumMax)}</td><td colspan="3"></td></tr>`;
+  h += `<tr style="background:#082B5A;color:#fff;font-weight:800;"><td colspan="6">الإجمالي</td><td class="total-cell" style="color:#fff;">${ar(sumAssigned)} / ${ar(sumMax)}</td><td colspan="3"></td></tr>`;
   h += '</tbody></table>';
   h += `<div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;">
     <button class="print-btn secondary" onclick="addTeacher()">➕ إضافة معلم/ة</button>
@@ -3006,6 +3014,103 @@ function addTeacherForGroup(g){
   const n=state.teachers.filter(t=>t.group===g).length+1;
   state.teachers.push({id:uid('t'), name:`معلم/ة ${g} ${n}`, group:g, maxWeek:state.settings.nisab, maxDay:state.settings.maxPerDay, unavailable:[], preferred:[]});
   saveState(); fullRender(); uiAlert(`تمت إضافة معلم/ة لتخصص «${g}». أعد التوليد.`);
+}
+
+// ===== أدوات الإسناد: نقل/نسخ مادة لفصل آخر بنفس المعلم + التطبيق الجماعي على المعلمين =====
+function teacherAssignmentItems(teacherId){
+  const classes=buildClasses(); const map={};
+  Object.keys(state.workAssignments).forEach(k=>{
+    if(state.workAssignments[k]!==teacherId) return;
+    const i=k.lastIndexOf('|'); const cid=k.slice(0,i), sub=k.slice(i+1); const c=classes.find(x=>x.id===cid); if(!c) return;
+    map[k]={key:k, classId:cid, subject:sub, label:c.label, count:0};
+  });
+  getTeacherActualAssignments(teacherId).list.forEach(x=>{ const k=x.classId+'|'+x.subject; if(!map[k]) map[k]={key:k,classId:x.classId,subject:x.subject,label:x.classLabel,count:0}; map[k].count=x.count; });
+  return Object.values(map);
+}
+let _atTeacher = '';
+function renderTeacherTools(){
+  const el=document.getElementById('teacher-tools'); if(!el) return;
+  if(!state.teachers.length){ el.innerHTML=''; return; }
+  if(!state.teachers.some(t=>t.id===_atTeacher)) _atTeacher=state.teachers[0].id;
+  const items=teacherAssignmentItems(_atTeacher), classes=buildClasses();
+  const grades={}; classes.forEach(c=>{ const g=c.id.slice(0,c.id.lastIndexOf('_')); (grades[g]=grades[g]||[]).push(c); });
+  let h=`<div class="card"><h2>نقل ونسخ الإسناد بين الفصول</h2>
+  <p class="card-sub">اختر معلماً ومادته، ثم الفصول الأخرى التي سيدرّسها فيها بنفس المعلم. «نسخ» يُبقي الفصل الأصلي كما هو، و«نقل» يرفع المعلم من الفصل الأصلي ويُفرّغ حصصه فيه.</p>
+  <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px;">
+    <div class="field"><label>المعلم/ة</label><select id="atTeacher" onchange="_atTeacher=this.value;renderTeacherTools()">${state.teachers.map(t=>`<option value="${t.id}" ${t.id===_atTeacher?'selected':''}>${t.name} (${t.group||'—'})</option>`).join('')}</select></div>
+    <div class="field"><label>المادة / الفصل الحالي</label><select id="atItem">${items.length?items.map(x=>`<option value="${x.key}">${x.subject} — ${x.label}${x.count?` (${ar(x.count)} حصة)`:''}</option>`).join(''):'<option value="">— لا إسناد لهذا المعلم —</option>'}</select></div>
+    <div class="field"><label>العملية</label><select id="atMode"><option value="copy">نسخ (نفس المعلم يدرّس فصولاً إضافية)</option><option value="move">نقل (من الفصل الأصلي إلى الفصول المحددة)</option></select></div>
+  </div>
+  <div style="font-weight:700;color:var(--navy);margin-bottom:6px;">الفصول الهدف:</div>
+  <div style="display:flex;flex-direction:column;gap:6px;max-height:230px;overflow:auto;padding:4px;">`;
+  Object.keys(grades).forEach(g=>{
+    h+=`<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;"><button class="print-btn secondary" style="padding:3px 10px;font-size:11px;" onclick="atSelectGrade('${g}')">كل شُعب الصف</button>${grades[g].map(c=>`<label style="background:#EDF3F9;border-radius:8px;padding:4px 10px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="atTarget" value="${c.id}" data-grade="${g}"> ${c.label}</label>`).join('')}</div>`;
+  });
+  h+=`</div><div style="margin-top:12px;"><button class="print-btn" onclick="applyAssignmentMove()">↪ تنفيذ</button></div></div>
+
+  <div class="card"><h2>تطبيق جماعي على المعلمين</h2>
+  <p class="card-sub">غيّر قيداً واحداً لكل معلمي تخصص معيّن (أو لجميع المعلمين) دفعة واحدة، مثل منع يوم كامل، أو تحديد أقصى أيام العمل.</p>
+  <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;">
+    <div class="field"><label>التخصص</label><select id="bkGroup"><option value="">كل المعلمين</option>${[...new Set(state.teachers.map(t=>t.group).filter(Boolean))].map(g=>`<option>${g}</option>`).join('')}</select></div>
+    <div class="field"><label>القيد</label><select id="bkField" onchange="document.getElementById('bkDayWrap').style.display=/Day$/.test(this.value)&&this.value!=='maxDay'?'':'none'">
+      <option value="maxWeek">الحد الأسبوعي (النصاب)</option><option value="maxDay">الحد اليومي</option><option value="maxDays">أقصى أيام العمل</option><option value="maxConsec">أقصى حصص متتالية</option>
+      <option value="blockDay">منع يوم كامل ✕</option><option value="unblockDay">إتاحة يوم كامل</option><option value="clearUnavail">مسح كل الأوقات غير المتاحة</option></select></div>
+    <div class="field"><label>القيمة</label><input type="number" id="bkVal" min="0" value="0" style="width:80px;"></div>
+    <div class="field" id="bkDayWrap" style="display:none;"><label>اليوم</label><select id="bkDay">${getDays().map((d,i)=>`<option value="${i}">${d}</option>`).join('')}</select></div>
+    <button class="print-btn" onclick="bulkApplyTeachers()">✔ تطبيق</button>
+  </div></div>`;
+  el.innerHTML=h;
+}
+function atSelectGrade(g){ document.querySelectorAll('.atTarget').forEach(c=>{ if(c.dataset.grade===g) c.checked=true; }); }
+async function applyAssignmentMove(){
+  const tid=_atTeacher, key=(document.getElementById('atItem')||{}).value, mode=document.getElementById('atMode').value;
+  const targets=[...document.querySelectorAll('.atTarget:checked')].map(c=>c.value);
+  if(!key){ uiAlert('هذا المعلم ليس لديه إسناد لنقله.'); return; }
+  if(!targets.length){ uiAlert('اختر فصلاً واحداً على الأقل.'); return; }
+  const i=key.lastIndexOf('|'), srcClass=key.slice(0,i), subject=key.slice(i+1);
+  const classes=buildClasses(), t=state.teachers.find(x=>x.id===tid);
+  const days=getDays().length, per=getPeriods().length;
+  let done=0, cleared=0, retargeted=0; const skipped=[];
+  targets.forEach(cid=>{
+    if(cid===srcClass) return;
+    const c=classes.find(x=>x.id===cid);
+    if(!classSubjectRequirements(c).some(r=>r.name===subject)){ skipped.push(`${c.label}: المادة «${subject}» غير مقررة لهذا الصف`); return; }
+    state.workAssignments[`${cid}|${subject}`]=tid; done++;
+    const grid=state.timetable[cid]; if(!grid) return;
+    for(let d=0; d<days; d++) for(let p=0; p<per; p++){
+      const cell=grid[d][p]; if(!cell||cell.reserved||cell.subject!==subject||cell.teacherId===tid) continue;
+      const busy=classes.some(o=>o.id!==cid && state.timetable[o.id] && state.timetable[o.id][d][p] && state.timetable[o.id][d][p].teacherId===tid);
+      const na=(t.unavailable||[]).some(u=>Number(u[0])===d&&Number(u[1])===p);
+      if(busy||na){ grid[d][p]=null; delete state.manualLocks[`${cid}|${d}|${p}`]; cleared++; } else { cell.teacherId=tid; retargeted++; }
+    }
+  });
+  if(mode==='move' && done){
+    delete state.workAssignments[key];
+    const g=state.timetable[srcClass];
+    if(g) for(let d=0; d<days; d++) for(let p=0; p<per; p++){ const cell=g[d][p]; if(cell && !cell.reserved && cell.subject===subject && cell.teacherId===tid){ g[d][p]=null; delete state.manualLocks[`${srcClass}|${d}|${p}`]; } }
+  }
+  saveState(); fullRender();
+  const hrs=teacherAssignedHours(tid);
+  let msg=`${mode==='move'?'تم نقل':'تم نسخ'} إسناد «${subject}» إلى ${ar(done)} فصل. تحديث ${ar(retargeted)} حصة قائمة، وإفراغ ${ar(cleared)} حصة متعارضة.`;
+  msg+=`\nإجمالي حصص ${t.name} المُسندة الآن: ${ar(hrs)} من ${ar(t.maxWeek)}.`+(hrs>t.maxWeek?'\n⚠️ تجاوز النصاب — فكّر في معلم إضافي.':'');
+  if(mode==='move') msg+='\nالفصل الأصلي أصبح بلا معلم لهذه المادة: أسند له معلماً ثم أعد التوليد.';
+  if(skipped.length) msg+='\n\nتعذّر:\n'+skipped.join('\n');
+  uiAlert(msg);
+}
+async function bulkApplyTeachers(){
+  const g=document.getElementById('bkGroup').value, f=document.getElementById('bkField').value, v=Number(document.getElementById('bkVal').value)||0, day=Number(document.getElementById('bkDay').value)||0;
+  const list=state.teachers.filter(t=>!g||t.group===g);
+  if(!list.length){ uiAlert('لا يوجد معلمون مطابقون.'); return; }
+  const label=g||'كل المعلمين';
+  if(!(await uiConfirm(`تطبيق التغيير على ${ar(list.length)} معلم/ة (${label})؟ يمكنك التراجع بعده.`))) return;
+  const per=getPeriods().length;
+  list.forEach(t=>{
+    if(['maxWeek','maxDay','maxDays','maxConsec'].includes(f)) t[f]=v;
+    else if(f==='blockDay'){ for(let p=0;p<per;p++) if(!t.unavailable.some(u=>Number(u[0])===day&&Number(u[1])===p)) t.unavailable.push([day,p]); t.preferred=(t.preferred||[]).filter(u=>Number(u[0])!==day); }
+    else if(f==='unblockDay'){ t.unavailable=t.unavailable.filter(u=>Number(u[0])!==day); }
+    else if(f==='clearUnavail'){ t.unavailable=[]; }
+  });
+  saveState(); fullRender(); uiAlert(`تم تطبيق القيد على ${ar(list.length)} معلم/ة.`);
 }
 
 function onPrintTypeChange(){

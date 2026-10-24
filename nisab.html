@@ -206,6 +206,7 @@ footer.site-footer b{color:#fff;}
 .print-only{display:none;}
 .pv-sheet{background:#fff;margin:0 auto;width:210mm;min-height:297mm;padding:9mm;box-sizing:border-box;box-shadow:0 12px 40px rgba(0,0,0,.5);border-radius:4px;direction:rtl;font-family:'Tajawal',sans-serif;}
 .pv-sheet.landscape{width:297mm;min-height:210mm;}
+#printPreviewOverlay > div:first-child{flex-wrap:wrap;}
 @page{ size:A4; margin:9mm; }
 @media print{
   body{background:#fff;}
@@ -389,8 +390,16 @@ footer.site-footer{border-top:5px solid #3AB1DB;background:#082B5A !important;}
 </div>
 
 <div id="printPreviewOverlay" class="no-print" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(8,43,90,.88);overflow:auto;backdrop-filter:blur(3px);">
-  <div style="position:sticky;top:0;z-index:2;display:flex;gap:10px;justify-content:center;align-items:center;padding:12px;background:linear-gradient(135deg,#082B5A,#005499);box-shadow:0 6px 18px rgba(0,0,0,.35);">
+  <div style="position:sticky;top:0;z-index:2;display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;padding:12px;background:linear-gradient(135deg,#082B5A,#005499);box-shadow:0 6px 18px rgba(0,0,0,.35);">
     <span style="color:#fff;font-weight:800;">معاينة قبل الطباعة</span>
+    <span style="color:#DCE8F5;font-size:12px;">الاتجاه</span>
+    <select id="pvOrient" onchange="pvSet('orient',this.value)" style="border-radius:8px;border:none;padding:7px 8px;font-family:inherit;font-weight:700;"><option value="portrait">طولي ▯</option><option value="landscape">عرضي ▭</option></select>
+    <span style="color:#DCE8F5;font-size:12px;">الورق</span>
+    <select id="pvPaper" onchange="pvSet('paper',this.value)" style="border-radius:8px;border:none;padding:7px 8px;font-family:inherit;font-weight:700;"><option value="A4">A4</option><option value="A3">A3</option></select>
+    <span style="color:#DCE8F5;font-size:12px;">الهوامش</span>
+    <select id="pvMargin" onchange="pvSet('margin',this.value)" style="border-radius:8px;border:none;padding:7px 8px;font-family:inherit;font-weight:700;"><option value="5">ضيقة</option><option value="9">عادية</option><option value="15">واسعة</option></select>
+    <span style="color:#DCE8F5;font-size:12px;">الحجم <b id="pvScaleLbl" style="color:#fff;">100٪</b></span>
+    <input id="pvScale" type="range" min="50" max="130" step="5" value="100" oninput="pvSet('scale',this.value)" style="width:110px;">
     <button onclick="confirmPrintNow()" style="background:linear-gradient(180deg,#5cc6ec,#3AB1DB);color:#fff;border:none;border-radius:10px;padding:10px 22px;font-weight:800;font-family:inherit;cursor:pointer;box-shadow:0 4px 0 #1f86ad,0 8px 14px rgba(0,0,0,.3);">🖨️ طباعة الآن</button>
     <button onclick="closePrintPreview()" style="background:#fff;color:#082B5A;border:none;border-radius:10px;padding:10px 22px;font-weight:800;font-family:inherit;cursor:pointer;box-shadow:0 4px 0 #b9c7da;">✕ إغلاق (Esc)</button>
   </div>
@@ -962,15 +971,30 @@ function footerHTML(){
 function todayLabel(){
   return new Date().toLocaleDateString('ar-SA-u-ca-gregory', {year:'numeric', month:'long', day:'numeric'});
 }
-function doPrint(innerHTML, landscape){
-  const pageCss = `<style>@page{size:A4 ${landscape?'landscape':'portrait'};margin:9mm;}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}</style>`;
-  const inner = `<div style="font-family:'Tajawal',sans-serif;direction:rtl;">${innerHTML}</div>`;
-  document.getElementById('print-report').innerHTML = pageCss + inner;
-  const pv = document.getElementById('print-preview-content'), ov = document.getElementById('printPreviewOverlay');
-  if(!pv || !ov){ confirmPrintNow(); return; }
-  pv.innerHTML = `<div class="pv-sheet ${landscape?'landscape':''}">${inner}</div>`;
-  ov.style.display='block'; ov.scrollTop=0; document.body.style.overflow='hidden';
+function doPrint(html, landscape){
+  _pv.html = html;
+  _pv.orient = landscape ? 'landscape' : 'portrait';   // الافتراضي حسب نوع التقرير، ويمكن تغييره من شريط المعاينة
+  renderPrintPreview();
+  const ov = document.getElementById('printPreviewOverlay');
+  if(!ov){ confirmPrintNow(); return; }
+  ov.style.display = 'block'; ov.scrollTop = 0; document.body.style.overflow = 'hidden';
 }
+const _pv = {html:'', orient:'portrait', margin:9, scale:100, paper:'A4'};
+function renderPrintPreview(){
+  const land = _pv.orient==='landscape';
+  const css = `<style>@page{size:${_pv.paper} ${_pv.orient};margin:${_pv.margin}mm;}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}</style>`;
+  const inner = `<div style="font-family:'Tajawal',sans-serif;direction:rtl;zoom:${_pv.scale/100};">${_pv.html}</div>`;
+  const pr = document.getElementById('print-report'); if(pr) pr.innerHTML = css + inner;
+  const pc = document.getElementById('print-preview-content');
+  if(pc){
+    const dims = _pv.paper==='A3' ? (land?[420,297]:[297,420]) : (land?[297,210]:[210,297]);
+    pc.innerHTML = `<div class="pv-sheet" style="width:${dims[0]}mm;min-height:${dims[1]}mm;padding:${_pv.margin}mm;">${inner}</div>`;
+  }
+  const set=(id,v)=>{ const e=document.getElementById(id); if(e) e.value=v; };
+  set('pvOrient',_pv.orient); set('pvMargin',_pv.margin); set('pvScale',_pv.scale); set('pvPaper',_pv.paper);
+  const sl=document.getElementById('pvScaleLbl'); if(sl) sl.textContent = _pv.scale+'٪'.replace(/[0-9]/g,d=>d);
+}
+function pvSet(k,v){ _pv[k] = (k==='margin'||k==='scale') ? Number(v) : v; renderPrintPreview(); }
 function confirmPrintNow(){
   const container = document.getElementById('print-report');
   const imgs = Array.from(container.querySelectorAll('img'));

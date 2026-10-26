@@ -3,7 +3,7 @@
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id' + Math.random().toString(36).slice(2));
   const clone = o => JSON.parse(JSON.stringify(o));
   function seed() {
-    const D = { schools: [], sections: [], staff: [], memberships: [], classes: [], subjects: [], timetable_versions: [], timetable_slots: [], weeks: [], plan_entries: [], notes: [], audit_log: [] };
+    const D = { extra_pages: [], join_codes: [], schools: [], sections: [], staff: [], memberships: [], classes: [], subjects: [], timetable_versions: [], timetable_slots: [], weeks: [], plan_entries: [], notes: [], audit_log: [] };
     const sch = { id: uid(), name: 'مدارس دينا العالمية', term_label: 'الفصل الدراسي الأول · العام الدراسي ١٤٤٨هـ' }; D.schools.push(sch);
     const g = { id: uid(), school_id: sch.id, name: 'قسم البنات', short_name: 'البنات', days: 5, periods: 7, sort: 1 };
     const b = { id: uid(), school_id: sch.id, name: 'قسم البنين', short_name: 'البنين', days: 5, periods: 7, sort: 2 };
@@ -49,6 +49,7 @@
     });
     const ret = D.plan_entries.find(e => e.status === 'submitted'); if (ret) { ret.status = 'returned'; ret.review_note = 'يرجى تحديد رقم الصفحة في الواجب'; }
     D.notes.push({ id: uid(), week_id: D.weeks[0].id, class_id: null, placement: 'day', day: 3, title: 'تنبيه', body: 'اختبار قصير في الرياضيات يوم الأربعاء', created_at: new Date().toISOString() });
+    D.join_codes.push({ code: 'DEMOJOIN', section_id: g.id, role: 'teacher', active: true, uses: 0 });
     return { D, owner, sup, T };
   }
 
@@ -139,6 +140,29 @@
       updateSection: (id, p) => wait(upd('sections', id, p)),
       updateSchool: (id, p) => wait(upd('schools', id, p)),
       audit: () => wait(clone(D.audit_log.slice(0, 200))),
+      extraPages: w => wait(pick('extra_pages', x => x.week_id === w).sort((a, b) => (a.sort || 0) - (b.sort || 0))),
+      addExtraPage: r => wait(ins('extra_pages', { sort: 0, position: 'end', content: {}, ...r, created_by: meId })),
+      updateExtraPage: (id, p) => wait(upd('extra_pages', id, p)),
+      deleteExtraPage: id => wait(del('extra_pages', x => x.id === id)),
+      joinCodes: () => wait(clone(D.join_codes)),
+      createJoinCode: (section_id, role) => wait(ins('join_codes', { code: 'DEMO' + Math.random().toString(36).slice(2, 8).toUpperCase(), section_id, role, active: true, uses: 0 })),
+      updateJoinCode: (code, p) => { const x = D.join_codes.find(j => j.code === code); Object.assign(x, p); return wait(clone(x)); },
+      async joinInfo(code) { const j = D.join_codes.find(x => x.code === code && x.active); if (!j) return null; return wait({ section: find('sections', j.section_id).name, school: D.schools[0].name, role: j.role }); },
+      async joinWithCode(code, name, email) {
+        const j = D.join_codes.find(x => x.code === code && x.active); if (!j) throw new Error('رابط الانضمام غير صالح أو أُوقف');
+        if (D.staff.some(s => s.email === email.toLowerCase())) throw new Error('هذا البريد مسجّل مسبقاً — سجّل الدخول به');
+        const p = ins('staff', { school_id: D.schools[0].id, user_id: uid(), full_name: name, email: email.toLowerCase(), active: true, is_owner: false });
+        D.memberships.push({ id: uid(), staff_id: p.id, section_id: j.section_id, role: j.role }); j.uses++; accounts[email.toLowerCase()] = p.id; return wait({ ok: true });
+      },
+      async claim(c, s, release) {
+        const cl = find('classes', c); const v = D.timetable_versions.find(x => x.section_id === cl.section_id && x.status === 'approved'); let n = 0;
+        const cur = (D.timetable_slots.find(x => x.version_id === v.id && x.class_id === c && x.subject_id === s && x.teacher_id) || {}).teacher_id;
+        if (!release && cur && cur !== meId) throw new Error('هذه المادة مسندة لمعلم آخر — تواصل مع الإدارة');
+        D.timetable_slots.forEach(x => { if (x.version_id === v.id && x.class_id === c && x.subject_id === s) x.teacher_id = release ? null : meId; });
+        D.plan_entries.forEach(e => { const w = find('weeks', e.week_id); if (w.status === 'open' && e.class_id === c && e.subject_id === s && (release ? e.teacher_id === meId : !e.teacher_id)) { e.teacher_id = release ? null : meId; n++; } });
+        return wait({ entries: n });
+      },
+      async approvedSlots(section) { const v = D.timetable_versions.find(x => x.section_id === section && x.status === 'approved'); return wait(v ? pick('timetable_slots', x => x.version_id === v.id) : []); },
       reloadStaff: () => wait(clone(D.staff)),
       reloadMemberships: () => wait(clone(D.memberships)),
       reloadSubjects: () => wait(clone(D.subjects)),

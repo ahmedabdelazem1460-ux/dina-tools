@@ -59,7 +59,7 @@
   };
 
   // ---------- الحالة ----------
-  const S = { me: null, school: null, sections: [], memberships: [], staff: [], subjects: [], sectionId: null, classes: [], weeks: [], weekId: null, entries: [], notes: [], view: null };
+  const S = { extraPages: [], me: null, school: null, sections: [], memberships: [], staff: [], subjects: [], sectionId: null, classes: [], weeks: [], weekId: null, entries: [], notes: [], view: null };
   window.S = S;
   const LS = { get(k) { try { return localStorage.getItem('dwp_' + k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem('dwp_' + k, v); } catch (e) { } } };
   const section = () => S.sections.find(s => s.id === S.sectionId);
@@ -170,8 +170,8 @@
   }
   async function loadWeek() {
     if (!S.weekId) { S.entries = []; S.notes = []; return; }
-    const [e, n] = await Promise.all([api.entries(S.weekId), api.notes(S.weekId)]);
-    S.entries = e; S.notes = n;
+    const [e, n, x] = await Promise.all([api.entries(S.weekId), api.notes(S.weekId), api.extraPages(S.weekId).catch(() => [])]);
+    S.entries = e; S.notes = n; S.extraPages = x;
   }
   async function refreshPeople() { const [st, me, su] = await Promise.all([api.reloadStaff(), api.reloadMemberships(), api.reloadSubjects()]); S.staff = st; S.memberships = me; S.subjects = su; }
 
@@ -201,15 +201,28 @@
       <button class="userbtn" id="ub"><span class="avatar">${esc((S.me.full_name.replace(/^(أ\.|Ms\.|Mr\.|د\.)\s*/, '')[0]) || '؟')}</span><span class="small" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.me.full_name)}</span></button>
     </div></header>
     <nav class="nav" id="nav"></nav>
-    <main id="main"></main>`;
+    <main id="main"></main><nav class="bnav" id="bnav" aria-label="التنقل"></nav>`;
     $('#secSel').onchange = async e => { S.sectionId = e.target.value; LS.set('section', S.sectionId); $('#main').innerHTML = '<div class="spinner"></div>'; await loadSection(); shell(); route(); };
     $('#weekSel').onchange = async e => { S.weekId = e.target.value; LS.set('week_' + S.sectionId, S.weekId); $('#main').innerHTML = '<div class="spinner"></div>'; await loadWeek(); route(); };
     $('#ub').onclick = e => { e.stopPropagation(); userMenu(); };
     renderNav();
   }
+  function moreSheet(items) {
+    const o = document.createElement('div'); o.className = 'ovl'; o.style.placeItems = 'end stretch'; o.style.padding = '0';
+    o.innerHTML = `<div class="sheet" role="dialog" aria-label="المزيد">${items.map(([k, l]) => `<a href="#/${k}" class="${S.view === k ? 'on' : ''}">${I[k]}<span>${l}</span></a>`).join('')}</div>`;
+    document.body.appendChild(o); o.onclick = e => { if (e.target === o || e.target.closest('a')) o.remove(); };
+  }
   function renderNav() {
     const myCount = S.entries.filter(e => e.teacher_id === S.me.id && required(e) && !filled(e)).length;
-    $('#nav').innerHTML = NAV.filter(n => n[2]()).map(([k, l]) => `<a href="#/${k}" class="${S.view === k ? 'on' : ''}">${I[k]}<span>${l}</span>${k === 'my' && myCount ? `<span class="cnt">${AR(myCount)}</span>` : ''}</a>`).join('');
+    const items = NAV.filter(n => n[2]());
+    $('#nav').innerHTML = items.map(([k, l]) => `<a href="#/${k}" class="${S.view === k ? 'on' : ''}" ${S.view === k ? 'aria-current="page"' : ''}>${I[k]}<span>${l}</span>${k === 'my' && myCount ? `<span class="cnt">${AR(myCount)}</span>` : ''}</a>`).join('');
+    const bn = $('#bnav'); if (bn) {
+      const prim = items.length > 5 ? items.slice(0, 4) : items, rest = items.length > 5 ? items.slice(4) : [];
+      const SHORT = { dash: 'المتابعة', classes: 'الفصول', timetable: 'الجدول', builder: 'الجدول الآلي', nisab: 'النصاب', dev: 'المطوّر' };
+      bn.innerHTML = prim.map(([k, l]) => `<a href="#/${k}" class="${S.view === k ? 'on' : ''}">${I[k]}<span>${SHORT[k] || l}</span></a>`).join('') +
+        (rest.length ? `<button type="button" id="moreBtn" class="${rest.some(r => r[0] === S.view) ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg><span>المزيد</span></button>` : '');
+      const mb = $('#moreBtn'); if (mb) mb.onclick = () => moreSheet(rest);
+    }
   }
   function userMenu() {
     const old = $('.menu'); if (old) return old.remove();
@@ -247,6 +260,64 @@
   // =====================================================================
   //  بوابة المعلم — خطتي
   // =====================================================================
+  // ---------- اختيار المعلم لمواده وفصوله ----------
+  async function claimView(root, first) {
+    root.innerHTML = '<div class="spinner"></div>';
+    let slots = []; try { slots = await api.approvedSlots(S.sectionId); } catch (e) { toast(apiMsg(e), 'err'); }
+    const pairs = {};
+    slots.filter(x => x.subject_id && !(subj(x.subject_id) || {}).is_activity).forEach(x => { const k = x.class_id + '|' + x.subject_id; (pairs[k] = pairs[k] || { c: x.class_id, s: x.subject_id, n: 0, t: x.teacher_id }).n++; if (x.teacher_id) pairs[k].t = x.teacher_id; });
+    const bySub = {}; Object.values(pairs).forEach(p => (bySub[p.s] = bySub[p.s] || []).push(p));
+    const mineN = Object.values(pairs).filter(p => p.t === S.me.id).length;
+    root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>${first ? 'أهلاً ' + esc(S.me.full_name) + ' — اختر موادك وفصولك' : 'موادي وفصولي'}</h2>
+      <p class="sub" style="margin:2px 0 0">اضغط على كل مادة تدرّسها في كل فصل لتظهر حصصها في «خطتي». المادة المسندة لمعلم آخر لا يمكن اختيارها — تواصل مع الإدارة إن كان ذلك خطأ.</p></div>
+      ${mineN ? `<button class="btn" id="goMy">${I.my} الانتقال إلى خطتي (${cnt(mineN, 'مادة', 'مواد')})</button>` : ''}</div>
+      <input class="in" id="cq" placeholder="ابحث عن مادتك، مثل: الرياضيات" style="max-width:340px;margin-bottom:14px">
+      <div id="cg"></div></div>`;
+    const draw = () => {
+      const q = normKey($('#cq', root).value);
+      $('#cg', root).innerHTML = Object.entries(bySub).sort((a, b) => subjName(a[0]).localeCompare(subjName(b[0]), 'ar')).filter(([sid]) => !q || normKey(subjName(sid)).includes(q)).map(([sid, list]) => `<h3 style="margin:16px 0 8px">${esc(subjName(sid))}</h3><div class="claim-grid">${list.sort((a, b) => (cls(a.c)?.sort ?? 0) - (cls(b.c)?.sort ?? 0)).map(p => { const st = p.t === S.me.id ? 'mine' : p.t ? 'taken' : 'free'; return `<button class="claim ${st}" data-c="${p.c}" data-s="${p.s}" data-st="${st}" ${st === 'taken' ? 'aria-disabled="true"' : ''}><span class="c">${esc((cls(p.c) || {}).name || '')}<small>${cnt(p.n, 'حصة', 'حصص')} أسبوعياً${st === 'taken' ? ' · ' + esc(personName(p.t)) : ''}</small></span>${st === 'mine' ? `<span class="pill st-approved">${I.check.replace('<svg', '<svg style="width:14px;height:14px"')} لي</span>` : st === 'free' ? '<span class="pill st-draft">اختيار</span>' : '<span class="pill st-empty">مسندة</span>'}</button>`; }).join('')}</div>`).join('') || emptyBox('لا توجد مواد مطابقة');
+      $$('.claim', root).forEach(b => b.onclick = () => run(null, async () => {
+        const st = b.dataset.st; if (st === 'taken') return toast('هذه المادة مسندة لمعلم آخر — تواصل مع الإدارة');
+        if (st === 'mine' && !(await confirmBox('إلغاء اختيار هذه المادة في هذا الفصل؟ ستختفي حصصها غير المكتوبة من خطتك.', 'إلغاء الاختيار', true))) return;
+        await api.claim(b.dataset.c, b.dataset.s, st === 'mine');
+        const p = pairs[b.dataset.c + '|' + b.dataset.s]; p.t = st === 'mine' ? null : S.me.id;
+        await loadWeek(); renderNav(); draw(); toast(st === 'mine' ? 'أُلغي الاختيار' : 'أُضيفت إلى خطتك', 'ok');
+        const g = $('#goMy', root); if (!g) claimView(root, false);
+      }));
+    };
+    $('#cq', root).oninput = draw; draw();
+    const g = $('#goMy', root); if (g) g.onclick = () => VIEWS.my(root);
+  }
+
+  // ---------- الانضمام برابط ----------
+  async function joinScreen(code) {
+    $('#app').innerHTML = '<div class="spinner"></div>';
+    let info = null; try { info = await api.joinInfo(code); } catch (e) { }
+    const bad = !info;
+    $('#app').innerHTML = `<div class="login"><div class="art"><img src="assets/logo_white.svg" alt="مدارس دينا العالمية">
+      <div><h1>انضم إلى<br>منصة دينا</h1><p>${bad ? '' : `أنشئ حسابك في ${esc(info.section)} لتكتب خطتك الأسبوعية وترسلها للمراجعة.`}</p></div><div class="small" style="color:#8FB3D9">رحلتهم الكبرى... تبدأ من هنا</div></div>
+      <div class="form"><form class="box card" id="jf">
+        ${bad ? `<h2>الرابط غير صالح</h2><p class="sub">رابط الانضمام غير صحيح أو أوقفته الإدارة. اطلب رابطاً جديداً، أو سجّل الدخول إن كان لديك حساب.</p><a class="btn" href="${location.pathname}">تسجيل الدخول</a>` : `
+        <h2>إنشاء حساب — ${esc(info.section)}</h2><p class="sub">${esc(info.school)} · ${info.role === 'supervisor' ? 'مشرف' : 'معلم'}</p>
+        <div class="field"><label for="jn">الاسم كما يظهر في الخطة</label><input class="in" id="jn" required placeholder="أ. الاسم الثلاثي" autocomplete="name"></div>
+        <div class="field"><label for="je">البريد الإلكتروني (المدرسي إن وُجد)</label><input class="in" id="je" type="email" dir="ltr" required autocomplete="username"></div>
+        <div class="field"><label for="jp">كلمة مرور جديدة (٨ أحرف على الأقل)</label><input class="in" id="jp" type="password" dir="ltr" minlength="8" required autocomplete="new-password"></div>
+        <div class="field"><label for="jp2">أعد كتابة كلمة المرور</label><input class="in" id="jp2" type="password" dir="ltr" minlength="8" required autocomplete="new-password"></div>
+        <div class="err-line" id="jerr" role="alert"></div>
+        <button class="btn" style="width:100%;padding:13px" id="jb">إنشاء الحساب والدخول</button>
+        <p class="small muted" style="margin-top:14px">لديك حساب؟ <a href="${location.pathname}">سجّل الدخول</a></p>`}
+      </form></div></div>`;
+    if (bad) return;
+    $('#jf').onsubmit = async e => {
+      e.preventDefault(); $('#jerr').textContent = '';
+      const n = $('#jn').value.trim(), em = $('#je').value.trim(), p1 = $('#jp').value, p2 = $('#jp2').value;
+      if (p1 !== p2) { $('#jerr').textContent = 'كلمتا المرور غير متطابقتين'; return; }
+      const b = $('#jb'); b.disabled = true; b.textContent = 'جارٍ إنشاء الحساب…';
+      try { await api.joinWithCode(code, n, em, p1); await api.signIn(em, p1); history.replaceState(null, '', location.pathname + (DEMO ? '?demo=1' : '') + '#/my'); await start(); toast('أُنشئ حسابك — اختر موادك وفصولك', 'ok'); }
+      catch (err) { $('#jerr').textContent = apiMsg(err); b.disabled = false; b.textContent = 'إنشاء الحساب والدخول'; }
+    };
+  }
+
   VIEWS.my = function (root) {
     const w = week();
     if (!w) { root.innerHTML = `<div class="card">${emptyBox('لا يوجد أسبوع مفتوح حالياً', 'سيظهر هنا عند فتح الإدارة لأسبوع جديد.')}</div>`; return; }
@@ -254,9 +325,7 @@
     const dates = weekDates(w, section().days);
     const open = w.status === 'open';
     const filter = LS.get('myfilter') || 'all';
-    if (!mine.length) {
-      root.innerHTML = `<div class="card">${emptyBox('لا توجد حصص مسندة إليك في هذا الأسبوع', 'إذا كان هذا غير صحيح، اطلب من الإدارة إسناد موادك في الجدول الدراسي.')}</div>`; return;
-    }
+    if (!mine.length) { claimView(root, true); return; }
     const req = mine.filter(required);
     const done = req.filter(filled).length;
     const sent = mine.filter(e => ['submitted', 'approved'].includes(e.status)).length;
@@ -266,6 +335,7 @@
     root.innerHTML = `
       <div class="head"><div class="grow"><h2 style="margin:0;font-size:24px;font-weight:800">خطتي — الأسبوع ${esc(w.word)}</h2>
         <p class="sub" style="margin:4px 0 0">${AR(dates[0])} : ${AR(dates[dates.length - 1])} · ${cnt(req.length, 'حصة', 'حصص')} مطلوبة · ${esc(section().name)}</p></div>
+        <button class="btn ghost sm" id="myClaim">${I.classes} موادي وفصولي</button>
         <div class="tabs" style="margin:0;border:0" id="flt">${[['all', 'الكل'], ['todo', 'غير مكتملة'], ['returned', 'مُعادة'], ['done', 'مكتملة']].map(([k, l]) => `<button data-f="${k}" class="${filter === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
       ${!open ? `<div class="notice warn">${I.lock} هذا الأسبوع ${WSTATUS[w.status]} — لا يمكن التعديل.</div>` : ''}
       ${late ? `<div class="notice bad">انتهى موعد التسليم (${fmtDT(w.deadline)}) وما زالت خطتك غير مكتملة.</div>` : (dl && open ? `<div class="notice info">آخر موعد للتسليم: <b>${fmtDT(w.deadline)}</b></div>` : '')}
@@ -277,6 +347,7 @@
         ${open ? `<button class="btn sky" id="submitW">${I.send} إرسال للمراجعة</button>` : ''}
       </div></div>`;
     $$('#flt button', root).forEach(b => b.onclick = () => { LS.set('myfilter', b.dataset.f); VIEWS.my(root); });
+    $('#myClaim', root).onclick = () => claimView(root, false);
     const days = $('#days', root);
     for (let d = 0; d < section().days; d++) {
       const hol = holidayOf(d);
@@ -368,25 +439,52 @@
         <p class="sub" style="margin:4px 0 0">${esc(section().name)} · ${AR(weekDates(w)[0])} : ${AR(weekDates(w)[4])} · <span class="pill st-${w.status}">${WSTATUS[w.status]}</span></p></div>
         ${perm('export') ? `<a class="btn sky" href="#/export">${I.export} التصدير</a>` : ''}</div>
       <div class="grid g4">
-        <div class="kpi navy"><div class="k">نسبة الإنجاز</div><div class="v">${AR(pct(all.filled, all.total))}<small>٪</small></div><div class="d">${AR(all.filled)} من ${cnt(all.total, 'حصة', 'حصص')}</div></div>
-        <div class="kpi"><div class="k">معتمدة</div><div class="v">${AR(all.approved)}</div><div class="d">مُرسلة بانتظار المراجعة: ${AR(all.submitted)}</div></div>
-        <div class="kpi"><div class="k">مُعادة للتعديل</div><div class="v" style="color:var(--warn)">${AR(all.returned)}</div><div class="d">معلمون لم يكملوا: ${AR(lateT.length)}</div></div>
-        <div class="kpi"><div class="k">المتبقي على موعد التسليم</div><div class="v" style="${left != null && left < 0 ? 'color:var(--bad)' : ''}">${leftTxt}</div><div class="d">${dl ? fmtDT(w.deadline) : 'لم يُحدَّد موعد'}</div></div>
+        <button class="kpi navy btnlike" data-drill="todo"><span class="more">التفاصيل</span><div class="k">نسبة الإنجاز</div><div class="v">${AR(pct(all.filled, all.total))}<small>٪</small></div><div class="d">${AR(all.filled)} من ${cnt(all.total, 'حصة', 'حصص')}</div></button>
+        <button class="kpi btnlike" data-drill="submitted"><span class="more">التفاصيل</span><div class="k">معتمدة</div><div class="v">${AR(all.approved)}</div><div class="d">مُرسلة بانتظار المراجعة: ${AR(all.submitted)}</div></button>
+        <button class="kpi btnlike" data-drill="returned"><span class="more">التفاصيل</span><div class="k">مُعادة للتعديل</div><div class="v" style="color:var(--warn)">${AR(all.returned)}</div><div class="d">معلمون لم يكملوا: ${AR(lateT.length)}</div></button>
+        <button class="kpi btnlike" data-drill="late"><span class="more">التفاصيل</span><div class="k">المتبقي على موعد التسليم</div><div class="v" style="${left != null && left < 0 ? 'color:var(--bad)' : ''}">${leftTxt}</div><div class="d">${dl ? fmtDT(w.deadline) : 'لم يُحدَّد موعد'}</div></button>
       </div>
-      ${unassigned.length ? `<div class="notice warn" style="margin-top:16px">${cnt(unassigned.length, 'حصة', 'حصص')} بلا معلم مُسند — لن تظهر لأي معلم. ${anyPerm('timetable_edit') ? '<a href="#/timetable" data-tab="assign">إسناد المعلمين</a>' : ''}</div>` : ''}
+      ${unassigned.length ? `<div class="notice warn" style="margin-top:16px">${cnt(unassigned.length, 'حصة', 'حصص')} بلا معلم مُسند — لن تظهر لأي معلم. <button class="btn ghost sm" data-drill="unassigned">عرض الحصص</button> ${anyPerm('timetable_edit') ? '<a href="#/timetable" data-tab="assign">إسناد المعلمين</a>' : ''}</div>` : ''}
       <div class="grid g2" style="margin-top:16px;align-items:start">
         <div class="card"><h3>الفصول</h3><div class="scroll"><table class="tbl"><thead><tr><th>الفصل</th><th style="width:34%">الإنجاز</th><th>مُرسلة</th><th>معتمدة</th><th>مُعادة</th></tr></thead><tbody>
           ${S.classes.filter(c => c.active).map(c => { const s = stats(S.entries.filter(e => e.class_id === c.id)); return `<tr class="click" data-c="${c.id}"><td><b>${esc(c.name)}</b></td><td><div class="row" style="flex-wrap:nowrap">${bar(s.filled, s.total)}<span class="small muted">${AR(pct(s.filled, s.total))}٪</span></div></td><td>${AR(s.submitted)}</td><td>${AR(s.approved)}</td><td>${s.returned ? `<span class="pill st-returned">${AR(s.returned)}</span>` : '—'}</td></tr>`; }).join('')}
         </tbody></table></div></div>
         <div class="card"><div class="head" style="margin-bottom:6px"><div class="grow"><h3 style="margin:0">المعلمون</h3><p class="sub" style="margin:2px 0 0">الأقل إنجازاً أولاً</p></div>${lateT.length ? `<button class="btn ghost sm" id="remindAll">${I.mail} تذكير غير المكتملين</button>` : ''}</div>
           <div class="scroll"><table class="tbl"><thead><tr><th>المعلم</th><th style="width:30%">الإنجاز</th><th>آخر تحديث</th><th></th></tr></thead><tbody>
-          ${teachers.length ? teachers.map(t => `<tr><td><b>${esc(t.p ? t.p.full_name : '—')}</b><div class="small faint">${cnt(t.classes, 'فصل', 'فصول')} · ${cnt(t.s.total, 'حصة', 'حصص')}</div></td><td><div class="row" style="flex-wrap:nowrap">${bar(t.s.filled, t.s.total)}<span class="small muted">${AR(t.s.filled)}/${AR(t.s.total)}</span></div></td><td class="small muted">${t.s.last ? fmtDT(t.s.last) : 'لم يبدأ'}</td><td>${t.s.filled < t.s.total && t.p && t.p.email ? `<a class="btn ghost sm" href="${remindLink([t.p])}" title="تذكير بالبريد">${I.mail}</a>` : (t.s.filled >= t.s.total ? `<span class="pill st-approved">${I.check.replace('<svg', '<svg style="width:14px;height:14px"')} مكتمل</span>` : '')}</td></tr>`).join('') : `<tr><td colspan="4">${emptyBox('لا يوجد معلمون مُسندون بعد')}</td></tr>`}
+          ${teachers.length ? teachers.map(t => `<tr class="click" data-t="${t.id}" tabindex="0"><td><b>${esc(t.p ? t.p.full_name : '—')}</b><div class="small faint">${cnt(t.classes, 'فصل', 'فصول')} · ${cnt(t.s.total, 'حصة', 'حصص')}</div></td><td><div class="row" style="flex-wrap:nowrap">${bar(t.s.filled, t.s.total)}<span class="small muted">${AR(t.s.filled)}/${AR(t.s.total)}</span></div></td><td class="small muted">${t.s.last ? fmtDT(t.s.last) : 'لم يبدأ'}</td><td>${t.s.filled < t.s.total && t.p && t.p.email ? `<a class="btn ghost sm" href="${remindLink([t.p])}" title="تذكير بالبريد" aria-label="تذكير ${esc(t.p.full_name)} بالبريد">${I.mail}</a>` : (t.s.filled >= t.s.total ? `<span class="pill st-approved">${I.check.replace('<svg', '<svg style="width:14px;height:14px"')} مكتمل</span>` : '')}</td></tr>`).join('') : `<tr><td colspan="4">${emptyBox('لا يوجد معلمون مُسندون بعد')}</td></tr>`}
           </tbody></table></div></div>
       </div>`;
     $$('tr[data-c]', root).forEach(r => r.onclick = () => { LS.set('cls', r.dataset.c); location.hash = '#/classes'; });
+    $$('[data-drill]', root).forEach(b => b.onclick = () => drill(b.dataset.drill));
+    $$('tr[data-t]', root).forEach(r => { const go = e => { if (e.target.closest('a')) return; drill('teacher', r.dataset.t); }; r.onclick = go; r.onkeydown = e => { if (e.key === 'Enter') go(e); }; });
+    $$('tr[data-c]', root).forEach(r => r.tabIndex = 0);
     const ra = $('#remindAll', root); if (ra) ra.onclick = () => { location.href = remindLink(lateT.map(t => t.p).filter(p => p && p.email)); };
     const at = $('[data-tab=assign]', root); if (at) at.onclick = () => LS.set('tttab', 'assign');
   };
+  // ---------- تفاصيل عند النقر ----------
+  function drill(kind, arg) {
+    const w = week();
+    const F = { todo: ['غير المكتمل', e => required(e) && !filled(e)], submitted: ['بانتظار المراجعة', e => e.status === 'submitted'], approved: ['المعتمد', e => e.status === 'approved'], returned: ['المُعاد للتعديل', e => e.status === 'returned'], unassigned: ['بلا معلم', e => required(e) && !e.teacher_id], all: ['الكل', e => !!e.subject_id] };
+    let base = S.entries, title;
+    if (kind === 'teacher') { base = S.entries.filter(e => e.teacher_id === arg); title = 'خطة ' + personName(arg); kind = 'todo'; }
+    else if (kind === 'late') {
+      const lt = {}; S.entries.filter(e => required(e) && e.teacher_id && !filled(e)).forEach(e => lt[e.teacher_id] = (lt[e.teacher_id] || 0) + 1);
+      const list = Object.entries(lt).sort((a, b) => b[1] - a[1]);
+      const m = modal(`<h3>المعلمون الذين لم يكملوا — الأسبوع ${esc(w.word)}</h3><p class="sub">${w.deadline ? 'آخر موعد: ' + fmtDT(w.deadline) : 'لم يُحدَّد موعد للتسليم'}</p>
+        <div class="scroll drill"><table class="tbl"><thead><tr><th>المعلم</th><th>حصص ناقصة</th><th></th></tr></thead><tbody>${list.map(([id, n]) => `<tr class="click" data-t="${id}"><td><b>${esc(personName(id))}</b></td><td>${cnt(n, 'حصة', 'حصص')}</td><td>${(person(id) || {}).email ? `<a class="btn ghost sm" href="${remindLink([person(id)])}" aria-label="تذكير بالبريد">${I.mail}</a>` : ''}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">الجميع أكمل خطته</td></tr>'}</tbody></table></div>`, { cls: 'wide' });
+      $$('tr[data-t]', m.el).forEach(r => r.onclick = e => { if (e.target.closest('a')) return; m.close(); drill('teacher', r.dataset.t); });
+      return;
+    } else title = F[kind][0] + ' — الأسبوع ' + w.word;
+    const m = modal(`<h3>${esc(title)}</h3><div class="chip-filter" id="dfl">${Object.entries(F).filter(([k]) => k !== 'unassigned' || !arg).map(([k, [l]]) => `<button data-f="${k}" class="${k === kind ? 'on' : ''}">${l} <span class="small">(${AR(base.filter(F[k][1]).length)})</span></button>`).join('')}</div><div class="scroll drill" style="max-height:60vh"><table class="tbl"><thead><tr><th>الفصل</th><th>اليوم</th><th>الحصة</th><th>المادة</th>${arg ? '' : '<th>المعلم</th>'}<th>الموضوع</th><th>الحالة</th></tr></thead><tbody id="dtb"></tbody></table></div>`, { cls: 'wide' });
+    const draw = k => {
+      $$('#dfl button', m.el).forEach(b => b.classList.toggle('on', b.dataset.f === k));
+      const list = base.filter(F[k][1]).sort((a, b) => (cls(a.class_id)?.sort ?? 0) - (cls(b.class_id)?.sort ?? 0) || a.day - b.day || a.period - b.period);
+      $('#dtb', m.el).innerHTML = list.slice(0, 400).map(e => `<tr class="click" data-c="${e.class_id}"><td><b>${esc((cls(e.class_id) || {}).name || '')}</b></td><td>${DAYS[e.day]}</td><td>${AR(e.period + 1)}</td><td>${esc(subjName(e.subject_id))}</td>${arg ? '' : `<td class="small">${esc(personName(e.teacher_id) || '—')}</td>`}<td class="small">${esc(e.topic) || '<span class="faint">—</span>'}</td><td>${pill(e.status)}</td></tr>`).join('') || `<tr><td colspan="7">${emptyBox('لا توجد حصص في هذا التصنيف')}</td></tr>`;
+      $$('tr[data-c]', m.el).forEach(r => r.onclick = () => { m.close(); LS.set('cls', r.dataset.c); location.hash = '#/classes'; if (S.view === 'classes') route(); });
+    };
+    $$('#dfl button', m.el).forEach(b => b.onclick = () => draw(b.dataset.f)); draw(kind);
+  }
+  window.APP_DRILL = drill;
   function remindLink(people) {
     const w = week();
     const to = people.map(p => p.email).join(',');
@@ -419,7 +517,8 @@
         </div></div>
       <div class="scroll"><table class="cgrid"><thead><tr>${reviewer ? '<th style="width:34px"><input type="checkbox" id="selAll" aria-label="تحديد الكل"></th>' : ''}<th>اليوم</th><th>الحصة</th><th style="width:15%">المادة / المعلم</th><th style="width:30%">الموضوع</th><th style="width:22%">الواجب</th><th style="width:14%">ملاحظة</th><th>الحالة</th></tr></thead><tbody id="cgb"></tbody></table></div>
     </div>
-    <div class="card" id="notesCard"></div>`;
+    <div class="card" id="notesCard"></div>
+    <div class="card" id="xpCard"></div>`;
     const tb = $('#cgb', cv);
     for (let d = 0; d < section().days; d++) {
       const hol = holidayOf(d);
@@ -458,6 +557,7 @@
       };
     }
     renderNotes($('#notesCard', cv), c, () => VIEWS.classes(root));
+    if (VIEWS._xp) VIEWS._xp($('#xpCard', cv), c, () => VIEWS.classes(root));
   };
 
   function renderNotes(card, c, refresh) {
@@ -465,7 +565,7 @@
     const mine = S.notes.filter(n => n.class_id === c.id || n.class_id === null);
     const where = n => n.placement === 'extra' ? 'صفحة إضافية' : `ملاحظات يوم ${DAYS[n.day] || ''}`;
     card.innerHTML = `<div class="head"><div class="grow"><h3 style="margin:0">ملاحظات الملف</h3><p class="sub" style="margin:2px 0 0">تظهر في صندوق «ملاحظات اليوم» أسفل جدول اليوم، أو في صفحة «ملاحظات وتنبيهات» بعد الخميس.</p></div>${canN && w.status !== 'published' ? `<button class="btn sm" id="addN">${I.plus} إضافة ملاحظة</button>` : ''}</div>
-      ${mine.length ? `<table class="tbl"><thead><tr><th>الموضع</th><th>النطاق</th><th>العنوان</th><th>النص</th><th></th></tr></thead><tbody>${mine.map(n => `<tr><td>${where(n)}</td><td>${n.class_id ? 'هذا الفصل' : '<span class="pill st-submitted">جميع الفصول</span>'}</td><td><b>${esc(n.title)}</b></td><td style="white-space:pre-line">${esc(n.body)}</td><td>${canN ? `<button class="btn ghost sm" data-en="${n.id}">تعديل</button> <button class="btn bad sm" data-dn="${n.id}">حذف</button>` : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="muted small">لا توجد ملاحظات لهذا الفصل. ملاحظات المعلمين على الحصص تُضاف تلقائياً إلى ملاحظات اليوم.</p>'}`;
+      ${mine.length ? `<div class="scroll"><table class="tbl"><thead><tr><th>الموضع</th><th>النطاق</th><th>العنوان</th><th>النص</th><th></th></tr></thead><tbody>${mine.map(n => `<tr><td>${where(n)}</td><td>${n.class_id ? 'هذا الفصل' : '<span class="pill st-submitted">جميع الفصول</span>'}</td><td><b>${esc(n.title)}</b></td><td style="white-space:pre-line">${esc(n.body)}</td><td>${canN ? `<button class="btn ghost sm" data-en="${n.id}">تعديل</button> <button class="btn bad sm" data-dn="${n.id}">حذف</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted small">لا توجد ملاحظات لهذا الفصل. ملاحظات المعلمين على الحصص تُضاف تلقائياً إلى ملاحظات اليوم.</p>'}`;
     const edit = n => {
       n = n || { class_id: c.id, placement: 'day', day: 0, title: '', body: '' };
       const m = modal(`<h3>${n.id ? 'تعديل' : 'إضافة'} ملاحظة</h3>
@@ -492,7 +592,8 @@
 
   // ---------- تشغيل ----------
   window.addEventListener('DOMContentLoaded', async () => {
-    try { const s = await api.session(); if (s) await start(); else loginScreen(); } catch (e) { loginScreen(apiMsg(e)); }
+    const jc = new URLSearchParams(location.search).get('join');
+    try { if (jc) { await api.signOut().catch(() => { }); return joinScreen(jc); } const s = await api.session(); if (s) await start(); else loginScreen(); } catch (e) { loginScreen(apiMsg(e)); }
   });
   window.addEventListener('beforeunload', e => { if (pending.size) { flushSaves(); e.preventDefault(); e.returnValue = ''; } });
 })();

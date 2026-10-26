@@ -108,11 +108,12 @@
       <div class="head"><div class="grow"><h2>لوحة المطوّر</h2><p class="sub" style="margin:2px 0 0">تظهر لحسابك فقط. كل صلاحيات النظام لكل المستخدمين — أي تغيير هنا يُحفظ فوراً ويُسجَّل في سجل العمليات.</p></div>
         <select class="in" id="dsec" style="max-width:220px">${S.sections.map(s => `<option value="${s.id}" ${s.id === sid ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>
       <div class="grid g4" style="margin-bottom:16px">
-        <div class="kpi navy"><div class="k">المستخدمون في القسم</div><div class="v">${AR(S.memberships.filter(m => m.section_id === sid).length)}</div><div class="d">لديهم حساب دخول: ${AR(people.filter(p => p.user_id && mem(p.id)).length)}</div></div>
-        <div class="kpi"><div class="k">مديرو القسم</div><div class="v">${AR(S.memberships.filter(m => m.section_id === sid && m.role === 'admin').length)}</div><div class="d">مشرفون: ${AR(S.memberships.filter(m => m.section_id === sid && m.role === 'supervisor').length)}</div></div>
-        <div class="kpi"><div class="k">أداة النصاب</div><div class="v">${AR(count('can_use_nisab'))}</div><div class="d">مستخدم مُنح الصلاحية</div></div>
-        <div class="kpi"><div class="k">الجدول الآلي</div><div class="v">${AR(count('can_use_tt_builder'))}</div><div class="d">مستخدم مُنح الصلاحية</div></div>
+        <button class="kpi navy btnlike" data-dk="members"><span class="more">التفاصيل</span><div class="k">المستخدمون في القسم</div><div class="v">${AR(S.memberships.filter(m => m.section_id === sid).length)}</div><div class="d">لديهم حساب دخول: ${AR(people.filter(p => p.user_id && mem(p.id)).length)}</div></button>
+        <button class="kpi btnlike" data-dk="admins"><span class="more">التفاصيل</span><div class="k">مديرو القسم والمشرفون</div><div class="v">${AR(S.memberships.filter(m => m.section_id === sid && m.role === 'admin').length)}</div><div class="d">مشرفون: ${AR(S.memberships.filter(m => m.section_id === sid && m.role === 'supervisor').length)}</div></button>
+        <button class="kpi btnlike" data-dk="can_use_nisab"><span class="more">التفاصيل</span><div class="k">أداة النصاب</div><div class="v">${AR(count('can_use_nisab'))}</div><div class="d">مستخدم مُنح الصلاحية</div></button>
+        <button class="kpi btnlike" data-dk="can_use_tt_builder"><span class="more">التفاصيل</span><div class="k">الجدول الآلي</div><div class="v">${AR(count('can_use_tt_builder'))}</div><div class="d">مستخدم مُنح الصلاحية</div></button>
       </div>
+      <div class="sec-box" style="margin-bottom:14px"><b>من يملك كل صلاحية؟</b> <span class="small muted">اضغط على أي صلاحية لعرض أصحابها</span><div class="chip-filter" style="margin-top:8px">${ALLP().map(([k, l]) => `<button data-dk="${k}">${l} <span class="small">(${AR(count(k))})</span></button>`).join('')}</div></div>
       <div class="row" style="margin-bottom:10px"><input class="in" id="dq" placeholder="بحث بالاسم" style="max-width:260px"><label class="chk"><input type="checkbox" id="donly"> أعضاء القسم فقط</label></div>
       <div class="scroll" style="max-height:65vh"><table class="tbl" id="dt"><thead><tr><th>المستخدم</th><th>الدور</th>${ALLP().map(([k, l]) => `<th style="white-space:normal;min-width:84px;font-size:12px;text-align:center">${l}</th>`).join('')}</tr></thead><tbody></tbody></table></div>
       <p class="small muted">«مدير القسم» يملك كل صلاحيات القسم تلقائياً ما عدا الأداتين (النصاب والجدول الآلي) فتُمنحان صراحةً. حسابك (المالك) يملك كل شيء دائماً.</p></div>`;
@@ -136,6 +137,12 @@
         $$('[data-k]', tr).forEach(i => i.onchange = () => A.run(null, save));
       });
     };
+    $$('[data-dk]', root).forEach(b => b.onclick = () => {
+      const k = b.dataset.dk; const ms = S.memberships.filter(m => m.section_id === sid);
+      const list = k === 'members' ? ms : k === 'admins' ? ms.filter(m => m.role !== 'teacher') : ms.filter(m => m[k] || (m.role === 'admin' && !A.TOOL_PERMS.some(t => t[0] === k)));
+      const title = k === 'members' ? 'المستخدمون في القسم' : k === 'admins' ? 'مديرو القسم والمشرفون' : (ALLP().find(x => x[0] === k) || [, ''])[1];
+      A.modal(`<h3>${esc(title)} — ${esc(A.section().name)}</h3><div class="scroll" style="max-height:60vh"><table class="tbl"><thead><tr><th>المستخدم</th><th>الدور</th><th>الدخول</th></tr></thead><tbody>${list.map(m => { const p = A.person(m.staff_id) || {}; return `<tr><td><b>${esc(p.full_name || '')}</b><div class="small faint" dir="ltr" style="text-align:right">${esc(p.email || '')}</div></td><td>${ROLES[m.role]}</td><td>${p.user_id ? '<span class="pill st-approved">مفعّل</span>' : '<span class="pill st-empty">بلا حساب</span>'}</td></tr>`; }).join('') || '<tr><td colspan="3" class="muted">لا يوجد</td></tr>'}</tbody></table></div><p class="small muted">${S.me.is_owner ? 'حسابك (المالك) يملك كل الصلاحيات دائماً ولا يظهر هنا.' : ''}</p>`, { cls: 'wide' });
+    });
     $('#dq', root).oninput = draw; $('#donly', root).onchange = draw; draw();
   };
 })();

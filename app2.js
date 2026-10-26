@@ -6,6 +6,22 @@
   // =====================================================================
   //  التصدير
   // =====================================================================
+  // ---------- خيارات القالب ----------
+  const TEMPLATES = [
+    ['classic', 'هوية دينا — طولي', 'غلاف + صفحة لكل يوم (المعتمد)', { layout: 'daily', orientation: 'portrait' }, '<i style="inset:8px 30% 8px 30%;background:#fff"></i><i style="top:16px;left:34%;right:34%;height:10px;background:#082B5A"></i><i style="top:32px;left:34%;right:34%;height:44px;background:#3AB1DB;opacity:.5"></i>'],
+    ['classic-land', 'هوية دينا — عرضي', 'نفس التصميم بصفحات أفقية', { layout: 'daily', orientation: 'landscape' }, '<i style="inset:18px 12% 18px 12%;background:#fff"></i><i style="top:24px;left:16%;right:16%;height:8px;background:#082B5A"></i><i style="top:36px;left:16%;right:16%;height:30px;background:#3AB1DB;opacity:.5"></i>'],
+    ['overview', 'نظرة أسبوعية', 'الأسبوع كاملاً في صفحة عرضية واحدة', { layout: 'overview', orientation: 'landscape' }, '<i style="inset:18px 12% 18px 12%;background:#fff"></i><i style="top:24px;left:16%;width:10%;bottom:24px;right:auto;background:#082B5A"></i>' + [0, 1, 2, 3].map(k => `<i style="top:${26 + k * 11}px;left:28%;right:16%;height:7px;background:${k % 2 ? '#E4EBF5' : '#84B7E3'}"></i>`).join('')],
+  ];
+  function expOpts() { let o = {}; try { o = JSON.parse(A.LS.get('expopts') || '{}'); } catch (e) { } const t = TEMPLATES.find(x => x[0] === (o.tpl || 'classic')) || TEMPLATES[0]; return { tpl: t[0], ...t[3], ink: !!o.ink, cover: o.cover !== false, notes: o.notes !== false, extras: o.extras !== false }; }
+  function setExpOpts(p) { const o = { ...expOpts(), ...p }; A.LS.set('expopts', JSON.stringify({ tpl: o.tpl, ink: o.ink, cover: o.cover, notes: o.notes, extras: o.extras })); }
+  function optsPanel(box, onChange) {
+    const o = expOpts();
+    box.innerHTML = `<h3>قالب الطباعة والتصدير</h3><div class="tpl-grid">${TEMPLATES.map(([k, l, d, , pv]) => `<label class="tpl ${o.tpl === k ? 'on' : ''}"><input type="radio" name="tpl" value="${k}" ${o.tpl === k ? 'checked' : ''}><div class="pv">${pv}</div>${l}<small>${d}</small></label>`).join('')}</div>
+      <div class="row" style="margin-top:12px;gap:18px">${[['cover', 'صفحة الغلاف'], ['notes', 'ملاحظات اليوم'], ['extras', 'الصفحات الإضافية'], ['ink', 'موفّر للحبر (بلا خلفيات داكنة)']].map(([k, l]) => `<label class="chk"><input type="checkbox" data-o="${k}" ${o[k] ? 'checked' : ''}> ${l}</label>`).join('')}</div>`;
+    $$('input[name=tpl]', box).forEach(i => i.onchange = () => { setExpOpts({ tpl: i.value }); optsPanel(box, onChange); onChange && onChange(); });
+    $$('[data-o]', box).forEach(i => i.onchange = () => { setExpOpts({ [i.dataset.o]: i.checked }); onChange && onChange(); });
+  }
+  V._optsPanel = optsPanel;
   function buildDoc(c) {
     const w = A.week(), sec = A.section();
     const days = [], dayNotes = [], extra = [];
@@ -29,6 +45,8 @@
       info: { name: c.name, stage: c.stage, grade_word: c.grade_word, class_label: c.class_label },
       week: { word: w.word, term, dates: A.weekDates(w, sec.days), footer: term.replace(/العام الدراسي\s*/, '') },
       days, dayNotes, extra,
+      extraPages: (S.extraPages || []).filter(x => x.class_id === c.id || x.class_id === null),
+      opts: expOpts(),
     };
   }
   const fileName = c => `الخطة الأسبوعية للأسبوع ${A.week().word} - ${c.name}`;
@@ -39,7 +57,11 @@
       <p class="small muted" style="margin:8px 0 0">«طباعة / حفظ PDF» تعطي أعلى جودة (نص قابل للتحديد): اختر «حفظ بتنسيق PDF» في نافذة الطباعة. «تنزيل PDF» يحفظ مباشرة كصور عالية الدقة.</p>`, { cls: 'full', noFocus: true });
     const f = PlanExport.makeFrame(true); const box = m.el.querySelector('#pf');
     box.innerHTML = ''; box.appendChild(f);
-    await PlanExport.renderInto(f, buildDoc(c), fileName(c));
+    const op = document.createElement('div'); op.className = 'card'; op.style.cssText = 'padding:12px;margin-bottom:10px;box-shadow:none';
+    box.parentNode.insertBefore(op, box);
+    const draw = async () => { box.style.opacity = .4; await PlanExport.renderInto(f, buildDoc(c), fileName(c)); box.style.opacity = 1; };
+    optsPanel(op, draw); op.querySelector('h3').style.display = 'none';
+    await draw();
     m.el.querySelector('#pp').onclick = () => { f.contentWindow.focus(); f.contentWindow.print(); };
     m.el.querySelector('#pd').onclick = e => A.run(e.currentTarget, async () => A.download(await PlanExport.toPdfBlob(buildDoc(c), fileName(c)), fileName(c) + '.pdf'));
   };
@@ -51,11 +73,13 @@
     root.innerHTML = `<div class="card">
       <div class="head"><div class="grow"><h2>تصدير ملفات الأسبوع ${esc(w.word)}</h2><p class="sub" style="margin:2px 0 0">القالب: <b>هوية دينا ٢٠٢٦</b> (المعتمد) · ${esc(A.section().name)} · ${AR(rows.filter(ready).length)} من ${A.cnt(rows.length, 'فصل', 'فصول')} جاهز</p></div>
         <div class="row"><label class="chk"><input type="checkbox" id="onlyReady" checked> الجاهزة فقط</label><button class="btn" id="zipB">${I.down} تنزيل المحدد (ZIP)</button></div></div>
+      <div id="optsBox" class="sec-box" style="margin-bottom:14px"></div>
       <div class="notice info">الفصل «جاهز» عندما تكتمل حصصه (يُسمح بحصة واحدة ناقصة). الخانات الفارغة تظهر بعلامة «–». اسم الملف: <code class="k">${esc(fileName({ name: 'اسم الفصل' }))}.pdf</code></div>
       <div class="scroll"><table class="tbl"><thead><tr><th style="width:34px"><input type="checkbox" id="sa" checked></th><th>الفصل</th><th style="width:26%">الإنجاز</th><th>الحالة</th><th>معتمدة</th><th></th></tr></thead><tbody>
       ${rows.map(r => `<tr><td><input type="checkbox" data-x="${r.c.id}" ${ready(r) ? 'checked' : ''}></td><td><b>${esc(r.c.name)}</b></td><td><div class="row" style="flex-wrap:nowrap">${A.bar(r.s.filled, r.s.total)}<span class="small muted">${AR(r.s.filled)}/${AR(r.s.total)}</span></div></td><td>${ready(r) ? '<span class="pill st-approved">جاهز</span>' : '<span class="pill st-returned">غير مكتمل</span>'}</td><td>${AR(r.s.approved)}</td><td class="row" style="flex-wrap:nowrap"><button class="btn sky sm" data-pv="${r.c.id}">${I.eye} معاينة</button><button class="btn ghost sm" data-dl="${r.c.id}">${I.down} PDF</button></td></tr>`).join('')}
       </tbody></table></div>
       <div class="small muted" id="zipProg" style="margin-top:10px"></div></div>`;
+    optsPanel($('#optsBox', root));
     $('#sa', root).onchange = e => $$('[data-x]', root).forEach(i => i.checked = e.target.checked);
     $('#onlyReady', root).onchange = e => $$('[data-x]', root).forEach(i => { const r = rows.find(x => x.c.id === i.dataset.x); i.checked = e.target.checked ? ready(r) : true; });
     $$('[data-pv]', root).forEach(b => b.onclick = () => V._preview(A.cls(b.dataset.pv)));
@@ -364,6 +388,7 @@
     const fsec = A.LS.get('stsec') || 'all';
     box.innerHTML = `<div class="head"><div class="grow"><p class="sub" style="margin:0">أضف المعلمين وأنشئ حسابات دخولهم وحدد صلاحياتهم في كل قسم. يمكنك تفويض أي صلاحية (مثل تعديل الجدول أو اعتماده) لمعلم أو لحساب مكلّف.</p></div>
       <button class="btn" id="add1">${I.plus} إضافة موظف</button><button class="btn ghost" id="addN">إضافة جماعية</button></div>
+      <div id="joinBox"></div>
       <div class="row" style="margin-bottom:12px"><input class="in" id="q" placeholder="بحث بالاسم أو البريد" style="max-width:300px"><select class="in" id="fs" style="max-width:220px"><option value="all">كل الأقسام</option>${S.sections.map(s => `<option value="${s.id}" ${fsec === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}<option value="none" ${fsec === 'none' ? 'selected' : ''}>غير مضاف لقسم</option></select></div>
       <div class="scroll"><table class="tbl"><thead><tr><th>الاسم</th><th>البريد</th><th>الدخول</th><th>الأقسام والأدوار</th><th></th></tr></thead><tbody id="sb"></tbody></table></div>`;
     const draw = () => {
@@ -373,6 +398,7 @@
     };
     $('#q', box).oninput = draw; $('#fs', box).onchange = draw; draw();
     $('#add1', box).onclick = () => staffDialog(null, again);
+    if (V._joinPanel) V._joinPanel($('#joinBox', box));
     $('#addN', box).onclick = () => bulkDialog(again);
   }
   function staffDialog(p, again) {

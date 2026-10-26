@@ -117,6 +117,7 @@
       },
       joinWithCode2: (code, f) => sb.rpc('join_with_code_v2', { p_code: code, p_full_name: f.name, p_email: f.email, p_password: f.password, p_phone: f.phone || null, p_specialty: f.specialty || null, p_employee_no: f.employee_no || null }).then(ok),
       // ---- مزامنة Google Sheets
+      sheetPushUser: (week, rows) => sb.rpc('sheet_push_user', { p_week: week, p_rows: rows }).then(ok),
       requestSheetSync: (week, dir) => sb.rpc('request_sheet_sync', { p_week: week, p_dir: dir || 'pull' }).then(ok),
       syncCfg: () => T('sync_cfg').select('*').eq('id', 1).maybeSingle().then(ok),
       updateSyncCfg: p => T('sync_cfg').update({ ...p, updated_at: new Date().toISOString() }).eq('id', 1).select().single().then(ok),

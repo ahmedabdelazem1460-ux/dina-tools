@@ -18,6 +18,67 @@
   const sheetUrl = id => `https://docs.google.com/spreadsheets/d/${id}/edit`;
   A.syncLabel = w => w && w.sheet_synced_at ? `آخر مزامنة: <b>${A.fmtDT(w.sheet_synced_at)}</b>` : 'لم تتم مزامنة بعد';
 
+  // ---- سحب الشيت مباشرة من المتصفح (الملف مشارك بالرابط) — لا يحتاج سكربت جوجل
+  function parseCSV(t) {
+    const rows = []; let row = [], f = '', q = false;
+    for (let i = 0; i < t.length; i++) {
+      const ch = t[i];
+      if (q) { if (ch === '"') { if (t[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += ch; }
+      else if (ch === '"') q = true; else if (ch === ',') { row.push(f); f = ''; } else if (ch === '\n') { row.push(f); rows.push(row); row = []; f = ''; } else if (ch !== '\r') f += ch;
+    }
+    if (f || row.length) { row.push(f); rows.push(row); }
+    return rows;
+  }
+  const PW = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة'];
+  const DW = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+  const nrm = x => A.normKey(x || '');
+  function rowsOfTab(csv, className) {
+    const out = []; let d = -1;
+    parseCSV(csv).slice(1).forEach(r => {
+      const a = nrm(r[0]), b = String(r[1] || '');
+      const di = DW.findIndex(x => nrm(x) === a); const bk = nrm(b); const p = PW.findIndex(x => bk.includes(nrm(x)));
+      if (p < 0) return;
+      if (di >= 0) d = di; else if (p === 0) d++;
+      if (d < 0 || d > 4) return;
+      out.push({ class: className, day: d, period: p, subject: r[2] || '', topic: r[3] || '', homework: r[4] || '', note: r[5] || '' });
+    });
+    return out;
+  }
+  async function pullFromSheet(w, onProgress) {
+    const entries = w.id === S.weekId ? S.entries : await api.entries(w.id);
+    const tabs = w.sheet_tabs || {}; let rows = [], miss = [];
+    const classes = S.classes.filter(c => c.active);
+    for (let i = 0; i < classes.length; i++) {
+      const c = classes[i]; onProgress && onProgress(i + 1, classes.length);
+      const tab = tabs[c.name] || c.name;
+      const url = `https://docs.google.com/spreadsheets/d/${w.sheet_id}/gviz/tq?tqx=out:csv&headers=0&range=A1:F45&sheet=${encodeURIComponent(tab)}&t=${Date.now()}`;
+      let txt; try { const r = await fetch(url); if (!r.ok) throw 0; txt = await r.text(); } catch (_) { throw new Error('تعذّر الاتصال بملف Google Sheet — تأكد من الاتصال بالإنترنت وأن الملف مشارك «لأي شخص لديه الرابط»'); }
+      if (/<html/i.test(txt.slice(0, 200))) throw new Error('الملف غير مشارك بالرابط — افتح «مشاركة» واجعله متاحاً لأي شخص لديه الرابط');
+      const R = rowsOfTab(txt, c.name);
+      if (!tabs[c.name]) { // تحقق أن التبويب هو تبويب هذا الفصل (جوجل يعيد أول تبويب إن لم يجد الاسم)
+        const mine = entries.filter(e => e.class_id === c.id && e.subject_id); let both = 0, same = 0;
+        R.forEach(x => { const e = mine.find(y => y.day === x.day && y.period === x.period); if (e && x.subject.trim()) { both++; const a = nrm(A.subjName(e.subject_id)).replace(/^ال/, ''), b = nrm(x.subject).replace(/^ال/, ''); if (a === b || a.includes(b) || b.includes(a)) same++; } });
+        if (!both || same / both < 0.5) { miss.push(c.name); continue; }
+      }
+      rows = rows.concat(R);
+    }
+    if (!rows.length) throw new Error('لم أجد تبويبات تطابق فصول القسم في الملف');
+    const r = await api.sheetPushUser(w.id, rows);
+    w.sheet_synced_at = new Date().toISOString();
+    if (w.id === S.weekId) await A.loadWeek();
+    return { updated: r.updated || 0, miss };
+  }
+  A.pullFromSheet = pullFromSheet;
+  async function doPull(w, btn) {
+    const bar = btn && btn.closest('.syncbar'); bar && bar.classList.add('busy');
+    const lbl = btn ? btn.innerHTML : ''; const prog = (i, n) => { if (btn) btn.textContent = `جارٍ القراءة ${A.AR(i)}/${A.AR(n)}`; };
+    try {
+      const r = await pullFromSheet(w, prog);
+      A.toast(`تمت المزامنة مع الشيت ✓ — ${r.updated ? A.cnt(r.updated, 'حصة حُدِّثت', 'حصص حُدِّثت') : 'لا تغييرات جديدة'}${r.miss.length ? ` · لم يُعثر على تبويب: ${r.miss.join('، ')}` : ''}`, r.miss.length ? '' : 'ok');
+      A.route();
+    } finally { if (btn && btn.isConnected) btn.innerHTML = lbl; bar && bar.classList.remove('busy'); }
+  }
+
   function syncBar(w) {
     if (!w || w.archived || !canSync()) return '';
     if (!w.sheet_id) return canLink() ? `<div class="syncbar off" role="region" aria-label="مزامنة Google Sheets"><span class="ttl">${ICO} مزامنة Google Sheets</span><span class="grow small muted">هذا الأسبوع غير مربوط بملف Google Sheet.</span><button class="btn ghost sm" data-sync-link>ربط بملف</button></div>` : '';
@@ -29,11 +90,11 @@
   }
   function bindBar(root, w) {
     $$('[data-sync]', root).forEach(b => b.onclick = () => A.run(b, async () => {
-      const dir = b.dataset.sync; const bar = b.closest('.syncbar');
-      if (dir === 'push' && !(await A.confirmBox('كتابة كل خطط هذا الأسبوع من المنصة داخل ملف Google Sheet؟<br><span class="small muted">تُستبدل الخانات المختلفة في الشيت بما في المنصة.</span>', 'إرسال إلى الشيت'))) return;
-      const r = await api.requestSheetSync(w.id, dir);
-      bar && bar.classList.add('busy'); setTimeout(() => bar && bar.classList.remove('busy'), r.instant ? 8000 : 60000);
-      A.toast(dir === 'push' ? 'جارٍ كتابة بيانات المنصة في الشيت…' : r.instant ? 'جارٍ سحب الشيت — تظهر التحديثات هنا تلقائياً خلال ثوانٍ' : 'طُلبت المزامنة — تكتمل خلال دقيقة وتظهر تلقائياً', 'ok');
+      if (b.dataset.sync === 'pull') return doPull(w, b);
+      if (!(await A.confirmBox('كتابة كل خطط هذا الأسبوع من المنصة داخل ملف Google Sheet؟<br><span class="small muted">تُستبدل الخانات المختلفة في الشيت بما في المنصة.</span>', 'إرسال إلى الشيت'))) return;
+      const r = await api.requestSheetSync(w.id, 'push');
+      if (r.worker) A.toast('جارٍ كتابة بيانات المنصة في الشيت…', 'ok');
+      else A.toast(S.me.is_owner ? 'الكتابة في الشيت تحتاج تفعيل سكربت المزامنة مرة واحدة (لوحة المطوّر ← مزامنة Google Sheets). سيُنفَّذ الطلب تلقائياً بعد التفعيل.' : 'الكتابة في الشيت تحتاج تفعيل سكربت المزامنة من حساب المالك. سيُنفَّذ الطلب تلقائياً بعد التفعيل.', 'err');
     }));
     $$('[data-sync-link]', root).forEach(b => b.onclick = () => linkDialog(w));
   }
@@ -42,7 +103,7 @@
       <div class="field"><label for="shU">رابط الملف (انسخه من شريط العنوان)</label><input class="in" id="shU" dir="ltr" placeholder="https://docs.google.com/spreadsheets/d/…" value="${w.sheet_id ? sheetUrl(w.sheet_id) : ''}"></div>
       <p class="small muted">بعد الربط: كل تعديل في الشيت يظهر في المنصة فوراً، وكل تعديل في المنصة يُكتب في الشيت. تبويبات الفصول تُطابَق بأسمائها تلقائياً.</p>
       <div class="acts">${w.sheet_id ? '<button class="btn ghost" id="shX">فك الربط</button>' : ''}<button class="btn" id="shGo">حفظ الربط</button></div>`);
-    const save = async (id) => { const r = await api.updateWeek(w.id, { sheet_id: id }); Object.assign(w, r || { sheet_id: id }); m.close(); A.route(); A.toast(id ? 'رُبط الأسبوع بالملف — اضغط «مزامنة الآن» لسحب بياناته' : 'فُكّ الربط', 'ok'); };
+    const save = async (id) => { const r = await api.updateWeek(w.id, { sheet_id: id, sheet_tabs: null }); Object.assign(w, r || { sheet_id: id }); m.close(); A.route(); A.toast(id ? 'رُبط الأسبوع بالملف — اضغط «مزامنة الآن» لسحب بياناته (يجب أن يكون الملف مشاركاً بالرابط)' : 'فُكّ الربط', 'ok'); };
     m.el.querySelector('#shGo').onclick = e => A.run(e.currentTarget, async () => { const id = sheetIdOf(m.el.querySelector('#shU').value); if (!id) throw new Error('الرابط غير صحيح — انسخ رابط ملف Google Sheet كاملاً'); await save(id); });
     const x = m.el.querySelector('#shX'); if (x) x.onclick = e => A.run(e.currentTarget, () => save(null));
   }
@@ -68,7 +129,7 @@
         <td class="row" style="flex-wrap:nowrap"><button class="btn ghost sm" data-lk="${w.id}">${w.sheet_id ? 'تغيير' : 'ربط'}</button>${w.sheet_id ? `<button class="btn sky sm" data-pl="${w.id}">مزامنة الآن</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="4">${A.emptyBox('لا توجد أسابيع')}</td></tr>`}
       </tbody></table></div></div>`);
     $$('[data-lk]', root).forEach(b => b.onclick = () => linkDialog(S.weeks.find(w => w.id === b.dataset.lk)));
-    $$('[data-pl]', root).forEach(b => b.onclick = () => A.run(b, async () => { const r = await api.requestSheetSync(b.dataset.pl, 'pull'); A.toast(r.instant ? 'جارٍ السحب — يكتمل خلال ثوانٍ' : 'طُلبت المزامنة — تكتمل خلال دقيقة', 'ok'); }));
+    $$('[data-pl]', root).forEach(b => b.onclick = () => A.run(b, () => doPull(S.weeks.find(w => w.id === b.dataset.pl), b)));
   };
 
   // ---- لوحة المطوّر: إعداد سكربت المزامنة (المالك فقط)

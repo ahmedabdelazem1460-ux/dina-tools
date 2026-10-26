@@ -183,6 +183,7 @@
         setTimeout(() => onSync(st()), 300);
         return { update: m => { meta = m; onSync(st()); }, stop: () => { } };
       },
+      sheetPushUser: (week, rows) => { const w = find('weeks', week); if (w) w.sheet_synced_at = new Date().toISOString(); return wait({ updated: 0, week: w && w.word }); },
       requestSheetSync: (week, dir) => { const w = find('weeks', week); if (!w || !w.sheet_id) return Promise.reject(new Error('لم يُربط هذا الأسبوع بملف Google Sheet بعد')); setTimeout(() => { w.sheet_synced_at = new Date().toISOString(); }, 800); return wait({ queued: true, instant: true }); },
       syncCfg: () => wait(DEMO_SYNC),
       updateSyncCfg: p => { Object.assign(DEMO_SYNC, p); return wait(DEMO_SYNC); },

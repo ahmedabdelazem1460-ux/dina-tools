@@ -105,23 +105,31 @@
     if (S.weekId) unsub.push(api.subscribe('pe-' + S.weekId, 'plan_entries', 'week_id=eq.' + S.weekId, p => {
       const r = p.new && p.new.id ? p.new : null; if (!r) return;
       const i = S.entries.findIndex(e => e.id === r.id); if (i >= 0) S.entries[i] = { ...S.entries[i], ...r }; else S.entries.push(r);
+      changed.add(r.id);
       scheduleRefresh();
+    }));
+    if (S.sectionId) unsub.push(api.subscribe('wk-' + S.sectionId, 'weeks', 'section_id=eq.' + S.sectionId, p => {
+      const r = p.new && p.new.id ? p.new : null; if (!r) return; const i = S.weeks.findIndex(w => w.id === r.id); if (i >= 0) { S.weeks[i] = { ...S.weeks[i], ...r }; const sb = $('#syncLast'); if (sb && A.syncLabel) sb.innerHTML = A.syncLabel(S.weeks[i]); }
     }));
     unsub.push(api.subscribe('msg-' + myId(), 'messages', 'recipient_id=eq.' + myId(), p => {
       if (p.eventType === 'INSERT') { MSG.unshift(p.new); badge(); A.toast(`رسالة جديدة من ${A.personName(p.new.sender_id)}`); }
     }));
   }
-  let rt;
+  let rt, changed = new Set();
   function scheduleRefresh() {
     clearTimeout(rt); rt = setTimeout(() => {
       const busy = document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
-      if (!busy && !$('.ovl') && ['dash', 'classes', 'export'].includes(S.view)) A.route(); else A.renderNav();
+      if ($('.ovl')) return A.renderNav();
+      if (A._exRe && $('#exL')) { A._exRe(); return A.renderNav(); }
+      if (S.view === 'my' && A.refreshMyCards) { A.refreshMyCards(changed); changed = new Set(); return A.renderNav(); }
+      if (!busy && ['dash', 'classes', 'export', 'reports'].includes(S.view)) A.route(); else A.renderNav();
     }, 1200);
   }
   window.APP_AFTER_SHELL = () => {
     const ib = $('#inboxBtn'); if (ib) ib.onclick = () => inbox();
     loadMsgs(); realtime();
   };
+  window.APP_AFTER_WEEK = () => { if ($('#inboxBtn')) realtime(); };
 
   // =====================================================================
   //  التنفيذ اليومي (تأكيد ما دُرِّس فعلاً)
@@ -133,17 +141,19 @@
     const start = A.parseDate(w.start_date); let def = Math.round((A.parseDate(tIso) - start) / 864e5); if (def < 0 || def >= dates.length) def = 0;
     let day = opts.day ?? +(A.LS.get('exday') ?? def); if (day >= dates.length) day = 0;
     const reviewer = A.perm('review');
-    const scope = opts.all && reviewer ? S.entries.filter(e => e.subject_id) : S.entries.filter(e => e.teacher_id === S.me.id && e.subject_id);
+    const scope = opts.all && (reviewer || A.perm('exec_confirm')) ? S.entries.filter(e => e.subject_id) : S.entries.filter(e => e.teacher_id === S.me.id && e.subject_id);
     const list = scope.filter(e => e.day === day && !A.holidayOf(e.day)).sort((a, b) => a.period - b.period || (A.cls(a.class_id)?.sort ?? 0) - (A.cls(b.class_id)?.sort ?? 0));
     const cnt = k => scope.filter(e => (e.exec_status || 'pending') === k && A.required(e)).length;
+    const ro = !!opts.all && !A.perm('exec_confirm'); // التأكيد من معلم الحصة، أو ممن مُنح صلاحية «التأكيد نيابةً»
+    A._exRe = () => { if (root.isConnected && $('#exL', root)) V._exec(root, { ...opts, day }); else A._exRe = null; };
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>التنفيذ اليومي — ${opts.all ? 'كل الفصول' : 'حصصي'}</h2>
-      <p class="sub" style="margin:2px 0 0">أكّد لكل حصة: نُفِّذت كما خُطِّط (أخضر)، أو عُدِّلت ثم نُفِّذت (أخضر فاتح)، أو لم تُنفَّذ مع السبب. غير المؤكَّد يبقى أصفر.</p></div>
+      <p class="sub" style="margin:2px 0 0">${ro ? 'متابعة فقط — يؤكّد كل معلم حصصه بنفسه من «خطتي ← التنفيذ اليومي»، أو من يمنحه المالك صلاحية التأكيد نيابةً. تتحدّث الألوان لحظياً.' : opts.all ? 'لديك صلاحية التأكيد نيابةً عن المعلمين — كل تأكيد يُسجَّل باسمك.' : 'أكّد لكل حصة: نُفِّذت كما خُطِّط (أخضر)، أو عُدِّلت ثم نُفِّذت (أخضر فاتح)، أو لم تُنفَّذ مع السبب. غير المؤكَّد يبقى أصفر.'}</p></div>
       <div class="row">${exPill('done')} ${AR(cnt('done'))} ${exPill('modified')} ${AR(cnt('modified'))} ${exPill('pending')} ${AR(cnt('pending'))} ${exPill('not_done')} ${AR(cnt('not_done'))}</div></div>
       <div class="tabs">${dates.map((d, i) => `<button data-d="${i}" class="${i === day ? 'on' : ''}">${DAYS[i]} <span class="small muted">${AR(d)}</span></button>`).join('')}</div>
-      ${list.length ? `<div class="row" style="margin-bottom:10px"><button class="btn ok sm" id="exAll">${I.check} تأكيد كل حصص اليوم كما خُطِّطت</button></div>` : ''}
+      ${list.length && !ro ? `<div class="row" style="margin-bottom:10px"><button class="btn ok sm" id="exAll">${I.check} تأكيد كل حصص اليوم كما خُطِّطت</button></div>` : ''}
       <div id="exL">${list.map(e => `<div class="exrow ex-${e.exec_status || 'pending'}" data-id="${e.id}"><div><b>الحصة ${PER[e.period]}</b> · ${esc((A.cls(e.class_id) || {}).name || '')} · ${esc(A.subjName(e.subject_id))}${opts.all ? ` · <span class="muted">${esc(A.personName(e.teacher_id) || 'بلا معلم')}</span>` : ''}
         <div class="small" style="margin-top:4px">${esc(e.topic) || '<span class="faint">لا يوجد موضوع مكتوب</span>'}${e.homework ? ` — <span style="color:var(--blue)">الواجب: ${esc(e.homework)}</span>` : ''}</div>${e.exec_note ? `<div class="small" style="margin-top:4px;color:var(--warn)">${esc(e.exec_note)}</div>` : ''}</div>
-        <div class="acts"><button class="btn ghost sm ${e.exec_status === 'done' ? 'on' : ''}" data-x="done">نُفِّذت</button><button class="btn ghost sm ${e.exec_status === 'modified' ? 'on' : ''}" data-x="modified">عُدِّلت ثم نُفِّذت</button><button class="btn ghost sm ${e.exec_status === 'not_done' ? 'on' : ''}" data-x="not_done">لم تُنفَّذ</button></div></div>`).join('') || A.emptyBox(A.holidayOf(day) ? 'إجازة' : 'لا توجد حصص في هذا اليوم')}</div></div>`;
+        ${ro ? `<div class="acts">${exPill(e.exec_status)}${e.exec_at ? `<span class="small faint">${A.fmtDT(e.exec_at)}</span>` : ''}</div>` : `<div class="acts"><button class="btn ghost sm ${e.exec_status === 'done' ? 'on' : ''}" data-x="done">نُفِّذت</button><button class="btn ghost sm ${e.exec_status === 'modified' ? 'on' : ''}" data-x="modified">عُدِّلت ثم نُفِّذت</button><button class="btn ghost sm ${e.exec_status === 'not_done' ? 'on' : ''}" data-x="not_done">لم تُنفَّذ</button></div>`}</div>`).join('') || A.emptyBox(A.holidayOf(day) ? 'إجازة' : 'لا توجد حصص في هذا اليوم')}</div></div>`;
     $$('.tabs button', root).forEach(b => b.onclick = () => { A.LS.set('exday', b.dataset.d); V._exec(root, { ...opts, day: +b.dataset.d }); });
     const save = async (ids, st, note) => { await api.confirmExec(ids, st, note); ids.forEach(id => { const e = S.entries.find(x => x.id === id); if (e) { e.exec_status = st; e.exec_note = note || ''; } }); V._exec(root, { ...opts, day }); };
     const ea = $('#exAll', root); if (ea) ea.onclick = e => A.run(e.currentTarget, () => save(list.filter(x => (x.exec_status || 'pending') === 'pending').map(x => x.id), 'done'));

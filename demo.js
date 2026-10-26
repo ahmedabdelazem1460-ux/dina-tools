@@ -1,6 +1,7 @@
 /* وضع التجربة: نفس واجهة البيانات لكن في ذاكرة المتصفح ببيانات تجريبية */
 (function () {
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id' + Math.random().toString(36).slice(2));
+  const DEMO_SYNC = { id: 1, secret: 'demo-secret-0000000000000000', script_url: null };
   const clone = o => JSON.parse(JSON.stringify(o));
   function seed() {
     const D = { messages: [], language_issues: [], extra_pages: [], join_codes: [], schools: [], sections: [], staff: [], memberships: [], classes: [], subjects: [], timetable_versions: [], timetable_slots: [], weeks: [], plan_entries: [], notes: [], audit_log: [] };
@@ -176,6 +177,15 @@
       async uploadAsset(file) { return await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(file); }); },
       joinWithCode2(code, f) { return this.joinWithCode(code, f.name, f.email, f.password); },
       subscribe() { return () => { }; },
+      presence(room, key, meta, onSync) {
+        const others = D.staff.filter(p => !p.is_owner && p.id !== key).slice(0, 3).map((p, i) => [p.id, [{ staff_id: p.id, name: p.full_name, view: ['my', 'dash', 'classes'][i % 3], at: new Date(Date.now() - (i + 1) * 7 * 60000).toISOString() }]]);
+        const st = () => Object.fromEntries([[key, [meta]], ...others]);
+        setTimeout(() => onSync(st()), 300);
+        return { update: m => { meta = m; onSync(st()); }, stop: () => { } };
+      },
+      requestSheetSync: (week, dir) => { const w = find('weeks', week); if (!w || !w.sheet_id) return Promise.reject(new Error('لم يُربط هذا الأسبوع بملف Google Sheet بعد')); setTimeout(() => { w.sheet_synced_at = new Date().toISOString(); }, 800); return wait({ queued: true, instant: true }); },
+      syncCfg: () => wait(DEMO_SYNC),
+      updateSyncCfg: p => { Object.assign(DEMO_SYNC, p); return wait(DEMO_SYNC); },
       reloadStaff: () => wait(clone(D.staff)),
       reloadMemberships: () => wait(clone(D.memberships)),
       reloadSubjects: () => wait(clone(D.subjects)),

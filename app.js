@@ -17,9 +17,9 @@
   const WSTATUS = { open: 'مفتوح للإدخال', locked: 'مقفل', published: 'منشور' };
   const ROLES = { admin: 'مدير القسم', supervisor: 'مشرف', teacher: 'معلم' };
   const PERMS = [['can_manage_users', 'إدارة الحسابات والصلاحيات'], ['can_manage_structure', 'الفصول والمواد والأسابيع'], ['can_edit_timetable', 'تعديل الجدول وإسناد المعلمين'], ['can_approve_timetable', 'اعتماد الجدول'], ['can_review_plans', 'مراجعة الخطط واعتمادها'], ['can_export', 'التصدير']];
-  const PKEY = { users: 'can_manage_users', structure: 'can_manage_structure', timetable_edit: 'can_edit_timetable', timetable_approve: 'can_approve_timetable', review: 'can_review_plans', export: 'can_export', nisab: 'can_use_nisab', tt_builder: 'can_use_tt_builder' };
-  const TOOL_PERMS = [['can_use_nisab', 'احتساب النصاب'], ['can_use_tt_builder', 'الجدول الآلي']];
-  const TOOL_KEYS = ['nisab', 'tt_builder'];
+  const PKEY = { users: 'can_manage_users', structure: 'can_manage_structure', timetable_edit: 'can_edit_timetable', timetable_approve: 'can_approve_timetable', review: 'can_review_plans', export: 'can_export', nisab: 'can_use_nisab', tt_builder: 'can_use_tt_builder', exec_confirm: 'can_confirm_exec' };
+  const TOOL_PERMS = [['can_use_nisab', 'احتساب النصاب'], ['can_use_tt_builder', 'الجدول الآلي'], ['can_confirm_exec', 'التأكيد اليومي نيابةً عن المعلمين']];
+  const TOOL_KEYS = ['nisab', 'tt_builder', 'exec_confirm'];
   const ROLE_DEFAULTS = { admin: {}, supervisor: { can_review_plans: true, can_export: true }, teacher: {} };
 
   const parseDate = s => { const [y, m, d] = String(s).slice(0, 10).split('-').map(Number); return new Date(y, m - 1, d); };
@@ -176,6 +176,7 @@
     if (!S.weekId) { S.entries = []; S.notes = []; return; }
     const [e, n, x] = await Promise.all([api.entries(S.weekId), api.notes(S.weekId), api.extraPages(S.weekId).catch(() => [])]);
     S.entries = e; S.notes = n; S.extraPages = x;
+    if (window.APP_AFTER_WEEK) window.APP_AFTER_WEEK();
   }
   async function refreshPeople() { const [st, me, su] = await Promise.all([api.reloadStaff(), api.reloadMemberships(), api.reloadSubjects()]); S.staff = st; S.memberships = me; S.subjects = su; }
 
@@ -393,7 +394,7 @@
   function lessonCard(e, open) {
     const c = cls(e.class_id) || {}; const ro = !open || e.status === 'approved';
     const el = document.createElement('div');
-    el.className = `lesson ${e.status}`;
+    el.className = `lesson ${e.status}`; el.dataset.eid = e.id;
     el.innerHTML = `
       <div class="side"><div><span class="pn">${AR(e.period + 1)}</span> <span class="pw">الحصة ${PER[e.period]}</span></div>
         <div class="cl">${esc(c.name || '')}</div><div class="sj">${esc(subjName(e.subject_id))}</div><div data-st>${pill(e.status)}</div></div>
@@ -422,6 +423,15 @@
       const ta = $('textarea', el); const fit = () => { ta.style.height = 'auto'; ta.style.height = Math.max(44, ta.scrollHeight + 2) + 'px'; }; ta.addEventListener('input', fit); setTimeout(fit, 0);
     }
     return el;
+  }
+  // تحديث بطاقات «خطتي» لحظياً دون مقاطعة ما يكتبه المعلم
+  function refreshMyCards(ids) {
+    const w = week(); const open = w && w.status === 'open';
+    (ids || []).forEach(id => {
+      const el = document.querySelector(`.lesson[data-eid="${id}"]`); if (!el || pending.has(id) || el.contains(document.activeElement)) return;
+      const e = S.entries.find(x => x.id === id); if (e) el.replaceWith(lessonCard(e, open));
+    });
+    updateMyProgress();
   }
   function updateMyProgress() {
     const mine = S.entries.filter(e => e.teacher_id === S.me.id && e.subject_id), req = mine.filter(required), done = req.filter(filled).length;
@@ -452,7 +462,7 @@
     root.innerHTML = `
       <div class="head"><div class="grow"><h2 style="margin:0;font-size:24px;font-weight:800">لوحة المتابعة — الأسبوع ${esc(w.word)}</h2>
         <p class="sub" style="margin:4px 0 0">${esc(section().name)} · ${AR(weekDates(w)[0])} : ${AR(weekDates(w)[4])} · <span class="pill st-${w.status}">${WSTATUS[w.status]}</span></p></div>
-        <div class="row">${perm('review') ? `<button class="btn ghost" id="dLang">التدقيق اللغوي</button><button class="btn ghost" id="dExec">${I.check} التنفيذ اليومي</button>` : ''}${perm('export') ? `<a class="btn sky" href="#/export">${I.export} التصدير</a>` : ''}</div></div>
+        <div class="row">${perm('review') ? `<button class="btn ghost" id="dLang">التدقيق اللغوي</button>` : ''}${perm('review') || perm('exec_confirm') ? `<button class="btn ghost" id="dExec">${I.check} التنفيذ اليومي</button>` : ''}${perm('export') ? `<a class="btn sky" href="#/export">${I.export} التصدير</a>` : ''}</div></div>
       <div class="grid g4">
         <button class="kpi navy btnlike" data-drill="todo"><span class="more">التفاصيل</span><div class="k">نسبة الإنجاز</div><div class="v">${AR(pct(all.filled, all.total))}<small>٪</small></div><div class="d">${AR(all.filled)} من ${cnt(all.total, 'حصة', 'حصص')}</div></button>
         <button class="kpi btnlike" data-drill="submitted"><span class="more">التفاصيل</span><div class="k">معتمدة</div><div class="v">${AR(all.approved)}</div><div class="d">مُرسلة بانتظار المراجعة: ${AR(all.submitted)}</div></button>
@@ -606,7 +616,7 @@
   }
 
   // ---------- مشترك مع الملفات الأخرى ----------
-  window.APP = { start: () => start(), TOOL_PERMS, TOOL_KEYS, cnt, api, S, $, $$, esc, AR, DAYS, PER, ORD, STATUS, WSTATUS, ROLES, PERMS, ROLE_DEFAULTS, I, parseDate, isoDate, dmy, weekDates, fmtDT, pct, norm, normKey, genPass, toast, modal, confirmBox, run, pill, bar, emptyBox, download, section, week, subj, subjName, person, personName, cls, myMem, perm, anyPerm, holidayOf, required, filled, stats, loadSection, loadWeek, refreshPeople, shell, route, renderNav, LS, DEMO };
+  window.APP = { start: () => start(), TOOL_PERMS, TOOL_KEYS, cnt, api, S, $, $$, esc, AR, DAYS, PER, ORD, STATUS, WSTATUS, ROLES, PERMS, ROLE_DEFAULTS, I, parseDate, isoDate, dmy, weekDates, fmtDT, pct, norm, normKey, genPass, toast, modal, confirmBox, run, pill, bar, emptyBox, download, section, week, subj, subjName, person, personName, cls, myMem, perm, anyPerm, holidayOf, required, filled, stats, loadSection, loadWeek, refreshPeople, refreshMyCards, shell, route, renderNav, LS, DEMO };
 
   // ---------- تشغيل ----------
   window.addEventListener('DOMContentLoaded', async () => {

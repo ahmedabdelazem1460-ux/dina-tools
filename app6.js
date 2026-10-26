@@ -34,6 +34,7 @@
     ['subject', 'خطة مادة لفصل', 'خطة مادة لفصل واحد عبر عدة أسابيع أو الفصل الدراسي كاملاً.'],
     ['edits', 'التعديلات والتدقيق', 'التصحيحات اللغوية والتعديلات حسب الفصل والمعلم والحصة.'],
     ['exec', 'التنفيذ اليومي', 'نسبة ما نُفِّذ كما خُطِّط وما عُدِّل وما لم يُنفَّذ.'],
+    ['daily', 'الخطة اليومية للفصول', 'ما دُرِّس فعلاً (المؤكَّد) أو خطة اليوم كاملة أو الواجبات فقط كتذكير — طباعة وExcel ونص جاهز للإرسال.'],
   ];
   V.reports = function (root) {
     const cur = A.LS.get('rep') || '';
@@ -45,7 +46,7 @@
     const [, title] = REPORTS.find(r => r[0] === cur);
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>${title} — ${esc(A.section().name)}</h2></div><button class="btn ghost sm" id="rBack">كل التقارير</button></div><div id="rForm"></div><div id="rOut"></div></div>`;
     $('#rBack', root).onclick = () => { A.LS.set('rep', ''); V.reports(root); };
-    ({ teachers: repTeachers, teacher: repTeacher, subject: repSubject, edits: repEdits, exec: repExec })[cur]($('#rForm', root), $('#rOut', root));
+    ({ teachers: repTeachers, teacher: repTeacher, subject: repSubject, edits: repEdits, exec: repExec, daily: repDaily })[cur]($('#rForm', root), $('#rOut', root));
   };
   async function load(weeks) { const es = await api.entriesForWeeks(weeks.map(w => w.id)); return es; }
   function teacherStats(es, weeks, li) {
@@ -139,6 +140,47 @@
       O.innerHTML = `<div class="row" style="margin:14px 0"><button class="btn ghost sm" id="rX">${I.down} Excel</button></div><div class="grid g2"><div>${tbl(gc, 'الفصل')}</div><div>${tbl(gt, 'المعلم')}</div></div>`;
       const flat = g => Object.entries(g).map(([k, t]) => ({ الاسم: k, 'نُفِّذ': t.done, 'عُدِّل ثم نُفِّذ': t.modified, 'لم يُنفَّذ': t.not_done, 'لم يُؤكَّد': t.pending }));
       $('#rX', O).onclick = () => xlsx('تقرير التنفيذ اليومي', [['حسب الفصل', flat(gc)], ['حسب المعلم', flat(gt)]]);
+    });
+  }
+
+  // ---------- الخطة اليومية للفصول ----------
+  const DTYPES = [['taught', 'ما دُرِّس فعلاً', 'الحصص المؤكَّد تنفيذها فقط (أخضر وأخضر فاتح)'], ['plan', 'خطة اليوم كاملة', 'كل الحصص المخطَّطة دون اشتراط التأكيد'], ['hw', 'الواجبات فقط', 'تذكير بواجبات اليوم للطلاب وأولياء الأمور']];
+  function repDaily(F, O) {
+    const w0 = A.week(); const days = A.section().days;
+    const today = (() => { if (!w0) return 0; const d = Math.round((A.parseDate(A.isoDate(new Date())) - A.parseDate(w0.start_date)) / 864e5); return d >= 0 && d < days ? d : 0; })();
+    F.innerHTML = `<div class="grid g3">
+      <div class="field"><label for="dW">الأسبوع</label><select class="in" id="dW">${S.weeks.map(w => `<option value="${w.id}" ${w.id === S.weekId ? 'selected' : ''}>الأسبوع ${esc(w.word)}${w.archived ? ' (أرشيف)' : ''}</option>`).join('')}</select></div>
+      <div class="field"><label for="dD">اليوم</label><select class="in" id="dD">${DAYS.slice(0, days).map((d, i) => `<option value="${i}" ${i === today ? 'selected' : ''}>${d}</option>`).join('')}</select></div>
+      <div class="field"><label>نوع التصدير</label><div class="ui-opt" id="dT">${DTYPES.map(([k, l, d], i) => `<button type="button" data-v="${k}" class="${i ? '' : 'on'}" title="${d}">${l}</button>`).join('')}</div></div></div>
+      <div class="field"><label>الفصول <button type="button" class="btn ghost sm" id="dAll">الكل</button></label><div class="perm-grid" id="dC">${S.classes.filter(c => c.active).map(c => `<label class="chk"><input type="checkbox" value="${c.id}" checked> ${esc(c.name)}</label>`).join('')}</div></div>
+      <label class="chk" style="margin-bottom:10px"><input type="checkbox" id="dSt" checked> إظهار حالة التنفيذ في خطة اليوم</label>
+      <button class="btn" id="rGo">عرض الخطة اليومية</button>`;
+    let type = 'taught';
+    $$('#dT button', F).forEach(b => b.onclick = () => { type = b.dataset.v; $$('#dT button', F).forEach(x => x.classList.toggle('on', x === b)); });
+    $('#dAll', F).onclick = () => { const ins = $$('#dC input', F); const on = ins.some(i => !i.checked); ins.forEach(i => i.checked = on); };
+    $('#rGo', F).onclick = e => A.run(e.currentTarget, async () => {
+      const w = S.weeks.find(x => x.id === $('#dW', F).value); const day = +$('#dD', F).value; const showSt = $('#dSt', F).checked;
+      const cids = $$('#dC input:checked', F).map(i => i.value); if (!cids.length) throw new Error('اختر فصلاً واحداً على الأقل');
+      const all = w.id === S.weekId ? S.entries : await load([w]);
+      const date = A.weekDates(w)[day]; const hol = (w.holidays || []).find(h => h.day === day);
+      const pick = x => x.day === day && x.subject_id && cids.includes(x.class_id) && (type === 'taught' ? ['done', 'modified'].includes(x.exec_status) : type === 'hw' ? !!x.homework : A.required(x) || x.topic);
+      const byC = S.classes.filter(c => cids.includes(c.id)).map(c => ({ c, rows: all.filter(x => x.class_id === c.id && pick(x)).sort((a, b) => a.period - b.period) }));
+      const tLabel = DTYPES.find(t => t[0] === type)[1];
+      const head = type === 'hw' ? ['الحصة', 'المادة', 'الواجب'] : ['الحصة', 'المادة', 'الموضوع / الدرس', 'الواجب', ...(type === 'taught' ? ['ملاحظة التنفيذ'] : showSt ? ['التنفيذ'] : [])];
+      const cells = x => type === 'hw' ? [PER[x.period], A.subjName(x.subject_id), x.homework] : [PER[x.period], A.subjName(x.subject_id), x.topic || '—', x.homework || '—', ...(type === 'taught' ? [x.exec_status === 'modified' ? (x.exec_note || 'عُدِّل ثم نُفِّذ') : 'نُفِّذ كما خُطِّط'] : showSt ? [A.EX ? A.EX[x.exec_status || 'pending'] : ''] : [])];
+      const total = byC.reduce((n, g) => n + g.rows.length, 0);
+      O.innerHTML = `${hol ? `<div class="notice info">${esc(hol.label || 'إجازة')} في هذا اليوم.</div>` : ''}
+        <div class="row" style="margin:14px 0"><b>${tLabel} — ${DAYS[day]} ${AR(date)}</b><span class="small muted">${A.cnt(total, 'حصة', 'حصص')} في ${A.cnt(byC.filter(g => g.rows.length).length, 'فصل', 'فصول')}</span><span class="grow"></span>
+          <button class="btn sky sm" id="rP">${I.export} طباعة / PDF</button><button class="btn ghost sm" id="rX">${I.down} Excel</button><button class="btn ghost sm" id="rT">نسخ نص للإرسال</button></div>
+        ${byC.map(g => `<div class="card" style="margin-bottom:12px;padding:14px"><div class="row" style="justify-content:space-between"><h3 style="margin:0">${esc(g.c.name)}</h3><button class="btn ghost sm" data-txt="${g.c.id}">نسخ نص الفصل</button></div>
+          ${g.rows.length ? `<div class="scroll"><table class="tbl"><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${g.rows.map(x => `<tr>${cells(x).map((v, i) => `<td${i > 1 ? ' style="text-align:start"' : ''}>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : `<p class="small muted" style="margin:8px 0 0">${type === 'taught' ? 'لم يُؤكَّد تنفيذ أي حصة بعد.' : type === 'hw' ? 'لا واجبات اليوم.' : 'لا حصص.'}</p>`}</div>`).join('')}`;
+      const txt = g => `${g.c.name} — ${DAYS[day]} ${date}\n${tLabel}\n` + (g.rows.length ? g.rows.map(x => type === 'hw' ? `• ${A.subjName(x.subject_id)}: ${x.homework}` : `• الحصة ${PER[x.period]} — ${A.subjName(x.subject_id)}: ${x.topic || '—'}${x.homework ? `\n   الواجب: ${x.homework}` : ''}`).join('\n') : (type === 'hw' ? 'لا واجبات اليوم.' : 'لا يوجد.'));
+      const copy = async t => { await navigator.clipboard.writeText(t); A.toast('نُسخ النص — الصقه في واتساب أو البريد', 'ok'); };
+      $$('[data-txt]', O).forEach(b => b.onclick = () => copy(txt(byC.find(g => g.c.id === b.dataset.txt))));
+      $('#rT', O).onclick = () => copy(byC.filter(g => g.rows.length).map(txt).join('\n\n— — —\n\n'));
+      $('#rX', O).onclick = () => xlsx(`${tLabel} - ${DAYS[day]} ${date}`, byC.filter(g => g.rows.length).map(g => [g.c.name, g.rows.map(x => Object.fromEntries(head.map((h, i) => [h, cells(x)[i]])))]));
+      $('#rP', O).onclick = () => printDoc(`${tLabel} — ${DAYS[day]}`, `${A.section().name} · الأسبوع ${w.word} · ${date}`,
+        byC.filter(g => g.rows.length).map((g, i) => `<div style="${i ? 'page-break-before:always;' : ''}"><h2 style="margin:0 0 8px;font-size:18px;border-inline-start:6px solid #3AB1DB;padding-inline-start:10px">${esc(g.c.name)}</h2><table><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${g.rows.map(x => `<tr>${cells(x).map((v, k) => `<td${k > 1 ? ' style="text-align:right"' : ''}>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`).join('') || '<p>لا توجد بيانات.</p>');
     });
   }
 

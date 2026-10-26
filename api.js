@@ -116,6 +116,17 @@
         return sb.storage.from('plan-assets').getPublicUrl(path).data.publicUrl;
       },
       joinWithCode2: (code, f) => sb.rpc('join_with_code_v2', { p_code: code, p_full_name: f.name, p_email: f.email, p_password: f.password, p_phone: f.phone || null, p_specialty: f.specialty || null, p_employee_no: f.employee_no || null }).then(ok),
+      // ---- مزامنة Google Sheets
+      requestSheetSync: (week, dir) => sb.rpc('request_sheet_sync', { p_week: week, p_dir: dir || 'pull' }).then(ok),
+      syncCfg: () => T('sync_cfg').select('*').eq('id', 1).maybeSingle().then(ok),
+      updateSyncCfg: p => T('sync_cfg').update({ ...p, updated_at: new Date().toISOString() }).eq('id', 1).select().single().then(ok),
+      // ---- من يعمل الآن (Presence)
+      presence(room, key, meta, onSync) {
+        const ch = sb.channel(room, { config: { presence: { key } } });
+        ch.on('presence', { event: 'sync' }, () => onSync(ch.presenceState()));
+        ch.subscribe(st => { if (st === 'SUBSCRIBED') ch.track(meta); });
+        return { update: m => ch.track(m), stop: () => sb.removeChannel(ch) };
+      },
       // ---- مزامنة لحظية
       subscribe(name, table, filter, cb) {
         const ch = sb.channel(name).on('postgres_changes', { event: '*', schema: 'public', table, ...(filter ? { filter } : {}) }, p => cb(p)).subscribe();

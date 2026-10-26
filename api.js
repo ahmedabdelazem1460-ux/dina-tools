@@ -91,6 +91,36 @@
       joinWithCode: (code, name, email, pw) => sb.rpc('join_with_code', { p_code: code, p_full_name: name, p_email: email, p_password: pw }).then(ok),
       claim: (c, s, release) => sb.rpc('claim_assignment', { p_class: c, p_subject: s, p_release: !!release }).then(ok),
       async approvedSlots(section) { const v = ok(await T('timetable_versions').select('id').eq('section_id', section).eq('status', 'approved').maybeSingle()); return v ? ok(await T('timetable_slots').select('*').eq('version_id', v.id)) : []; },
+      // ---- مراسلات
+      messages: () => T('messages').select('*').order('created_at', { ascending: false }).limit(300).then(ok),
+      sendMessage: r => T('messages').insert(r).select().single().then(ok),
+      sendMessages: rows => T('messages').insert(rows).then(ok),
+      markRead: ids => T('messages').update({ read_at: new Date().toISOString() }).in('id', ids).then(ok),
+      // ---- تدقيق لغوي
+      langIssues: (q = {}) => { let x = T('language_issues').select('*').order('created_at', { ascending: false }).limit(2000); if (q.week) x = x.eq('week_id', q.week); if (q.teacher) x = x.eq('teacher_id', q.teacher); return x.then(ok); },
+      addLangIssues: rows => T('language_issues').insert(rows).then(ok),
+      // ---- التنفيذ اليومي
+      confirmExec: (ids, st, note) => sb.rpc('confirm_exec', { p_ids: ids, p_status: st, p_note: note || '' }).then(ok),
+      // ---- تقارير
+      async entriesForWeeks(ids) {
+        let all = [];
+        for (const w of ids) { let from = 0; for (;;) { const r = ok(await T('plan_entries').select('*').eq('week_id', w).range(from, from + 999)); all = all.concat(r); if (r.length < 1000) break; from += 1000; } }
+        return all;
+      },
+      auditRange: (sinceIso, lim = 3000) => T('audit_log').select('*').gte('at', sinceIso).order('at', { ascending: false }).limit(lim).then(ok),
+      // ---- ملفات وصور
+      async uploadAsset(file) {
+        const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+        const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        ok(await sb.storage.from('plan-assets').upload(path, file, { contentType: file.type, upsert: false }));
+        return sb.storage.from('plan-assets').getPublicUrl(path).data.publicUrl;
+      },
+      joinWithCode2: (code, f) => sb.rpc('join_with_code_v2', { p_code: code, p_full_name: f.name, p_email: f.email, p_password: f.password, p_phone: f.phone || null, p_specialty: f.specialty || null, p_employee_no: f.employee_no || null }).then(ok),
+      // ---- مزامنة لحظية
+      subscribe(name, table, filter, cb) {
+        const ch = sb.channel(name).on('postgres_changes', { event: '*', schema: 'public', table, ...(filter ? { filter } : {}) }, p => cb(p)).subscribe();
+        return () => sb.removeChannel(ch);
+      },
       reloadStaff: () => T('staff').select('*').order('full_name').then(ok),
       reloadMemberships: () => T('memberships').select('*').then(ok),
       reloadSubjects: () => T('subjects').select('*').order('name').then(ok),

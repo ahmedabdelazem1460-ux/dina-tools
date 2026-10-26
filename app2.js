@@ -12,14 +12,17 @@
     ['classic-land', 'هوية دينا — عرضي', 'نفس التصميم بصفحات أفقية', { layout: 'daily', orientation: 'landscape' }, '<i style="inset:18px 12% 18px 12%;background:#fff"></i><i style="top:24px;left:16%;right:16%;height:8px;background:#082B5A"></i><i style="top:36px;left:16%;right:16%;height:30px;background:#3AB1DB;opacity:.5"></i>'],
     ['overview', 'نظرة أسبوعية', 'الأسبوع كاملاً في صفحة عرضية واحدة', { layout: 'overview', orientation: 'landscape' }, '<i style="inset:18px 12% 18px 12%;background:#fff"></i><i style="top:24px;left:16%;width:10%;bottom:24px;right:auto;background:#082B5A"></i>' + [0, 1, 2, 3].map(k => `<i style="top:${26 + k * 11}px;left:28%;right:16%;height:7px;background:${k % 2 ? '#E4EBF5' : '#84B7E3'}"></i>`).join('')],
   ];
-  function expOpts() { let o = {}; try { o = JSON.parse(A.LS.get('expopts') || '{}'); } catch (e) { } const t = TEMPLATES.find(x => x[0] === (o.tpl || 'classic')) || TEMPLATES[0]; return { tpl: t[0], ...t[3], ink: !!o.ink, cover: o.cover !== false, notes: o.notes !== false, extras: o.extras !== false }; }
-  function setExpOpts(p) { const o = { ...expOpts(), ...p }; A.LS.set('expopts', JSON.stringify({ tpl: o.tpl, ink: o.ink, cover: o.cover, notes: o.notes, extras: o.extras })); }
+  function expOpts() { let o = {}; try { o = JSON.parse(A.LS.get('expopts') || '{}'); } catch (e) { } const t = TEMPLATES.find(x => x[0] === (o.tpl || 'classic')) || TEMPLATES[0]; const sec = A.section() || {}; const st = (S.school && S.school.settings) || {};
+    return { tpl: t[0], ...t[3], ink: !!o.ink, cover: o.cover !== false, notes: o.notes !== false, extras: o.extras !== false, theme: o.theme || sec.theme || 'dina', rich: !!o.rich, coverImg: o.noimg ? '' : ((st.cover_images || {})[sec.id] || '') }; }
+  function setExpOpts(p) { const o = { ...expOpts(), ...p }; A.LS.set('expopts', JSON.stringify({ tpl: o.tpl, ink: o.ink, cover: o.cover, notes: o.notes, extras: o.extras, theme: o.theme, rich: o.rich, noimg: o.noimg })); }
   function optsPanel(box, onChange) {
     const o = expOpts();
     box.innerHTML = `<h3>قالب الطباعة والتصدير</h3><div class="tpl-grid">${TEMPLATES.map(([k, l, d, , pv]) => `<label class="tpl ${o.tpl === k ? 'on' : ''}"><input type="radio" name="tpl" value="${k}" ${o.tpl === k ? 'checked' : ''}><div class="pv">${pv}</div>${l}<small>${d}</small></label>`).join('')}</div>
-      <div class="row" style="margin-top:12px;gap:18px">${[['cover', 'صفحة الغلاف'], ['notes', 'ملاحظات اليوم'], ['extras', 'الصفحات الإضافية'], ['ink', 'موفّر للحبر (بلا خلفيات داكنة)']].map(([k, l]) => `<label class="chk"><input type="checkbox" data-o="${k}" ${o[k] ? 'checked' : ''}> ${l}</label>`).join('')}</div>`;
+      <div class="row" style="margin-top:12px;gap:8px"><span class="small muted">هوية الألوان:</span>${[['dina', 'دينا — سماوي', '#3AB1DB'], ['lavender', 'دينا — بنفسجي', '#AE95DA'], ['green', 'دينا — أخضر', '#8CC56A']].map(([k, l, c]) => `<button type="button" class="btn ${o.theme === k ? '' : 'ghost'} sm" data-th="${k}"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${c};box-shadow:0 0 0 2px #fff,0 0 0 3px #082B5A"></span> ${l}</button>`).join('')}</div>
+      <div class="row" style="margin-top:12px;gap:18px">${[['rich', 'زخارف مجسمة'], ['cover', 'صفحة الغلاف'], ['notes', 'ملاحظات اليوم'], ['extras', 'الصفحات الإضافية'], ['ink', 'موفّر للحبر (بلا خلفيات داكنة)']].map(([k, l]) => `<label class="chk"><input type="checkbox" data-o="${k}" ${o[k] ? 'checked' : ''}> ${l}</label>`).join('')}</div>`;
     $$('input[name=tpl]', box).forEach(i => i.onchange = () => { setExpOpts({ tpl: i.value }); optsPanel(box, onChange); onChange && onChange(); });
     $$('[data-o]', box).forEach(i => i.onchange = () => { setExpOpts({ [i.dataset.o]: i.checked }); onChange && onChange(); });
+    $$('[data-th]', box).forEach(b => b.onclick = () => { setExpOpts({ theme: b.dataset.th }); optsPanel(box, onChange); onChange && onChange(); });
   }
   V._optsPanel = optsPanel;
   function buildDoc(c) {
@@ -133,7 +136,7 @@
         const chg = b && ((b.subject_id || null) !== (s.subject_id || null) || (b.teacher_id || null) !== (s.teacher_id || null));
         h += editable
           ? `<td class="${chg ? 'chg' : ''}"><select data-d="${d}" data-p="${p}" data-f="subject_id">${subjOpts(s.subject_id)}</select><select data-d="${d}" data-p="${p}" data-f="teacher_id" style="margin-top:4px">${teachersOpts(s.teacher_id)}</select></td>`
-          : `<td class="${s.subject_id && !s.teacher_id ? 'noteach' : ''}"><div class="s">${esc(A.subjName(s.subject_id)) || '<span class="faint">—</span>'}</div><div class="t">${s.subject_id ? esc(A.personName(s.teacher_id) || 'بلا معلم') : ''}</div></td>`;
+          : `<td class="${s.subject_id && !s.teacher_id ? 'noteach' : ''}"><div class="s">${esc(A.subjName(s.subject_id)) || '<span class="faint">—</span>'}</div><div class="t">${s.subject_id ? (s.teacher_id ? esc(A.personName(s.teacher_id)) : `<a href="#" class="assignlink" data-assign-c="${c}" data-assign-s="${s.subject_id}">بلا معلم — إسناد</a>`) : ''}</div></td>`;
       }
       h += '</tr>';
     }
@@ -197,7 +200,7 @@
     box.innerHTML = `<div class="notice info">التعديل يتم على <b>مسودة</b> ولا يؤثر على الأسابيع حتى تُعتمد. ${canA ? 'عند الاعتماد يمكنك تطبيق التغييرات على الأسابيع المفتوحة (الحصص المعتمدة لا تتغير).' : 'الاعتماد يتم من صاحب صلاحية «اعتماد الجدول».'}</div>
       <div class="row" style="margin-bottom:14px">
         ${canE ? `<button class="btn" id="nd">${I.plus} مسودة جديدة من الجدول الحالي</button><button class="btn ghost" id="ne">مسودة فارغة</button>` : ''}
-        <button class="btn ghost" id="tpl">${I.down} قالب Excel للجدول</button></div>
+        <button class="btn ghost" id="tpl">${I.down} قالب Excel للجدول</button>${A.perm('tt_builder') ? `<a class="btn sky" href="#/builder">${I.builder} مزامنة من الجدول الآلي</a>` : ''}</div>
       <table class="tbl" style="margin-bottom:16px"><thead><tr><th>الإصدار</th><th>الحالة</th><th>المصدر</th><th>التاريخ</th><th></th></tr></thead><tbody>
       ${T.versions.map(v => `<tr><td><b>${esc(v.label)}</b>${v.note ? `<div class="small muted">${esc(v.note)}</div>` : ''}</td><td><span class="pill ${v.status === 'approved' ? 'st-approved' : v.status === 'draft' ? 'st-draft' : 'st-empty'}">${LBL[v.status]}</span></td><td class="small">${esc(v.source || '')}</td><td class="small muted">${A.fmtDT(v.approved_at || v.created_at)}</td><td>${v.status === 'draft' ? `<button class="btn sm ${v.id === T.draft ? '' : 'ghost'}" data-open="${v.id}">فتح</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">لا توجد إصدارات</td></tr>'}
       </tbody></table><div id="de"></div>`;
@@ -331,13 +334,14 @@
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>الأسابيع — ${esc(A.section().name)}</h2><p class="sub" style="margin:2px 0 0">إنشاء الأسبوع يولّد حصص كل الفصول من الجدول المعتمد مع المعلمين المسندين.</p></div><button class="btn" id="nw">${I.plus} أسبوع جديد</button></div>
       <div class="scroll"><table class="tbl"><thead><tr><th>الأسبوع</th><th>التواريخ</th><th>موعد التسليم</th><th>الحالة</th><th>الإجازات</th><th></th></tr></thead><tbody>
       ${ws.map(w => { const dd = A.weekDates(w); return `<tr><td><b>الأسبوع ${esc(w.word)}</b> <span class="small faint">(${AR(w.number)})</span></td><td class="small">${AR(dd[0])} : ${AR(dd[4])}</td><td class="small">${A.fmtDT(w.deadline)}</td><td><span class="pill st-${w.status}">${WSTATUS[w.status]}</span></td><td class="small">${(w.holidays || []).map(h => DAYS[h.day]).join('، ') || '—'}</td>
-        <td class="row" style="flex-wrap:nowrap">${w.status === 'open' ? `<button class="btn ghost sm" data-st="locked" data-w="${w.id}">${I.lock} قفل</button>` : `<button class="btn ghost sm" data-st="open" data-w="${w.id}">فتح</button>`}${w.status !== 'published' ? `<button class="btn ghost sm" data-st="published" data-w="${w.id}">نشر</button>` : ''}<button class="btn ghost sm" data-ed="${w.id}">تعديل</button><button class="btn bad sm" data-del="${w.id}">حذف</button></td></tr>`; }).join('') || `<tr><td colspan="6">${A.emptyBox('لا توجد أسابيع')}</td></tr>`}
+        <td class="row" style="flex-wrap:nowrap">${w.status === 'open' ? `<button class="btn ghost sm" data-st="locked" data-w="${w.id}">${I.lock} قفل</button>` : `<button class="btn ghost sm" data-st="open" data-w="${w.id}">فتح</button>`}${w.status !== 'published' ? `<button class="btn ghost sm" data-st="published" data-w="${w.id}">نشر</button>` : ''}<button class="btn ghost sm" data-ed="${w.id}">تعديل</button>${S.me.is_owner ? `<button class="btn ghost sm" data-arc="${w.id}" data-v="${w.archived ? 0 : 1}">${w.archived ? 'إلغاء الأرشفة' : 'أرشفة'}</button>` : ''}<button class="btn bad sm" data-del="${w.id}">حذف</button></td></tr>`; }).join('') || `<tr><td colspan="6">${A.emptyBox('لا توجد أسابيع')}</td></tr>`}
       </tbody></table></div>
       <p class="small muted">«مقفل»: يتوقف المعلمون عن التعديل ويستمر المراجع. «منشور»: اكتمل الأسبوع وصُدّرت ملفاته.</p></div>`;
     const reload = async () => { await A.loadSection(A.S.weekId); A.shell(); A.route(); };
     $$('[data-st]', root).forEach(b => b.onclick = () => A.run(b, async () => { await api.updateWeek(b.dataset.w, { status: b.dataset.st }); await reload(); A.toast('تم تحديث حالة الأسبوع', 'ok'); }));
     $$('[data-del]', root).forEach(b => b.onclick = async () => { const w = ws.find(x => x.id === b.dataset.del); if (!(await A.confirmBox(`حذف الأسبوع ${esc(w.word)} وكل خططه نهائياً؟ لا يمكن التراجع.`, 'حذف نهائي', true))) return; A.run(null, async () => { await api.deleteWeek(w.id); S.weekId = null; await reload(); }); });
     $$('[data-ed]', root).forEach(b => b.onclick = () => weekDialog(ws.find(x => x.id === b.dataset.ed), reload));
+    $$('[data-arc]', root).forEach(b => b.onclick = () => A.run(b, async () => { await api.updateWeek(b.dataset.arc, { archived: b.dataset.v === '1' }); await reload(); A.toast(b.dataset.v === '1' ? 'أُرشف الأسبوع — لا يراه غيرك' : 'أُعيد الأسبوع', 'ok'); }));
     $('#nw', root).onclick = () => weekDialog(null, reload);
   };
   function weekDialog(w, reload) {
@@ -387,7 +391,7 @@
   function admStaff(box, again) {
     const fsec = A.LS.get('stsec') || 'all';
     box.innerHTML = `<div class="head"><div class="grow"><p class="sub" style="margin:0">أضف المعلمين وأنشئ حسابات دخولهم وحدد صلاحياتهم في كل قسم. يمكنك تفويض أي صلاحية (مثل تعديل الجدول أو اعتماده) لمعلم أو لحساب مكلّف.</p></div>
-      <button class="btn" id="add1">${I.plus} إضافة موظف</button><button class="btn ghost" id="addN">إضافة جماعية</button></div>
+      <button class="btn" id="add1">${I.plus} إضافة موظف</button><button class="btn ghost" id="addN">إضافة جماعية</button><button class="btn ghost" id="addX">${I.up} استيراد Excel</button></div>
       <div id="joinBox"></div>
       <div class="row" style="margin-bottom:12px"><input class="in" id="q" placeholder="بحث بالاسم أو البريد" style="max-width:300px"><select class="in" id="fs" style="max-width:220px"><option value="all">كل الأقسام</option>${S.sections.map(s => `<option value="${s.id}" ${fsec === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}<option value="none" ${fsec === 'none' ? 'selected' : ''}>غير مضاف لقسم</option></select></div>
       <div class="scroll"><table class="tbl"><thead><tr><th>الاسم</th><th>البريد</th><th>الدخول</th><th>الأقسام والأدوار</th><th></th></tr></thead><tbody id="sb"></tbody></table></div>`;
@@ -400,6 +404,7 @@
     $('#add1', box).onclick = () => staffDialog(null, again);
     if (V._joinPanel) V._joinPanel($('#joinBox', box));
     $('#addN', box).onclick = () => bulkDialog(again);
+    $('#addX', box).onclick = () => V._staffImport(again);
   }
   function staffDialog(p, again) {
     const isNew = !p; p = p || { full_name: '', email: '', phone: '', active: true };
@@ -411,9 +416,10 @@
         <div class="field"><label>${p.user_id ? 'كلمة مرور جديدة (اتركها فارغة للإبقاء)' : 'كلمة المرور'}</label><div class="row" style="flex-wrap:nowrap"><input class="in" id="spw" dir="ltr" placeholder="${p.user_id ? '••••••••' : ''}"><button class="btn ghost sm" id="gp" type="button">توليد</button></div></div></div>
         <p class="small muted" style="margin:0">${p.user_id ? 'الحساب مفعّل.' : 'بدون كلمة مرور يُحفظ الموظف بلا حساب دخول (يمكن إسناد الحصص له لاحقاً).'} انسخ كلمة المرور وأرسلها للمعلم، ويمكنه تغييرها بعد الدخول.</p></div>
       ${p.is_owner ? '<div class="notice ok">مالك النظام — كل الصلاحيات في كل الأقسام.</div>' : `<div><b>الأقسام والصلاحيات</b>${secs.map(s => { const mm = S.memberships.find(x => x.staff_id === p.id && x.section_id === s.id) || {}; return `<div class="sec-box" data-sec="${s.id}" style="margin-top:8px"><div class="row" style="justify-content:space-between"><b>${esc(s.name)}</b><select class="in" data-role style="max-width:200px"><option value="">غير مضاف</option>${Object.entries(ROLES).map(([k, l]) => `<option value="${k}" ${mm.role === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div><div class="perm-grid" style="margin-top:10px">${PERMS.map(([k, l]) => `<label class="chk"><input type="checkbox" data-p="${k}" ${mm[k] ? 'checked' : ''}> ${l}</label>`).join('')}</div><div class="perm-grid" style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)"><span class="small muted">الأدوات:</span>${A.TOOL_PERMS.map(([k, l]) => `<label class="chk"><input type="checkbox" data-tp="${k}" ${mm[k] ? 'checked' : ''}> ${l}</label>`).join('')}</div><p class="small faint" style="margin:6px 0 0">«مدير القسم» يملك كل الصلاحيات في القسم. للمعلم والمشرف فعّل ما تريد تفويضه.</p></div>`; }).join('')}</div>`}
-      <div class="acts">${!isNew && !p.is_owner && p.id !== S.me.id ? `<button class="btn bad" id="sact">${p.active ? 'إيقاف الحساب' : 'إعادة التفعيل'}</button>` : ''}<button class="btn" id="ssave">حفظ</button></div>`, { cls: 'wide' });
+      <div class="acts">${!isNew && !p.is_owner && (S.realMe || S.me).is_owner ? `<button class="btn ghost" id="sview">${I.eye} الدخول بحسابه</button>` : ''}${!isNew && !p.is_owner && p.id !== S.me.id ? `<button class="btn bad" id="sact">${p.active ? 'إيقاف الحساب' : 'إعادة التفعيل'}</button>` : ''}<button class="btn" id="ssave">حفظ</button></div>`, { cls: 'wide' });
     const syncRole = box => { const r = box.querySelector('[data-role]').value; $$('[data-p]', box).forEach(i => { i.disabled = !r || r === 'admin'; if (r === 'admin') i.checked = true; }); $$('[data-tp]', box).forEach(i => { i.disabled = !r; }); };
     $$('[data-sec]', m.el).forEach(b => { syncRole(b); b.querySelector('[data-role]').onchange = e => { const r = e.target.value; if (r && ROLE_DEFAULTS[r]) $$('[data-p]', b).forEach(i => i.checked = r === 'admin' || !!ROLE_DEFAULTS[r][i.dataset.p]); syncRole(b); }; });
+    const sv = m.el.querySelector('#sview'); if (sv) sv.onclick = () => { m.close(); A.viewAs(p.id); };
     m.el.querySelector('#gp').onclick = () => { m.el.querySelector('#spw').value = A.genPass(); };
     const act = m.el.querySelector('#sact'); if (act) act.onclick = e => A.run(e.currentTarget, async () => { await api.setActive(p.id, !p.active); await A.refreshPeople(); m.close(); again(); A.toast('تم', 'ok'); });
     m.el.querySelector('#ssave').onclick = e => A.run(e.currentTarget, async () => {
@@ -528,6 +534,7 @@
     $('#os', box).onclick = e => A.run(e.currentTarget, async () => { S.school = await api.updateSchool(S.school.id, { name: $('#on', box).value.trim(), term_label: $('#ot', box).value.trim() }); A.toast('حُفظ', 'ok'); });
     const upd = (sel, key, num) => $$(`[${sel}]`, box).forEach(i => i.onchange = () => A.run(null, async () => { const id = i.getAttribute(sel); const r = await api.updateSection(id, { [key]: num ? +i.value : i.value.trim() }); Object.assign(S.sections.find(s => s.id === id), r); A.toast('حُفظ', 'ok'); }));
     upd('data-sn', 'name'); upd('data-ss', 'short_name'); upd('data-sp', 'periods', true);
+    if (V._sectionLook) V._sectionLook(box);
     $('#nsb', box).onclick = e => A.run(e.currentTarget, async () => { const n = $('#nsn', box).value.trim(); if (!n) throw new Error('اكتب اسم القسم'); const s = await api.addSection({ school_id: S.school.id, name: n, short_name: $('#nss', box).value.trim() || n.replace(/^قسم\s*/, ''), sort: S.sections.length + 1 }); S.sections.push(s); A.shell(); A.route(); A.toast('أُضيف القسم — أضف فصوله وجدوله', 'ok'); });
   }
   async function admAudit(box) {

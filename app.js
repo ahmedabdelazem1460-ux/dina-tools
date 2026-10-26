@@ -44,6 +44,8 @@
     admin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><path d="M17 11l1.5 1.5L21.5 9"/></svg>',
     nisab: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h2M12 12h2M8 16h2M12 16h2"/></svg>',
     builder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v11M15 10v11"/><path d="M8 2v4M16 2v4"/></svg>',
+    reports: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
+    archive: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10h14V9M10 13h4"/></svg>',
     dev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>',
     send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg>',
     check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
@@ -148,7 +150,9 @@
       $('#lo').onclick = async () => { await api.signOut(); loginScreen(); };
       return;
     }
-    Object.assign(S, b);
+    Object.assign(S, b); S.realMe = null; S.allSections = b.sections;
+    const va = LS.get('viewas');
+    if (va && b.me.is_owner) { const t = b.staff.find(x => x.id === va && !x.is_owner); if (t) { S.realMe = b.me; S.me = t; } else LS.set('viewas', ''); }
     S.sections = S.me.is_owner ? S.sections : S.sections.filter(s => S.memberships.some(m => m.staff_id === S.me.id && m.section_id === s.id));
     if (!S.sections.length) {
       $('#app').innerHTML = `<main><div class="card" style="max-width:560px;margin:60px auto">${emptyBox('لم تُضَف إلى أي قسم بعد', 'تواصل مع إدارة القسم لإضافتك.')}<div class="row" style="justify-content:center"><button class="btn ghost" id="lo">تسجيل الخروج</button></div></div></main>`;
@@ -164,7 +168,7 @@
     const [c, w] = await Promise.all([api.classes(S.sectionId), api.weeks(S.sectionId)]);
     S.classes = c; S.weeks = w;
     const savedW = keepWeek || LS.get('week_' + S.sectionId);
-    const open = w.filter(x => x.status === 'open').sort((a, b) => a.number - b.number);
+    const open = w.filter(x => x.status === 'open' && !x.archived).sort((a, b) => a.number - b.number);
     S.weekId = w.some(x => x.id === savedW) ? savedW : (open[0] || w[0] || {}).id || null;
     await loadWeek();
   }
@@ -186,18 +190,22 @@
     ['nisab', 'احتساب النصاب', () => perm('nisab')],
     ['builder', 'الجدول الآلي', () => perm('tt_builder')],
     ['admin', 'الإدارة', () => S.me.is_owner || anyPerm('users', 'structure')],
+    ['reports', 'التقارير', () => S.me.is_owner || anyPerm('review', 'export', 'users')],
+    ['archive', 'الأرشيف', () => S.me.is_owner],
     ['dev', 'لوحة المطوّر', () => S.me.is_owner],
   ];
   function shell() {
     const sec = section();
     $('#app').innerHTML = `
     ${DEMO ? '<div class="demo-banner">وضع التجربة — بيانات تجريبية ولا تُحفظ</div>' : ''}
+    ${S.realMe ? `<div class="viewas" role="status"><span>تتصفّح الآن بحساب <b>${esc(S.me.full_name)}</b> — ترى ما يراه بالضبط، وأي تعديل يُسجَّل باسمك.</span><button class="btn sky sm" id="backMe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg> العودة لحسابي</button></div>` : ''}
     <header class="top"><div class="top-in">
       <img class="logo" src="assets/logo_white.svg" alt="مدارس دينا العالمية">
       <div class="ttl">منصة دينا للتخطيط الدراسي<small>${esc(S.school.name)}</small></div>
       <div class="grow"></div>
       <div class="pick"><label>القسم</label><select id="secSel">${S.sections.map(s => `<option value="${s.id}" ${s.id === S.sectionId ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>
-      <div class="pick"><label>الأسبوع</label><select id="weekSel">${S.weeks.length ? S.weeks.map(w => `<option value="${w.id}" ${w.id === S.weekId ? 'selected' : ''}>الأسبوع ${esc(w.word)} ${w.status !== 'open' ? '· ' + WSTATUS[w.status] : ''}</option>`).join('') : '<option>لا توجد أسابيع</option>'}</select></div>
+      <div class="pick"><label>الأسبوع</label><select id="weekSel">${S.weeks.length ? S.weeks.map(w => `<option value="${w.id}" ${w.id === S.weekId ? 'selected' : ''}>الأسبوع ${esc(w.word)} ${w.archived ? '· أرشيف' : w.status !== 'open' ? '· ' + WSTATUS[w.status] : ''}</option>`).join('') : '<option>لا توجد أسابيع</option>'}</select></div>
+      <button class="userbtn icon-only" id="inboxBtn" aria-label="الرسائل"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H7l-3 3z"/></svg><span class="badge hidden" id="inboxN"></span></button>
       <button class="userbtn" id="ub"><span class="avatar">${esc((S.me.full_name.replace(/^(أ\.|Ms\.|Mr\.|د\.)\s*/, '')[0]) || '؟')}</span><span class="small" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.me.full_name)}</span></button>
     </div></header>
     <nav class="nav" id="nav"></nav>
@@ -205,6 +213,8 @@
     $('#secSel').onchange = async e => { S.sectionId = e.target.value; LS.set('section', S.sectionId); $('#main').innerHTML = '<div class="spinner"></div>'; await loadSection(); shell(); route(); };
     $('#weekSel').onchange = async e => { S.weekId = e.target.value; LS.set('week_' + S.sectionId, S.weekId); $('#main').innerHTML = '<div class="spinner"></div>'; await loadWeek(); route(); };
     $('#ub').onclick = e => { e.stopPropagation(); userMenu(); };
+    const bm = $('#backMe'); if (bm) bm.onclick = () => { LS.set('viewas', ''); location.hash = '#/dev'; start(); };
+    if (window.APP_AFTER_SHELL) window.APP_AFTER_SHELL();
     renderNav();
   }
   function moreSheet(items) {
@@ -215,6 +225,7 @@
   function renderNav() {
     const myCount = S.entries.filter(e => e.teacher_id === S.me.id && required(e) && !filled(e)).length;
     const items = NAV.filter(n => n[2]());
+    if (!$('#nav')) return;
     $('#nav').innerHTML = items.map(([k, l]) => `<a href="#/${k}" class="${S.view === k ? 'on' : ''}" ${S.view === k ? 'aria-current="page"' : ''}>${I[k]}<span>${l}</span>${k === 'my' && myCount ? `<span class="cnt">${AR(myCount)}</span>` : ''}</a>`).join('');
     const bn = $('#bnav'); if (bn) {
       const prim = items.length > 5 ? items.slice(0, 4) : items, rest = items.length > 5 ? items.slice(4) : [];
@@ -252,7 +263,7 @@
     S.view = v; LS.set('view', v);
     if (location.hash !== '#/' + v) history.replaceState(null, '', '#/' + v);
     renderNav();
-    const main = $('#main'); main.innerHTML = '';
+    const main = $('#main'); if (!main) return; main.innerHTML = '';
     try { VIEWS[v](main); } catch (e) { console.error(e); main.innerHTML = `<div class="card">${emptyBox('حدث خطأ في عرض الصفحة', esc(e.message))}</div>`; }
   }
   window.addEventListener('hashchange', () => { if (S.me) route(); });
@@ -279,7 +290,7 @@
       $$('.claim', root).forEach(b => b.onclick = () => run(null, async () => {
         const st = b.dataset.st; if (st === 'taken') return toast('هذه المادة مسندة لمعلم آخر — تواصل مع الإدارة');
         if (st === 'mine' && !(await confirmBox('إلغاء اختيار هذه المادة في هذا الفصل؟ ستختفي حصصها غير المكتوبة من خطتك.', 'إلغاء الاختيار', true))) return;
-        await api.claim(b.dataset.c, b.dataset.s, st === 'mine');
+        if (S.realMe) await api.assignTeacher(b.dataset.c, b.dataset.s, st === 'mine' ? null : S.me.id); else await api.claim(b.dataset.c, b.dataset.s, st === 'mine');
         const p = pairs[b.dataset.c + '|' + b.dataset.s]; p.t = st === 'mine' ? null : S.me.id;
         await loadWeek(); renderNav(); draw(); toast(st === 'mine' ? 'أُلغي الاختيار' : 'أُضيفت إلى خطتك', 'ok');
         const g = $('#goMy', root); if (!g) claimView(root, false);
@@ -301,6 +312,9 @@
         <h2>إنشاء حساب — ${esc(info.section)}</h2><p class="sub">${esc(info.school)} · ${info.role === 'supervisor' ? 'مشرف' : 'معلم'}</p>
         <div class="field"><label for="jn">الاسم كما يظهر في الخطة</label><input class="in" id="jn" required placeholder="أ. الاسم الثلاثي" autocomplete="name"></div>
         <div class="field"><label for="je">البريد الإلكتروني (المدرسي إن وُجد)</label><input class="in" id="je" type="email" dir="ltr" required autocomplete="username"></div>
+        <div class="grid g2" style="gap:0 12px"><div class="field"><label for="jph">الجوال</label><input class="in" id="jph" type="tel" dir="ltr" autocomplete="tel" placeholder="05xxxxxxxx"></div>
+        <div class="field"><label for="jsp">التخصص</label><input class="in" id="jsp" placeholder="مثال: اللغة العربية"></div></div>
+        <div class="field"><label for="jen">الرقم الوظيفي (اختياري)</label><input class="in" id="jen" dir="ltr"></div>
         <div class="field"><label for="jp">كلمة مرور جديدة (٨ أحرف على الأقل)</label><input class="in" id="jp" type="password" dir="ltr" minlength="8" required autocomplete="new-password"></div>
         <div class="field"><label for="jp2">أعد كتابة كلمة المرور</label><input class="in" id="jp2" type="password" dir="ltr" minlength="8" required autocomplete="new-password"></div>
         <div class="err-line" id="jerr" role="alert"></div>
@@ -313,7 +327,7 @@
       const n = $('#jn').value.trim(), em = $('#je').value.trim(), p1 = $('#jp').value, p2 = $('#jp2').value;
       if (p1 !== p2) { $('#jerr').textContent = 'كلمتا المرور غير متطابقتين'; return; }
       const b = $('#jb'); b.disabled = true; b.textContent = 'جارٍ إنشاء الحساب…';
-      try { await api.joinWithCode(code, n, em, p1); await api.signIn(em, p1); history.replaceState(null, '', location.pathname + (DEMO ? '?demo=1' : '') + '#/my'); await start(); toast('أُنشئ حسابك — اختر موادك وفصولك', 'ok'); }
+      try { await api.joinWithCode2(code, { name: n, email: em, password: p1, phone: $('#jph').value.trim(), specialty: $('#jsp').value.trim(), employee_no: $('#jen').value.trim() }); await api.signIn(em, p1); history.replaceState(null, '', location.pathname + (DEMO ? '?demo=1' : '') + '#/my'); await start(); toast('أُنشئ حسابك — اختر موادك وفصولك', 'ok'); }
       catch (err) { $('#jerr').textContent = apiMsg(err); b.disabled = false; b.textContent = 'إنشاء الحساب والدخول'; }
     };
   }
@@ -335,7 +349,7 @@
     root.innerHTML = `
       <div class="head"><div class="grow"><h2 style="margin:0;font-size:24px;font-weight:800">خطتي — الأسبوع ${esc(w.word)}</h2>
         <p class="sub" style="margin:4px 0 0">${AR(dates[0])} : ${AR(dates[dates.length - 1])} · ${cnt(req.length, 'حصة', 'حصص')} مطلوبة · ${esc(section().name)}</p></div>
-        <button class="btn ghost sm" id="myClaim">${I.classes} موادي وفصولي</button>
+        <button class="btn ghost sm" id="myClaim">${I.classes} موادي وفصولي</button><button class="btn ghost sm" id="myExec">${I.check} التنفيذ اليومي</button>
         <div class="tabs" style="margin:0;border:0" id="flt">${[['all', 'الكل'], ['todo', 'غير مكتملة'], ['returned', 'مُعادة'], ['done', 'مكتملة']].map(([k, l]) => `<button data-f="${k}" class="${filter === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
       ${!open ? `<div class="notice warn">${I.lock} هذا الأسبوع ${WSTATUS[w.status]} — لا يمكن التعديل.</div>` : ''}
       ${late ? `<div class="notice bad">انتهى موعد التسليم (${fmtDT(w.deadline)}) وما زالت خطتك غير مكتملة.</div>` : (dl && open ? `<div class="notice info">آخر موعد للتسليم: <b>${fmtDT(w.deadline)}</b></div>` : '')}
@@ -348,6 +362,7 @@
       </div></div>`;
     $$('#flt button', root).forEach(b => b.onclick = () => { LS.set('myfilter', b.dataset.f); VIEWS.my(root); });
     $('#myClaim', root).onclick = () => claimView(root, false);
+    $('#myExec', root).onclick = () => VIEWS._exec(root);
     const days = $('#days', root);
     for (let d = 0; d < section().days; d++) {
       const hol = holidayOf(d);
@@ -368,7 +383,7 @@
       await flushSaves();
       const pend = mine.filter(e => required(e) && !filled(e)).length;
       if (pend && !(await confirmBox(`ما زالت ${cnt(pend, 'حصة', 'حصص')} بدون موضوع. هل ترسل المكتمل الآن؟`, 'إرسال المكتمل'))) return;
-      const n = await api.submitMyWeek(w.id);
+      const n = S.realMe ? await api.review(mine.filter(e => filled(e) && ['draft', 'returned'].includes(e.status)).map(e => e.id), 'submitted') : await api.submitMyWeek(w.id);
       await loadWeek(); VIEWS.my(root); renderNav();
       toast(n ? `أُرسلت ${cnt(n, 'حصة', 'حصص')} للمراجعة` : 'لا توجد حصص جديدة للإرسال', n ? 'ok' : '');
     });
@@ -437,7 +452,7 @@
     root.innerHTML = `
       <div class="head"><div class="grow"><h2 style="margin:0;font-size:24px;font-weight:800">لوحة المتابعة — الأسبوع ${esc(w.word)}</h2>
         <p class="sub" style="margin:4px 0 0">${esc(section().name)} · ${AR(weekDates(w)[0])} : ${AR(weekDates(w)[4])} · <span class="pill st-${w.status}">${WSTATUS[w.status]}</span></p></div>
-        ${perm('export') ? `<a class="btn sky" href="#/export">${I.export} التصدير</a>` : ''}</div>
+        <div class="row">${perm('review') ? `<button class="btn ghost" id="dLang">التدقيق اللغوي</button><button class="btn ghost" id="dExec">${I.check} التنفيذ اليومي</button>` : ''}${perm('export') ? `<a class="btn sky" href="#/export">${I.export} التصدير</a>` : ''}</div></div>
       <div class="grid g4">
         <button class="kpi navy btnlike" data-drill="todo"><span class="more">التفاصيل</span><div class="k">نسبة الإنجاز</div><div class="v">${AR(pct(all.filled, all.total))}<small>٪</small></div><div class="d">${AR(all.filled)} من ${cnt(all.total, 'حصة', 'حصص')}</div></button>
         <button class="kpi btnlike" data-drill="submitted"><span class="more">التفاصيل</span><div class="k">معتمدة</div><div class="v">${AR(all.approved)}</div><div class="d">مُرسلة بانتظار المراجعة: ${AR(all.submitted)}</div></button>
@@ -456,6 +471,8 @@
       </div>`;
     $$('tr[data-c]', root).forEach(r => r.onclick = () => { LS.set('cls', r.dataset.c); location.hash = '#/classes'; });
     $$('[data-drill]', root).forEach(b => b.onclick = () => drill(b.dataset.drill));
+    const dl2 = $('#dLang', root); if (dl2) dl2.onclick = () => VIEWS._lang(null);
+    const de2 = $('#dExec', root); if (de2) de2.onclick = () => VIEWS._exec(root, { all: true });
     $$('tr[data-t]', root).forEach(r => { const go = e => { if (e.target.closest('a')) return; drill('teacher', r.dataset.t); }; r.onclick = go; r.onkeydown = e => { if (e.key === 'Enter') go(e); }; });
     $$('tr[data-c]', root).forEach(r => r.tabIndex = 0);
     const ra = $('#remindAll', root); if (ra) ra.onclick = () => { location.href = remindLink(lateT.map(t => t.p).filter(p => p && p.email)); };
@@ -479,7 +496,7 @@
     const draw = k => {
       $$('#dfl button', m.el).forEach(b => b.classList.toggle('on', b.dataset.f === k));
       const list = base.filter(F[k][1]).sort((a, b) => (cls(a.class_id)?.sort ?? 0) - (cls(b.class_id)?.sort ?? 0) || a.day - b.day || a.period - b.period);
-      $('#dtb', m.el).innerHTML = list.slice(0, 400).map(e => `<tr class="click" data-c="${e.class_id}"><td><b>${esc((cls(e.class_id) || {}).name || '')}</b></td><td>${DAYS[e.day]}</td><td>${AR(e.period + 1)}</td><td>${esc(subjName(e.subject_id))}</td>${arg ? '' : `<td class="small">${esc(personName(e.teacher_id) || '—')}</td>`}<td class="small">${esc(e.topic) || '<span class="faint">—</span>'}</td><td>${pill(e.status)}</td></tr>`).join('') || `<tr><td colspan="7">${emptyBox('لا توجد حصص في هذا التصنيف')}</td></tr>`;
+      $('#dtb', m.el).innerHTML = list.slice(0, 400).map(e => `<tr class="click" data-c="${e.class_id}"><td><b>${esc((cls(e.class_id) || {}).name || '')}</b></td><td>${DAYS[e.day]}</td><td>${AR(e.period + 1)}</td><td>${esc(subjName(e.subject_id))}</td>${arg ? '' : `<td class="small">${e.teacher_id ? esc(personName(e.teacher_id)) : `<a href="#" class="assignlink" data-assign-c="${e.class_id}" data-assign-s="${e.subject_id}">إسناد</a>`}</td>`}<td class="small">${esc(e.topic) || '<span class="faint">—</span>'}</td><td>${pill(e.status)}</td></tr>`).join('') || `<tr><td colspan="7">${emptyBox('لا توجد حصص في هذا التصنيف')}</td></tr>`;
       $$('tr[data-c]', m.el).forEach(r => r.onclick = () => { m.close(); LS.set('cls', r.dataset.c); location.hash = '#/classes'; if (S.view === 'classes') route(); });
     };
     $$('#dfl button', m.el).forEach(b => b.onclick = () => draw(b.dataset.f)); draw(kind);
@@ -513,7 +530,7 @@
       <div class="head"><div class="grow"><h2>${esc(c.name)}</h2><p class="sub" style="margin:2px 0 0">الأسبوع ${esc(w.word)} · الإنجاز ${AR(s.filled)}/${AR(s.total)} · معتمدة ${AR(s.approved)} · مُرسلة ${AR(s.submitted)}</p></div>
         <div class="row">
           ${reviewer ? `<button class="btn ok sm" id="apAll">${I.check} اعتماد كل المُرسل</button><button class="btn ghost sm" id="apSel">اعتماد المحدد</button><button class="btn ghost sm" id="retSel">${I.undo} إرجاع المحدد</button>` : ''}
-          <button class="btn sky sm" id="prev">${I.eye} معاينة الملف</button>
+          ${reviewer ? `<button class="btn ghost sm" id="langB">التدقيق اللغوي</button>` : ''}<button class="btn sky sm" id="prev">${I.eye} معاينة الملف</button>
         </div></div>
       <div class="scroll"><table class="cgrid"><thead><tr>${reviewer ? '<th style="width:34px"><input type="checkbox" id="selAll" aria-label="تحديد الكل"></th>' : ''}<th>اليوم</th><th>الحصة</th><th style="width:15%">المادة / المعلم</th><th style="width:30%">الموضوع</th><th style="width:22%">الواجب</th><th style="width:14%">ملاحظة</th><th>الحالة</th></tr></thead><tbody id="cgb"></tbody></table></div>
     </div>
@@ -529,9 +546,9 @@
         const ed = canEdit(e);
         tr.innerHTML = `${reviewer ? `<td><input type="checkbox" data-sel="${e.id}"></td>` : ''}${k === 0 ? `<td class="dayc" rowspan="${rows.length}">${DAYS[d]}<div class="small muted">${AR(dates[d])}</div></td>` : ''}
           <td class="per">${AR(e.period + 1)}</td>
-          <td><b>${esc(subjName(e.subject_id) || '—')}</b><div class="small ${e.teacher_id ? 'muted' : ''}" style="${e.teacher_id ? '' : 'color:var(--bad)'}">${e.subject_id ? esc(personName(e.teacher_id) || 'بلا معلم') : ''}</div></td>
+          <td><b>${esc(subjName(e.subject_id) || '—')}</b><div class="small ${e.teacher_id ? 'muted' : ''}" style="${e.teacher_id ? '' : 'color:var(--bad)'}">${e.subject_id ? (e.teacher_id ? esc(personName(e.teacher_id)) : `<a href="#" class="assignlink" data-assign-c="${e.class_id}" data-assign-s="${e.subject_id}">بلا معلم — إسناد</a>`) : ''}</div></td>
           ${['topic', 'homework', 'note'].map(k2 => `<td>${ed ? `<textarea data-k="${k2}" rows="1">${esc(e[k2])}</textarea>` : `<div style="padding:6px">${esc(e[k2]) || '<span class="faint">–</span>'}</div>`}</td>`).join('')}
-          <td>${pill(e.status)}${e.review_note ? `<div class="small" style="color:var(--warn);margin-top:4px">${esc(e.review_note)}</div>` : ''}</td>`;
+          <td>${pill(e.status)}${e.subject_id && APP.exPill ? `<div style="margin-top:4px">${APP.exPill(e.exec_status)}</div>` : ''}${e.review_note ? `<div class="small" style="color:var(--warn);margin-top:4px">${esc(e.review_note)}</div>` : ''}</td>`;
         if (ed) {
           const save = async () => {
             const patch = {}; $$('[data-k]', tr).forEach(i => patch[i.dataset.k] = i.value.trim());
@@ -544,6 +561,7 @@
       });
     }
     $('#prev', cv).onclick = () => VIEWS._preview(c);
+    const lb = $('#langB', cv); if (lb) lb.onclick = () => VIEWS._lang(c.id);
     if (reviewer) {
       const sel = () => $$('[data-sel]:checked', cv).map(i => i.dataset.sel);
       $('#selAll', cv).onchange = e => $$('[data-sel]', cv).forEach(i => i.checked = e.target.checked);
@@ -588,7 +606,7 @@
   }
 
   // ---------- مشترك مع الملفات الأخرى ----------
-  window.APP = { TOOL_PERMS, TOOL_KEYS, cnt, api, S, $, $$, esc, AR, DAYS, PER, ORD, STATUS, WSTATUS, ROLES, PERMS, ROLE_DEFAULTS, I, parseDate, isoDate, dmy, weekDates, fmtDT, pct, norm, normKey, genPass, toast, modal, confirmBox, run, pill, bar, emptyBox, download, section, week, subj, subjName, person, personName, cls, myMem, perm, anyPerm, holidayOf, required, filled, stats, loadSection, loadWeek, refreshPeople, shell, route, renderNav, LS, DEMO };
+  window.APP = { start: () => start(), TOOL_PERMS, TOOL_KEYS, cnt, api, S, $, $$, esc, AR, DAYS, PER, ORD, STATUS, WSTATUS, ROLES, PERMS, ROLE_DEFAULTS, I, parseDate, isoDate, dmy, weekDates, fmtDT, pct, norm, normKey, genPass, toast, modal, confirmBox, run, pill, bar, emptyBox, download, section, week, subj, subjName, person, personName, cls, myMem, perm, anyPerm, holidayOf, required, filled, stats, loadSection, loadWeek, refreshPeople, shell, route, renderNav, LS, DEMO };
 
   // ---------- تشغيل ----------
   window.addEventListener('DOMContentLoaded', async () => {

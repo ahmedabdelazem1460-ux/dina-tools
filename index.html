@@ -13,7 +13,12 @@
 @font-face{font-family:'Tajawal';font-weight:500;src:url(fonts/tajawal-latin-500-normal.woff2) format('woff2')}
 @font-face{font-family:'Tajawal';font-weight:700;src:url(fonts/tajawal-latin-700-normal.woff2) format('woff2')}
 @font-face{font-family:'Tajawal';font-weight:800;src:url(fonts/tajawal-latin-800-normal.woff2) format('woff2')}
-@font-face{font-family:'GE SS Two';src:local('GE SS Two Bold'),local('GESSTwoBold-Bold');font-weight:700}
+@font-face{font-family:'GE SS Two';font-weight:300;font-display:swap;src:url(fonts/gess-two-light.woff2) format('woff2')}
+@font-face{font-family:'GE SS Two';font-weight:400 500;font-display:swap;src:url(fonts/gess-two-medium.woff2) format('woff2')}
+@font-face{font-family:'GE SS Two';font-weight:600 900;font-display:swap;src:url(fonts/gess-two-bold.woff2) format('woff2')}
+@font-face{font-family:'Myriad Pro';font-weight:300 400;font-display:swap;src:url(fonts/myriad-pro-regular.woff2) format('woff2')}
+@font-face{font-family:'Myriad Pro';font-weight:500 600;font-display:swap;src:url(fonts/myriad-pro-semibold.woff2) format('woff2')}
+@font-face{font-family:'Myriad Pro';font-weight:700 900;font-display:swap;src:url(fonts/myriad-pro-bold.woff2) format('woff2')}
 :root{
   --navy:#082B5A;--sky:#3AB1DB;--blue:#005499;--pale:#E4EBF5;--line:#84B7E3;--mid:#5E9BD3;--soft:#6EA7DA;
   --green:#BADF93;--purple:#AE95DA;--lav:#DAD5EB;
@@ -25,7 +30,7 @@
   --sh3:0 24px 60px -16px rgba(8,43,90,.45);
 }
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--ink);font-family:'GE SS Two','Tajawal',system-ui,sans-serif;font-weight:500;-webkit-font-smoothing:antialiased}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:'GE SS Two','Myriad Pro','Tajawal',system-ui,sans-serif;font-weight:500;-webkit-font-smoothing:antialiased}
 body{min-height:100vh;background:
   radial-gradient(circle at 1px 1px,rgba(58,177,219,.18) 1px,transparent 1.3px) 0 0/22px 22px,
   linear-gradient(180deg,#F5F8FC,#EAF0F8)}
@@ -223,6 +228,33 @@ code.k{background:var(--pale);border-radius:6px;padding:1px 6px;font-size:13px}
 }
 @media print{.top,.nav,.sticky-foot,.bnav{display:none}}
 
+/* ---------- تصفّح كموظف + رسائل ---------- */
+.viewas{background:linear-gradient(90deg,#3AB1DB,#5BC2E5);color:#082B5A;display:flex;align-items:center;justify-content:center;gap:14px;padding:8px 16px;font-size:14px;flex-wrap:wrap;position:sticky;top:0;z-index:31}
+.userbtn.icon-only{position:relative;padding:8px 10px}
+.badge{position:absolute;top:-6px;left:-6px;background:#E2574C;color:#fff;border-radius:20px;font-size:11px;font-weight:800;min-width:20px;height:20px;display:grid;place-items:center;padding:0 5px;border:2px solid #082B5A}
+.inbox{display:grid;grid-template-columns:300px 1fr;gap:0;min-height:420px;border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.inbox .lst{border-inline-end:1px solid var(--border);overflow:auto;max-height:60vh;background:#FAFCFF}
+.inbox .lst button{display:block;width:100%;text-align:start;border:0;border-bottom:1px solid var(--border);background:none;padding:12px 14px}
+.inbox .lst button.on{background:var(--pale)}.inbox .lst button.unread b{color:var(--blue)}
+.inbox .lst button.unread::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--sky);margin-inline-end:6px}
+.inbox .rd{padding:16px;overflow:auto;max-height:60vh}
+.inbox .msg{background:#F6F9FD;border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin-bottom:10px;white-space:pre-line;line-height:1.7}
+.inbox .msg.me{background:#fff;border-color:var(--sky)}
+@media (max-width:760px){.inbox{grid-template-columns:1fr}.inbox .lst{max-height:30vh}}
+/* التنفيذ اليومي */
+.ex-pending{--exc:#E8B931;--exb:#FFF8E1}.ex-done{--exc:#2E8B57;--exb:#E5F4EA}.ex-modified{--exc:#7CC796;--exb:#F0FAF3}.ex-not_done{--exc:#B83A3A;--exb:#FBE7E7}
+.exdot{display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--exc);box-shadow:0 0 0 3px var(--exb);vertical-align:middle}
+.expill{display:inline-flex;align-items:center;gap:6px;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:800;background:var(--exb);color:#082B5A;border:1px solid var(--exc)}
+.exrow{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;border:1px solid var(--border);border-inline-start:6px solid var(--exc);background:#fff;border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.exrow .acts{display:flex;gap:6px;flex-wrap:wrap}
+.exrow .acts .btn.on{outline:3px solid var(--exc)}
+.lang-row{display:grid;grid-template-columns:28px 1fr 1fr;gap:10px;align-items:start;border-bottom:1px solid var(--border);padding:10px 0}
+.lang-row del{color:var(--bad);text-decoration:line-through;background:var(--badbg);border-radius:4px;padding:0 2px}
+.lang-row ins{color:var(--oktx);text-decoration:none;background:var(--okbg);border-radius:4px;padding:0 2px}
+.rep-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.rep-card{border:1px solid var(--border);border-radius:16px;padding:16px;background:linear-gradient(170deg,#fff,#F4F8FD);text-align:start;font:inherit;cursor:pointer}
+.rep-card:hover{border-color:var(--sky)}
+.assignlink{color:var(--bad);font-weight:800;text-decoration:underline dotted}.rep-card b{display:block;font-size:16px;margin-bottom:4px}
 /* ---------- وصول وتفاعل ---------- */
 :focus-visible{outline:3px solid var(--sky);outline-offset:2px;border-radius:8px}
 .in:focus-visible{outline:none}
@@ -276,19 +308,22 @@ button,a,select,[role=button],.click{cursor:pointer}
 <body>
 <div id="app"><div class="spinner"></div></div>
 <div id="toasts"></div>
-<script src="config.js"></script>
+<script src="config.js?v=1793045026"></script>
 <script src="vendor/supabase.js"></script>
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/html2canvas.min.js"></script>
 <script src="vendor/jspdf.umd.min.js"></script>
 <script src="vendor/jszip.min.js"></script>
-<script src="tpl_consts.js"></script>
-<script src="export.js"></script>
-<script src="api.js"></script>
-<script src="demo.js"></script>
-<script src="app.js"></script>
-<script src="app2.js"></script>
-<script src="app3.js"></script>
-<script src="app4.js"></script>
+<script src="tpl_consts.js?v=1793045026"></script>
+<script src="export.js?v=1793045026"></script>
+<script src="api.js?v=1793045026"></script>
+<script src="demo.js?v=1793045026"></script>
+<script src="app.js?v=1793045026"></script>
+<script src="app2.js?v=1793045026"></script>
+<script src="app3.js?v=1793045026"></script>
+<script src="app4.js?v=1793045026"></script>
+<script src="lang.js?v=1793045026"></script>
+<script src="app5.js?v=1793045026"></script>
+<script src="app6.js?v=1793045026"></script>
 </body>
 </html>

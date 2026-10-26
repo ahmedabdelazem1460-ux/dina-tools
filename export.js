@@ -38,9 +38,14 @@
 @font-face{font-family:'Source Sans 3';font-weight:400;src:url(fonts/source-sans-3-latin-400-normal.woff2) format('woff2')}
 @font-face{font-family:'Source Sans 3';font-weight:600;src:url(fonts/source-sans-3-latin-600-normal.woff2) format('woff2')}
 @font-face{font-family:'Source Sans 3';font-weight:700;src:url(fonts/source-sans-3-latin-700-normal.woff2) format('woff2')}
-@font-face{font-family:'GE SS Two';font-weight:700;src:local('GE SS Two Bold'),local('GESSTwoBold-Bold')}
+@font-face{font-family:'GE SS Two';font-weight:300;font-display:swap;src:url(fonts/gess-two-light.woff2) format('woff2')}
+@font-face{font-family:'GE SS Two';font-weight:400 500;font-display:swap;src:url(fonts/gess-two-medium.woff2) format('woff2')}
+@font-face{font-family:'GE SS Two';font-weight:600 900;font-display:swap;src:url(fonts/gess-two-bold.woff2) format('woff2')}
+@font-face{font-family:'Myriad Pro';font-weight:300 400;font-display:swap;src:url(fonts/myriad-pro-regular.woff2) format('woff2')}
+@font-face{font-family:'Myriad Pro';font-weight:500 600;font-display:swap;src:url(fonts/myriad-pro-semibold.woff2) format('woff2')}
+@font-face{font-family:'Myriad Pro';font-weight:700 900;font-display:swap;src:url(fonts/myriad-pro-bold.woff2) format('woff2')}
 `;
-  const BASE = FONTS + TPL.CSS2.replace("font-family:'Tajawal'", "font-family:'GE SS Two','Tajawal'") + `
+  const BASE = FONTS + TPL.CSS2.replace("font-family:'Tajawal'", "font-family:'GE SS Two','Myriad Pro','Tajawal'").replace(/'Source Sans 3'/g, "'Myriad Pro','Source Sans 3'") + `
 @media screen{body{background:#cfd8e6;padding:12px 0}.page{margin:0 auto 18px;box-shadow:0 6px 24px rgba(8,43,90,.18)}}
 table.plan td.c{overflow-wrap:anywhere}
 .notes ul{list-style:none;padding:8px 18px 10px 16px}.notes li .bl{color:#3AB1DB;font-size:9px;vertical-align:middle;margin-inline-end:4px}
@@ -243,9 +248,26 @@ body.ink .topbar{background:#fff;border-bottom:3px solid #3AB1DB}
     });
     if (o.notes && doc.extra && doc.extra.length) h += notesPage(doc, land);
     xp.filter(x => x.position !== 'after_cover').forEach(x => h += extraPageHTML(doc, x, land));
-    return { html: h, land, ink: o.ink };
+    if (o.rich) h = richDecor(h, land);
+    if (o.coverImg && o.cover) h = h.replace('<div class="page cover', `<div class="page cover`).replace(/(<div class="page cover[^>]*>)/, `$1<img class="cimg" src="${esc(o.coverImg)}" crossorigin="anonymous" style="top:${land ? 640 : 860}px;width:${land ? 220 : 300}px;height:${land ? 90 : 150}px">`);
+    return { html: themed(h, { name: o.theme }), land, ink: o.ink, rich: o.rich, theme: o.theme };
   }
-  const shell = (r, title) => `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><base href="${location.href.replace(/[^/]*$/, '')}"><title>${esc(title || '')}</title><style>${BASE}@page{size:A4 ${r.land ? 'landscape' : 'portrait'};margin:0}</style></head><body class="${r.ink ? 'ink' : ''}">${r.html}</body></html>`;
+  // هويات التصميم المشتقة من دليل هوية دينا (الكحلي ثابت؛ يتغير اللون المساند)
+  const THEMES = {
+    dina: null,
+    lavender: { '#3AB1DB': '#AE95DA', '#84B7E3': '#C4B5E3', '#E4EBF5': '#EEEBF6', '#5E9BD3': '#AE95DA', '#6EA7DA': '#DAD5EB' },
+    green: { '#3AB1DB': '#8CC56A', '#84B7E3': '#BADF93', '#E4EBF5': '#EEF6E6', '#5E9BD3': '#8CC56A', '#6EA7DA': '#BADF93' },
+  };
+  const RICH = `.rich .banner,.rich .week{border-bottom:5px solid #3AB1DB}
+.rich .cards td,.rich table.honor td,.rich .xn{border-bottom:4px solid #84B7E3}
+.rich .tw,.rich .wkwrap{border-bottom-width:4px}
+.rich .chip{border-bottom:3px solid #082B5A}`;
+  function themed(html, t) { const map = t && THEMES[t.name]; if (!map) return html; return html.replace(/#(3AB1DB|84B7E3|E4EBF5|5E9BD3|6EA7DA)\b/gi, m => map[m.toUpperCase()] || m); }
+  function richDecor(html, land) {
+    const add = (land ? '' : pin('position:absolute;top:150px;right:46px;width:40px;height:40px;opacity:.9')) + star('position:absolute;bottom:150px;left:52px;width:22px;height:22px', SKY, NAVY, 2.4) + flower('position:absolute;top:150px;left:-46px;width:120px;height:120px', SKY, 1.1, 0.5);
+    return html.replace(/<div class="page day([^"]*)"([^>]*)>/g, (m) => m + add);
+  }
+  const shell = (r, title) => `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><base href="${location.href.replace(/[^/]*$/, '')}"><title>${esc(title || '')}</title><style>${themed(BASE + (r.rich ? RICH : ''), { name: r.theme })}@page{size:A4 ${r.land ? 'landscape' : 'portrait'};margin:0}.cimg{position:absolute;left:50%;transform:translateX(-50%);border-radius:18px;object-fit:cover;box-shadow:0 12px 26px -12px rgba(8,43,90,.5)}</style></head><body class="${r.ink ? 'ink' : ''} ${r.rich ? 'rich' : ''}">${r.html}</body></html>`;
 
   async function renderInto(frame, doc, title) {
     const fits = doc.days.map(() => 0); let ov = 0; let r;

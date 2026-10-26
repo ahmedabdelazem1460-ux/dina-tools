@@ -3,7 +3,7 @@
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id' + Math.random().toString(36).slice(2));
   const clone = o => JSON.parse(JSON.stringify(o));
   function seed() {
-    const D = { extra_pages: [], join_codes: [], schools: [], sections: [], staff: [], memberships: [], classes: [], subjects: [], timetable_versions: [], timetable_slots: [], weeks: [], plan_entries: [], notes: [], audit_log: [] };
+    const D = { messages: [], language_issues: [], extra_pages: [], join_codes: [], schools: [], sections: [], staff: [], memberships: [], classes: [], subjects: [], timetable_versions: [], timetable_slots: [], weeks: [], plan_entries: [], notes: [], audit_log: [] };
     const sch = { id: uid(), name: 'مدارس دينا العالمية', term_label: 'الفصل الدراسي الأول · العام الدراسي ١٤٤٨هـ' }; D.schools.push(sch);
     const g = { id: uid(), school_id: sch.id, name: 'قسم البنات', short_name: 'البنات', days: 5, periods: 7, sort: 1 };
     const b = { id: uid(), school_id: sch.id, name: 'قسم البنين', short_name: 'البنين', days: 5, periods: 7, sort: 2 };
@@ -47,6 +47,7 @@
       const sn = (D.subjects.find(s => s.id === e.subject_id) || {}).name;
       if (samples[sn] && (i % 5 !== 0)) { e.topic = samples[sn][0]; e.homework = i % 3 ? samples[sn][1] : ''; e.status = i % 7 === 0 ? 'approved' : i % 4 === 0 ? 'submitted' : 'draft'; }
     });
+    D.plan_entries.forEach((e, i) => { e.exec_status = e.status === 'approved' && e.day < 2 ? (i % 6 === 0 ? 'modified' : 'done') : 'pending'; e.exec_note = ''; if (e.status === 'submitted') e.submitted_at = new Date(Date.now() - (i % 3) * 864e5).toISOString(); });
     const ret = D.plan_entries.find(e => e.status === 'submitted'); if (ret) { ret.status = 'returned'; ret.review_note = 'يرجى تحديد رقم الصفحة في الواجب'; }
     D.notes.push({ id: uid(), week_id: D.weeks[0].id, class_id: null, placement: 'day', day: 3, title: 'تنبيه', body: 'اختبار قصير في الرياضيات يوم الأربعاء', created_at: new Date().toISOString() });
     D.join_codes.push({ code: 'DEMOJOIN', section_id: g.id, role: 'teacher', active: true, uses: 0 });
@@ -163,6 +164,18 @@
         return wait({ entries: n });
       },
       async approvedSlots(section) { const v = D.timetable_versions.find(x => x.section_id === section && x.status === 'approved'); return wait(v ? pick('timetable_slots', x => x.version_id === v.id) : []); },
+      messages: () => wait(pick('messages', m => m.recipient_id === meId || m.sender_id === meId).sort((a, b) => b.created_at.localeCompare(a.created_at))),
+      sendMessage: r => wait(ins('messages', { sender_id: meId, kind: 'message', read_at: null, ...r })),
+      sendMessages: rows => { rows.forEach(r => ins('messages', { sender_id: meId, kind: 'message', read_at: null, ...r })); return wait(true); },
+      markRead: ids => { ids.forEach(id => { const m = find('messages', id); if (m) m.read_at = new Date().toISOString(); }); return wait(true); },
+      langIssues: (q = {}) => wait(pick('language_issues', x => (!q.week || x.week_id === q.week) && (!q.teacher || x.teacher_id === q.teacher))),
+      addLangIssues: rows => { rows.forEach(r => ins('language_issues', { status: 'applied', checked_by: meId, ...r })); return wait(true); },
+      confirmExec: (ids, st, note) => { ids.forEach(id => { const e = find('plan_entries', id); Object.assign(e, { exec_status: st, exec_note: note || '', exec_at: new Date().toISOString(), exec_by: meId }); }); return wait(ids.length); },
+      entriesForWeeks: ids => wait(pick('plan_entries', e => ids.includes(e.week_id))),
+      auditRange: () => wait(clone(D.audit_log)),
+      async uploadAsset(file) { return await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(file); }); },
+      joinWithCode2(code, f) { return this.joinWithCode(code, f.name, f.email, f.password); },
+      subscribe() { return () => { }; },
       reloadStaff: () => wait(clone(D.staff)),
       reloadMemberships: () => wait(clone(D.memberships)),
       reloadSubjects: () => wait(clone(D.subjects)),

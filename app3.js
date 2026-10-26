@@ -122,7 +122,7 @@
       const q = A.normKey($('#dq', root).value), only = $('#donly', root).checked;
       $('#dt tbody', root).innerHTML = people.filter(p => (!q || A.normKey(p.full_name).includes(q)) && (!only || mem(p.id))).map(p => {
         const m = mem(p.id) || {}; const adm = m.role === 'admin';
-        return `<tr data-s="${p.id}" style="${p.active ? '' : 'opacity:.5'}"><td><b>${esc(p.full_name)}</b><div class="small faint" dir="ltr" style="text-align:right">${esc(p.email || 'بلا حساب')}</div></td>
+        return `<tr data-s="${p.id}" style="${p.active ? '' : 'opacity:.5'}"><td><b>${esc(p.full_name)}</b><div class="small faint" dir="ltr" style="text-align:right">${esc(p.email || 'بلا حساب')}</div><button class="btn ghost sm" data-va="${p.id}" style="margin-top:4px">${I.eye} الدخول بحسابه</button></td>
           <td><select class="in" data-r style="padding:5px 8px;min-width:120px"><option value="">غير مضاف</option>${Object.entries(ROLES).map(([k, l]) => `<option value="${k}" ${m.role === k ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
           ${ALLP().map(([k]) => { const tool = A.TOOL_PERMS.some(t => t[0] === k); return `<td style="text-align:center"><input type="checkbox" data-k="${k}" ${m[k] || (adm && !tool) ? 'checked' : ''} ${!m.role || (adm && !tool) ? 'disabled' : ''} style="width:18px;height:18px;accent-color:var(--blue)"></td>`; }).join('')}</tr>`;
       }).join('') || '<tr><td colspan="10" class="muted">لا يوجد مستخدمون</td></tr>';
@@ -143,6 +143,7 @@
       const title = k === 'members' ? 'المستخدمون في القسم' : k === 'admins' ? 'مديرو القسم والمشرفون' : (ALLP().find(x => x[0] === k) || [, ''])[1];
       A.modal(`<h3>${esc(title)} — ${esc(A.section().name)}</h3><div class="scroll" style="max-height:60vh"><table class="tbl"><thead><tr><th>المستخدم</th><th>الدور</th><th>الدخول</th></tr></thead><tbody>${list.map(m => { const p = A.person(m.staff_id) || {}; return `<tr><td><b>${esc(p.full_name || '')}</b><div class="small faint" dir="ltr" style="text-align:right">${esc(p.email || '')}</div></td><td>${ROLES[m.role]}</td><td>${p.user_id ? '<span class="pill st-approved">مفعّل</span>' : '<span class="pill st-empty">بلا حساب</span>'}</td></tr>`; }).join('') || '<tr><td colspan="3" class="muted">لا يوجد</td></tr>'}</tbody></table></div><p class="small muted">${S.me.is_owner ? 'حسابك (المالك) يملك كل الصلاحيات دائماً ولا يظهر هنا.' : ''}</p>`, { cls: 'wide' });
     });
+    root.addEventListener('click', e => { const b = e.target.closest('[data-va]'); if (b) A.viewAs(b.dataset.va); });
     $('#dq', root).oninput = draw; $('#donly', root).onchange = draw; draw();
   };
 })();

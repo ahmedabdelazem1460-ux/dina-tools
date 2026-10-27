@@ -9,7 +9,9 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const AR = s => String(s).replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+  // الأرقام العربية + التواريخ من اليمين لليسار (اليوم يميناً ثم الشهر ثم السنة)
+  const RTLD = m => '\u200F' + m.split('/').join('\u200F/\u200F'); // تاريخ يُقرأ من اليمين: اليوم ثم الشهر ثم السنة
+  const AR = s => String(s).replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[d]).replace(/[٠-٩]{1,2}\/[٠-٩]{1,2}\/[٠-٩]{4}/g, RTLD);
   const DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
   const PER = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
   const ORD = ['', 'الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر', 'الحادي عشر', 'الثاني عشر', 'الثالث عشر', 'الرابع عشر', 'الخامس عشر', 'السادس عشر', 'السابع عشر', 'الثامن عشر', 'التاسع عشر', 'العشرون', 'الحادي والعشرون', 'الثاني والعشرون', 'الثالث والعشرون', 'الرابع والعشرون', 'الخامس والعشرون'];
@@ -26,7 +28,7 @@
   const isoDate = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const dmy = d => `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
   const weekDates = (w, n = 5) => { const s = parseDate(w.start_date); return Array.from({ length: n }, (_, i) => { const d = new Date(s); d.setDate(s.getDate() + i); return dmy(d); }); };
-  const fmtDT = s => { if (!s) return '—'; const d = new Date(s); return AR(`${d.getDate()}/${d.getMonth() + 1} — ${d.toLocaleTimeString('ar-SA-u-nu-latn', { hour: 'numeric', minute: '2-digit' })}`); };
+  const fmtDT = s => { if (!s) return '—'; const d = new Date(s); return RTLD(AR(`${d.getDate()}/${d.getMonth() + 1}`)) + AR(` — ${d.toLocaleTimeString('ar-SA-u-nu-latn', { hour: 'numeric', minute: '2-digit' })}`); };
   const pct = (a, b) => b ? Math.round(100 * a / b) : 0;
   const norm = s => String(s ?? '').replace(/[_ـ]/g, ' ').replace(/\s+/g, ' ').trim();
   const normKey = s => norm(s).replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/^ال/, '').replace(/ ال/g, ' ').toLowerCase();

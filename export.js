@@ -3,13 +3,15 @@
    الخيارات: طولي/عرضي، موفّر للحبر، نظرة أسبوعية في صفحة واحدة، صفحات إضافية (وسام التميز، إعلانات، مهام أدائية، صفحة حرة). */
 (function () {
   const AR = s => String(s).replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+  const RTLD = m => '\u200F' + m.split('/').join('\u200F/\u200F'); // تاريخ يُقرأ من اليمين: اليوم ثم الشهر ثم السنة
+
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const hasAr = s => /[؀-ۿ]/.test(s || '');
   const clean = s => String(s ?? '').split(/\s+/).join(' ').trim().replace(/\s*->\s*/g, ' ← ');
   const cleanML = s => String(s ?? '').split('\n').map(l => l.split(/\s+/).join(' ').trim()).join('\n').trim();
   const ar = s => esc(AR(clean(s)));
   const arML = s => esc(AR(cleanML(s)));
-  const iso = d => `<span dir="ltr" style="unicode-bidi:isolate;display:inline-block">${esc(AR(d))}</span>`;
+  const iso = d => `<span dir="rtl" style="unicode-bidi:isolate;display:inline-block">${esc(RTLD(AR(d)))}</span>`;
   const NAVY = '#082B5A', SKY = '#3AB1DB', BLUE = '#005499';
   const ARNUM = ['١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩', '١٠', '١١', '١٢'];
   const PERIODS_FULL = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
@@ -134,7 +136,7 @@ body.ink .topbar{background:#fff;border-bottom:3px solid #3AB1DB}
     p.push(`<div class="cdiv" style="top:${y.div}px"><span></span>&#160;&#160;` + star('width:16px;height:16px;vertical-align:middle', SKY, SKY, 0) + '&#160;&#160;<span></span></div>');
     p.push(`<div class="csub" style="top:${y.sub}px">${esc(week.term)}</div>`);
     p.push(`<div class="week" style="top:${y.week}px;left:${(W - 470) / 2}px">` + flower('position:absolute;top:-26px;left:-30px;width:120px;height:120px', SKY, 1.4, 0.35) +
-      `<div class="w1">الأسبوع ${esc(week.word)}</div><div class="w2" dir="ltr">${iso(week.dates[0])}&#160;&#160;:&#160;&#160;${iso(week.dates[week.dates.length - 1])}</div></div>`);
+      `<div class="w1">الأسبوع ${esc(week.word)}</div><div class="w2" dir="rtl">${iso(week.dates[0])}&#160;&#160;:&#160;&#160;${iso(week.dates[week.dates.length - 1])}</div></div>`);
     const cards = [['stage', 'المرحلة', info.stage], ['grade', 'الصف', info.grade_word], ['class', 'الفصل', info.class_label]];
     p.push(`<table class="cards" style="top:${y.cards}px;left:${(W - 654) / 2}px">` + '<tr>' + cards.map(([k, l, v]) => `<td>${icon(k)}<div class="lb">${l}</div><div class="vl">${esc(v)}</div></td>`).join('') + '</tr></table>');
     p.push(flower(`position:absolute;bottom:20px;left:-60px;width:${land ? 240 : 300}px;height:${land ? 240 : 300}px`, SKY, 0.9));

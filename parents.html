@@ -79,13 +79,14 @@ footer{text-align:center;color:var(--faint);font-size:12px;padding:10px 16px 30p
 <header class="top"><div class="top-in"><img src="assets/logo_white.svg" alt="مدارس دينا العالمية"><h1>خطط أبنائي<small id="schName">مدارس دينا العالمية</small></h1></div></header>
 <main id="app"><div class="spin" role="status" aria-label="جارٍ التحميل"></div></main>
 <footer>مدارس دينا العالمية · Dinaaedu · 920035881</footer>
-<script src="config.js?v=1793128759"></script>
+<script src="config.js?v=1793129449"></script>
 <script>
 (function () {
   const C = window.APP_CONFIG, $ = s => document.querySelector(s), app = $('#app');
   const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
   const PER = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة'];
-  const AR = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+  const RTLD = m => '\u200F' + m.split('/').join('\u200F/\u200F'); // تاريخ يُقرأ من اليمين: اليوم ثم الشهر ثم السنة
+  const AR = s => String(s).replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[d]).replace(/[٠-٩]{1,2}\/[٠-٩]{1,2}\/[٠-٩]{4}/g, RTLD);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const blank = s => !s || /^[\s\-–—_.ـ]*$/.test(s);
   const LS = { get(k) { try { return JSON.parse(localStorage.getItem('dina_parent_' + k)); } catch (_) { return null; } }, set(k, v) { try { localStorage.setItem('dina_parent_' + k, JSON.stringify(v)); } catch (_) { } } };

@@ -184,7 +184,7 @@
   const NAV = [
     ['my', 'خطتي', () => S.entries.some(e => e.teacher_id === S.me.id) || (myMem() || {}).role === 'teacher'],
     ['dash', 'لوحة المتابعة', () => anyPerm('review', 'export', 'structure', 'users')],
-    ['classes', 'خطط الفصول', () => true],
+    ['classes', 'خطط الفصول', () => anyPerm('review', 'export', 'structure', 'users', 'timetable_edit', 'exec_confirm')],
     ['export', 'التصدير', () => perm('export')],
     ['timetable', 'الجدول الدراسي', () => anyPerm('timetable_edit', 'timetable_approve', 'structure')],
     ['weeks', 'الأسابيع', () => perm('structure')],
@@ -340,6 +340,8 @@
     const dates = weekDates(w, section().days);
     const open = w.status === 'open';
     const filter = LS.get('myfilter') || 'all';
+    let sel = LS.get('mysel') || 'all'; if (sel !== 'all' && !mine.some(e => e.class_id + '|' + e.subject_id === sel)) sel = 'all';
+    const selOk = e => sel === 'all' || e.class_id + '|' + e.subject_id === sel;
     if (!mine.length) { claimView(root, true); return; }
     const req = mine.filter(required);
     const done = req.filter(filled).length;
@@ -355,6 +357,9 @@
       ${!open ? `<div class="notice warn">${I.lock} هذا الأسبوع ${WSTATUS[w.status]} — لا يمكن التعديل.</div>` : ''}
       ${late ? `<div class="notice bad">انتهى موعد التسليم (${fmtDT(w.deadline)}) وما زالت خطتك غير مكتملة.</div>` : (dl && open ? `<div class="notice info">آخر موعد للتسليم: <b>${fmtDT(w.deadline)}</b></div>` : '')}
       ${returned.length ? `<div class="notice warn"><b>${cnt(returned.length, 'حصة', 'حصص')} أُعيدت إليك للتعديل.</b> عدّلها ثم أعد الإرسال.</div>` : ''}
+      ${myGrid(mine, dates)}
+      <div class="row" style="margin:14px 0 6px;align-items:end"><div class="field" style="margin:0;min-width:240px;flex:1;max-width:420px"><label for="mySel">عرض حصص</label><select class="in" id="mySel"><option value="all">كل حصصي هذا الأسبوع (${AR(mine.length)})</option>${myPairs(mine).map(([k, l, n]) => `<option value="${k}" ${sel === k ? 'selected' : ''}>${esc(l)} — ${cnt(n, 'حصة', 'حصص')}</option>`).join('')}</select></div>
+        <span class="small muted">لتغيير الأسبوع استخدم قائمة «الأسبوع» في أعلى الصفحة.</span></div>
       <div id="days"></div>
       <div class="sticky-foot"><div class="card">
         <div style="flex:1;min-width:200px"><div class="row" style="justify-content:space-between"><b>الإنجاز ${AR(pct(done, req.length))}٪</b><span class="small muted">${AR(done)} من ${AR(req.length)} · مُرسلة ${AR(sent)}</span></div>${bar(done, req.length)}</div>
@@ -364,10 +369,15 @@
     $$('#flt button', root).forEach(b => b.onclick = () => { LS.set('myfilter', b.dataset.f); VIEWS.my(root); });
     $('#myClaim', root).onclick = () => claimView(root, false);
     $('#myExec', root).onclick = () => VIEWS._exec(root);
+    $('#mySel', root).onchange = e => { LS.set('mysel', e.target.value); VIEWS.my(root); };
+    $$('[data-cell]', root).forEach(c => c.onclick = () => {
+      const [cl, sj, id] = c.dataset.cell.split('|'); LS.set('mysel', cl + '|' + sj); LS.set('myfilter', 'all'); VIEWS.my(root);
+      setTimeout(() => { const el = document.querySelector(`.lesson[data-eid="${id}"]`); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); const t = el.querySelector('textarea'); if (t && !t.readOnly) t.focus({ preventScroll: true }); } }, 60);
+    });
     const days = $('#days', root);
     for (let d = 0; d < section().days; d++) {
       const hol = holidayOf(d);
-      let list = mine.filter(e => e.day === d).sort((a, b) => a.period - b.period || (cls(a.class_id)?.sort ?? 0) - (cls(b.class_id)?.sort ?? 0));
+      let list = mine.filter(e => e.day === d && selOk(e)).sort((a, b) => a.period - b.period || (cls(a.class_id)?.sort ?? 0) - (cls(b.class_id)?.sort ?? 0));
       if (filter === 'todo') list = list.filter(e => required(e) && !filled(e));
       if (filter === 'returned') list = list.filter(e => e.status === 'returned');
       if (filter === 'done') list = list.filter(filled);
@@ -389,6 +399,26 @@
       toast(n ? `أُرسلت ${cnt(n, 'حصة', 'حصص')} للمراجعة` : 'لا توجد حصص جديدة للإرسال', n ? 'ok' : '');
     });
   };
+  // ---------- جدول المعلم الأسبوعي (حصصه المسندة فقط) ----------
+  function myPairs(mine) {
+    const m = {}; mine.forEach(e => { const k = e.class_id + '|' + e.subject_id; (m[k] = m[k] || [k, `${subjName(e.subject_id)} — ${(cls(e.class_id) || {}).name || ''}`, 0])[2]++; });
+    return Object.values(m).sort((a, b) => a[1].localeCompare(b[1], 'ar'));
+  }
+  function myGrid(mine, dates) {
+    const P = section().periods || 7, D = dates.length;
+    const at = (d, p) => mine.filter(e => e.day === d && e.period === p);
+    const cell = (d, p) => {
+      const hol = holidayOf(d); const l = at(d, p);
+      if (hol) return `<td class="tg-hol">${p === 0 ? esc(hol.label || 'إجازة') : ''}</td>`;
+      if (!l.length) return '<td class="tg-free">—</td>';
+      return `<td>${l.map(e => `<button class="tg-c ${filled(e) ? 'ok' : required(e) ? 'todo' : ''}" data-cell="${e.class_id}|${e.subject_id}|${e.id}" title="${esc(subjName(e.subject_id))} — ${esc((cls(e.class_id) || {}).name || '')}"><b>${esc(subjName(e.subject_id))}</b><span>${esc((cls(e.class_id) || {}).name || '')}</span></button>`).join('')}</td>`;
+    };
+    const n = mine.length, f = mine.filter(e => required(e) && filled(e)).length, rq = mine.filter(required).length;
+    return `<details class="card tgrid" ${LS.get('mygrid') === '0' ? '' : 'open'} ontoggle="APP.LS.set('mygrid', this.open ? '1' : '0')"><summary><b>جدولي الأسبوعي</b> <span class="small muted">${cnt(n, 'حصة', 'حصص')} · مكتملة ${AR(f)} من ${AR(rq)} · اضغط على أي حصة لفتحها</span></summary>
+      <div class="scroll"><table class="tbl tg"><thead><tr><th>اليوم</th>${Array.from({ length: P }, (_, p) => `<th>${PER[p] || AR(p + 1)}</th>`).join('')}</tr></thead>
+      <tbody>${dates.map((dt, d) => `<tr><th><b>${DAYS[d]}</b><div class="small faint">${AR(dt)}</div></th>${Array.from({ length: P }, (_, p) => cell(d, p)).join('')}</tr>`).join('')}</tbody></table></div>
+      <div class="row small muted" style="margin-top:8px"><span class="tg-c ok tg-key"></span> مكتملة <span class="tg-c todo tg-key"></span> بانتظار الإدخال</div></details>`;
+  }
   const pending = new Map();
   async function flushSaves() { const ps = [...pending.values()].map(f => f()); pending.clear(); await Promise.all(ps); }
   function lessonCard(e, open) {

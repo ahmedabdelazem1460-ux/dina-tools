@@ -117,6 +117,14 @@
         return sb.storage.from('plan-assets').getPublicUrl(path).data.publicUrl;
       },
       joinWithCode2: (code, f) => sb.rpc('join_with_code_v2', { p_code: code, p_full_name: f.name, p_email: f.email, p_password: f.password, p_phone: f.phone || null, p_specialty: f.specialty || null, p_employee_no: f.employee_no || null }).then(ok),
+      // ---- إعلانات أولياء الأمور
+      posts: () => T('parent_posts').select('*').order('pinned', { ascending: false }).order('starts_on', { ascending: false }).order('created_at', { ascending: false }).then(ok),
+      addPost: r => T('parent_posts').insert(r).select().single().then(ok),
+      updatePost: (id, p) => T('parent_posts').update(p).eq('id', id).select().single().then(ok),
+      deletePost: id => T('parent_posts').delete().eq('id', id).then(ok),
+      // ---- بوابة أولياء الأمور
+      parentLinks: () => T('parent_links').select('*').order('created_at').then(ok),
+      updateParentLink: (id, p) => T('parent_links').update(p).eq('id', id).select().single().then(ok),
       // ---- مزامنة Google Sheets
       sheetPushUser: (week, rows) => sb.rpc('sheet_push_user', { p_week: week, p_rows: rows }).then(ok),
       requestSheetSync: (week, dir) => sb.rpc('request_sheet_sync', { p_week: week, p_dir: dir || 'pull' }).then(ok),

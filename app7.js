@@ -136,9 +136,28 @@
   const dev0 = V.dev;
   V.dev = function (root) {
     dev0(root); if (!S.me.is_owner) return;
+    const pbox = document.createElement('div'); pbox.className = 'card'; pbox.style.marginTop = '16px'; root.appendChild(pbox); drawParents(pbox);
     const box = document.createElement('div'); box.className = 'card'; box.style.marginTop = '16px'; root.appendChild(box);
     drawSetup(box);
   };
+  // ---- بوابة أولياء الأمور (للمالك)
+  async function drawParents(box) {
+    box.innerHTML = '<div class="spinner"></div>';
+    let L; try { L = (await api.parentLinks())[0]; } catch (e) { box.innerHTML = `<p class="small muted">${esc(e.message)}</p>`; return; }
+    if (!L) { box.innerHTML = '<p class="small muted">لا يوجد رابط لأولياء الأمور.</p>'; return; }
+    const url = location.origin + location.pathname.replace(/[^/]*$/, '') + 'parents.html?t=' + L.token;
+    box.innerHTML = `<div class="head"><div class="grow"><h3 style="margin:0">بوابة أولياء الأمور</h3><p class="sub" style="margin:2px 0 0">رابط واحد ثابت لكل أولياء الأمور: يختارون صف كل ابن (أكثر من ابن)، ويرون خطة اليوم أو الأسبوع أو الواجبات. يظهر <b>المعتمد فقط</b>، ودون أسماء المعلمين.</p></div>
+      <span class="pill ${L.active ? 'st-approved' : 'st-returned'}">${L.active ? 'الرابط مفعّل' : 'الرابط متوقف'}</span></div>
+      <div class="row"><input class="in" dir="ltr" readonly value="${esc(url)}" style="flex:1;min-width:240px" aria-label="رابط أولياء الأمور"><button class="btn" id="plC">نسخ الرابط</button><a class="btn ghost" href="${esc(url)}" target="_blank" rel="noopener">فتح</a></div>
+      <div class="row" style="margin-top:10px"><button class="btn ghost sm" id="plT">${L.active ? 'إيقاف الرابط مؤقتاً' : 'تفعيل الرابط'}</button><button class="btn bad sm" id="plR">تجديد الرابط (يُبطل القديم)</button>
+        <a class="btn ghost sm" href="https://wa.me/?text=${encodeURIComponent('أولياء الأمور الكرام، يمكنكم متابعة الخطة الأسبوعية والواجبات اليومية لأبنائكم عبر الرابط:\n' + url + '\nاختر صف ابنك مرة واحدة، ويمكن إضافة أكثر من ابن.\nمدارس دينا العالمية')}" target="_blank" rel="noopener">رسالة واتساب جاهزة</a></div>`;
+    $('#plC', box).onclick = async () => { try { await navigator.clipboard.writeText(url); A.toast('نُسخ رابط أولياء الأمور', 'ok'); } catch (_) { A.toast(url); } };
+    $('#plT', box).onclick = e => A.run(e.currentTarget, async () => { await api.updateParentLink(L.id, { active: !L.active }); drawParents(box); A.toast(L.active ? 'أُوقف الرابط' : 'فُعّل الرابط', 'ok'); });
+    $('#plR', box).onclick = e => A.run(e.currentTarget, async () => {
+      if (!(await A.confirmBox('تجديد الرابط يُبطل الرابط القديم فوراً، وستحتاج لإرسال الرابط الجديد لأولياء الأمور. متابعة؟', 'تجديد', true))) return;
+      const b = new Uint8Array(9); crypto.getRandomValues(b); await api.updateParentLink(L.id, { token: [...b].map(x => x.toString(16).padStart(2, '0')).join(''), active: true }); drawParents(box); A.toast('جُدّد الرابط', 'ok');
+    });
+  }
   async function drawSetup(box) {
     box.innerHTML = '<div class="spinner"></div>';
     let cfg = null; try { cfg = await api.syncCfg(); } catch (e) { box.innerHTML = `<p class="small muted">${esc(e.message)}</p>`; return; }

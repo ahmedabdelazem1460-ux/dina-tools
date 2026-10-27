@@ -44,6 +44,7 @@
     admin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><path d="M17 11l1.5 1.5L21.5 9"/></svg>',
     nisab: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h2M12 12h2M8 16h2M12 16h2"/></svg>',
     builder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v11M15 10v11"/><path d="M8 2v4M16 2v4"/></svg>',
+    posts: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h3l5 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M16 8a5 5 0 0 1 0 8M19 5a9 9 0 0 1 0 14"/></svg>',
     reports: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
     archive: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10h14V9M10 13h4"/></svg>',
     dev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>',
@@ -192,6 +193,7 @@
     ['builder', 'الجدول الآلي', () => perm('tt_builder')],
     ['admin', 'الإدارة', () => S.me.is_owner || anyPerm('users', 'structure')],
     ['reports', 'التقارير', () => S.me.is_owner || anyPerm('review', 'export', 'users')],
+    ['posts', 'إعلانات أولياء الأمور', () => S.me.is_owner || anyPerm('users', 'structure')],
     ['archive', 'الأرشيف', () => S.me.is_owner],
     ['dev', 'لوحة المطوّر', () => S.me.is_owner],
   ];
@@ -230,7 +232,7 @@
     $('#nav').innerHTML = items.map(([k, l]) => `<a href="#/${k}" class="${S.view === k ? 'on' : ''}" ${S.view === k ? 'aria-current="page"' : ''}>${I[k]}<span>${l}</span>${k === 'my' && myCount ? `<span class="cnt">${AR(myCount)}</span>` : ''}</a>`).join('');
     const bn = $('#bnav'); if (bn) {
       const prim = items.length > 5 ? items.slice(0, 4) : items, rest = items.length > 5 ? items.slice(4) : [];
-      const SHORT = { dash: 'المتابعة', classes: 'الفصول', timetable: 'الجدول', builder: 'الجدول الآلي', nisab: 'النصاب', dev: 'المطوّر' };
+      const SHORT = { dash: 'المتابعة', classes: 'الفصول', timetable: 'الجدول', builder: 'الجدول الآلي', nisab: 'النصاب', dev: 'المطوّر', posts: 'الإعلانات' };
       bn.innerHTML = prim.map(([k, l]) => `<a href="#/${k}" class="${S.view === k ? 'on' : ''}">${I[k]}<span>${SHORT[k] || l}</span></a>`).join('') +
         (rest.length ? `<button type="button" id="moreBtn" class="${rest.some(r => r[0] === S.view) ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg><span>المزيد</span></button>` : '');
       const mb = $('#moreBtn'); if (mb) mb.onclick = () => moreSheet(rest);

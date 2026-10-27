@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>خطط أبنائي — مدارس دينا العالمية</title>
+<meta name="description" content="الخطة الأسبوعية والواجبات اليومية لطلاب مدارس دينا العالمية">
+<meta name="theme-color" content="#082B5A">
+<link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+<style>
+@font-face{font-family:'GE SS Two';font-weight:300;src:url(fonts/gess-two-light.woff2) format('woff2');font-display:swap}
+@font-face{font-family:'GE SS Two';font-weight:400 500;src:url(fonts/gess-two-medium.woff2) format('woff2');font-display:swap}
+@font-face{font-family:'GE SS Two';font-weight:600 900;src:url(fonts/gess-two-bold.woff2) format('woff2');font-display:swap}
+@font-face{font-family:'Myriad Pro';font-weight:400;src:url(fonts/myriad-pro-regular.woff2) format('woff2');font-display:swap}
+@font-face{font-family:'Myriad Pro';font-weight:600 900;src:url(fonts/myriad-pro-bold.woff2) format('woff2');font-display:swap}
+:root{--navy:#082B5A;--sky:#3AB1DB;--blue:#005499;--pale:#E4EBF5;--line:#84B7E3;--mid:#5E9BD3;--bg:#EEF3FA;--card:#fff;--ink:#082B5A;--muted:#4D6A8F;--faint:#5F7896;--border:#D5E1F0;--warn:#8A5A12;--warnbg:#FFF4DC;--okbg:#E5F4EA;--ok:#23704A;--r:16px;
+--sh1:0 1px 2px rgba(8,43,90,.06),0 4px 10px -2px rgba(8,43,90,.08);--sh2:0 1px 0 rgba(255,255,255,.9) inset,0 2px 4px rgba(8,43,90,.06),0 16px 32px -12px rgba(8,43,90,.22)}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'GE SS Two','Myriad Pro','Tajawal',system-ui,sans-serif;font-size:15px;line-height:1.6;background-image:radial-gradient(circle at 1px 1px,rgba(8,43,90,.05) 1px,transparent 0);background-size:22px 22px}
+button{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--sky);outline-offset:2px;border-radius:10px}
+.top{background:linear-gradient(180deg,#0A3268,var(--navy));color:#fff;box-shadow:0 6px 20px -8px rgba(8,43,90,.6);position:sticky;top:0;z-index:10}
+.top::after{content:"";display:block;height:4px;background:linear-gradient(90deg,var(--sky),var(--mid),var(--sky))}
+.top-in{max-width:880px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:12px}
+.top img{height:40px}
+.top h1{margin:0;font-size:18px;font-weight:800;line-height:1.2}.top h1 small{display:block;font-size:12px;font-weight:500;color:var(--sky)}
+main{max-width:880px;margin:0 auto;padding:16px 16px 40px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--sh1);padding:16px;margin-bottom:14px}
+h2{margin:0 0 4px;font-size:20px;font-weight:800}h3{margin:0 0 8px;font-size:16px;font-weight:800}
+.muted{color:var(--muted)}.small{font-size:13px}.faint{color:var(--faint)}
+.kids{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}.kids::-webkit-scrollbar{display:none}
+.kid{flex:none;display:flex;align-items:center;gap:8px;border:2px solid var(--border);background:var(--card);border-radius:999px;padding:8px 14px;cursor:pointer;font-weight:700;min-height:44px}
+.kid.on{border-color:var(--navy);background:var(--navy);color:#fff}
+.kid .x{border:0;background:none;cursor:pointer;opacity:.7;padding:0 2px;font-size:16px;line-height:1}
+.kid.add{border-style:dashed;color:var(--blue)}
+.seg{display:flex;background:var(--pale);border-radius:14px;padding:4px;gap:4px}
+.seg button{flex:1;border:0;background:none;border-radius:10px;padding:10px 6px;font-weight:700;color:var(--muted);cursor:pointer;min-height:44px}
+.seg button.on{background:var(--card);color:var(--navy);box-shadow:var(--sh1)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:12px}
+.cls{border:1px solid var(--border);background:var(--card);border-radius:12px;padding:12px 10px;font-weight:700;cursor:pointer;min-height:48px;text-align:center}
+.cls:hover{border-color:var(--sky);background:var(--pale)}
+.wk{display:flex;align-items:center;gap:8px;justify-content:space-between;margin:12px 0}
+.wk .nav{width:44px;height:44px;border-radius:12px;border:1px solid var(--border);background:var(--card);cursor:pointer;font-size:20px;display:grid;place-items:center}
+.wk .nav:disabled{opacity:.35;cursor:default}
+.wk .t{text-align:center;flex:1}.wk .t b{display:block;font-size:17px}
+.days{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-bottom:12px}.days::-webkit-scrollbar{display:none}
+.days button{flex:1 0 auto;min-width:76px;border:1px solid var(--border);background:var(--card);border-radius:12px;padding:8px 6px;cursor:pointer;font-weight:700;min-height:52px;line-height:1.3}
+.days button span{display:block;font-size:11px;font-weight:500;color:var(--faint)}
+.days button.on{background:var(--navy);color:#fff;border-color:var(--navy)}.days button.on span{color:var(--sky)}
+.days button.today:not(.on){border-color:var(--sky);border-width:2px}
+.dayhead{display:flex;align-items:center;gap:10px;margin:18px 0 8px}.dayhead .dn{background:var(--navy);color:#fff;border-radius:10px;padding:4px 12px;font-weight:800}.dayhead .dd{background:var(--sky);color:var(--navy);border-radius:10px;padding:4px 10px;font-weight:700;font-size:13px}.dayhead .ln{flex:1;height:2px;background:var(--line);opacity:.5}
+.ls{display:grid;grid-template-columns:52px 1fr;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px;margin-bottom:8px;box-shadow:var(--sh1)}
+.ls .pn{background:var(--pale);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;color:var(--navy);font-size:20px;line-height:1.1}.ls .pn span{font-size:10px;font-weight:500;color:var(--muted)}
+.ls .sj{font-weight:800}.ls .tp{margin-top:2px}.ls .hw{margin-top:6px;color:var(--blue);font-weight:700}.ls .hw::before{content:"الواجب: ";color:var(--muted);font-weight:500}.ls .nt{margin-top:4px;color:var(--warn);font-size:13px}
+.hwi{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)}.hwi:last-child{border:0}
+.hwi .sj{flex:none;min-width:110px;font-weight:800}.hwi .t{color:var(--blue);font-weight:700}
+.notice{border-radius:12px;padding:12px 14px;margin:8px 0;background:var(--pale)}.notice.warn{background:var(--warnbg);color:var(--warn)}
+.empty{text-align:center;padding:30px 10px;color:var(--muted)}.empty b{display:block;color:var(--ink);font-size:16px;margin-bottom:4px}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.btn{border:1px solid var(--border);background:var(--card);border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;gap:6px;color:var(--navy)}
+.btn.pri{background:var(--navy);color:#fff;border-color:var(--navy)}
+.spin{width:36px;height:36px;border:4px solid var(--pale);border-top-color:var(--sky);border-radius:50%;margin:40px auto;animation:sp 1s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
+footer{text-align:center;color:var(--faint);font-size:12px;padding:10px 16px 30px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:12px;box-shadow:var(--sh2);z-index:20;font-weight:700}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media print{.top,.no-print,footer,.toast{display:none!important}body{background:#fff}main{padding:0}.card,.ls{box-shadow:none;break-inside:avoid}.print-head{display:block!important}.print-only{display:flex!important}}
+.posts{margin-bottom:14px}.posts h3{display:flex;align-items:center;gap:8px}
+.pst{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--sh1);margin-bottom:10px}
+.pst img{width:100%;max-height:420px;object-fit:contain;background:var(--pale);display:block;cursor:zoom-in}
+.pst .bd{padding:12px 14px}.pst h4{margin:6px 0 4px;font-size:16px;font-weight:800}.pst p{margin:0;white-space:pre-line}
+.pst .kb{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:800}.pst .dt{font-size:12px;color:var(--faint);margin-inline-start:6px}
+.pst .pin{font-size:12px;color:var(--blue);font-weight:700;margin-inline-start:6px}
+.more{width:100%;justify-content:center}
+.print-only{display:none}.print-head{display:none;text-align:center;border-bottom:3px solid var(--sky);padding-bottom:8px;margin-bottom:10px}.print-head img{height:56px}
+</style>
+</head>
+<body>
+<header class="top"><div class="top-in"><img src="assets/logo_white.svg" alt="مدارس دينا العالمية"><h1>خطط أبنائي<small id="schName">مدارس دينا العالمية</small></h1></div></header>
+<main id="app"><div class="spin" role="status" aria-label="جارٍ التحميل"></div></main>
+<footer>مدارس دينا العالمية · Dinaaedu · 920035881</footer>
+<script src="config.js?v=1793128759"></script>
+<script>
+(function () {
+  const C = window.APP_CONFIG, $ = s => document.querySelector(s), app = $('#app');
+  const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+  const PER = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة'];
+  const AR = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const blank = s => !s || /^[\s\-–—_.ـ]*$/.test(s);
+  const LS = { get(k) { try { return JSON.parse(localStorage.getItem('dina_parent_' + k)); } catch (_) { return null; } }, set(k, v) { try { localStorage.setItem('dina_parent_' + k, JSON.stringify(v)); } catch (_) { } } };
+  const q = new URLSearchParams(location.search);
+  const token = q.get('t') || LS.get('token'); if (q.get('t')) LS.set('token', q.get('t'));
+  const st = { posts: [], gposts: null, showAll: false, info: null, kids: LS.get('kids') || [], cur: null, view: LS.get('view') || 'day', week: null, day: null, data: null, adding: false, sec: null };
+  if (q.get('c') && !st.kids.includes(q.get('c'))) { st.kids.push(q.get('c')); LS.set('kids', st.kids); }
+  st.cur = q.get('c') || LS.get('cur') || st.kids[0] || null;
+  const toast = t => { const d = document.createElement('div'); d.className = 'toast'; d.setAttribute('role', 'status'); d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 2400); };
+  async function rpc(fn, body) {
+    const r = await fetch(`${C.supabaseUrl}/rest/v1/rpc/${fn}`, { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => null); if (!r.ok) throw new Error((j && j.message) || 'تعذّر الاتصال'); return j;
+  }
+  const dateOf = (start, d) => { const x = new Date(start + 'T00:00:00'); x.setDate(x.getDate() + d); return x; };
+  const dmy = x => AR(`${x.getDate()}/${x.getMonth() + 1}/${x.getFullYear()}`);
+  const iso = x => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+  const clsName = id => { const c = st.info && st.info.classes.find(x => x.id === id); if (!c) return ''; const dup = st.info.classes.filter(x => x.name === c.name).length > 1; const sec = st.info.sections.find(x => x.id === c.section); return c.name + (dup && sec ? ` (${(sec.short || sec.name).replace(/^قسم\s*/, '')})` : ''); };
+  const emptyBox = (t, s) => `<div class="empty"><b>${t}</b>${s || ''}</div>`;
+
+  async function boot() {
+    if (!token) { app.innerHTML = `<div class="card">${emptyBox('الرابط غير مكتمل', 'افتح الرابط كما أرسلته المدرسة.')}</div>`; return; }
+    try { st.info = await rpc('parent_info', { p_token: token }); }
+    catch (e) { app.innerHTML = `<div class="card">${emptyBox('تعذّر فتح الصفحة', esc(e.message))}</div>`; return; }
+    $('#schName').textContent = st.info.school.name || 'مدارس دينا العالمية';
+    st.kids = st.kids.filter(id => st.info.classes.some(c => c.id === id)); LS.set('kids', st.kids);
+    if (!st.kids.includes(st.cur)) st.cur = st.kids[0] || null;
+    if (!st.cur) { st.adding = true; render(); } else load();
+  }
+  async function load(week) {
+    app.innerHTML = kidsBar() + '<div class="spin" role="status" aria-label="جارٍ التحميل"></div>'; bindKids();
+    try { const [d, ps] = await Promise.all([rpc('parent_plan', { p_token: token, p_class: st.cur, p_week: week || null }), rpc('parent_posts_for', { p_token: token, p_class: st.cur }).catch(() => [])]); st.data = d; st.posts = ps || []; }
+    catch (e) { app.innerHTML = kidsBar() + `<div class="card">${emptyBox('تعذّر تحميل الخطة', esc(e.message))}</div>`; bindKids(); return; }
+    const w = st.data.week; st.week = w && w.id;
+    if (w) { const t = Math.round((new Date(st.data.today + 'T00:00:00') - new Date(w.start + 'T00:00:00')) / 864e5); if (st.day == null || week) st.day = t >= 0 && t < st.data.class.days ? t : 0; }
+    LS.set('cur', st.cur); render();
+  }
+  const KINDS = { announcement: ['إعلان', '#082B5A', '#E4EBF5'], reminder: ['تذكير', '#8A5A12', '#FFF4DC'], tip: ['نصيحة', '#23704A', '#E5F4EA'], celebration: ['احتفال', '#6B4FA3', '#EEEBF6'], event: ['مناسبة', '#005499', '#E1F3FA'] };
+  const ddate = s => { const x = new Date(s + 'T00:00:00'); return dmy(x); };
+  function postsHtml(list) {
+    if (!list || !list.length) return '';
+    const vis = st.showAll ? list : list.slice(0, 3);
+    return `<section class="posts" aria-label="إعلانات المدرسة"><h3>إعلانات المدرسة <span class="small muted">(${AR(list.length)})</span></h3>${vis.map(p => { const k = KINDS[p.kind] || KINDS.announcement; return `<article class="pst">${p.image ? `<img src="${esc(p.image)}" alt="${esc(p.title)}" loading="lazy" data-full="${esc(p.image)}">` : ''}<div class="bd"><span class="kb" style="color:${k[1]};background:${k[2]}">${k[0]}</span>${p.pinned ? '<span class="pin">مثبّت</span>' : ''}<span class="dt">${ddate(p.date)}</span><h4>${esc(p.title)}</h4>${p.body ? `<p>${esc(p.body)}</p>` : ''}${p.link ? `<div class="acts"><a class="btn" href="${esc(p.link)}" target="_blank" rel="noopener">التفاصيل</a></div>` : ''}</div></article>`; }).join('')}${list.length > 3 ? `<button class="btn more no-print" id="pMore">${st.showAll ? 'عرض أقل' : `عرض كل الإعلانات (${AR(list.length)})`}</button>` : ''}</section>`;
+  }
+  function bindPosts() {
+    const m = $('#pMore'); if (m) m.onclick = () => { st.showAll = !st.showAll; render(); };
+    app.querySelectorAll('[data-full]').forEach(i => i.onclick = () => window.open(i.dataset.full, '_blank', 'noopener'));
+  }
+  const kidsBar = () => `<div class="card no-print" style="padding:12px"><div class="small muted" style="margin-bottom:6px">أبنائي</div><div class="kids">${st.kids.map(id => `<button class="kid ${id === st.cur && !st.adding ? 'on' : ''}" data-k="${id}">${esc(clsName(id))}<span class="x" data-rm="${id}" role="button" aria-label="إزالة ${esc(clsName(id))}">×</span></button>`).join('')}<button class="kid add ${st.adding ? 'on' : ''}" data-add="1">+ إضافة ابن / ابنة</button></div></div>`;
+  function bindKids() {
+    app.querySelectorAll('[data-k]').forEach(b => b.onclick = e => { if (e.target.dataset.rm) return; st.adding = false; st.cur = b.dataset.k; st.day = null; load(); });
+    app.querySelectorAll('[data-rm]').forEach(x => x.onclick = e => { e.stopPropagation(); st.kids = st.kids.filter(k => k !== x.dataset.rm); LS.set('kids', st.kids); if (st.cur === x.dataset.rm) st.cur = st.kids[0] || null; if (!st.cur) st.adding = true; st.cur && !st.adding ? load() : render(); });
+    const a = app.querySelector('[data-add]'); if (a) a.onclick = () => { st.adding = true; render(); };
+  }
+  function picker() {
+    const secs = st.info.sections; if (!st.sec) st.sec = secs[0] && secs[0].id;
+    return `<div class="card"><h2>اختر صف ابنك / ابنتك</h2><p class="small muted" style="margin:0 0 10px">يمكنك إضافة أكثر من ابن والتنقل بينهم من الأعلى. يُحفظ اختيارك على هذا الجهاز.</p>
+      ${secs.length > 1 ? `<div class="seg" role="tablist">${secs.map(s => `<button role="tab" aria-selected="${s.id === st.sec}" class="${s.id === st.sec ? 'on' : ''}" data-sec="${s.id}">${esc(s.name)}</button>`).join('')}</div>` : ''}
+      <div class="grid">${st.info.classes.filter(c => c.section === st.sec).map(c => `<button class="cls" data-pick="${c.id}">${esc(c.name)}</button>`).join('')}</div></div>`;
+  }
+  function render() {
+    if (st.adding || !st.cur) {
+      app.innerHTML = (st.kids.length ? kidsBar() : '') + picker() + postsHtml(st.gposts); bindKids(); bindPosts();
+      if (st.gposts == null) { st.gposts = []; rpc('parent_posts_for', { p_token: token, p_class: null }).then(ps => { st.gposts = ps || []; if (st.adding || !st.cur) render(); }).catch(() => { }); }
+      app.querySelectorAll('[data-sec]').forEach(b => b.onclick = () => { st.sec = b.dataset.sec; render(); });
+      app.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { const id = b.dataset.pick; if (!st.kids.includes(id)) st.kids.push(id); LS.set('kids', st.kids); st.cur = id; st.adding = false; st.day = null; load(); });
+      return;
+    }
+    const d = st.data, w = d.week;
+    const views = [['day', 'خطة اليوم'], ['week', 'الأسبوع كاملاً'], ['hw', 'الواجبات']];
+    let body = '';
+    if (!w) body = `<div class="card">${emptyBox('لا توجد خطة منشورة حالياً', 'ستظهر هنا فور اعتمادها من المدرسة.')}</div>`;
+    else {
+      const idx = d.weeks.findIndex(x => x.id === w.id), prev = d.weeks[idx - 1], next = d.weeks[idx + 1];
+      const start = dateOf(w.start, 0), end = dateOf(w.start, d.class.days - 1);
+      body += `<div class="wk no-print"><button class="nav" data-w="${prev ? prev.id : ''}" ${prev ? '' : 'disabled'} aria-label="الأسبوع السابق">›</button><div class="t"><b>الأسبوع ${esc(w.word)}</b><span class="small muted">${dmy(start)} : ${dmy(end)}</span></div><button class="nav" data-w="${next ? next.id : ''}" ${next ? '' : 'disabled'} aria-label="الأسبوع التالي">‹</button></div>`;
+      body += `<div class="seg no-print" role="tablist" style="margin-bottom:12px">${views.map(([k, l]) => `<button role="tab" aria-selected="${st.view === k}" class="${st.view === k ? 'on' : ''}" data-v="${k}">${l}</button>`).join('')}</div>`;
+      body += `<div class="print-head"><img src="assets/logo.svg" alt=""><h2>${esc(d.class.name)} — الأسبوع ${esc(w.word)}</h2><div class="small">${dmy(start)} : ${dmy(end)}</div></div>`;
+      const hol = day => (w.holidays || []).find(h => h.day === day);
+      const today = st.data.today;
+      const E = d.entries, N = d.notes;
+      const lesson = e => `<div class="ls"><div class="pn">${AR(e.period + 1)}<span>${PER[e.period] || ''}</span></div><div><div class="sj">${esc(e.subject)}</div>${blank(e.topic) ? '' : `<div class="tp">${esc(e.topic)}</div>`}${blank(e.homework) ? '' : `<div class="hw">${esc(e.homework)}</div>`}${blank(e.note) ? '' : `<div class="nt">${esc(e.note)}</div>`}</div></div>`;
+      const dayNotes = day => N.filter(n => n.day === day).map(n => `<div class="notice">${n.title ? `<b>${esc(n.title)}</b><br>` : ''}${esc(n.body)}</div>`).join('');
+      const dayBlock = day => { const h = hol(day); const l = E.filter(e => e.day === day); return h ? `<div class="notice warn">${esc(h.label || 'إجازة')}</div>` : (l.length ? l.map(lesson).join('') : `<div class="card">${emptyBox('لم تُنشر خطة هذا اليوم بعد', 'تظهر الحصص بعد اعتمادها من المدرسة.')}</div>`) + dayNotes(day); };
+      if (st.view === 'day') {
+        body += `<div class="days no-print" role="tablist">${Array.from({ length: d.class.days }, (_, i) => { const x = dateOf(w.start, i); return `<button role="tab" aria-selected="${i === st.day}" class="${i === st.day ? 'on' : ''} ${iso(x) === today ? 'today' : ''}" data-d="${i}">${DAYS[i]}<span>${dmy(x)}</span></button>`; }).join('')}</div>`;
+        body += `<div class="dayhead print-only"><span class="dn">${DAYS[st.day]}</span><span class="dd">${dmy(dateOf(w.start, st.day))}</span><span class="ln"></span></div>` + dayBlock(st.day);
+      } else if (st.view === 'week') {
+        for (let i = 0; i < d.class.days; i++) body += `<div class="dayhead"><span class="dn">${DAYS[i]}</span><span class="dd">${dmy(dateOf(w.start, i))}</span><span class="ln"></span></div>` + dayBlock(i);
+      } else {
+        let any = false;
+        for (let i = 0; i < d.class.days; i++) { const l = E.filter(e => e.day === i && !blank(e.homework)); if (!l.length) continue; any = true; body += `<div class="dayhead"><span class="dn">${DAYS[i]}</span><span class="dd">${dmy(dateOf(w.start, i))}</span><span class="ln"></span></div><div class="card" style="padding:4px 14px">${l.map(e => `<div class="hwi"><span class="sj">${esc(e.subject)}</span><span class="t">${esc(e.homework)}</span></div>`).join('')}</div>`; }
+        if (!any) body += `<div class="card">${emptyBox('لا توجد واجبات منشورة لهذا الأسبوع', '')}</div>`;
+      }
+      const extra = N.filter(n => n.day == null);
+      if (extra.length && st.view !== 'hw') body += `<div class="card"><h3>ملاحظات وتنبيهات</h3>${extra.map(n => `<div class="notice">${n.title ? `<b>${esc(n.title)}</b><br>` : ''}${esc(n.body)}</div>`).join('')}</div>`;
+      body += `<div class="acts no-print"><button class="btn" id="pr">طباعة / PDF</button><button class="btn" id="sh">مشاركة الرابط</button></div>`;
+    }
+    app.innerHTML = kidsBar() + postsHtml(st.posts) + `<div class="card" style="padding:12px 16px"><h2 style="margin:0">${esc(clsName(st.cur) || d.class.name)}</h2><span class="small muted">الخطة المعتمدة من المدرسة · تُحدَّث تلقائياً</span></div>` + body;
+    bindKids(); bindPosts();
+    app.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { st.view = b.dataset.v; LS.set('view', st.view); render(); });
+    app.querySelectorAll('[data-d]').forEach(b => b.onclick = () => { st.day = +b.dataset.d; render(); });
+    app.querySelectorAll('[data-w]').forEach(b => b.onclick = () => { if (b.dataset.w) load(b.dataset.w); });
+    const pr = $('#pr'); if (pr) pr.onclick = () => window.print();
+    const sh = $('#sh'); if (sh) sh.onclick = async () => { const u = `${location.origin}${location.pathname}?t=${token}`; try { if (navigator.share) await navigator.share({ title: 'خطط أبنائي — مدارس دينا', url: u }); else { await navigator.clipboard.writeText(u); toast('نُسخ الرابط'); } } catch (_) { } };
+  }
+  // تحديث تلقائي كل دقيقة عند فتح الصفحة
+  setInterval(async () => { if (document.hidden || !st.cur || st.adding || !st.week) return; try { const [n, ps] = await Promise.all([rpc('parent_plan', { p_token: token, p_class: st.cur, p_week: st.week }), rpc('parent_posts_for', { p_token: token, p_class: st.cur }).catch(() => st.posts)]); if (JSON.stringify(n.entries) !== JSON.stringify(st.data.entries) || JSON.stringify(n.notes) !== JSON.stringify(st.data.notes) || JSON.stringify(ps) !== JSON.stringify(st.posts)) { st.data = n; st.posts = ps || []; render(); } } catch (_) { } }, 60000);
+  boot();
+})();
+</script>
+</body>
+</html>

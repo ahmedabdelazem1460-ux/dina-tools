@@ -5,7 +5,7 @@
   const DEMO_SYNC = { id: 1, secret: 'demo-secret-0000000000000000', script_url: null };
   const clone = o => JSON.parse(JSON.stringify(o));
   function seed() {
-    const D = { parent_posts: [], messages: [], language_issues: [], extra_pages: [], join_codes: [], schools: [], sections: [], staff: [], memberships: [], classes: [], subjects: [], timetable_versions: [], timetable_slots: [], weeks: [], plan_entries: [], notes: [], audit_log: [] };
+    const D = { entry_delegations: [], parent_posts: [], messages: [], language_issues: [], extra_pages: [], join_codes: [], schools: [], sections: [], staff: [], memberships: [], classes: [], subjects: [], timetable_versions: [], timetable_slots: [], weeks: [], plan_entries: [], notes: [], audit_log: [] };
     const sch = { id: uid(), name: 'مدارس دينا العالمية', term_label: 'الفصل الدراسي الأول · العام الدراسي ١٤٤٨هـ' }; D.schools.push(sch);
     const g = { id: uid(), school_id: sch.id, name: 'قسم البنات', short_name: 'البنات', days: 5, periods: 7, sort: 1 };
     const b = { id: uid(), school_id: sch.id, name: 'قسم البنين', short_name: 'البنين', days: 5, periods: 7, sort: 2 };
@@ -188,6 +188,9 @@
       requestSheetSync: (week, dir) => { const w = find('weeks', week); if (!w || !w.sheet_id) return Promise.reject(new Error('لم يُربط هذا الأسبوع بملف Google Sheet بعد')); setTimeout(() => { w.sheet_synced_at = new Date().toISOString(); }, 800); return wait({ queued: true, instant: true }); },
       syncCfg: () => wait(DEMO_SYNC),
       parentLinks: () => wait([DEMO_PARENT]),
+      delegations: sec => wait(pick('entry_delegations', d => d.section_id === sec && d.active)),
+      addDelegation: r => wait(ins('entry_delegations', { active: true, note: '', ...r })),
+      updateDelegation: (id, p) => wait(upd('entry_delegations', id, p)),
       posts: () => wait(clone(D.parent_posts).sort((a, b) => (b.pinned - a.pinned) || String(b.starts_on).localeCompare(a.starts_on))),
       addPost: r => wait(ins('parent_posts', { active: true, pinned: false, kind: 'announcement', starts_on: new Date().toISOString().slice(0, 10), ...r })),
       updatePost: (id, p) => wait(upd('parent_posts', id, p)),

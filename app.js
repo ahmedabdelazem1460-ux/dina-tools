@@ -179,13 +179,14 @@
     if (!S.weekId) { S.entries = []; S.notes = []; return; }
     const [e, n, x] = await Promise.all([api.entries(S.weekId), api.notes(S.weekId), api.extraPages(S.weekId).catch(() => [])]);
     S.entries = e; S.notes = n; S.extraPages = x;
+    try { S.delegs = api.delegations ? await api.delegations(S.sectionId) : []; } catch (_) { S.delegs = []; }
     if (window.APP_AFTER_WEEK) window.APP_AFTER_WEEK();
   }
   async function refreshPeople() { const [st, me, su] = await Promise.all([api.reloadStaff(), api.reloadMemberships(), api.reloadSubjects()]); S.staff = st; S.memberships = me; S.subjects = su; }
 
   // ---------- الإطار ----------
   const NAV = [
-    ['my', 'خطتي', () => S.entries.some(e => e.teacher_id === S.me.id) || (myMem() || {}).role === 'teacher'],
+    ['my', 'خطتي', () => S.entries.some(e => e.teacher_id === S.me.id || (S.delegs || []).some(d => d.to_teacher === S.me.id)) || (myMem() || {}).role === 'teacher'],
     ['dash', 'لوحة المتابعة', () => anyPerm('review', 'export', 'structure', 'users')],
     ['classes', 'خطط الفصول', () => anyPerm('review', 'export', 'structure', 'users', 'timetable_edit', 'exec_confirm')],
     ['export', 'التصدير', () => perm('export')],
@@ -340,7 +341,7 @@
   VIEWS.my = function (root) {
     const w = week();
     if (!w) { root.innerHTML = `<div class="card">${emptyBox('لا يوجد أسبوع مفتوح حالياً', 'سيظهر هنا عند فتح الإدارة لأسبوع جديد.')}</div>`; return; }
-    const mine = S.entries.filter(e => e.teacher_id === S.me.id && e.subject_id);
+    const mine = S.entries.filter(isMine);
     const dates = weekDates(w, section().days);
     const open = w.status === 'open';
     const filter = LS.get('myfilter') || 'all';
@@ -405,7 +406,7 @@
   };
   // ---------- جدول المعلم الأسبوعي (حصصه المسندة فقط) ----------
   function myPairs(mine) {
-    const m = {}; mine.forEach(e => { const k = e.class_id + '|' + e.subject_id; (m[k] = m[k] || [k, `${subjName(e.subject_id)} — ${(cls(e.class_id) || {}).name || ''}`, 0])[2]++; });
+    const m = {}; mine.forEach(e => { const k = e.class_id + '|' + e.subject_id; (m[k] = m[k] || [k, `${subjName(e.subject_id)} — ${(cls(e.class_id) || {}).name || ''}${e.teacher_id !== S.me.id ? ' (نيابة)' : ''}`, 0])[2]++; });
     return Object.values(m).sort((a, b) => a[1].localeCompare(b[1], 'ar'));
   }
   function myGrid(mine, dates) {
@@ -415,7 +416,7 @@
       const hol = holidayOf(d); const l = at(d, p);
       if (hol) return `<td class="tg-hol">${p === 0 ? esc(hol.label || 'إجازة') : ''}</td>`;
       if (!l.length) return '<td class="tg-free">—</td>';
-      return `<td>${l.map(e => `<button class="tg-c ${filled(e) ? 'ok' : required(e) ? 'todo' : ''}" data-cell="${e.class_id}|${e.subject_id}|${e.id}" title="${esc(subjName(e.subject_id))} — ${esc((cls(e.class_id) || {}).name || '')}"><b>${esc(subjName(e.subject_id))}</b><span>${esc((cls(e.class_id) || {}).name || '')}</span></button>`).join('')}</td>`;
+      return `<td>${l.map(e => `<button class="tg-c ${filled(e) ? 'ok' : required(e) ? 'todo' : ''} ${e.teacher_id !== S.me.id ? 'dl' : ''}" data-cell="${e.class_id}|${e.subject_id}|${e.id}" title="${esc(subjName(e.subject_id))} — ${esc((cls(e.class_id) || {}).name || '')}"><b>${esc(subjName(e.subject_id))}</b><span>${esc((cls(e.class_id) || {}).name || '')}${e.teacher_id !== S.me.id ? ' · نيابة' : ''}</span></button>`).join('')}</td>`;
     };
     const n = mine.length, f = mine.filter(e => required(e) && filled(e)).length, rq = mine.filter(required).length;
     return `<details class="card tgrid" ${LS.get('mygrid') === '0' ? '' : 'open'} ontoggle="APP.LS.set('mygrid', this.open ? '1' : '0')"><summary><b>جدولي الأسبوعي</b> <span class="small muted">${cnt(n, 'حصة', 'حصص')} · مكتملة ${AR(f)} من ${AR(rq)} · اضغط على أي حصة لفتحها</span></summary>
@@ -431,7 +432,7 @@
     el.className = `lesson ${e.status}`; el.dataset.eid = e.id;
     el.innerHTML = `
       <div class="side"><div><span class="pn">${AR(e.period + 1)}</span> <span class="pw">الحصة ${PER[e.period]}</span></div>
-        <div class="cl">${esc(c.name || '')}</div><div class="sj">${esc(subjName(e.subject_id))}</div><div data-st>${pill(e.status)}</div></div>
+        <div class="cl">${esc(c.name || '')}</div><div class="sj">${esc(subjName(e.subject_id))}</div><div data-st>${pill(e.status)}</div>${e.teacher_id !== S.me.id && delegOf(e) ? `<div class="pill st-submitted" style="margin-top:6px" title="تكليف مؤقت للإدخال">نيابة عن ${esc(personName(e.teacher_id))}</div>` : ''}</div>
       <div class="main">
         ${e.status === 'returned' && e.review_note ? `<div class="rnote">ملاحظة المراجعة: ${esc(e.review_note)}</div>` : ''}
         <div class="field full"><label>الموضوع / الدرس</label><textarea class="in" rows="1" data-k="topic" ${ro ? 'readonly' : ''} placeholder="مثال: الفعل الماضي — ص ٤٥">${esc(e.topic)}</textarea></div>
@@ -462,7 +463,7 @@
   function refreshMyCards(ids) {
     const w = week(); const open = w && w.status === 'open';
     // إسناد جديد أو سحب حصة من المعلم: إعادة رسم الصفحة كاملة (إن لم يكن يكتب الآن)
-    const structural = (ids || []).some(id => { const e = S.entries.find(x => x.id === id); const el = document.querySelector(`.lesson[data-eid="${id}"]`); return e && ((e.teacher_id === S.me.id && e.subject_id && !el) || (el && e.teacher_id !== S.me.id)); });
+    const structural = (ids || []).some(id => { const e = S.entries.find(x => x.id === id); const el = document.querySelector(`.lesson[data-eid="${id}"]`); return e && ((isMine(e) && !el) || (el && !isMine(e))); });
     if (structural && !(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) && !pending.size) { route(); return; }
     (ids || []).forEach(id => {
       const el = document.querySelector(`.lesson[data-eid="${id}"]`); if (!el || pending.has(id) || el.contains(document.activeElement)) return;
@@ -470,8 +471,11 @@
     });
     updateMyProgress();
   }
+  // التكليف المؤقت: حصة معلم آخر كُلِّف المستخدم بإدخالها دون نقلها
+  function delegOf(e) { return (S.delegs || []).find(d => d.to_teacher === S.me.id && d.from_teacher === e.teacher_id && (d.week_ids || []).includes(e.week_id) && (!d.pairs || d.pairs.some(x => x.c === e.class_id && x.s === e.subject_id))); }
+  const isMine = e => !!e.subject_id && (e.teacher_id === S.me.id || !!delegOf(e));
   function updateMyProgress() {
-    const mine = S.entries.filter(e => e.teacher_id === S.me.id && e.subject_id), req = mine.filter(required), done = req.filter(filled).length;
+    const mine = S.entries.filter(isMine), req = mine.filter(required), done = req.filter(filled).length;
     const f = $('.sticky-foot'); if (!f) return;
     f.querySelector('b').textContent = `الإنجاز ${AR(pct(done, req.length))}٪`;
     f.querySelector('.bar').outerHTML = bar(done, req.length);
@@ -653,7 +657,7 @@
   }
 
   // ---------- مشترك مع الملفات الأخرى ----------
-  window.APP = { start: () => start(), TOOL_PERMS, TOOL_KEYS, cnt, api, S, $, $$, esc, AR, DAYS, PER, ORD, STATUS, WSTATUS, ROLES, PERMS, ROLE_DEFAULTS, I, parseDate, isoDate, dmy, weekDates, fmtDT, pct, norm, normKey, genPass, toast, modal, confirmBox, run, pill, bar, emptyBox, download, section, week, subj, subjName, person, personName, cls, myMem, perm, anyPerm, holidayOf, required, filled, stats, loadSection, loadWeek, refreshPeople, refreshMyCards, shell, route, renderNav, LS, DEMO };
+  window.APP = { start: () => start(), TOOL_PERMS, TOOL_KEYS, cnt, api, S, $, $$, esc, AR, DAYS, PER, ORD, STATUS, WSTATUS, ROLES, PERMS, ROLE_DEFAULTS, I, parseDate, isoDate, dmy, weekDates, fmtDT, pct, norm, normKey, genPass, toast, modal, confirmBox, run, pill, bar, emptyBox, download, section, week, subj, subjName, person, personName, cls, myMem, perm, anyPerm, holidayOf, required, filled, stats, loadSection, loadWeek, refreshPeople, refreshMyCards, delegOf, shell, route, renderNav, LS, DEMO };
 
   // ---------- تشغيل ----------
   window.addEventListener('DOMContentLoaded', async () => {

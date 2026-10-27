@@ -117,6 +117,10 @@
         return sb.storage.from('plan-assets').getPublicUrl(path).data.publicUrl;
       },
       joinWithCode2: (code, f) => sb.rpc('join_with_code_v2', { p_code: code, p_full_name: f.name, p_email: f.email, p_password: f.password, p_phone: f.phone || null, p_specialty: f.specialty || null, p_employee_no: f.employee_no || null }).then(ok),
+      // ---- التكليف المؤقت للإدخال
+      delegations: sec => T('entry_delegations').select('*').eq('section_id', sec).eq('active', true).order('created_at', { ascending: false }).then(ok),
+      addDelegation: r => T('entry_delegations').insert(r).select().single().then(ok),
+      updateDelegation: (id, p) => T('entry_delegations').update(p).eq('id', id).select().single().then(ok),
       // ---- إعلانات أولياء الأمور
       posts: () => T('parent_posts').select('*').order('pinned', { ascending: false }).order('starts_on', { ascending: false }).order('created_at', { ascending: false }).then(ok),
       addPost: r => T('parent_posts').insert(r).select().single().then(ok),

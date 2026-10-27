@@ -198,6 +198,7 @@
     const v = approved(); if (!v) { box.innerHTML = A.emptyBox('لا يوجد جدول معتمد'); return; }
     const can = A.perm('timetable_edit');
     const sl = await slotsOf(v.id);
+    let dl = []; try { dl = await api.delegations(S.sectionId); } catch (_) { }
     const act = s => s.subject_id && !(A.subj(s.subject_id) || {}).is_activity;
     const secMem = id => S.memberships.some(m => m.staff_id === id && m.section_id === S.sectionId);
     const build = () => {
@@ -223,7 +224,10 @@
         return `<tr><td><b>${esc(p.full_name)}</b><div class="small muted">${esc(p.specialty || '')}${p.user_id ? '' : ' · بلا حساب دخول'}</div></td>
           <td class="ldn"><b>${AR(o.n)}</b><div class="small muted">حصة/أسبوع</div>${o.n !== o.nAct ? `<div class="small faint">منها ${AR(o.n - o.nAct)} نشاط</div>` : ''}</td>
           <td class="small">${AR(nSub)} مادة · ${AR(nCls)} فصل</td>
-          <td>${pairs.map(pr => chip(pr, p.id)).join('') || '<span class="faint small">لا يوجد إسناد</span>'}${can ? `<button class="btn ghost sm" data-add="${p.id}" style="margin:4px 0">+ إسناد</button>` : ''}</td></tr>`; }).join('') || `<tr><td colspan="4">${A.emptyBox('لا يوجد معلمون في هذا القسم بعد', 'أضفهم من الإدارة أو برابط الانضمام.')}</td></tr>`;
+          <td>${pairs.map(pr => chip(pr, p.id)).join('') || '<span class="faint small">لا يوجد إسناد</span>'}${can ? `<button class="btn ghost sm" data-add="${p.id}" style="margin:4px 0">+ إسناد</button>${o.n ? ` <button class="btn ghost sm" data-dlg="${p.id}" style="margin:4px 0">تكليف مؤقت للإدخال</button>` : ''}` : ''}${dl.some(d => d.from_teacher === p.id) ? `<div class="small" style="color:var(--warn);margin-top:4px">يُدخل عنه حالياً: ${dl.filter(d => d.from_teacher === p.id).map(d => esc(A.personName(d.to_teacher))).join('، ')}</div>` : ''}</td></tr>`; }).join('') || `<tr><td colspan="4">${A.emptyBox('لا يوجد معلمون في هذا القسم بعد', 'أضفهم من الإدارة أو برابط الانضمام.')}</td></tr>`;
+      const wk = id => (S.weeks.find(w => w.id === id) || {}).word || '';
+      $('#ldl', box).innerHTML = dl.length ? `<div class="sec-box" style="margin-bottom:12px"><b>تكليفات مؤقتة للإدخال (${AR(dl.length)})</b> <span class="small muted">المكلَّف يُدخل الخطط نيابةً عن المعلم دون نقل الحصص</span>
+        ${dl.map(d => `<div class="row" style="margin-top:8px;justify-content:space-between;border-top:1px dashed var(--border);padding-top:8px"><span><b>${esc(A.personName(d.to_teacher))}</b> <span class="small muted">نيابةً عن</span> <b>${esc(A.personName(d.from_teacher))}</b><br><span class="small muted">${d.pairs ? d.pairs.map(x => `${A.subjName(x.s)} — ${(A.cls(x.c) || {}).name || ''}`).join('، ') : 'كل مواده'} · الأسبوع ${d.week_ids.map(wk).filter(Boolean).join('، ')}${d.note ? ' · ' + esc(d.note) : ''}</span></span>${can ? `<button class="btn ghost sm" data-dlx="${d.id}">إنهاء التكليف</button>` : ''}</div>`).join('')}</div>` : '';
       $('#lun', box).innerHTML = un.n ? `<details class="sec-box" style="margin-top:12px"><summary><b>حصص بلا معلم (${AR(un.n)})</b> <span class="small muted">اضغط على أي مادة لإسنادها</span></summary><div style="margin-top:8px">${Object.values(un.pairs).sort((a, b) => (A.cls(a.c)?.sort ?? 0) - (A.cls(b.c)?.sort ?? 0)).map(pr => `<button class="ldc ldbtn" data-re="${pr.c}|${pr.s}">${esc(A.subjName(pr.s))} — ${esc((A.cls(pr.c) || {}).name || '')} <b>${AR(pr.n)}</b></button>`).join('')}</div></details>` : '<div class="notice ok" style="margin-top:12px">كل حصص الجدول مُسندة.</div>';
       bind();
     };
@@ -233,6 +237,34 @@
       $$('[data-rm]', box).forEach(b => b.onclick = () => A.run(b, async () => { const [c, s] = b.dataset.rm.split('|'); if (!(await A.confirmBox(`إلغاء إسناد ${esc(A.subjName(s))} — ${esc((A.cls(c) || {}).name || '')}؟<br><span class="small muted">تصبح الحصص «بلا معلم» في الجدول والأسابيع المفتوحة.</span>`, 'إلغاء الإسناد', true))) return; await api.assignTeacher(c, s, null); await after('أُلغي الإسناد'); }));
       $$('[data-re]', box).forEach(b => b.onclick = () => { const [c, s] = b.dataset.re.split('|'); A.assignDialog(c, s); });
       $$('[data-add]', box).forEach(b => b.onclick = () => addDialog(b.dataset.add));
+      $$('[data-dlg]', box).forEach(b => b.onclick = () => dlgDialog(b.dataset.dlg));
+      $$('[data-dlx]', box).forEach(b => b.onclick = () => A.run(b, async () => { if (!(await A.confirmBox('إنهاء هذا التكليف؟ تعود الحصص لإدخال معلمها فقط، ويبقى ما أُدخل.', 'إنهاء'))) return; await api.updateDelegation(b.dataset.dlx, { active: false }); dl = await api.delegations(S.sectionId); await A.loadWeek(); draw(); A.toast('انتهى التكليف', 'ok'); }));
+    };
+    const dlgDialog = fid => {
+      const o = by[fid] || { pairs: {} }; const pairs = Object.values(o.pairs);
+      const subs = S.staff.filter(p => p.active && p.id !== fid && (secMem(p.id) || by[p.id]));
+      const wks = S.weeks.filter(w => !w.archived && w.status === 'open').sort((a, b) => a.number - b.number);
+      const m = A.modal(`<h3>تكليف مؤقت للإدخال نيابةً عن ${esc(A.personName(fid))}</h3><p class="sub">المكلَّف يرى هذه الحصص في صفحته ويُدخل خططها ويرسلها، بينما تبقى الحصص مسندة للمعلم الأصلي في الجدول والتقارير. يُسجَّل كل تعديل باسم من أدخله.</p>
+        <div class="field"><label for="dgT">المعلم المكلَّف</label><select class="in" id="dgT"><option value="">— اختر —</option>${subs.map(p => `<option value="${p.id}">${esc(p.full_name)}${p.specialty ? ' — ' + esc(p.specialty) : ''}</option>`).join('')}</select></div>
+        <div class="field"><label>المواد</label><label class="chk"><input type="checkbox" id="dgAll" checked> كل مواده (${AR(pairs.length)})</label><div class="perm-grid hidden" id="dgP" style="margin-top:6px">${pairs.map(pr => `<label class="chk"><input type="checkbox" value="${pr.c}|${pr.s}" checked> ${esc(A.subjName(pr.s))} — ${esc((A.cls(pr.c) || {}).name || '')}</label>`).join('')}</div></div>
+        <div class="field"><label>الأسابيع</label><div class="perm-grid" id="dgW">${wks.map(w => `<label class="chk"><input type="checkbox" value="${w.id}" ${w.id === S.weekId ? 'checked' : ''}> الأسبوع ${esc(w.word)}</label>`).join('') || '<span class="small muted">لا توجد أسابيع مفتوحة</span>'}</div></div>
+        <div class="field"><label for="dgN">السبب (اختياري)</label><input class="in" id="dgN" placeholder="مثال: إجازة مرضية"></div>
+        <label class="chk"><input type="checkbox" id="dgM" checked> إرسال رسالة للمعلم المكلَّف والمعلم الأصلي</label>
+        <div class="acts"><button class="btn" id="dgGo">تكليف</button></div>`, { cls: 'wide' });
+      m.el.querySelector('#dgAll').onchange = e => m.el.querySelector('#dgP').classList.toggle('hidden', e.target.checked);
+      m.el.querySelector('#dgGo').onclick = e => A.run(e.currentTarget, async () => {
+        const to = m.el.querySelector('#dgT').value; if (!to) throw new Error('اختر المعلم المكلَّف');
+        const all = m.el.querySelector('#dgAll').checked; const ps = $$('#dgP input:checked', m.el).map(i => { const [c, s2] = i.value.split('|'); return { c, s: s2 }; });
+        if (!all && !ps.length) throw new Error('اختر مادة واحدة على الأقل');
+        const ws = $$('#dgW input:checked', m.el).map(i => i.value); if (!ws.length) throw new Error('اختر أسبوعاً واحداً على الأقل');
+        const note = m.el.querySelector('#dgN').value.trim();
+        await api.addDelegation({ section_id: S.sectionId, from_teacher: fid, to_teacher: to, pairs: all ? null : ps, week_ids: ws, note });
+        if (m.el.querySelector('#dgM').checked) {
+          const wl = ws.map(id => 'الأسبوع ' + ((S.weeks.find(w => w.id === id) || {}).word || '')).join('، '); const scope = all ? 'كل مواده' : ps.map(x => `${A.subjName(x.s)} — ${(A.cls(x.c) || {}).name || ''}`).join('، ');
+          await api.sendMessages([{ recipient_id: to, subject: 'تكليف مؤقت بإدخال خطط', body: `كُلِّفت بإدخال خطط ${A.personName(fid)} (${scope}) في ${wl}${note ? ' — ' + note : ''}. ستجدها في صفحتك «خطتي» بعلامة «نيابة».`, kind: 'system' }, { recipient_id: fid, subject: 'تكليف مؤقت', body: `كُلِّف ${A.personName(to)} بإدخال خططك (${scope}) في ${wl}${note ? ' — ' + note : ''}.`, kind: 'system' }]).catch(() => { });
+        }
+        m.close(); dl = await api.delegations(S.sectionId); await A.loadWeek(); draw(); A.toast(`كُلِّف ${A.personName(to)} بالإدخال نيابةً عن ${A.personName(fid)}`, 'ok');
+      });
     };
     const addDialog = tid => {
       const pairs = {}; sl.filter(s => s.subject_id).forEach(s => { const k = s.class_id + '|' + s.subject_id; (pairs[k] = pairs[k] || { c: s.class_id, s: s.subject_id, n: 0, t: s.teacher_id }).n++; });
@@ -249,7 +281,7 @@
       m.el.querySelector('#adg').onclick = e => A.run(e.currentTarget, async () => { if (!sel.size) throw new Error('اختر مادة وفصلاً'); for (const k of sel) { const [c, s] = k.split('|'); await api.assignTeacher(c, s, tid); } m.close(); await after(`أُسند ${A.cnt(sel.size, 'مادة/فصل', 'مواد/فصول')} إلى ${A.personName(tid)}`); });
     };
     box.innerHTML = `<p class="sub" style="margin-top:0">نصاب كل معلم من الجدول المعتمد: المواد والفصول وعدد الحصص الأسبوعية. أي تعديل هنا يُطبَّق فوراً على الجدول وإسناد المعلمين وكل الأسابيع المفتوحة وصفحات المعلمين.</p>
-      <div class="grid g3" id="lsum" style="margin-bottom:14px"></div>
+      <div class="grid g3" id="lsum" style="margin-bottom:14px"></div><div id="ldl"></div>
       <div class="row" style="margin-bottom:12px"><input class="in" id="lq" placeholder="بحث بالمعلم أو المادة أو الفصل" style="max-width:320px"><select class="in" id="ls" style="max-width:200px"><option value="load">الأعلى نصاباً أولاً</option><option value="name">حسب الاسم</option></select><button class="btn ghost sm" id="lx">${I.down} Excel</button></div>
       <div class="scroll"><table class="tbl"><thead><tr><th>المعلم</th><th>النصاب</th><th>التوزيع</th><th style="width:52%">المواد والفصول (عدد الحصص)</th></tr></thead><tbody id="lb"></tbody></table></div><div id="lun"></div>`;
     $('#lq', box).oninput = draw; $('#ls', box).onchange = draw;

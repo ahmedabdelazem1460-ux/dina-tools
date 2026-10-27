@@ -155,6 +155,8 @@
     b.innerHTML = IC.users + '<span class="dot" id="onlineN" hidden></span>'; b.onclick = whoDialog; ib.before(b); badge();
   }
 
+  // ---- انتهاء الجلسة (مثلاً بعد تغيير كلمة المرور من جهاز آخر): العودة لشاشة الدخول بدل أخطاء الصلاحية
+  if (api.onAuth && !api.demo) api.onAuth(ev => { if (ev === 'SIGNED_OUT' && S.me) { A.toast('انتهت جلستك — سجّل الدخول من جديد', 'err'); setTimeout(() => location.reload(), 1500); } });
   // ---- الربط بعد رسم الواجهة
   const after0 = window.APP_AFTER_SHELL;
   window.APP_AFTER_SHELL = () => { if (after0) after0(); apply(); watchNav(); addOnlineBtn(); startPresence(); };

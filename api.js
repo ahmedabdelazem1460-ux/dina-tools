@@ -5,6 +5,7 @@
     const m = e.message || String(e);
     if (/Invalid login credentials/i.test(m)) return 'البريد أو كلمة المرور غير صحيحة';
     if (/Failed to fetch|NetworkError/i.test(m)) return 'تعذّر الاتصال بالخادم — تحقق من الإنترنت';
+    if (/permission denied for function|JWT|session/i.test(m)) return 'انتهت جلستك — أعد تسجيل الدخول ثم حاول مجدداً';
     if (/row-level security|permission denied/i.test(m)) return 'ليست لديك صلاحية لهذا الإجراء';
     if (/duplicate key/i.test(m)) return 'هذا العنصر موجود مسبقاً';
     if (/JWT expired/i.test(m)) return 'انتهت الجلسة — سجّل الدخول من جديد';

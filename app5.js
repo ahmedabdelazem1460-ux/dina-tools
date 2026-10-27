@@ -41,7 +41,7 @@
       if (!tid) throw new Error('اختر معلماً');
       const targets = m.el.querySelector('#asAll').checked ? S.classes.filter(x => x.active && x.stage === c.stage && x.grade_word === c.grade_word).map(x => x.id) : [classId];
       for (const cid of targets) await api.assignTeacher(cid, subjectId, tid);
-      m.close(); await A.refreshPeople(); await A.loadWeek(); A.route();
+      m.close(); await A.refreshPeople(); await A.loadWeek(); if (A._ttLoadRefresh && document.querySelector('#lb')) A._ttLoadRefresh(); else A.route();
       A.toast(`أُسند ${A.personName(tid)} في ${A.cnt(targets.length, 'فصل', 'فصول')}`, 'ok');
     });
   }
@@ -80,17 +80,45 @@
     m.el.querySelector('#newMsg').onclick = () => { m.close(); compose(); };
     if (openWith) openThread(openWith);
   }
+  // ---- رسالة جديدة: اختيار بالمربعات مع صفة كل موظف، وإرسال جماعي
+  const roleOf = p => {
+    if (p.is_owner) return 'مالك النظام';
+    const ms = S.memberships.filter(m => m.staff_id === p.id);
+    return ms.map(m => `${A.ROLES[m.role] || m.role} · ${(S.sections.find(x => x.id === m.section_id) || {}).short_name || ''}`).join('، ') || 'غير مضاف لقسم';
+  };
   function compose(to = [], subject = '', body = '', kind = 'message') {
-    const people = S.staff.filter(p => p.active && p.id !== myId() && p.user_id);
+    const people = S.staff.filter(p => p.active && p.id !== myId()).sort((a, b) => (b.user_id ? 1 : 0) - (a.user_id ? 1 : 0) || a.full_name.localeCompare(b.full_name, 'ar'));
+    const sel = new Set(to.filter(id => people.some(p => p.id === id && p.user_id)));
+    const inSec = (p, sid) => S.memberships.some(m => m.staff_id === p.id && m.section_id === sid);
+    const isRole = (p, r) => S.memberships.some(m => m.staff_id === p.id && m.role === r);
+    const groups = [['all', 'الكل', () => true], ['t', 'المعلمون', p => isRole(p, 'teacher')], ['s', 'المشرفون والإدارة', p => p.is_owner || isRole(p, 'supervisor') || isRole(p, 'admin')], ...S.sections.map(x => ['sec' + x.id, x.short_name || x.name, p => inSec(p, x.id)])];
     const m = A.modal(`<h3>رسالة جديدة</h3>
-      <div class="field"><label>إلى</label><select class="in" id="cTo" multiple size="6">${people.map(p => `<option value="${p.id}" ${to.includes(p.id) ? 'selected' : ''}>${esc(p.full_name)}</option>`).join('')}</select><span class="small muted">اضغط Ctrl لاختيار أكثر من شخص.</span></div>
-      <div class="field"><label>الموضوع</label><input class="in" id="cSub" value="${esc(subject)}"></div>
-      <div class="field"><label>النص</label><textarea class="in" id="cBody" rows="6">${esc(body)}</textarea></div>
+      <div class="field"><label>المستلمون <span class="small muted" id="cCnt"></span></label>
+        <div class="chip-filter" id="cGrp" style="margin-bottom:8px">${groups.map(([k, l]) => `<button type="button" data-g="${k}">${esc(l)}</button>`).join('')}<button type="button" data-g="none">إلغاء التحديد</button></div>
+        <input class="in" id="cQ" placeholder="بحث بالاسم أو الصفة أو التخصص" style="margin-bottom:8px">
+        <div id="cList" class="rcpt"></div></div>
+      <div class="field"><label for="cSub">الموضوع</label><input class="in" id="cSub" value="${esc(subject)}"></div>
+      <div class="field"><label for="cBody">النص</label><textarea class="in" id="cBody" rows="5">${esc(body)}</textarea></div>
       <div class="acts"><button class="btn" id="cGo">${I.send} إرسال</button></div>`, { cls: 'wide' });
+    const L = m.el.querySelector('#cList');
+    const draw = () => {
+      const q = A.normKey(m.el.querySelector('#cQ').value);
+      L.innerHTML = people.filter(p => !q || A.normKey(p.full_name + ' ' + roleOf(p) + ' ' + (p.specialty || '')).includes(q)).map(p => `<label class="rc ${p.user_id ? '' : 'off'}"><input type="checkbox" value="${p.id}" ${sel.has(p.id) ? 'checked' : ''} ${p.user_id ? '' : 'disabled'}><span class="nm"><b>${esc(p.full_name)}</b><span class="small muted">${esc(roleOf(p))}${p.specialty ? ' · ' + esc(p.specialty) : ''}${p.user_id ? '' : ' · لم يُنشئ حساباً بعد'}</span></span></label>`).join('') || `<p class="small muted">لا نتائج</p>`;
+      $$('input', L).forEach(i => i.onchange = () => { i.checked ? sel.add(i.value) : sel.delete(i.value); count(); });
+      count();
+    };
+    const count = () => { m.el.querySelector('#cCnt').textContent = sel.size ? `(${AR(sel.size)} محدد)` : ''; m.el.querySelector('#cGo').innerHTML = `${I.send} إرسال${sel.size > 1 ? ` إلى ${AR(sel.size)}` : ''}`; };
+    $$('#cGrp button', m.el).forEach(b => b.onclick = () => {
+      if (b.dataset.g === 'none') sel.clear();
+      else { const g = groups.find(x => x[0] === b.dataset.g); people.filter(p => p.user_id && g[2](p)).forEach(p => sel.add(p.id)); }
+      draw();
+    });
+    m.el.querySelector('#cQ').oninput = draw; draw();
     m.el.querySelector('#cGo').onclick = e => A.run(e.currentTarget, async () => {
-      const ids = [...m.el.querySelector('#cTo').selectedOptions].map(o => o.value); const b = m.el.querySelector('#cBody').value.trim();
-      if (!ids.length) throw new Error('اختر المستلم'); if (!b) throw new Error('اكتب نص الرسالة');
-      await api.sendMessages(ids.map(id => ({ recipient_id: id, subject: m.el.querySelector('#cSub').value.trim(), body: b, kind })));
+      const ids = [...sel]; const b = m.el.querySelector('#cBody').value.trim();
+      if (!ids.length) throw new Error('اختر مستلماً واحداً على الأقل'); if (!b) throw new Error('اكتب نص الرسالة');
+      const sub = m.el.querySelector('#cSub').value.trim();
+      for (let i = 0; i < ids.length; i += 200) await api.sendMessages(ids.slice(i, i + 200).map(id => ({ recipient_id: id, subject: sub, body: b, kind })));
       m.close(); await loadMsgs(); A.toast(`أُرسلت إلى ${A.cnt(ids.length, 'شخص', 'أشخاص')}`, 'ok');
     });
   }
@@ -108,6 +136,7 @@
       changed.add(r.id);
       scheduleRefresh();
     }));
+    unsub.push(api.subscribe('tts-' + S.sectionId, 'timetable_slots', null, () => { clearTimeout(realtime._t); realtime._t = setTimeout(() => { if (A._ttLoadRefresh && $('#lb')) A._ttLoadRefresh(); }, 1500); }));
     if (S.sectionId) unsub.push(api.subscribe('wk-' + S.sectionId, 'weeks', 'section_id=eq.' + S.sectionId, p => {
       const r = p.new && p.new.id ? p.new : null; if (!r) return; const i = S.weeks.findIndex(w => w.id === r.id); if (i >= 0) { S.weeks[i] = { ...S.weeks[i], ...r }; const sb = $('#syncLast'); if (sb && A.syncLabel) sb.innerHTML = A.syncLabel(S.weeks[i]); }
     }));

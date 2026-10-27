@@ -110,7 +110,7 @@
     root.innerHTML = '<div class="spinner"></div>';
     T.slots = {}; await loadVersions();
     T.tab = A.LS.get('tttab') || 'view';
-    const tabs = [['view', 'الجدول المعتمد'], ['assign', 'إسناد المعلمين'], ['drafts', 'تعديل واستيراد الجدول']];
+    const tabs = [['view', 'الجدول المعتمد'], ['load', 'نصاب المعلمين'], ['assign', 'إسناد المعلمين'], ['drafts', 'تعديل واستيراد الجدول']];
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>الجدول الدراسي — ${esc(A.section().name)}</h2>
       <p class="sub" style="margin:2px 0 0">${approved() ? `المعتمد: <b>${esc(approved().label)}</b> · ${A.fmtDT(approved().approved_at)}` : '<span style="color:var(--bad)">لا يوجد جدول معتمد</span>'}</p></div></div>
       <div class="tabs">${tabs.map(([k, l]) => `<button data-t="${k}" class="${T.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div><div id="tt"></div></div>`;
@@ -118,6 +118,7 @@
     const box = $('#tt', root);
     if (T.tab === 'view') return ttView(box);
     if (T.tab === 'assign') return ttAssign(box);
+    if (T.tab === 'load') return ttLoad(box);
     return ttDrafts(box, root);
   };
   function classChips(box, onPick, cur) {
@@ -191,6 +192,69 @@
         m.close(); await A.loadWeek(); await A.refreshPeople(); A.toast(`أُسند المعلم في ${A.cnt(cs.length, 'فصل', 'فصول')}`, 'ok'); V.timetable(box.closest('main'));
       });
     };
+  }
+  // ---------- نصاب المعلمين: الفصول والمواد وعدد الحصص لكل معلم، مع التعديل المباشر ----------
+  async function ttLoad(box) {
+    const v = approved(); if (!v) { box.innerHTML = A.emptyBox('لا يوجد جدول معتمد'); return; }
+    const can = A.perm('timetable_edit');
+    const sl = await slotsOf(v.id);
+    const act = s => s.subject_id && !(A.subj(s.subject_id) || {}).is_activity;
+    const secMem = id => S.memberships.some(m => m.staff_id === id && m.section_id === S.sectionId);
+    const build = () => {
+      const by = {};
+      sl.filter(s => s.subject_id).forEach(s => {
+        const t = s.teacher_id || ''; const k = s.class_id + '|' + s.subject_id;
+        const o = by[t] = by[t] || { pairs: {}, n: 0, nAct: 0 };
+        (o.pairs[k] = o.pairs[k] || { c: s.class_id, s: s.subject_id, n: 0 }).n++; o.n++; if (act(s)) o.nAct++;
+      });
+      return by;
+    };
+    let by = build();
+    const people = () => S.staff.filter(p => p.active && (secMem(p.id) || by[p.id])).map(p => ({ p, o: by[p.id] || { pairs: {}, n: 0, nAct: 0 } }));
+    const chip = (pr, tid) => `<span class="ldc">${esc(A.subjName(pr.s))} — ${esc((A.cls(pr.c) || {}).name || '')} <b>${AR(pr.n)}</b>${can ? `<button class="ldx" title="تغيير المعلم" aria-label="تغيير المعلم" data-re="${pr.c}|${pr.s}">⇄</button><button class="ldx" title="إلغاء الإسناد" aria-label="إلغاء الإسناد" data-rm="${pr.c}|${pr.s}">×</button>` : ''}</span>`;
+    const draw = () => {
+      by = build();
+      const q = A.normKey(($('#lq', box) || {}).value || ''); const sort = ($('#ls', box) || {}).value || 'load';
+      let list = people().filter(x => !q || A.normKey(x.p.full_name + ' ' + (x.p.specialty || '') + ' ' + Object.values(x.o.pairs).map(pr => A.subjName(pr.s) + ' ' + (A.cls(pr.c) || {}).name).join(' ')).includes(q));
+      list.sort((a, b) => sort === 'name' ? a.p.full_name.localeCompare(b.p.full_name, 'ar') : b.o.n - a.o.n);
+      const un = by[''] || { pairs: {}, n: 0 }; const assigned = sl.filter(s => s.subject_id && s.teacher_id).length;
+      $('#lsum', box).innerHTML = `<div class="kpi"><div class="k">معلمون في القسم</div><div class="v">${AR(people().length)}</div></div><div class="kpi"><div class="k">حصص مُسندة</div><div class="v">${AR(assigned)}</div><div class="d">من ${AR(assigned + un.n)} حصة في الجدول</div></div><div class="kpi"><div class="k">حصص بلا معلم</div><div class="v" style="${un.n ? 'color:var(--warn)' : ''}">${AR(un.n)}</div><div class="d">${A.cnt(Object.keys(un.pairs).length, 'مادة', 'مواد')} في الفصول</div></div>`;
+      $('#lb', box).innerHTML = list.map(({ p, o }) => { const pairs = Object.values(o.pairs).sort((a, b) => (A.cls(a.c)?.sort ?? 0) - (A.cls(b.c)?.sort ?? 0)); const nCls = new Set(pairs.map(x => x.c)).size, nSub = new Set(pairs.map(x => x.s)).size;
+        return `<tr><td><b>${esc(p.full_name)}</b><div class="small muted">${esc(p.specialty || '')}${p.user_id ? '' : ' · بلا حساب دخول'}</div></td>
+          <td class="ldn"><b>${AR(o.n)}</b><div class="small muted">حصة/أسبوع</div>${o.n !== o.nAct ? `<div class="small faint">منها ${AR(o.n - o.nAct)} نشاط</div>` : ''}</td>
+          <td class="small">${AR(nSub)} مادة · ${AR(nCls)} فصل</td>
+          <td>${pairs.map(pr => chip(pr, p.id)).join('') || '<span class="faint small">لا يوجد إسناد</span>'}${can ? `<button class="btn ghost sm" data-add="${p.id}" style="margin:4px 0">+ إسناد</button>` : ''}</td></tr>`; }).join('') || `<tr><td colspan="4">${A.emptyBox('لا يوجد معلمون في هذا القسم بعد', 'أضفهم من الإدارة أو برابط الانضمام.')}</td></tr>`;
+      $('#lun', box).innerHTML = un.n ? `<details class="sec-box" style="margin-top:12px"><summary><b>حصص بلا معلم (${AR(un.n)})</b> <span class="small muted">اضغط على أي مادة لإسنادها</span></summary><div style="margin-top:8px">${Object.values(un.pairs).sort((a, b) => (A.cls(a.c)?.sort ?? 0) - (A.cls(b.c)?.sort ?? 0)).map(pr => `<button class="ldc ldbtn" data-re="${pr.c}|${pr.s}">${esc(A.subjName(pr.s))} — ${esc((A.cls(pr.c) || {}).name || '')} <b>${AR(pr.n)}</b></button>`).join('')}</div></details>` : '<div class="notice ok" style="margin-top:12px">كل حصص الجدول مُسندة.</div>';
+      bind();
+    };
+    const after = async (msg) => { T.slots[v.id] = null; const fresh = await slotsOf(v.id); sl.length = 0; fresh.forEach(x => sl.push(x)); await A.loadWeek(); await A.refreshPeople(); draw(); if (msg) A.toast(msg, 'ok'); };
+    A._ttLoadRefresh = () => { if (box.isConnected) after(); };
+    const bind = () => {
+      $$('[data-rm]', box).forEach(b => b.onclick = () => A.run(b, async () => { const [c, s] = b.dataset.rm.split('|'); if (!(await A.confirmBox(`إلغاء إسناد ${esc(A.subjName(s))} — ${esc((A.cls(c) || {}).name || '')}؟<br><span class="small muted">تصبح الحصص «بلا معلم» في الجدول والأسابيع المفتوحة.</span>`, 'إلغاء الإسناد', true))) return; await api.assignTeacher(c, s, null); await after('أُلغي الإسناد'); }));
+      $$('[data-re]', box).forEach(b => b.onclick = () => { const [c, s] = b.dataset.re.split('|'); A.assignDialog(c, s); });
+      $$('[data-add]', box).forEach(b => b.onclick = () => addDialog(b.dataset.add));
+    };
+    const addDialog = tid => {
+      const pairs = {}; sl.filter(s => s.subject_id).forEach(s => { const k = s.class_id + '|' + s.subject_id; (pairs[k] = pairs[k] || { c: s.class_id, s: s.subject_id, n: 0, t: s.teacher_id }).n++; });
+      const rows = Object.values(pairs).filter(x => x.t !== tid).sort((a, b) => (a.t ? 1 : 0) - (b.t ? 1 : 0) || A.subjName(a.s).localeCompare(A.subjName(b.s), 'ar') || (A.cls(a.c)?.sort ?? 0) - (A.cls(b.c)?.sort ?? 0));
+      const m = A.modal(`<h3>إسناد إلى ${esc(A.personName(tid))}</h3><p class="sub">اختر المواد والفصول — يُطبَّق على الجدول المعتمد وكل الأسابيع المفتوحة فوراً.</p>
+        <input class="in" id="adq" placeholder="بحث بالمادة أو الفصل" style="margin-bottom:8px"><label class="chk" style="margin-bottom:8px"><input type="checkbox" id="adt"> إظهار المُسند لمعلمين آخرين (للنقل)</label>
+        <div class="rcpt" id="adl"></div><div class="acts"><span class="small muted" id="adn"></span><button class="btn" id="adg">إسناد</button></div>`, { cls: 'wide' });
+      const sel = new Set();
+      const dr = () => { const q = A.normKey(m.el.querySelector('#adq').value), oth = m.el.querySelector('#adt').checked;
+        m.el.querySelector('#adl').innerHTML = rows.filter(r => (oth || !r.t) && (!q || A.normKey(A.subjName(r.s) + ' ' + (A.cls(r.c) || {}).name).includes(q))).map(r => { const k = r.c + '|' + r.s; return `<label class="rc"><input type="checkbox" value="${k}" ${sel.has(k) ? 'checked' : ''}><span class="nm"><b>${esc(A.subjName(r.s))} — ${esc((A.cls(r.c) || {}).name || '')}</b><span class="small muted">${A.cnt(r.n, 'حصة', 'حصص')}${r.t ? ' · حالياً: ' + esc(A.personName(r.t)) : ' · بلا معلم'}</span></span></label>`; }).join('') || '<p class="small muted">لا توجد مواد</p>';
+        $$('#adl input', m.el).forEach(i => i.onchange = () => { i.checked ? sel.add(i.value) : sel.delete(i.value); cnt(); }); cnt(); };
+      const cnt = () => { const n = [...sel].reduce((a, k) => a + (pairs[k] || { n: 0 }).n, 0); m.el.querySelector('#adn').textContent = sel.size ? `${A.cnt(sel.size, 'مادة/فصل', 'مواد/فصول')} · ${A.cnt(n, 'حصة', 'حصص')}` : ''; };
+      m.el.querySelector('#adq').oninput = dr; m.el.querySelector('#adt').onchange = dr; dr();
+      m.el.querySelector('#adg').onclick = e => A.run(e.currentTarget, async () => { if (!sel.size) throw new Error('اختر مادة وفصلاً'); for (const k of sel) { const [c, s] = k.split('|'); await api.assignTeacher(c, s, tid); } m.close(); await after(`أُسند ${A.cnt(sel.size, 'مادة/فصل', 'مواد/فصول')} إلى ${A.personName(tid)}`); });
+    };
+    box.innerHTML = `<p class="sub" style="margin-top:0">نصاب كل معلم من الجدول المعتمد: المواد والفصول وعدد الحصص الأسبوعية. أي تعديل هنا يُطبَّق فوراً على الجدول وإسناد المعلمين وكل الأسابيع المفتوحة وصفحات المعلمين.</p>
+      <div class="grid g3" id="lsum" style="margin-bottom:14px"></div>
+      <div class="row" style="margin-bottom:12px"><input class="in" id="lq" placeholder="بحث بالمعلم أو المادة أو الفصل" style="max-width:320px"><select class="in" id="ls" style="max-width:200px"><option value="load">الأعلى نصاباً أولاً</option><option value="name">حسب الاسم</option></select><button class="btn ghost sm" id="lx">${I.down} Excel</button></div>
+      <div class="scroll"><table class="tbl"><thead><tr><th>المعلم</th><th>النصاب</th><th>التوزيع</th><th style="width:52%">المواد والفصول (عدد الحصص)</th></tr></thead><tbody id="lb"></tbody></table></div><div id="lun"></div>`;
+    $('#lq', box).oninput = draw; $('#ls', box).onchange = draw;
+    $('#lx', box).onclick = () => { const rows = people().map(({ p, o }) => ({ المعلم: p.full_name, التخصص: p.specialty || '', 'النصاب (حصة/أسبوع)': o.n, 'المواد والفصول': Object.values(o.pairs).map(pr => `${A.subjName(pr.s)} - ${(A.cls(pr.c) || {}).name} (${pr.n})`).join('، ') })); const ws = XLSX.utils.json_to_sheet(rows); ws['!views'] = [{ RTL: true }]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'النصاب'); wb.Workbook = { Views: [{ RTL: true }] }; XLSX.writeFile(wb, `نصاب المعلمين - ${A.section().name}.xlsx`); };
+    draw();
   }
   async function ttDrafts(box, root) {
     const canE = A.perm('timetable_edit'), canA = A.perm('timetable_approve');

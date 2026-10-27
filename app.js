@@ -457,6 +457,9 @@
   // تحديث بطاقات «خطتي» لحظياً دون مقاطعة ما يكتبه المعلم
   function refreshMyCards(ids) {
     const w = week(); const open = w && w.status === 'open';
+    // إسناد جديد أو سحب حصة من المعلم: إعادة رسم الصفحة كاملة (إن لم يكن يكتب الآن)
+    const structural = (ids || []).some(id => { const e = S.entries.find(x => x.id === id); const el = document.querySelector(`.lesson[data-eid="${id}"]`); return e && ((e.teacher_id === S.me.id && e.subject_id && !el) || (el && e.teacher_id !== S.me.id)); });
+    if (structural && !(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) && !pending.size) { route(); return; }
     (ids || []).forEach(id => {
       const el = document.querySelector(`.lesson[data-eid="${id}"]`); if (!el || pending.has(id) || el.contains(document.activeElement)) return;
       const e = S.entries.find(x => x.id === id); if (e) el.replaceWith(lessonCard(e, open));

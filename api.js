@@ -63,6 +63,9 @@
         for (let i = 0; i < slots.length; i += 500) ok(await T('timetable_slots').insert(slots.slice(i, i + 500).map(s => ({ ...s, version_id: v }))));
       },
       upsertSlots: (v, slots) => T('timetable_slots').upsert(slots.map(s => ({ ...s, version_id: v })), { onConflict: 'version_id,class_id,day,period' }).then(ok),
+      scheduleTT: (id, from, to) => sb.rpc('schedule_timetable', { p_version: id, p_from: from, p_to: to || null }).then(ok),
+      unscheduleTT: id => sb.rpc('unschedule_timetable', { p_version: id }).then(ok),
+      promoteTT: () => sb.rpc('timetable_promote').then(ok),
       approveTT: (id, apply) => sb.rpc('approve_timetable', { p_version: id, p_apply_open_weeks: apply }).then(ok),
       deleteVersion: id => T('timetable_versions').delete().eq('id', id).then(ok),
       assignTeacher: (c, s, t) => sb.rpc('assign_teacher', { p_class: c, p_subject: s, p_teacher: t }).then(ok),

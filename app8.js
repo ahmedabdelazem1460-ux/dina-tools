@@ -159,7 +159,8 @@
   if (api.onAuth && !api.demo) api.onAuth(ev => { if (ev === 'SIGNED_OUT' && S.me) { A.toast('انتهت جلستك — سجّل الدخول من جديد', 'err'); setTimeout(() => location.reload(), 1500); } });
   // ---- الربط بعد رسم الواجهة
   const after0 = window.APP_AFTER_SHELL;
-  window.APP_AFTER_SHELL = () => { if (after0) after0(); apply(); watchNav(); addOnlineBtn(); startPresence(); };
+  let promoted = false;
+  window.APP_AFTER_SHELL = () => { if (after0) after0(); apply(); watchNav(); addOnlineBtn(); startPresence(); if (!promoted && api.promoteTT && !api.demo) { promoted = true; api.promoteTT().catch(() => { }); } };
   window.addEventListener('hashchange', () => setTimeout(() => { if (pres && S.me) pres.update(meta()); }, 50));
   apply();
 })();

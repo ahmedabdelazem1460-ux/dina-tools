@@ -110,6 +110,9 @@
       updateDraft: (id, p) => wait(upd('timetable_versions', id, p)),
       async replaceSlots(v, slots) { del('timetable_slots', s => s.version_id === v); slots.forEach(s => D.timetable_slots.push({ id: uid(), ...s, version_id: v })); return wait(true); },
       async upsertSlots(v, slots) { slots.forEach(s => { const x = D.timetable_slots.find(y => y.version_id === v && y.class_id === s.class_id && y.day === s.day && y.period === s.period); if (x) Object.assign(x, s); else D.timetable_slots.push({ id: uid(), ...s, version_id: v }); }); return wait(true); },
+      scheduleTT: (id, from, to) => { upd('timetable_versions', id, { scheduled: true, effective_from: from, effective_to: to || null, scheduled_at: new Date().toISOString() }); return wait({ weeks: D.weeks.filter(w => w.status === 'open' && w.start_date >= from && (!to || w.start_date <= to)).length, updated_entries: 0 }); },
+      unscheduleTT: id => { upd('timetable_versions', id, { scheduled: false }); return wait({ weeks: 0 }); },
+      promoteTT: () => wait(0),
       async approveTT(id, apply) {
         const v = find('timetable_versions', id);
         D.timetable_versions.forEach(x => { if (x.section_id === v.section_id && x.status === 'approved') x.status = 'archived'; });

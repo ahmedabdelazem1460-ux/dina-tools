@@ -332,7 +332,7 @@
         ${canE ? `<button class="btn" id="nd">${I.plus} مسودة جديدة من الجدول الحالي</button><button class="btn ghost" id="ne">مسودة فارغة</button>` : ''}
         <button class="btn ghost" id="tpl">${I.down} قالب Excel للجدول</button>${A.perm('tt_builder') ? `<a class="btn sky" href="#/builder">${I.builder} مزامنة من الجدول الآلي</a>` : ''}</div>
       <table class="tbl" style="margin-bottom:16px"><thead><tr><th>الإصدار</th><th>الحالة</th><th>المصدر</th><th>التاريخ</th><th></th></tr></thead><tbody>
-      ${T.versions.map(v => `<tr><td><b>${esc(v.label)}</b>${v.note ? `<div class="small muted">${esc(v.note)}</div>` : ''}</td><td><span class="pill ${v.status === 'approved' ? 'st-approved' : v.status === 'draft' ? 'st-draft' : 'st-empty'}">${LBL[v.status]}</span></td><td class="small">${esc(v.source || '')}</td><td class="small muted">${A.fmtDT(v.approved_at || v.created_at)}</td><td>${v.status === 'draft' ? `<button class="btn sm ${v.id === T.draft ? '' : 'ghost'}" data-open="${v.id}">فتح</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">لا توجد إصدارات</td></tr>'}
+      ${T.versions.map(v => `<tr><td><b>${esc(v.label)}</b>${v.note ? `<div class="small muted">${esc(v.note)}</div>` : ''}</td><td><span class="pill ${v.status === 'approved' ? 'st-approved' : v.scheduled ? 'st-submitted' : v.status === 'draft' ? 'st-draft' : 'st-empty'}">${v.scheduled ? (v.effective_to ? 'مجدول مؤقتاً' : 'مجدول') : LBL[v.status]}</span>${v.scheduled ? `<div class="small muted" style="margin-top:4px">${winTxt(v)}</div>` : ''}</td><td class="small">${esc(v.source || '')}</td><td class="small muted">${A.fmtDT(v.approved_at || v.created_at)}</td><td class="row" style="flex-wrap:nowrap">${v.status === 'draft' ? `<button class="btn sm ${v.id === T.draft ? '' : 'ghost'}" data-open="${v.id}">فتح</button>` : ''}${v.scheduled && canA ? `<button class="btn ghost sm" data-unsch="${v.id}">إلغاء الجدولة</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">لا توجد إصدارات</td></tr>'}
       </tbody></table><div id="de"></div>`;
     const mkDraft = async (copy) => {
       const lbl = prompt('اسم المسودة', copy ? 'تعديل الجدول — ' + new Date().toLocaleDateString('ar-SA-u-nu-latn') : 'جدول جديد'); if (!lbl) return;
@@ -344,16 +344,19 @@
     const ne = $('#ne', box); if (ne) ne.onclick = e => A.run(e.currentTarget, () => mkDraft(false));
     $('#tpl', box).onclick = e => A.run(e.currentTarget, async () => exportTemplate(approved() ? await slotsOf(approved().id) : []));
     $$('[data-open]', box).forEach(b => b.onclick = () => { T.draft = b.dataset.open; V.timetable(root); });
+    $$('[data-unsch]', box).forEach(b => b.onclick = () => A.run(b, async () => { if (!(await A.confirmBox('إلغاء جدولة هذا الجدول؟ يعود مسودة قابلة للتعديل، وتعود الأسابيع التي طُبّق عليها إلى الجدول الساري (الحصص المعتمدة لا تتغير).', 'إلغاء الجدولة'))) return; const r = await api.unscheduleTT(b.dataset.unsch); await A.loadWeek(); A.toast(`أُلغيت الجدولة${r && r.weeks ? ` وأُعيد ${A.cnt(r.weeks, 'أسبوع', 'أسابيع')}` : ''}`, 'ok'); V.timetable(root); }));
     if (!T.draft) return;
     const d = T.versions.find(v => v.id === T.draft); const sl = await slotsOf(d.id); const base = approved() ? await slotsOf(approved().id) : [];
+    const locked = !!d.scheduled; const canE2 = canE && !locked;
     const changes = sl.filter(s => { const b = base.find(x => x.class_id === s.class_id && x.day === s.day && x.period === s.period) || {}; return (b.subject_id || null) !== (s.subject_id || null) || (b.teacher_id || null) !== (s.teacher_id || null); }).length;
     T.cls = T.cls && A.cls(T.cls) ? T.cls : (S.classes[0] || {}).id;
     const de = $('#de', box);
     de.innerHTML = `<div class="sec-box"><div class="head" style="margin-bottom:8px"><div class="grow"><h3 style="margin:0">المسودة: ${esc(d.label)}</h3><p class="sub" style="margin:2px 0 0">${A.cnt(changes, 'تغيير', 'تغييرات')} عن الجدول المعتمد · الخانات المتغيرة مظللة باللون السماوي</p></div>
-      <div class="row">${canE ? `<button class="btn ghost sm" id="imp">${I.up} استيراد ملف</button><button class="btn bad sm" id="dd">حذف المسودة</button>` : ''}${canA ? `<button class="btn ok sm" id="ap">${I.check} اعتماد هذا الجدول</button>` : ''}</div></div><div id="dg"></div></div>`;
+      <div class="row">${canE2 ? `<button class="btn ghost sm" id="imp">${I.up} استيراد ملف</button><button class="btn bad sm" id="dd">حذف المسودة</button>` : ''}${canA && !locked ? `<button class="btn ok sm" id="ap">${I.check} اعتماد / جدولة هذا الجدول</button>` : ''}${canA && locked ? `<button class="btn ghost sm" data-unsch="${d.id}">إلغاء الجدولة</button>` : ''}</div></div>
+      ${locked ? `<div class="notice info">هذا الجدول <b>${d.effective_to ? 'مجدول مؤقتاً' : 'مجدول'}</b>: ${winTxt(d)}. التعديل مقفل حتى تُلغى الجدولة.</div>` : ''}<div id="dg"></div></div>`;
     const draw = () => {
       const dg = $('#dg', de); dg.innerHTML = ''; classChips(dg, id => { T.cls = id; draw(); }, T.cls);
-      dg.insertAdjacentHTML('beforeend', grid(sl, T.cls, canE, base));
+      dg.insertAdjacentHTML('beforeend', grid(sl, T.cls, canE2, base));
       $$('select[data-f]', dg).forEach(s => s.onchange = () => A.run(null, async () => {
         const dd = +s.dataset.d, pp = +s.dataset.p; let x = sl.find(y => y.class_id === T.cls && y.day === dd && y.period === pp);
         if (!x) { x = { class_id: T.cls, day: dd, period: pp, subject_id: null, teacher_id: null }; sl.push(x); }
@@ -365,17 +368,36 @@
     };
     draw();
     const imp = $('#imp', de); if (imp) imp.onclick = () => importDialog(d, sl, () => { T.slots[d.id] = null; V.timetable(root); });
+    $$('[data-unsch]', de).forEach(b => b.onclick = () => A.run(b, async () => { if (!(await A.confirmBox('إلغاء جدولة هذا الجدول؟ يعود مسودة قابلة للتعديل، وتعود الأسابيع التي طُبّق عليها إلى الجدول الساري.', 'إلغاء الجدولة'))) return; await api.unscheduleTT(b.dataset.unsch); await A.loadWeek(); A.toast('أُلغيت الجدولة', 'ok'); V.timetable(root); }));
     const dd = $('#dd', de); if (dd) dd.onclick = async () => { if (!(await confirmBox2('حذف المسودة نهائياً؟'))) return; await A.run(null, async () => { await api.deleteVersion(d.id); T.draft = null; V.timetable(root); }); };
     const ap = $('#ap', de); if (ap) ap.onclick = () => {
-      const m = A.modal(`<h3>اعتماد «${esc(d.label)}»</h3><p style="line-height:1.8">سيصبح هذا هو الجدول المعتمد لـ${esc(A.section().name)}، ويُؤرشف الجدول السابق. عدد التغييرات: <b>${AR(changes)}</b>.</p>
-        <label class="chk"><input type="checkbox" id="apw" checked> تطبيق التغييرات على الأسابيع المفتوحة (الحصص غير المعتمدة فقط)</label>
-        <div class="acts"><button class="btn ok" id="apgo">${I.check} اعتماد</button></div>`);
+      const ws = S.weeks.filter(w => !w.archived).slice().sort((x, y) => x.start_date.localeCompare(y.start_date));
+      const wOpt = (sel, end) => ws.map(w => { const v = end ? A.isoDate(new Date(A.parseDate(w.start_date).getTime() + 4 * 864e5)) : w.start_date; return `<option value="${v}" ${w.id === sel ? 'selected' : ''}>الأسبوع ${esc(w.word)} — ${AR(A.weekDates(w)[end ? 4 : 0])}</option>`; }).join('') + '<option value="custom">تاريخ آخر…</option>';
+      const cur = S.weekId; const nxt = (ws.find(w => w.start_date > ((ws.find(x => x.id === cur) || {}).start_date || '')) || {}).id || cur;
+      const m = A.modal(`<h3>اعتماد «${esc(d.label)}»</h3><p class="sub">عدد التغييرات عن الجدول الحالي: <b>${AR(changes)}</b>. اختر متى يسري هذا الجدول:</p>
+        <div class="kpick" id="apm" style="margin-bottom:12px"><button type="button" data-m="now" class="on">الآن</button><button type="button" data-m="from">من أسبوع / تاريخ</button><button type="button" data-m="temp">مؤقت لفترة ثم يعود الحالي</button></div>
+        <div id="apNow"><p class="small muted" style="margin-top:0">يصبح الجدول المعتمد فوراً ويُؤرشف السابق.</p><label class="chk"><input type="checkbox" id="apw" checked> تطبيق التغييرات على الأسابيع المفتوحة (الحصص غير المعتمدة فقط)</label></div>
+        <div id="apFrom" class="hidden"><div class="grid g2"><div class="field"><label for="apF">يسري ابتداءً من</label><select class="in" id="apF">${wOpt(nxt)}</select><input class="in hidden" type="date" id="apFd" style="margin-top:6px"></div>
+          <div class="field" id="apToBox"><label for="apT">وينتهي في (للمؤقت)</label><select class="in" id="apT">${wOpt(nxt, true)}</select><input class="in hidden" type="date" id="apTd" style="margin-top:6px"></div></div>
+          <p class="small muted" id="apHint" style="margin:0"></p></div>
+        <div class="acts"><button class="btn ok" id="apgo">${I.check} تأكيد</button></div>`, { cls: 'wide' });
+      let mode = 'now';
+      const sync = () => { m.el.querySelector('#apNow').classList.toggle('hidden', mode !== 'now'); m.el.querySelector('#apFrom').classList.toggle('hidden', mode === 'now'); m.el.querySelector('#apToBox').classList.toggle('hidden', mode !== 'temp');
+        m.el.querySelector('#apHint').textContent = mode === 'from' ? 'يُطبَّق على الأسابيع المفتوحة من هذا التاريخ وما بعدها فوراً، وعلى الأسابيع التي تُنشأ لاحقاً، ويصبح الجدول المعتمد تلقائياً عند حلول التاريخ.' : mode === 'temp' ? 'يُطبَّق فقط على أسابيع هذه الفترة (مثل رمضان أو الاختبارات)، ثم تعود الأسابيع بعدها للجدول المعتمد الحالي تلقائياً.' : ''; };
+      $$('#apm button', m.el).forEach(b => b.onclick = () => { mode = b.dataset.m; $$('#apm button', m.el).forEach(x => x.classList.toggle('on', x === b)); sync(); });
+      [['#apF', '#apFd'], ['#apT', '#apTd']].forEach(([a2, b2]) => { m.el.querySelector(a2).onchange = e => m.el.querySelector(b2).classList.toggle('hidden', e.target.value !== 'custom'); });
+      const val = (a2, b2) => { const v = m.el.querySelector(a2).value; return v === 'custom' ? m.el.querySelector(b2).value : v; };
+      sync();
       m.el.querySelector('#apgo').onclick = e => A.run(e.currentTarget, async () => {
-        const r = await api.approveTT(d.id, m.el.querySelector('#apw').checked);
-        m.close(); await A.loadWeek(); A.toast(`اعتُمد الجدول${r && r.updated_entries ? ` وحُدِّثت ${A.cnt(r.updated_entries, 'حصة', 'حصص')} في الأسابيع المفتوحة` : ''}`, 'ok'); A.LS.set('tttab', 'view'); V.timetable(root);
+        if (mode === 'now') { const r = await api.approveTT(d.id, m.el.querySelector('#apw').checked); m.close(); await A.loadWeek(); A.toast(`اعتُمد الجدول${r && r.updated_entries ? ` وحُدِّثت ${A.cnt(r.updated_entries, 'حصة', 'حصص')} في الأسابيع المفتوحة` : ''}`, 'ok'); A.LS.set('tttab', 'view'); V.timetable(root); return; }
+        const from = val('#apF', '#apFd'); if (!from) throw new Error('حدد تاريخ البداية');
+        const to = mode === 'temp' ? val('#apT', '#apTd') : null; if (mode === 'temp' && !to) throw new Error('حدد تاريخ النهاية'); if (to && to < from) throw new Error('تاريخ النهاية قبل البداية');
+        const r = await api.scheduleTT(d.id, from, to);
+        m.close(); T.versions = null; await A.loadWeek(); A.toast(`جُدول الجدول ${to ? 'مؤقتاً' : ''} — طُبّق على ${A.cnt((r && r.weeks) || 0, 'أسبوع مفتوح', 'أسابيع مفتوحة')}`, 'ok'); V.timetable(root);
       });
     };
   }
+  const winTxt = v => v.effective_to ? `من ${AR(A.dmy(A.parseDate(v.effective_from)))} إلى ${AR(A.dmy(A.parseDate(v.effective_to)))} ثم يعود الجدول المعتمد` : `يسري من ${AR(A.dmy(A.parseDate(v.effective_from)))}`;
   const confirmBox2 = t => A.confirmBox(t, 'حذف', true);
 
   // ---- قالب وتصدير الجدول ----

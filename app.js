@@ -280,26 +280,27 @@
   // ---------- اختيار المعلم لمواده وفصوله ----------
   async function claimView(root, first) {
     root.innerHTML = '<div class="spinner"></div>';
-    let slots = []; try { slots = await api.approvedSlots(S.sectionId); } catch (e) { toast(apiMsg(e), 'err'); }
+    let slots = [], reqs = []; try { [slots, reqs] = await Promise.all([api.approvedSlots(S.sectionId), api.myAssignRequests && !S.realMe ? api.myAssignRequests().catch(() => []) : []]); } catch (e) { toast(apiMsg(e), 'err'); }
+    const reqOf = (c, s) => reqs.find(r => r.class_id === c && r.subject_id === s && r.staff_id === S.me.id);
     const pairs = {};
     slots.filter(x => x.subject_id && !(subj(x.subject_id) || {}).is_activity).forEach(x => { const k = x.class_id + '|' + x.subject_id; (pairs[k] = pairs[k] || { c: x.class_id, s: x.subject_id, n: 0, t: x.teacher_id }).n++; if (x.teacher_id) pairs[k].t = x.teacher_id; });
     const bySub = {}; Object.values(pairs).forEach(p => (bySub[p.s] = bySub[p.s] || []).push(p));
     const mineN = Object.values(pairs).filter(p => p.t === S.me.id).length;
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>${first ? 'أهلاً ' + esc(S.me.full_name) + ' — اختر موادك وفصولك' : 'موادي وفصولي'}</h2>
-      <p class="sub" style="margin:2px 0 0">اضغط على كل مادة تدرّسها في كل فصل لتظهر حصصها في «خطتي». المادة المسندة لمعلم آخر لا يمكن اختيارها — تواصل مع الإدارة إن كان ذلك خطأ.</p></div>
+      <p class="sub" style="margin:2px 0 0">اضغط على كل مادة تدرّسها في كل فصل. ${S.realMe ? 'الإسناد يُطبَّق مباشرة لأنك تتصفح كمالك.' : 'يُرسل اختيارك للإدارة، وتظهر حصصه في «خطتي» بعد اعتماده.'} المادة المسندة لمعلم آخر لا يمكن اختيارها — تواصل مع الإدارة إن كان ذلك خطأ.</p>${reqs.length ? `<div class="notice info" style="margin-top:8px">لديك ${cnt(reqs.length, 'طلب', 'طلبات')} بانتظار اعتماد الإدارة. اضغط على المادة المعلّقة لإلغاء طلبها.</div>` : ''}</div>
       ${mineN ? `<button class="btn" id="goMy">${I.my} الانتقال إلى خطتي (${cnt(mineN, 'مادة', 'مواد')})</button>` : ''}</div>
       <input class="in" id="cq" placeholder="ابحث عن مادتك، مثل: الرياضيات" style="max-width:340px;margin-bottom:14px">
       <div id="cg"></div></div>`;
     const draw = () => {
       const q = normKey($('#cq', root).value);
-      $('#cg', root).innerHTML = Object.entries(bySub).sort((a, b) => subjName(a[0]).localeCompare(subjName(b[0]), 'ar')).filter(([sid]) => !q || normKey(subjName(sid)).includes(q)).map(([sid, list]) => `<h3 style="margin:16px 0 8px">${esc(subjName(sid))}</h3><div class="claim-grid">${list.sort((a, b) => (cls(a.c)?.sort ?? 0) - (cls(b.c)?.sort ?? 0)).map(p => { const st = p.t === S.me.id ? 'mine' : p.t ? 'taken' : 'free'; return `<button class="claim ${st}" data-c="${p.c}" data-s="${p.s}" data-st="${st}" ${st === 'taken' ? 'aria-disabled="true"' : ''}><span class="c">${esc((cls(p.c) || {}).name || '')}<small>${cnt(p.n, 'حصة', 'حصص')} أسبوعياً${st === 'taken' ? ' · ' + esc(personName(p.t)) : ''}</small></span>${st === 'mine' ? `<span class="pill st-approved">${I.check.replace('<svg', '<svg style="width:14px;height:14px"')} لي</span>` : st === 'free' ? '<span class="pill st-draft">اختيار</span>' : '<span class="pill st-empty">مسندة</span>'}</button>`; }).join('')}</div>`).join('') || emptyBox('لا توجد مواد مطابقة');
+      $('#cg', root).innerHTML = Object.entries(bySub).sort((a, b) => subjName(a[0]).localeCompare(subjName(b[0]), 'ar')).filter(([sid]) => !q || normKey(subjName(sid)).includes(q)).map(([sid, list]) => `<h3 style="margin:16px 0 8px">${esc(subjName(sid))}</h3><div class="claim-grid">${list.sort((a, b) => (cls(a.c)?.sort ?? 0) - (cls(b.c)?.sort ?? 0)).map(p => { const rq = reqOf(p.c, p.s); const st = rq ? 'pend' : p.t === S.me.id ? 'mine' : p.t ? 'taken' : 'free'; return `<button class="claim ${st}" data-c="${p.c}" data-s="${p.s}" data-st="${st}" ${st === 'taken' ? 'aria-disabled="true"' : ''}><span class="c">${esc((cls(p.c) || {}).name || '')}<small>${cnt(p.n, 'حصة', 'حصص')} أسبوعياً${st === 'taken' ? ' · ' + esc(personName(p.t)) : ''}${st === 'pend' ? ` · <b style="color:var(--warn)">${rq.kind === 'claim' ? 'بانتظار الاعتماد' : 'طلب إلغاء بانتظار الاعتماد'}</b>` : ''}</small></span>${st === 'mine' ? `<span class="pill st-approved">${I.check.replace('<svg', '<svg style="width:14px;height:14px"')} لي</span>` : st === 'free' ? '<span class="pill st-draft">اختيار</span>' : '<span class="pill st-empty">مسندة</span>'}</button>`; }).join('')}</div>`).join('') || emptyBox('لا توجد مواد مطابقة');
       $$('.claim', root).forEach(b => b.onclick = () => run(null, async () => {
         const st = b.dataset.st; if (st === 'taken') return toast('هذه المادة مسندة لمعلم آخر — تواصل مع الإدارة');
         if (st === 'mine' && !(await confirmBox('إلغاء اختيار هذه المادة في هذا الفصل؟ ستختفي حصصها غير المكتوبة من خطتك.', 'إلغاء الاختيار', true))) return;
-        if (S.realMe) await api.assignTeacher(b.dataset.c, b.dataset.s, st === 'mine' ? null : S.me.id); else await api.claim(b.dataset.c, b.dataset.s, st === 'mine');
-        const p = pairs[b.dataset.c + '|' + b.dataset.s]; p.t = st === 'mine' ? null : S.me.id;
-        await loadWeek(); renderNav(); draw(); toast(st === 'mine' ? 'أُلغي الاختيار' : 'أُضيفت إلى خطتك', 'ok');
-        const g = $('#goMy', root); if (!g) claimView(root, false);
+        if (S.realMe) { await api.assignTeacher(b.dataset.c, b.dataset.s, st === 'mine' ? null : S.me.id); const p = pairs[b.dataset.c + '|' + b.dataset.s]; p.t = st === 'mine' ? null : S.me.id; await loadWeek(); renderNav(); draw(); toast(st === 'mine' ? 'أُلغي الإسناد' : 'أُسندت', 'ok'); return; }
+        const r = await api.claim(b.dataset.c, b.dataset.s, st === 'mine');
+        toast(r && r.cancelled ? 'أُلغي الطلب' : st === 'mine' ? 'أُرسل طلب الإلغاء للإدارة' : 'أُرسل اختيارك للإدارة — تظهر الحصص بعد الاعتماد', 'ok');
+        claimView(root, first);
       }));
     };
     $('#cq', root).oninput = draw; draw();

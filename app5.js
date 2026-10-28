@@ -136,6 +136,7 @@
       changed.add(r.id);
       scheduleRefresh();
     }));
+    unsub.push(api.subscribe('arq-' + S.sectionId, 'assignment_requests', 'section_id=eq.' + S.sectionId, () => { if (A._ttReqRefresh && $('#lrq')) A._ttReqRefresh(); if (A._dashReq) A._dashReq(); }));
     unsub.push(api.subscribe('tts-' + S.sectionId, 'timetable_slots', null, () => { clearTimeout(realtime._t); realtime._t = setTimeout(() => { if (A._ttLoadRefresh && $('#lb')) A._ttLoadRefresh(); }, 1500); }));
     if (S.sectionId) unsub.push(api.subscribe('wk-' + S.sectionId, 'weeks', 'section_id=eq.' + S.sectionId, p => {
       const r = p.new && p.new.id ? p.new : null; if (!r) return; const i = S.weeks.findIndex(w => w.id === r.id); if (i >= 0) { S.weeks[i] = { ...S.weeks[i], ...r }; const sb = $('#syncLast'); if (sb && A.syncLabel) sb.innerHTML = A.syncLabel(S.weeks[i]); }

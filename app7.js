@@ -112,7 +112,13 @@
   const dash0 = V.dash;
   V.dash = function (root) {
     dash0(root); const w = A.week(); const h = $('.head', root); if (!h || !w) return;
-    h.insertAdjacentHTML('afterend', syncBar(w)); bindBar(root, w);
+    h.insertAdjacentHTML('afterend', syncBar(w) + '<div id="dReq"></div>'); bindBar(root, w);
+    if (S.me.is_owner || A.perm('timetable_approve')) {
+      A._dashReq = async () => { const el = $('#dReq', root); if (!el || !api.assignRequests) return; let n = 0; try { n = (await api.assignRequests(S.sectionId)).length; } catch (_) { }
+        el.innerHTML = n ? `<div class="notice info" style="margin-bottom:16px"><b>${A.cnt(n, 'طلب', 'طلبات')} من المعلمين لاختيار موادهم بانتظار اعتمادك.</b> <a href="#/timetable" id="dReqGo">مراجعة الطلبات</a></div>` : '';
+        const g = $('#dReqGo', el); if (g) g.onclick = () => A.LS.set('tttab', 'load'); };
+      A._dashReq();
+    }
   };
   // ---- الفصول: نفس الشريط للمراجعين
   if (V.classes) { const c0 = V.classes; V.classes = function (root) { c0(root); const w = A.week(); const h = $('.head', root) || root.firstElementChild; if (!h || !w || $('.syncbar', root)) return; h.insertAdjacentHTML('afterend', syncBar(w)); bindBar(root, w); }; }

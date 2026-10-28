@@ -5,7 +5,7 @@
   const DEMO_SYNC = { id: 1, secret: 'demo-secret-0000000000000000', script_url: null };
   const clone = o => JSON.parse(JSON.stringify(o));
   function seed() {
-    const D = { entry_delegations: [], parent_posts: [], messages: [], language_issues: [], extra_pages: [], join_codes: [], schools: [], sections: [], staff: [], memberships: [], classes: [], subjects: [], timetable_versions: [], timetable_slots: [], weeks: [], plan_entries: [], notes: [], audit_log: [] };
+    const D = { assignment_requests: [], entry_delegations: [], parent_posts: [], messages: [], language_issues: [], extra_pages: [], join_codes: [], schools: [], sections: [], staff: [], memberships: [], classes: [], subjects: [], timetable_versions: [], timetable_slots: [], weeks: [], plan_entries: [], notes: [], audit_log: [] };
     const sch = { id: uid(), name: 'مدارس دينا العالمية', term_label: 'الفصل الدراسي الأول · العام الدراسي ١٤٤٨هـ' }; D.schools.push(sch);
     const g = { id: uid(), school_id: sch.id, name: 'قسم البنات', short_name: 'البنات', days: 5, periods: 7, sort: 1 };
     const b = { id: uid(), school_id: sch.id, name: 'قسم البنين', short_name: 'البنين', days: 5, periods: 7, sort: 2 };
@@ -158,12 +158,27 @@
         D.memberships.push({ id: uid(), staff_id: p.id, section_id: j.section_id, role: j.role }); j.uses++; accounts[email.toLowerCase()] = p.id; return wait({ ok: true });
       },
       async claim(c, s, release) {
-        const cl = find('classes', c); const v = D.timetable_versions.find(x => x.section_id === cl.section_id && x.status === 'approved'); let n = 0;
+        const cl = find('classes', c); const v = D.timetable_versions.find(x => x.section_id === cl.section_id && x.status === 'approved');
         const cur = (D.timetable_slots.find(x => x.version_id === v.id && x.class_id === c && x.subject_id === s && x.teacher_id) || {}).teacher_id;
         if (!release && cur && cur !== meId) throw new Error('هذه المادة مسندة لمعلم آخر — تواصل مع الإدارة');
-        D.timetable_slots.forEach(x => { if (x.version_id === v.id && x.class_id === c && x.subject_id === s) x.teacher_id = release ? null : meId; });
-        D.plan_entries.forEach(e => { const w = find('weeks', e.week_id); if (w.status === 'open' && e.class_id === c && e.subject_id === s && (release ? e.teacher_id === meId : !e.teacher_id)) { e.teacher_id = release ? null : meId; n++; } });
-        return wait({ entries: n });
+        const ex = D.assignment_requests.find(r => r.staff_id === meId && r.class_id === c && r.subject_id === s && r.status === 'pending');
+        if (ex) { ex.status = 'cancelled'; return wait({ cancelled: true }); }
+        ins('assignment_requests', { section_id: cl.section_id, staff_id: meId, class_id: c, subject_id: s, kind: release ? 'release' : 'claim', status: 'pending' }); return wait({ pending: true });
+      },
+      assignRequests: sec => wait(pick('assignment_requests', r => r.section_id === sec && r.status === 'pending')),
+      myAssignRequests: () => wait(pick('assignment_requests', r => r.staff_id === meId && r.status === 'pending')),
+      async decideRequests(ids, approve) {
+        let done = 0, skipped = 0;
+        for (const id of ids) { const r = find('assignment_requests', id); if (!r || r.status !== 'pending') continue;
+          if (!approve) { r.status = 'rejected'; done++; continue; }
+          const v = D.timetable_versions.find(x => x.section_id === r.section_id && x.status === 'approved');
+          const cur = (D.timetable_slots.find(x => x.version_id === v.id && x.class_id === r.class_id && x.subject_id === r.subject_id && x.teacher_id) || {}).teacher_id;
+          if (r.kind === 'claim' && cur && cur !== r.staff_id) { r.status = 'rejected'; skipped++; continue; }
+          const t = r.kind === 'claim' ? r.staff_id : null;
+          D.timetable_slots.forEach(x => { if (x.version_id === v.id && x.class_id === r.class_id && x.subject_id === r.subject_id) x.teacher_id = t; });
+          D.plan_entries.forEach(e => { const w = find('weeks', e.week_id); if (w.status === 'open' && e.class_id === r.class_id && e.subject_id === r.subject_id && e.status !== 'approved') e.teacher_id = t; });
+          r.status = 'approved'; done++; }
+        return wait({ done, skipped });
       },
       async approvedSlots(section) { const v = D.timetable_versions.find(x => x.section_id === section && x.status === 'approved'); return wait(v ? pick('timetable_slots', x => x.version_id === v.id) : []); },
       messages: () => wait(pick('messages', m => m.recipient_id === meId || m.sender_id === meId).sort((a, b) => b.created_at.localeCompare(a.created_at))),

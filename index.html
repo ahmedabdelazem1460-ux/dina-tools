@@ -317,32 +317,34 @@ td.ldn b{font-size:22px;color:var(--navy)}
 .claim-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
 .claim{border:1.5px solid var(--border);border-radius:14px;padding:12px 14px;background:#fff;display:flex;align-items:center;gap:10px;text-align:start;font-weight:700}
 .claim.mine{border-color:var(--sky);background:#F1FAFD}
-.claim.taken{opacity:.6}
+.claim.taken{opacity:.6}.claim.pend{border-color:#E0A526;border-style:dashed;background:var(--warnbg)}
+.claim.as-oth{opacity:.55;background:#F6F8FB}.claim.as-oth.on{opacity:1;border-color:var(--warn)}.claim.as-mine{border-color:var(--ok);background:var(--okbg)}.claim.on{border-color:var(--blue);background:var(--pale)}
+.claim .oth-n{color:var(--warn);font-weight:700}.lg{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:-2px;border:1.5px solid var(--border)}.lg-free{background:#fff}.lg-oth{background:#F6F8FB;opacity:.6}.lg-mine{background:var(--okbg);border-color:var(--ok)}
 .claim .c{flex:1}.claim .c small{display:block;color:var(--muted);font-weight:500}
 </style>
 </head>
 <body>
 <div id="app"><div class="spinner"></div></div>
 <div id="toasts"></div>
-<script src="config.js?v=1793131096"></script>
+<script src="config.js?v=1793153859"></script>
 <script src="vendor/supabase.js"></script>
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/html2canvas.min.js"></script>
 <script src="vendor/jspdf.umd.min.js"></script>
 <script src="vendor/jszip.min.js"></script>
-<script src="tpl_consts.js?v=1793131096"></script>
-<script src="export.js?v=1793131096"></script>
-<script src="api.js?v=1793131096"></script>
-<script src="demo.js?v=1793131096"></script>
-<script src="app.js?v=1793131096"></script>
-<script src="app2.js?v=1793131096"></script>
-<script src="app3.js?v=1793131096"></script>
-<script src="app4.js?v=1793131096"></script>
-<script src="lang.js?v=1793131096"></script>
-<script src="app5.js?v=1793131096"></script>
-<script src="app6.js?v=1793131096"></script>
-<script src="app7.js?v=1793131096"></script>
-<script src="app8.js?v=1793131096"></script>
-<script src="app9.js?v=1793131096"></script>
+<script src="tpl_consts.js?v=1793153859"></script>
+<script src="export.js?v=1793153859"></script>
+<script src="api.js?v=1793153859"></script>
+<script src="demo.js?v=1793153859"></script>
+<script src="app.js?v=1793153859"></script>
+<script src="app2.js?v=1793153859"></script>
+<script src="app3.js?v=1793153859"></script>
+<script src="app4.js?v=1793153859"></script>
+<script src="lang.js?v=1793153859"></script>
+<script src="app5.js?v=1793153859"></script>
+<script src="app6.js?v=1793153859"></script>
+<script src="app7.js?v=1793153859"></script>
+<script src="app8.js?v=1793153859"></script>
+<script src="app9.js?v=1793153859"></script>
 </body>
 </html>

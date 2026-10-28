@@ -117,6 +117,10 @@
         return sb.storage.from('plan-assets').getPublicUrl(path).data.publicUrl;
       },
       joinWithCode2: (code, f) => sb.rpc('join_with_code_v2', { p_code: code, p_full_name: f.name, p_email: f.email, p_password: f.password, p_phone: f.phone || null, p_specialty: f.specialty || null, p_employee_no: f.employee_no || null }).then(ok),
+      // ---- طلبات اختيار المواد
+      assignRequests: sec => T('assignment_requests').select('*').eq('section_id', sec).eq('status', 'pending').order('created_at').then(ok),
+      myAssignRequests: () => T('assignment_requests').select('*').eq('status', 'pending').then(ok),
+      decideRequests: (ids, approve, note) => sb.rpc('decide_assignment_request', { p_ids: ids, p_approve: !!approve, p_note: note || '' }).then(ok),
       // ---- التكليف المؤقت للإدخال
       delegations: sec => T('entry_delegations').select('*').eq('section_id', sec).eq('active', true).order('created_at', { ascending: false }).then(ok),
       addDelegation: r => T('entry_delegations').insert(r).select().single().then(ok),

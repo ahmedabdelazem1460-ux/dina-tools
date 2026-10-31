@@ -21,6 +21,7 @@
     f.contentDocument.close();
     setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 3000); }, 700);
   }
+  A.printDoc = printDoc;
   const weeksPicker = (id, def = 4) => `<div class="field"><label>الأسابيع</label><div class="perm-grid" id="${id}">${S.weeks.slice().sort((a, b) => b.number - a.number).map((w, i) => `<label class="chk"><input type="checkbox" value="${w.id}" ${i < def ? 'checked' : ''}> الأسبوع ${esc(w.word)}${w.archived ? ' (أرشيف)' : ''}</label>`).join('')}</div></div>`;
   const pickedWeeks = (root, id) => $$(`#${id} input:checked`, root).map(i => S.weeks.find(w => w.id === i.value)).filter(Boolean).sort((a, b) => a.number - b.number);
   const onTime = (e, w) => !!e.submitted_at && (!w.deadline || new Date(e.submitted_at) <= new Date(w.deadline));
@@ -29,6 +30,7 @@
   //  التقارير
   // =====================================================================
   const REPORTS = [
+    ['custom', 'منشئ التقارير المخصصة', 'اختر التجميع (معلم، فصل، مادة، أسبوع، يوم) والمقاييس والأسابيع، واحفظ التقرير قالباً تعيد استخدامه.'],
     ['completion', 'نسب إنجاز المعلمين', 'أسبوعي أو لعدة أسابيع أو للفصل كاملاً: الإنجاز والإرسال والاعتماد والتنفيذ لكل معلم، مع مصفوفة المعلمين × الأسابيع.'],
     ['teachers', 'التزام المعلمين', 'لكل معلم: الإنجاز، الإرسال في الوقت، التأخر، الأخطاء اللغوية، التنفيذ.'],
     ['teacher', 'تقرير معلم', 'تفصيل معلم واحد أسبوعاً بأسبوع، قابل للطباعة والإرسال له.'],
@@ -47,7 +49,7 @@
     const [, title] = REPORTS.find(r => r[0] === cur);
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>${title} — ${esc(A.section().name)}</h2></div><button class="btn ghost sm" id="rBack">كل التقارير</button></div><div id="rForm"></div><div id="rOut"></div></div>`;
     $('#rBack', root).onclick = () => { A.LS.set('rep', ''); V.reports(root); };
-    ({ completion: repCompletion, teachers: repTeachers, teacher: repTeacher, subject: repSubject, edits: repEdits, exec: repExec, daily: repDaily })[cur]($('#rForm', root), $('#rOut', root));
+    ({ custom: repCustom, completion: repCompletion, teachers: repTeachers, teacher: repTeacher, subject: repSubject, edits: repEdits, exec: repExec, daily: repDaily })[cur]($('#rForm', root), $('#rOut', root));
   };
   async function load(weeks) { const es = await api.entriesForWeeks(weeks.map(w => w.id)); return es; }
   function teacherStats(es, weeks, li) {
@@ -63,6 +65,42 @@
     });
     (li || []).forEach(x => { if (out[x.teacher_id]) out[x.teacher_id].lang++; });
     return out;
+  }
+  // منشئ التقارير المخصصة — يقرأ فقط ولا يغيّر أي بيانات
+  const DIMS = [['teacher', 'المعلم', e => e.teacher_id ? A.personName(e.teacher_id) : 'بلا معلم'], ['class', 'الفصل', e => (A.cls(e.class_id) || {}).name || ''], ['subject', 'المادة', e => A.subjName(e.subject_id) || '—'], ['week', 'الأسبوع', (e, W) => 'الأسبوع ' + ((W[e.week_id] || {}).word || '')], ['day', 'اليوم', e => DAYS[e.day]]];
+  const METRICS = [['req', 'الحصص المطلوبة', 1], ['filled', 'المكتمل', 1], ['pf', 'نسبة الإنجاز %', 0], ['sent', 'مُرسلة', 1], ['appr', 'معتمدة', 1], ['pa', 'نسبة الاعتماد %', 0], ['ret', 'مُعادة', 1], ['hw', 'حصص بواجب', 1], ['done', 'نُفِّذت كما خُطِّط', 1], ['mod', 'نُفِّذت بتعديل', 1], ['nd', 'لم تُنفَّذ', 1], ['pe', 'نسبة التنفيذ %', 0], ['task', 'مهام أدائية', 1]];
+  function repCustom(F, O) {
+    let saved = []; try { saved = JSON.parse(A.LS.get('rep_tpls') || '[]'); } catch (_) { }
+    const cfg = { dims: ['teacher'], metrics: ['req', 'filled', 'pf', 'appr', 'pe'] };
+    const render = () => {
+      F.innerHTML = `${saved.length ? `<div class="row" style="margin-bottom:10px;gap:6px"><span class="small muted">قوالبي:</span>${saved.map((t, i) => `<span class="ldc"><button class="ldbtn" data-tp="${i}" style="border:0;background:none">${esc(t.name)}</button><button class="ldx" data-tx="${i}" aria-label="حذف القالب">×</button></span>`).join('')}</div>` : ''}
+        <div class="grid g2"><div class="field"><label>التجميع حسب (بالترتيب)</label><div class="perm-grid">${DIMS.map(([k, l]) => `<label class="chk"><input type="checkbox" data-d="${k}" ${cfg.dims.includes(k) ? 'checked' : ''}> ${l}</label>`).join('')}</div></div>
+        <div class="field"><label>المقاييس</label><div class="perm-grid">${METRICS.map(([k, l]) => `<label class="chk"><input type="checkbox" data-m="${k}" ${cfg.metrics.includes(k) ? 'checked' : ''}> ${l}</label>`).join('')}</div></div></div>
+        ${weeksPicker('rw', 4)}<div class="row"><button class="btn" id="rGo">عرض التقرير</button><button class="btn ghost" id="rSv">حفظ كقالب</button></div>`;
+      $$('[data-d]', F).forEach(i => i.onchange = () => { cfg.dims = DIMS.map(d => d[0]).filter(k => $(`[data-d="${k}"]`, F).checked); });
+      $$('[data-m]', F).forEach(i => i.onchange = () => { cfg.metrics = METRICS.map(d => d[0]).filter(k => $(`[data-m="${k}"]`, F).checked); });
+      $$('[data-tp]', F).forEach(b => b.onclick = () => { const t = saved[+b.dataset.tp]; cfg.dims = t.dims.slice(); cfg.metrics = t.metrics.slice(); render(); });
+      $$('[data-tx]', F).forEach(b => b.onclick = () => { saved.splice(+b.dataset.tx, 1); A.LS.set('rep_tpls', JSON.stringify(saved)); render(); });
+      $('#rSv', F).onclick = () => { const m = A.modal(`<h3>حفظ القالب</h3><div class="field"><label for="tpn">اسم القالب</label><input class="in" id="tpn" placeholder="مثال: اعتماد المواد لكل فصل"></div><div class="acts"><button class="btn" id="tpg">حفظ</button></div>`); m.el.querySelector('#tpg').onclick = () => { const n = m.el.querySelector('#tpn').value.trim(); if (!n) return; saved.push({ name: n, dims: cfg.dims.slice(), metrics: cfg.metrics.slice() }); A.LS.set('rep_tpls', JSON.stringify(saved)); m.close(); render(); A.toast('حُفظ القالب', 'ok'); }; };
+      $('#rGo', F).onclick = e => A.run(e.currentTarget, async () => {
+        const weeks = pickedWeeks(F, 'rw'); if (!weeks.length) throw new Error('اختر أسبوعاً'); if (!cfg.dims.length) throw new Error('اختر تجميعاً واحداً على الأقل'); if (!cfg.metrics.length) throw new Error('اختر مقياساً');
+        const W = Object.fromEntries(weeks.map(w => [w.id, w])); const es = (await load(weeks)).filter(e => e.subject_id);
+        const dims = cfg.dims.map(k => DIMS.find(d => d[0] === k)); const G = new Map();
+        es.forEach(e => { const key = dims.map(d => d[2](e, W)); const k = key.join('\u0001'); const g = G.get(k) || (G.set(k, { key, req: 0, filled: 0, sent: 0, appr: 0, ret: 0, hw: 0, done: 0, mod: 0, nd: 0, task: 0 }), G.get(k));
+          if (A.required(e)) g.req++; if (A.filled(e)) g.filled++; if (['submitted', 'approved'].includes(e.status) || (e.status === 'draft' && A.filled(e))) g.sent++; if (e.status === 'approved') g.appr++; if (e.status === 'returned') g.ret++; if ((e.homework || '').trim()) g.hw++;
+          if (e.exec_status === 'done') g.done++; if (e.exec_status === 'modified') g.mod++; if (e.exec_status === 'not_done') g.nd++; if (e.perf_task && e.perf_task.text) g.task++; });
+        const rows = [...G.values()].map(g => ({ ...g, pf: A.pct(g.filled, g.req), pa: A.pct(g.appr, g.req), pe: A.pct(g.done + g.mod, g.req) })).sort((a, b) => a.key.join(' ').localeCompare(b.key.join(' '), 'ar'));
+        const ms = cfg.metrics.map(k => METRICS.find(m => m[0] === k));
+        const tot = {}; ms.forEach(([k, , sum]) => { if (sum) tot[k] = rows.reduce((a, r) => a + r[k], 0); }); const T2 = { req: rows.reduce((a, r) => a + r.req, 0), filled: rows.reduce((a, r) => a + r.filled, 0), appr: rows.reduce((a, r) => a + r.appr, 0), ex: rows.reduce((a, r) => a + r.done + r.mod, 0) }; tot.pf = A.pct(T2.filled, T2.req); tot.pa = A.pct(T2.appr, T2.req); tot.pe = A.pct(T2.ex, T2.req);
+        const table = `<div class="scroll"><table class="tbl"><thead><tr>${dims.map(d => `<th>${d[1]}</th>`).join('')}${ms.map(m => `<th>${m[1]}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.key.map(k => `<td><b>${esc(k)}</b></td>`).join('')}${ms.map(([k]) => `<td>${AR(r[k])}</td>`).join('')}</tr>`).join('')}<tr style="background:var(--pale);font-weight:800"><td colspan="${dims.length}">الإجمالي</td>${ms.map(([k]) => `<td>${AR(tot[k])}</td>`).join('')}</tr></tbody></table></div>`;
+        const scope = weeks.map(w => 'الأسبوع ' + w.word).join('، ');
+        O.innerHTML = `<div class="row" style="margin-top:14px"><button class="btn ghost sm" id="rX">${I.down} Excel</button><button class="btn ghost sm" id="rP">${I.print} طباعة</button><span class="small muted">${AR(rows.length)} صف · ${esc(scope)}</span></div>` + table;
+        const flat = rows.map(r => Object.assign({}, ...dims.map((d, i) => ({ [d[1]]: r.key[i] })), ...ms.map(([k, l]) => ({ [l]: r[k] }))));
+        $('#rX', O).onclick = () => xlsx(`تقرير مخصص - ${A.section().name}`, [['التقرير', flat]]);
+        $('#rP', O).onclick = () => printDoc('تقرير مخصص', `${A.section().name} · ${dims.map(d => d[1]).join(' × ')} · ${scope}`, table, dims.length + ms.length > 7);
+      });
+    };
+    render();
   }
   // نسب إنجاز المعلمين: نطاق أسبوع / عدة أسابيع / الفصل كاملاً
   function repCompletion(F, O) {

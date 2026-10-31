@@ -50,6 +50,10 @@
   const BASE = FONTS + TPL.CSS2.replace("font-family:'Tajawal'", "font-family:'GE SS Two','Myriad Pro','Tajawal'").replace(/'Source Sans 3'/g, "'Myriad Pro','Source Sans 3'") + `
 @media screen{body{background:#cfd8e6;padding:12px 0}.page{margin:0 auto 18px;box-shadow:0 6px 24px rgba(8,43,90,.18)}}
 table.plan td.c{overflow-wrap:anywhere}
+table.wkc{width:100%;border-collapse:separate;border-spacing:14px 0;margin:0 -14px 16px;table-layout:fixed}table.wkc td{background:#E4EBF5;border-radius:18px;padding:16px;text-align:center;vertical-align:top;border-bottom:4px solid #3AB1DB}
+table.wkc .lb{font-size:14px;color:#005499;font-weight:700;margin-top:4px}table.wkc .vl{font-size:26px;font-weight:800;color:#082B5A;margin-top:4px}table.wkc .vl.sm{font-size:17px}table.wkc .ds{font-size:14px;color:#082B5A;margin-top:6px}
+.wkh{font-size:18px;font-weight:800;color:#082B5A;margin:4px 0 8px;border-inline-start:6px solid #3AB1DB;padding-inline-start:10px}
+table.tasks .tp{display:inline-block;background:#082B5A;color:#fff;border-radius:12px;padding:2px 10px;font-size:12.5px;font-weight:700}
 a.lnk{color:#005499;text-decoration:underline;text-underline-offset:2px;font-family:'Myriad Pro','Source Sans 3',sans-serif;unicode-bidi:isolate;word-break:break-all}
 .notes ul{list-style:none;padding:8px 18px 10px 16px}.notes li .bl{color:#3AB1DB;font-size:9px;vertical-align:middle;margin-inline-end:4px}
 /* ---- عرضي ---- */
@@ -152,6 +156,40 @@ body.ink .topbar{background:#fff;border-bottom:3px solid #3AB1DB}
     return p.join('');
   }
 
+  // ---------- هوية «الشريط المزخرف» (مستوحاة من غلاف سجل المتابعة): شريط كحلي بزخرفة الزهرة أعلى وأسفل، وحقول كبسولية ----------
+  const bandTile = acc => 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='72' height='44' viewBox='0 0 72 44'><g fill='none' stroke='#ffffff' stroke-opacity='.8' stroke-width='1.3'><path d='M36 7c6 6 6 11 0 15c-6-4-6-9 0-15z'/><path d='M36 37c6-6 6-11 0-15c-6 4-6 9 0 15z'/><path d='M21 22c6-6 11-6 15 0c-4 6-9 6-15 0z'/><path d='M51 22c-6-6-11-6-15 0c4 6 9 6 15 0z'/></g><circle cx='36' cy='22' r='2' fill='${acc}'/><path d='M0 22l3.5-3.5 3.5 3.5-3.5 3.5z M72 22l-3.5-3.5-3.5 3.5 3.5 3.5z' fill='${acc}'/><circle cx='0' cy='4' r='1.2' fill='${acc}'/><circle cx='72' cy='40' r='1.2' fill='${acc}'/></svg>`);
+  const BAND_CSS = (acc, pale) => `
+body.band .topbar{height:34px;background:#082B5A url("${bandTile(acc)}") repeat-x center/auto 34px;border-bottom:3px solid ${acc}}
+body.band .hd1{top:50px}body.band .hd2{top:88px}body.band .rule{top:138px}body.band .banner{top:152px}body.band .body{top:230px}
+body.band .page .abs[src*="logo"]:not(.bcv *){top:44px!important;width:138px!important}
+body.band .footline{display:block;bottom:56px;height:26px;background:#082B5A url("${bandTile(acc)}") repeat-x center/auto 26px;border-top:3px solid ${acc}}
+body.band .foot{background:#082B5A;color:#fff;border-top:0;height:56px}
+.bcv .bt,.bcv .bb{position:absolute;left:0;right:0;height:70px;background:#082B5A url("${bandTile(acc)}") repeat-x center/auto 70px}
+.bcv .bt{top:0;border-bottom:4px solid ${acc}}.bcv .bb{bottom:0;border-top:4px solid ${acc}}
+.bcv .ttl{position:absolute;left:0;right:0;text-align:center;font-size:62px;font-weight:800;color:#082B5A;line-height:1.1}
+.bcv .sub{position:absolute;left:0;right:0;text-align:center;font-size:20px;color:${acc};font-weight:600}
+.bcv .flds{position:absolute;left:0;right:0;margin:auto}
+.bcv .pf{display:flex;align-items:center;margin:0 auto 22px;direction:rtl}
+.bcv .pl{flex:0 0 auto;min-width:118px;height:58px;border-radius:29px 0 0 29px;background:linear-gradient(180deg,#2E7FC9,#082B5A);color:#fff;font-weight:800;font-size:19px;display:flex;align-items:center;justify-content:center;padding:0 18px;box-shadow:0 8px 16px -10px rgba(8,43,90,.8);position:relative;z-index:1;border-radius:0 29px 29px 0}
+.bcv .pv{flex:1;height:52px;border-radius:26px 0 0 26px;background:linear-gradient(90deg,${pale},${acc});margin-inline-start:-22px;padding:0 40px 0 24px;display:flex;align-items:center;font-size:21px;font-weight:700;color:#082B5A}
+`;
+  function bandCover(info, week, land, acc) {
+    const W = land ? 1123 : 794, H = land ? 794 : 1123, p = [];
+    const y = land ? { logo: 92, title: 270, sub: 346, f: 410 } : { logo: 150, title: 392, sub: 474, f: 560 };
+    const fw = land ? 640 : 560;
+    p.push(`<div class="page cover bcv ${land ? 'land' : ''}"><div class="bt"></div>`);
+    p.push(flower(`position:absolute;top:${land ? 40 : 60}px;right:-70px;width:${land ? 230 : 260}px;height:${land ? 230 : 260}px`, acc, 1.2));
+    p.push(pin(`position:absolute;top:${land ? 250 : 300}px;right:${land ? 120 : 80}px;width:46px;height:46px`));
+    p.push(star(`position:absolute;bottom:${land ? 100 : 150}px;left:${land ? 60 : 30}px;width:${land ? 110 : 130}px;height:${land ? 110 : 130}px`, '#ffffff', NAVY, 1.4));
+    p.push(quad(`position:absolute;top:${land ? 110 : 120}px;left:${land ? 90 : 70}px;width:34px;height:34px`));
+    p.push(`<img class="abs" src="assets/logo.svg" style="top:${y.logo}px;left:${(W - 250) / 2}px;width:250px">`);
+    p.push(`<div class="ttl" style="top:${y.title}px">الخطة الأسبوعية</div><div class="sub" style="top:${y.sub}px">${esc(week.term)}</div>`);
+    const flds = [['الأسبوع', `${esc(week.word)}&#160;&#160;<span style="font-size:16px;font-weight:500">${iso(week.dates[0])} : ${iso(week.dates[week.dates.length - 1])}</span>`], ['المرحلة', esc(info.stage || '')], ['الصف', esc(info.grade_word || '')], ['الفصل', esc(info.class_label || info.name || '')]];
+    p.push(`<div class="flds" style="top:${y.f}px;width:${fw}px">` + flds.map(([l, v]) => `<div class="pf"><div class="pl">${l}</div><div class="pv">${v}</div></div>`).join('') + '</div>');
+    p.push(`<div class="bb"></div></div>`);
+    return p.join('');
+  }
+
   function dayPage(info, week, di, day, notes, rowH, fs, land) {
     const p = [];
     p.push(`<div class="page day ${land ? 'land' : ''}" data-fit="${di}">` + header(week, info, land));
@@ -225,6 +263,15 @@ body.ink .topbar{background:#fff;border-bottom:3px solid #3AB1DB}
       const body = (c.items || []).filter(i => clean(i.body) || clean(i.title)).map(i => '<div class="xn">' + (clean(i.title) ? `<div class="t">${ar(i.title)}</div>` : '') + `<div class="x">${arML(i.body)}</div></div>`).join('');
       return framePage(doc, land, x.title || 'إعلانات', body);
     }
+    if (c.layout === 'weekly') {
+      const PT = (window.APP && APP.PERF) || []; const tn = t => (PT.find(p => p[0] === t) || [])[1] || '';
+      const rows = (c.rows || []).filter(r => clean(r.task));
+      const top = (clean(c.value) || clean(c.activity)) ? `<table class="wkc"><tr>${clean(c.value) ? `<td><div class="ic">${star('width:34px;height:34px', SKY, NAVY, 1.8)}</div><div class="lb">قيمة الأسبوع</div><div class="vl">${ar(c.value)}</div>${clean(c.value_text) ? `<div class="ds">${ar(c.value_text)}</div>` : ''}</td>` : ''}${clean(c.activity) ? `<td><div class="ic">${pin('width:34px;height:34px')}</div><div class="lb">نشاط الأسبوع</div><div class="vl sm">${txt(c.activity)}</div></td>` : ''}</tr></table>` : '';
+      const tasks = rows.length ? `<div class="wkh">المهام الأدائية</div><div class="tw"><table class="tasks"><colgroup><col style="width:19%"><col style="width:16%"><col style="width:47%"><col style="width:18%"></colgroup><tr><th>المادة / النطاق</th><th>النوع</th><th>المهمة</th><th>موعد التسليم</th></tr>` +
+        rows.map((r, i) => `<tr class="${i % 2 ? 'alt' : ''}"><td class="sj">${txt(r.scope) || '–'}</td><td><span class="tp">${esc(tn(r.type) || '—')}</span></td><td>${txt(r.task)}</td><td class="du">${txt(r.due) || '–'}</td></tr>`).join('') + '</table></div>' : '';
+      const box = (t, v) => clean(v) ? `<div class="xn"><div class="t">${t}</div><div class="x">${arML(v)}</div></div>` : '';
+      return framePage(doc, land, x.title || 'صفحة نهاية الأسبوع', top + tasks + box('إضاءات للمعلم', c.lights) + box('ملاحظات عامة', c.notes));
+    }
     return framePage(doc, land, x.title || 'صفحة', `<div class="xn"><div class="x">${arML(c.body)}</div></div>`);
   }
   function notesPage(doc, land) {
@@ -244,7 +291,8 @@ body.ink .topbar{background:#fff;border-bottom:3px solid #3AB1DB}
     const land = o.layout === 'overview' || o.orientation === 'landscape';
     const xp = o.extras ? (doc.extraPages || []) : [];
     let h = '';
-    if (o.cover) h += coverPage(doc.info, doc.week, land);
+    const acc = (THEMES[o.theme] || {})['#3AB1DB'] || SKY;
+    if (o.cover) h += o.style === 'band' ? bandCover(doc.info, doc.week, land, acc) : coverPage(doc.info, doc.week, land);
     xp.filter(x => x.position === 'after_cover').forEach(x => h += extraPageHTML(doc, x, land));
     const dn = o.notes ? doc.dayNotes : doc.days.map(() => []);
     if (o.layout === 'overview') h += overviewPage({ ...doc, dayNotes: dn }, OV[ovfit || 0]);
@@ -258,14 +306,17 @@ body.ink .topbar{background:#fff;border-bottom:3px solid #3AB1DB}
     xp.filter(x => x.position !== 'after_cover').forEach(x => h += extraPageHTML(doc, x, land));
     if (o.rich) h = richDecor(h, land);
     if (o.coverImg && o.cover) h = h.replace('<div class="page cover', `<div class="page cover`).replace(/(<div class="page cover[^>]*>)/, `$1<img class="cimg" src="${esc(o.coverImg)}" crossorigin="anonymous" style="top:${land ? 640 : 860}px;width:${land ? 220 : 300}px;height:${land ? 90 : 150}px">`);
-    return { html: themed(h, { name: o.theme }), land, ink: o.ink, rich: o.rich, theme: o.theme };
+    return { html: themed(h, { name: o.theme }), land, ink: o.ink, rich: o.rich, theme: o.theme, style: o.style || '' };
   }
   // هويات التصميم المشتقة من دليل هوية دينا (الكحلي ثابت؛ يتغير اللون المساند)
   const THEMES = {
     dina: null,
     lavender: { '#3AB1DB': '#AE95DA', '#84B7E3': '#C4B5E3', '#E4EBF5': '#EEEBF6', '#5E9BD3': '#AE95DA', '#6EA7DA': '#DAD5EB' },
     green: { '#3AB1DB': '#8CC56A', '#84B7E3': '#BADF93', '#E4EBF5': '#EEF6E6', '#5E9BD3': '#8CC56A', '#6EA7DA': '#BADF93' },
+    royal: { '#3AB1DB': '#2E7FC9', '#84B7E3': '#9FC3E8', '#E4EBF5': '#E8F0FA', '#5E9BD3': '#2E7FC9', '#6EA7DA': '#B9D3EE' },
+    gold: { '#3AB1DB': '#C9A44C', '#84B7E3': '#E3CF97', '#E4EBF5': '#F8F3E6', '#5E9BD3': '#C9A44C', '#6EA7DA': '#EADDB5' },
   };
+  const PALE = { dina: '#C9F1F7', lavender: '#E9E2F6', green: '#E3F3D6', royal: '#D8E8F8', gold: '#F5EBD0' };
   const RICH = `.rich .banner,.rich .week{border-bottom:5px solid #3AB1DB}
 .rich .cards td,.rich table.honor td,.rich .xn{border-bottom:4px solid #84B7E3}
 .rich .tw,.rich .wkwrap{border-bottom-width:4px}
@@ -275,7 +326,7 @@ body.ink .topbar{background:#fff;border-bottom:3px solid #3AB1DB}
     const add = (land ? '' : pin('position:absolute;top:150px;right:46px;width:40px;height:40px;opacity:.9')) + star('position:absolute;bottom:150px;left:52px;width:22px;height:22px', SKY, NAVY, 2.4) + flower('position:absolute;top:150px;left:-46px;width:120px;height:120px', SKY, 1.1, 0.5);
     return html.replace(/<div class="page day([^"]*)"([^>]*)>/g, (m) => m + add);
   }
-  const shell = (r, title) => `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><base href="${location.href.replace(/[^/]*$/, '')}"><title>${esc(title || '')}</title><style>${themed(BASE + (r.rich ? RICH : ''), { name: r.theme })}@page{size:A4 ${r.land ? 'landscape' : 'portrait'};margin:0}.cimg{position:absolute;left:50%;transform:translateX(-50%);border-radius:18px;object-fit:cover;box-shadow:0 12px 26px -12px rgba(8,43,90,.5)}</style></head><body class="${r.ink ? 'ink' : ''} ${r.rich ? 'rich' : ''}">${r.html}</body></html>`;
+  const shell = (r, title) => `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><base href="${location.href.replace(/[^/]*$/, '')}"><title>${esc(title || '')}</title><style>${themed(BASE + (r.rich ? RICH : ''), { name: r.theme })}${BAND_CSS((THEMES[r.theme] || {})['#3AB1DB'] || SKY, PALE[r.theme] || PALE.dina)}@page{size:A4 ${r.land ? 'landscape' : 'portrait'};margin:0}.cimg{position:absolute;left:50%;transform:translateX(-50%);border-radius:18px;object-fit:cover;box-shadow:0 12px 26px -12px rgba(8,43,90,.5)}</style></head><body class="${r.ink ? 'ink' : ''} ${r.rich ? 'rich' : ''} ${r.style === 'band' ? 'band' : ''}">${r.html}</body></html>`;
 
   async function renderInto(frame, doc, title) {
     const fits = doc.days.map(() => 0); let ov = 0; let r;
@@ -286,7 +337,7 @@ body.ink .topbar{background:#fff;border-bottom:3px solid #3AB1DB}
       await Promise.all([...frame.contentDocument.images].map(i => i.complete ? 0 : new Promise(x => { i.onload = i.onerror = x; })));
     };
     await write();
-    const H = r.land ? 794 : 1123, limit = H - 83;
+    const H = r.land ? 794 : 1123, limit = H - (r.style === 'band' ? 112 : 83);
     for (let pass = 0; pass < 10; pass++) {
       let changed = false;
       frame.contentDocument.querySelectorAll('.page[data-fit]').forEach(pg => {

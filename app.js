@@ -46,6 +46,9 @@
     admin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><path d="M17 11l1.5 1.5L21.5 9"/></svg>',
     nisab: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h2M12 12h2M8 16h2M12 16h2"/></svg>',
     builder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v11M15 10v11"/><path d="M8 2v4M16 2v4"/></svg>',
+    resources: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg>',
+    analysis: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
+    roles: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M17 11l2 2 3.5-4"/></svg>',
     posts: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h3l5 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M16 8a5 5 0 0 1 0 8M19 5a9 9 0 0 1 0 14"/></svg>',
     reports: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
     archive: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10h14V9M10 13h4"/></svg>',
@@ -84,6 +87,20 @@
   const anyPerm = (...ps) => ps.some(p => perm(p));
   const holidayOf = di => ((week() || {}).holidays || []).find(h => h.day === di);
   const required = e => e.subject_id && !(subj(e.subject_id) || {}).is_activity && !holidayOf(e.day);
+  // أنواع المهام الأدائية العشرة مع مثال لكل نوع (من دليل المدرسة)
+  const PERF = [
+    ['folding', 'مطوية', 'عمل مطوية عن صفة الصلاة مختصرة تسلم يوم الخميس القادم'],
+    ['inquiry', 'نشاط استقصاء', 'مع مجموعتك بيّن كيف يمكنكم حل مشكلة التنمر في الفصل وسجّل خطوات الحل'],
+    ['explore', 'نشاط استكشاف', 'من خلال دراستك لمكونات القصة اكتب قصة قصيرة تشمل جميع عناصرها'],
+    ['present', 'عرض تقديمي', 'إعداد عرض تقديمي تبيّن فيه مراحل نمو النبات ومكوناته'],
+    ['mindmap', 'خريطة معرفية', 'صمّم خريطة معرفية تبيّن فيها علامات الإعراب الأصلية والفرعية'],
+    ['concept', 'خريطة مفاهيمية', 'صمّم خريطة مفاهيم تقارن بين الخلية الحيوانية والنباتية'],
+    ['trip', 'رحلة معرفية', 'قم بزيارة جدة التاريخية واكتب أهم الأماكن التي يمكن زيارتها'],
+    ['research', 'بحث', 'بحث عن أهم إنجازات الملك عبدالعزيز آل سعود مع توثيق المراجع'],
+    ['report', 'تقرير علمي / تجربة عملية', 'زيارة معرض الكتاب وكتابة تقرير عن كتب الذكاء الاصطناعي'],
+    ['project', 'مشروع', 'صمّم نموذجاً لتصفية المياه المتعكرة لتصبح صالحة للشرب'],
+  ];
+  const perfName = k => (PERF.find(x => x[0] === k) || [])[1] || '';
   const filled = e => !!(e.topic || '').trim() || !!(e.homework || '').trim();
 
   // ---------- واجهات مساعدة ----------
@@ -219,6 +236,9 @@
     ['admin', 'الإدارة', () => S.me.is_owner || anyPerm('users', 'structure')],
     ['reports', 'التقارير', () => S.me.is_owner || anyPerm('review', 'export', 'users')],
     ['posts', 'إعلانات أولياء الأمور', () => S.me.is_owner || anyPerm('users', 'structure')],
+    ['resources', 'المصادر', () => true],
+    ['analysis', 'تحليل النتائج', () => !!(APP.hasModule && APP.hasModule('analysis'))],
+    ['roles', 'المسميات والصلاحيات', () => S.me.is_owner || anyPerm('users')],
     ['archive', 'الأرشيف', () => S.me.is_owner],
     ['dev', 'لوحة المطوّر', () => S.me.is_owner],
   ];
@@ -257,7 +277,7 @@
     $('#nav').innerHTML = items.map(([k, l]) => `<a href="#/${k}" class="${S.view === k ? 'on' : ''}" ${S.view === k ? 'aria-current="page"' : ''}>${I[k]}<span>${l}</span>${k === 'my' && myCount ? `<span class="cnt">${AR(myCount)}</span>` : ''}</a>`).join('');
     const bn = $('#bnav'); if (bn) {
       const prim = items.length > 5 ? items.slice(0, 4) : items, rest = items.length > 5 ? items.slice(4) : [];
-      const SHORT = { dash: 'المتابعة', classes: 'الفصول', timetable: 'الجدول', builder: 'الجدول الآلي', nisab: 'النصاب', dev: 'المطوّر', posts: 'الإعلانات' };
+      const SHORT = { resources: 'المصادر', analysis: 'التحليل', roles: 'الصلاحيات', dash: 'المتابعة', classes: 'الفصول', timetable: 'الجدول', builder: 'الجدول الآلي', nisab: 'النصاب', dev: 'المطوّر', posts: 'الإعلانات' };
       bn.innerHTML = prim.map(([k, l]) => `<a href="#/${k}" class="${S.view === k ? 'on' : ''}">${I[k]}<span>${SHORT[k] || l}</span></a>`).join('') +
         (rest.length ? `<button type="button" id="moreBtn" class="${rest.some(r => r[0] === S.view) ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg><span>المزيد</span></button>` : '');
       const mb = $('#moreBtn'); if (mb) mb.onclick = () => moreSheet(rest);
@@ -461,14 +481,20 @@
         <div class="field full"><label>الموضوع / الدرس</label><textarea class="in" rows="1" data-k="topic" ${ro ? 'readonly' : ''} placeholder="مثال: الفعل الماضي — ص ٤٥">${esc(e.topic)}</textarea></div>
         <div class="field"><label>الواجب</label><input class="in" data-k="homework" ${ro ? 'readonly' : ''} value="${esc(e.homework)}" placeholder="اتركه فارغاً إن لم يوجد"></div>
         <div class="field"><label>ملاحظة (تظهر في ملاحظات اليوم)</label><input class="in" data-k="note" ${ro ? 'readonly' : ''} value="${esc(e.note)}" placeholder="اختياري"></div>
+        <details class="perf full" ${e.perf_task && e.perf_task.text ? 'open' : ''}><summary>مهمة أدائية <span class="small muted">(اختياري — تظهر في صفحة نهاية الأسبوع)</span>${e.perf_task && e.perf_task.text ? ` <span class="pill st-submitted">${esc(perfName(e.perf_task.type) || 'مهمة')}</span>` : ''}</summary>
+          <div class="grid g3" style="margin-top:8px"><div class="field"><label>نوع المهمة</label><select class="in" data-p="type" ${ro ? 'disabled' : ''}><option value="">— اختر —</option>${PERF.map(([k, l]) => `<option value="${k}" ${e.perf_task && e.perf_task.type === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+          <div class="field" style="grid-column:span 2"><label>نص المهمة</label><input class="in" data-p="text" ${ro ? 'readonly' : ''} value="${esc((e.perf_task || {}).text || '')}" placeholder="اختر النوع ليظهر مثال"></div>
+          <div class="field"><label>موعد التسليم</label><input class="in" data-p="due" ${ro ? 'readonly' : ''} value="${esc((e.perf_task || {}).due || '')}" placeholder="مثال: الخميس القادم"></div></div></details>
       </div>`;
     if (!ro) {
       const save = async () => {
         pending.delete(e.id);
         const patch = {}; $$('[data-k]', el).forEach(i => patch[i.dataset.k] = i.value.trim());
-        if (patch.topic === e.topic && patch.homework === e.homework && patch.note === e.note) return;
+        const pt = {}; $$('[data-p]', el).forEach(i => pt[i.dataset.p] = i.value.trim()); const ptv = pt.text ? pt : null;
+        if (patch.topic === e.topic && patch.homework === e.homework && patch.note === e.note && JSON.stringify(ptv) === JSON.stringify(e.perf_task || null)) return;
+        patch.perf_task = ptv;
         // الإرسال التلقائي للمراجعة: أي حصة فيها محتوى تظهر للمراجع مباشرة ولو لم يكتمل الأسبوع
-        patch.status = (patch.topic || patch.homework || patch.note) ? 'submitted' : 'draft';
+        patch.status = (patch.topic || patch.homework || patch.note || ptv) ? 'submitted' : 'draft';
         const ss = $('#saveState'); ss && (ss.textContent = 'جارٍ الحفظ…');
         try {
           const r = await api.saveEntry(e.id, patch);
@@ -478,7 +504,8 @@
         } catch (err) { ss && (ss.textContent = ''); toast(apiMsg(err), 'err'); }
       };
       const deb = debounce(save, 900);
-      $$('[data-k]', el).forEach(i => { i.addEventListener('input', () => { pending.set(e.id, save); deb(); }); i.addEventListener('blur', () => { if (pending.has(e.id)) save(); }); });
+      $$('[data-k],[data-p]', el).forEach(i => { i.addEventListener(i.tagName === 'SELECT' ? 'change' : 'input', () => { pending.set(e.id, save); deb(); }); i.addEventListener('blur', () => { if (pending.has(e.id)) save(); }); });
+      const ps = $('[data-p=type]', el), pi = $('[data-p=text]', el); if (ps) ps.addEventListener('change', () => { const x = PERF.find(y => y[0] === ps.value); pi.placeholder = x ? 'مثال: ' + x[2] : 'اختر النوع ليظهر مثال'; });
       const ta = $('textarea', el); const fit = () => { ta.style.height = 'auto'; ta.style.height = Math.max(44, ta.scrollHeight + 2) + 'px'; }; ta.addEventListener('input', fit); setTimeout(fit, 0);
     }
     return el;
@@ -640,13 +667,13 @@
       const rows = list.filter(e => e.day === d).sort((a, b) => a.period - b.period);
       if (hol) { tb.insertAdjacentHTML('beforeend', `<tr><td ${reviewer ? 'colspan="2"' : ''} class="dayc">${DAYS[d]}<div class="small muted">${AR(dates[d])}</div></td><td colspan="6" style="text-align:center;font-weight:800;background:var(--pale)">${esc(hol.label || 'إجازة')}</td></tr>`); continue; }
       rows.forEach((e, k) => {
-        const tr = document.createElement('tr'); if (k % 2) tr.className = 'alt';
+        const tr = document.createElement('tr'); tr.className = (k % 2 ? 'alt ' : '') + (k === 0 ? 'dstart' : '') + (k === rows.length - 1 ? ' dend' : '');
         const ed = canEdit(e);
         tr.innerHTML = `${reviewer ? `<td><input type="checkbox" data-sel="${e.id}"></td>` : ''}${k === 0 ? `<td class="dayc" rowspan="${rows.length}">${DAYS[d]}<div class="small muted">${AR(dates[d])}</div></td>` : ''}
           <td class="per">${AR(e.period + 1)}</td>
           <td><b>${esc(subjName(e.subject_id) || '—')}</b>${ttEd ? ` <button class="ldx" data-es="${e.id}" title="تعديل هذه الحصة في الجدول المعتمد" aria-label="تعديل الحصة في الجدول">✎</button>` : ''}<div class="small ${e.teacher_id ? 'muted' : ''}" style="${e.teacher_id ? '' : 'color:var(--bad)'}">${e.subject_id ? (e.teacher_id ? esc(personName(e.teacher_id)) : `<a href="#" class="assignlink" data-assign-c="${e.class_id}" data-assign-s="${e.subject_id}">بلا معلم — إسناد</a>`) : ''}</div></td>
           ${['topic', 'homework', 'note'].map(k2 => `<td>${ed ? `<textarea data-k="${k2}" rows="1">${esc(e[k2])}</textarea>` : `<div style="padding:6px">${esc(e[k2]) || '<span class="faint">–</span>'}</div>`}</td>`).join('')}
-          <td>${pill(e.status)}${e.subject_id && APP.exPill ? `<div style="margin-top:4px">${APP.exPill(e.exec_status)}</div>` : ''}${e.review_note ? `<div class="small" style="color:var(--warn);margin-top:4px">${esc(e.review_note)}</div>` : ''}</td>`;
+          <td>${pill(e.status)}${e.subject_id && APP.exPill ? `<div style="margin-top:4px">${APP.exPill(e.exec_status)}</div>` : ''}${e.review_note ? `<div class="small" style="color:var(--warn);margin-top:4px">${esc(e.review_note)}</div>` : ''}${e.perf_task && e.perf_task.text ? `<div class="small" style="margin-top:4px" title="${esc(e.perf_task.text)}${e.perf_task.due ? ' — ' + esc(e.perf_task.due) : ''}"><span class="pill st-submitted">مهمة: ${esc(perfName(e.perf_task.type) || 'أدائية')}</span></div>` : ''}</td>`;
         if (ed) {
           const save = async () => {
             const patch = {}; $$('[data-k]', tr).forEach(i => patch[i.dataset.k] = i.value.trim());
@@ -736,7 +763,7 @@
   }
 
   // ---------- مشترك مع الملفات الأخرى ----------
-  window.APP = { start: () => start(), TOOL_PERMS, TOOL_KEYS, cnt, api, S, $, $$, esc, AR, DAYS, PER, ORD, STATUS, WSTATUS, ROLES, PERMS, ROLE_DEFAULTS, I, parseDate, isoDate, dmy, weekDates, fmtDT, pct, norm, normKey, genPass, toast, modal, confirmBox, run, pill, bar, emptyBox, download, section, week, subj, subjName, person, personName, cls, myMem, perm, anyPerm, holidayOf, required, filled, stats, loadSection, loadWeek, refreshPeople, refreshMyCards, delegOf, shell, route, renderNav, LS, DEMO };
+  window.APP = { PERF, perfName, start: () => start(), TOOL_PERMS, TOOL_KEYS, cnt, api, S, $, $$, esc, AR, DAYS, PER, ORD, STATUS, WSTATUS, ROLES, PERMS, ROLE_DEFAULTS, I, parseDate, isoDate, dmy, weekDates, fmtDT, pct, norm, normKey, genPass, toast, modal, confirmBox, run, pill, bar, emptyBox, download, section, week, subj, subjName, person, personName, cls, myMem, perm, anyPerm, holidayOf, required, filled, stats, loadSection, loadWeek, refreshPeople, refreshMyCards, delegOf, shell, route, renderNav, LS, DEMO };
 
   // ---------- تشغيل ----------
   window.addEventListener('DOMContentLoaded', async () => {

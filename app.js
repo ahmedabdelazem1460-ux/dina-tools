@@ -278,9 +278,14 @@
     o.innerHTML = `<div class="sheet" role="dialog" aria-label="المزيد">${items.map(([k, l]) => `<a href="#/${k}" class="${S.view === k ? 'on' : ''}">${I[k]}<span>${l}</span></a>`).join('')}</div>`;
     document.body.appendChild(o); o.onclick = e => { if (e.target === o || e.target.closest('a')) o.remove(); };
   }
+  // ظهور البنود للمعلمين بقرار المالك — الإخفاء لا يمس البيانات
+  const FEAT_DEF = { assess: 'all', resources: 'all', analysis: 'granted', attendance: 'granted', supervision: 'granted' };
+  const featMode = k => ((((S.school || {}).settings || {}).features || {})[k]) || FEAT_DEF[k];
+  const featGate = k => { if (!(k in FEAT_DEF) || !S.me || S.me.is_owner) return true; const m = featMode(k); if (m === 'off') return false; if (m === 'granted' && FEAT_DEF[k] === 'all') return !!(APP.hasModule && APP.hasModule(k)); return true; };
+  const navOK = n => n[2]() && featGate(n[0]) && (n[0] !== 'myreports' || featGate('supervision'));
   function renderNav() {
     const myCount = S.entries.filter(e => e.teacher_id === S.me.id && required(e) && !filled(e)).length;
-    const items = NAV.filter(n => n[2]());
+    const items = NAV.filter(navOK);
     if (!$('#nav')) return;
     $('#nav').innerHTML = items.map(([k, l]) => `<a href="#/${k}" class="${S.view === k ? 'on' : ''}" ${S.view === k ? 'aria-current="page"' : ''}>${I[k]}<span>${l}</span>${k === 'my' && myCount ? `<span class="cnt">${AR(myCount)}</span>` : ''}</a>`).join('');
     const bn = $('#bnav'); if (bn) {
@@ -314,7 +319,7 @@
   window.VIEWS = VIEWS;
   function route() {
     const k = (location.hash.match(/^#\/(\w+)/) || [])[1];
-    const allowed = NAV.filter(n => n[2]()).map(n => n[0]);
+    const allowed = NAV.filter(navOK).map(n => n[0]);
     let v = allowed.includes(k) ? k : (LS.get('view') && allowed.includes(LS.get('view')) ? LS.get('view') : (anyPerm('review', 'export', 'structure', 'users') && !S.entries.some(e => e.teacher_id === S.me.id) ? 'dash' : (allowed.includes('my') ? 'my' : allowed[0])));
     S.view = v; LS.set('view', v);
     if (location.hash !== '#/' + v) history.replaceState(null, '', '#/' + v);
@@ -493,7 +498,7 @@
           <div class="grid g3" style="margin-top:8px"><div class="field"><label>نوع المهمة</label><select class="in" data-p="type" ${ro ? 'disabled' : ''}><option value="">— اختر —</option>${PERF.map(([k, l]) => `<option value="${k}" ${e.perf_task && e.perf_task.type === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
           <div class="field" style="grid-column:span 2"><label>نص المهمة</label><input class="in" data-p="text" ${ro ? 'readonly' : ''} value="${esc((e.perf_task || {}).text || '')}" placeholder="اختر النوع ليظهر مثال"></div>
           <div class="field"><label>موعد التسليم</label><input class="in" data-p="due" ${ro ? 'readonly' : ''} value="${esc((e.perf_task || {}).due || '')}" placeholder="مثال: الخميس القادم"></div></div></details>
-        ${ro ? '' : `<div class="full"><button type="button" class="btn ghost sm" data-attach>${I.plus} إرفاق مصدر من المصادر</button></div>`}
+        ${ro || !featGate('resources') ? '' : `<div class="full"><button type="button" class="btn ghost sm" data-attach>${I.plus} إرفاق مصدر من المصادر</button></div>`}
       </div>`;
     if (!ro) {
       const save = async () => {
@@ -773,7 +778,7 @@
   }
 
   // ---------- مشترك مع الملفات الأخرى ----------
-  window.APP = { PERF, perfName, start: () => start(), TOOL_PERMS, TOOL_KEYS, cnt, api, S, $, $$, esc, AR, DAYS, PER, ORD, STATUS, WSTATUS, ROLES, PERMS, ROLE_DEFAULTS, I, parseDate, isoDate, dmy, weekDates, fmtDT, pct, norm, normKey, genPass, toast, modal, confirmBox, run, pill, bar, emptyBox, download, section, week, subj, subjName, person, personName, cls, myMem, perm, anyPerm, holidayOf, required, filled, stats, loadSection, loadWeek, refreshPeople, refreshMyCards, delegOf, shell, route, renderNav, LS, DEMO };
+  window.APP = { featMode, featGate, FEAT_DEF, PERF, perfName, start: () => start(), TOOL_PERMS, TOOL_KEYS, cnt, api, S, $, $$, esc, AR, DAYS, PER, ORD, STATUS, WSTATUS, ROLES, PERMS, ROLE_DEFAULTS, I, parseDate, isoDate, dmy, weekDates, fmtDT, pct, norm, normKey, genPass, toast, modal, confirmBox, run, pill, bar, emptyBox, download, section, week, subj, subjName, person, personName, cls, myMem, perm, anyPerm, holidayOf, required, filled, stats, loadSection, loadWeek, refreshPeople, refreshMyCards, delegOf, shell, route, renderNav, LS, DEMO };
 
   // ---------- تشغيل ----------
   window.addEventListener('DOMContentLoaded', async () => {

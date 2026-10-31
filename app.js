@@ -301,10 +301,11 @@
     const m = document.createElement('div'); m.className = 'menu';
     const roles = S.me.is_owner ? 'مالك النظام' : (myMem() ? ROLES[myMem().role] : '');
     m.innerHTML = `<div class="who"><b>${esc(S.me.full_name)}</b><span dir="ltr">${esc(S.me.email || '')}</span><br><span>${roles} · ${esc(section().name)}</span></div>
-      <button data-a="pw">تغيير كلمة المرور</button><button data-a="out">تسجيل الخروج</button>`;
+      <button data-a="drive">مجلدي في Google Drive</button><button data-a="pw">تغيير كلمة المرور</button><button data-a="out">تسجيل الخروج</button>`;
     document.body.appendChild(m);
     const off = () => { m.remove(); document.removeEventListener('click', off); };
     setTimeout(() => document.addEventListener('click', off), 0);
+    m.querySelector('[data-a=drive]').onclick = () => APP.driveDialog && APP.driveDialog(S.me);
     m.querySelector('[data-a=out]').onclick = async () => { await api.signOut(); loginScreen(); };
     m.querySelector('[data-a=pw]').onclick = () => {
       const md = modal(`<h3>تغيير كلمة المرور</h3><div class="field"><label>كلمة المرور الجديدة (٨ أحرف على الأقل)</label><input class="in" type="password" id="np" dir="ltr" autocomplete="new-password"></div><div class="field"><label>تأكيدها</label><input class="in" type="password" id="np2" dir="ltr" autocomplete="new-password"></div><div class="acts"><button class="btn" id="sp">حفظ</button></div>`);
@@ -413,7 +414,7 @@
     root.innerHTML = `
       <div class="head"><div class="grow"><h2 style="margin:0;font-size:24px;font-weight:800">خطتي — الأسبوع ${esc(w.word)}</h2>
         <p class="sub" style="margin:4px 0 0">${AR(dates[0])} : ${AR(dates[dates.length - 1])} · ${cnt(req.length, 'حصة', 'حصص')} مطلوبة · ${esc(section().name)}</p></div>
-        <button class="btn ghost sm" id="myClaim">${I.classes} موادي وفصولي</button><button class="btn ghost sm" id="myExec">${I.check} التنفيذ اليومي</button>
+        <button class="btn ghost sm" id="myDrive">${I.folder || ""} ${S.me.drive_url ? "مجلدي في Drive" : "ربط مجلدي في Drive"}</button><button class="btn ghost sm" id="myClaim">${I.classes} موادي وفصولي</button><button class="btn ghost sm" id="myExec">${I.check} التنفيذ اليومي</button>
         <div class="tabs" style="margin:0;border:0" id="flt">${[['all', 'الكل'], ['todo', 'غير مكتملة'], ['returned', 'مُعادة'], ['done', 'مكتملة']].map(([k, l]) => `<button data-f="${k}" class="${filter === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
       ${!open ? `<div class="notice warn">${I.lock} هذا الأسبوع ${WSTATUS[w.status]} — لا يمكن التعديل.</div>` : ''}
       ${late ? `<div class="notice bad">انتهى موعد التسليم (${fmtDT(w.deadline)}) وما زالت خطتك غير مكتملة.</div>` : (dl && open ? `<div class="notice info">آخر موعد للتسليم: <b>${fmtDT(w.deadline)}</b></div>` : '')}
@@ -427,6 +428,7 @@
         <span class="savestate" id="saveState"></span>
         ${open ? `<button class="btn sky" id="submitW">${I.send} إرسال للمراجعة</button>` : ''}
       </div></div>`;
+    const md = $('#myDrive', root); if (md) md.onclick = () => S.me.drive_url ? window.open(S.me.drive_url, '_blank', 'noopener') : (APP.driveDialog && APP.driveDialog(S.me, () => VIEWS.my(root)));
     $$('#flt button', root).forEach(b => b.onclick = () => { LS.set('myfilter', b.dataset.f); VIEWS.my(root); });
     $('#myClaim', root).onclick = () => claimView(root, false);
     $('#myExec', root).onclick = () => VIEWS._exec(root);

@@ -30,7 +30,7 @@
     const subs = mySubjects(), grades = [...new Set(myClasses().map(gk))];
     ctx.subj = A.LS.get('as_s') || ctx.subj || (subs[0] || {}).id; if (!subs.some(s => s.id === ctx.subj)) ctx.subj = (subs[0] || {}).id;
     ctx.grade = A.LS.get('as_g') || ctx.grade || grades[0]; if (!grades.includes(ctx.grade)) ctx.grade = grades[0];
-    const tabs = [['quizzes', 'الاختبارات وأوراق العمل'], ['bank', 'بنك الأسئلة'], ['spec', 'جدول المواصفات'], ['curriculum', 'المنهج والدروس'], ['results', 'النتائج والتحليل'], ['remedial', 'الخطط العلاجية والإثرائية']];
+    const tabs = [['quizzes', 'الاختبارات وأوراق العمل'], ['bank', 'بنك الأسئلة'], ['spec', 'جدول المواصفات'], ['curriculum', 'المنهج والدروس'], ['results', 'النتائج والتحليل'], ['cumul', 'التقرير التراكمي'], ['remedial', 'الخطط العلاجية والإثرائية']];
     let tab = A.LS.get('as_t') || 'quizzes';
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>التقويم والاختبارات</h2><p class="sub" style="margin:2px 0 0">بنك أسئلة مرتبط بالدروس ومستويات التفكير، جدول مواصفات آلي، اختبارات وأوراق عمل إلكترونية برابط للطالب، وتحليل يبني خططاً علاجية.</p></div></div>
       <div class="row" style="margin-bottom:10px;gap:8px"><label class="small">المادة <select class="in" id="asS" style="max-width:220px">${subs.map(s => `<option value="${s.id}" ${s.id === ctx.subj ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
@@ -41,7 +41,7 @@
     $$('.tabs button', root).forEach(b => b.onclick = () => { A.LS.set('as_t', b.dataset.t); V.assess(root); });
     if (!ctx.subj || !ctx.grade) { $('#asb', root).innerHTML = A.emptyBox('لا توجد مواد أو فصول مسندة لك'); return; }
     try { await loadCtx(); } catch (e) { $('#asb', root).innerHTML = A.emptyBox('تعذّر التحميل', e.message); return; }
-    ({ curriculum: tCur, bank: tBank, spec: tSpec, quizzes: tQuiz, results: tRes, remedial: tRem })[tab]($('#asb', root), root);
+    ({ curriculum: tCur, bank: tBank, spec: tSpec, quizzes: tQuiz, results: tRes, cumul: tCum, remedial: tRem })[tab]($('#asb', root), root);
   };
 
   // ---------- المنهج والدروس ----------
@@ -233,6 +233,56 @@
   }
 
   // ---------- النتائج والتحليل ----------
+  // تقرير تراكمي عبر كل الاختبارات وأوراق العمل للمادة والصف: الطالب، الدرس، الفصل
+  async function tCum(box) {
+    const list = (await api.list('quizzes', { school_id: sch(), subject_id: ctx.subj, grade_key: ctx.grade }, { order: 'created_at' })).filter(z => z.status !== 'draft' && (z.teacher_id === S.me.id || S.me.is_owner || A.hasModule('supervision')));
+    if (!list.length) { box.innerHTML = A.emptyBox('لا توجد اختبارات منشورة لهذه المادة والصف'); return; }
+    const at = await api.list('quiz_attempts', { quiz_id: list.map(z => z.id) }, { order: 'submitted_at' });
+    if (!at.length) { box.innerHTML = A.emptyBox('لا توجد محاولات بعد', 'يظهر التقرير بعد أن يحل الطلاب اختباراً واحداً على الأقل.'); return; }
+    const pc = a => a.max_score ? Math.round(a.score / a.max_score * 100) : 0;
+    const best = {}; at.forEach(a => { const k = a.quiz_id + '|' + A.normKey(a.student_name) + '|' + a.class_id; if (!best[k] || a.score >= best[k].score) best[k] = a; });
+    const B = Object.values(best);
+    const zi = Object.fromEntries(list.map((z, i) => [z.id, i]));
+    const st = {}; B.forEach(a => { const k = A.normKey(a.student_name) + '|' + a.class_id; const r = st[k] = st[k] || { name: a.student_name, cls: a.class_id, by: {} }; r.by[a.quiz_id] = pc(a); });
+    const studs = Object.values(st).map(r => { const v = list.filter(z => z.id in r.by).map(z => r.by[z.id]); const avg = Math.round(v.reduce((x, y) => x + y, 0) / v.length); const tr = v.length >= 2 ? v[v.length - 1] - v[0] : 0; return { ...r, n: v.length, avg, tr }; });
+    const lv = p => p >= 80 ? ['متمكن', 'st-approved'] : p >= 50 ? ['متوسط', 'st-submitted'] : ['يحتاج دعماً', 'st-returned'];
+    // إتقان الدروس من إجابات كل سؤال
+    const les = {}; B.forEach(a => Object.entries(a.per_q || {}).forEach(([qid, r]) => { const q = QB.find(x => x.id === qid); if (!q) return; const k = q.lesson_id || ''; const c = les[k] = les[k] || { got: 0, mx: 0 }; c.mx += +q.points || 1; if (r && r.ok) c.got += +q.points || 1; }));
+    const lesL = Object.entries(les).map(([k, c]) => ({ k, p: c.mx ? Math.round(c.got / c.mx * 100) : 0 })).sort((a, b) => a.p - b.p);
+    const clsL = [...new Set(studs.map(s => s.cls))].map(c => { const l = studs.filter(s => s.cls === c); return { c, n: l.length, avg: Math.round(l.reduce((x, s) => x + s.avg, 0) / l.length), weak: l.filter(s => s.avg < 50).length }; }).sort((a, b) => b.avg - a.avg);
+    const weak = studs.filter(s => s.avg < 50).sort((a, b) => a.avg - b.avg);
+    const cn = id => (A.cls(id) || {}).name || '';
+    const arrow = t => t > 4 ? `<span style="color:var(--ok)" title="تحسّن">▲ ${AR(t)}</span>` : t < -4 ? `<span style="color:var(--bad)" title="تراجع">▼ ${AR(-t)}</span>` : '<span class="faint">—</span>';
+    const cell = p => p == null ? '<td class="faint">—</td>' : `<td><span class="pill ${lv(p)[1]}">${AR(p)}٪</span></td>`;
+    let fc = A.LS.get('cu_c') || 'all'; if (fc !== 'all' && !clsL.some(x => x.c === fc)) fc = 'all';
+    const draw = () => {
+      const S2 = studs.filter(s => fc === 'all' || s.cls === fc).sort((a, b) => a.avg - b.avg);
+      box.innerHTML = `<div class="grid g4" style="margin-top:12px"><div class="kpi navy"><div class="k">اختبارات وأوراق محسوبة</div><div class="v">${AR(list.length)}</div><div class="d">${A.cnt(B.length, 'نتيجة', 'نتائج')}</div></div>
+        <div class="kpi"><div class="k">متوسط الطلاب</div><div class="v">${AR(Math.round(studs.reduce((x, s) => x + s.avg, 0) / studs.length))}<small>٪</small></div><div class="d">${A.cnt(studs.length, 'طالب', 'طلاب')}</div></div>
+        <div class="kpi"><div class="k">يحتاجون دعماً مستمراً</div><div class="v" style="color:var(--bad)">${AR(weak.length)}</div><div class="d">متوسطهم التراكمي أقل من ٥٠٪</div></div>
+        <div class="kpi"><div class="k">أضعف درس</div><div class="v" style="font-size:18px">${lesL[0] ? esc(lesson(lesL[0].k).lesson || 'بلا درس') : '—'}</div><div class="d">${lesL[0] ? AR(lesL[0].p) + '٪ إتقان' : ''}</div></div></div>
+        <div class="row" style="margin:12px 0;gap:8px"><button class="btn ghost sm" id="cuX">${I.down} Excel</button><button class="btn ghost sm" id="cuP">${I.print} طباعة التقرير</button></div>
+        <div class="grid g2" style="align-items:start"><div class="sec-box"><b>مقارنة الفصول</b><div class="scroll"><table class="tbl"><thead><tr><th>الفصل</th><th>الطلاب</th><th>المتوسط</th><th>يحتاجون دعماً</th></tr></thead><tbody>${clsL.map(x => `<tr><td><b>${esc(cn(x.c))}</b></td><td>${AR(x.n)}</td>${cell(x.avg)}<td>${AR(x.weak)}</td></tr>`).join('')}</tbody></table></div></div>
+          <div class="sec-box"><b>إتقان الدروس عبر كل الاختبارات (الأضعف أولاً)</b>${lesL.map(c => `<div style="margin-top:8px"><div class="row" style="justify-content:space-between"><span>${esc(lesson(c.k).lesson || 'بلا درس')}</span><b>${AR(c.p)}٪</b></div>${A.bar(c.p, 100)}</div>`).join('') || A.emptyBox('لا توجد بيانات')}</div></div>
+        <div class="row" style="margin:16px 0 8px;justify-content:space-between"><h3 style="margin:0">الطلاب عبر الاختبارات</h3><label class="small">الفصل <select class="in" id="cuC" style="max-width:200px"><option value="all">كل الفصول</option>${clsL.map(x => `<option value="${x.c}" ${fc === x.c ? 'selected' : ''}>${esc(cn(x.c))}</option>`).join('')}</select></label></div>
+        <div class="scroll"><table class="tbl"><thead><tr><th>الطالب</th><th>الفصل</th>${list.map((z, i) => `<th title="${esc(z.title)}">${AR(i + 1)}</th>`).join('')}<th>المتوسط</th><th>الاتجاه</th><th>المستوى</th></tr></thead>
+        <tbody>${S2.map(s => `<tr><td><b>${esc(s.name)}</b></td><td>${esc(cn(s.cls))}</td>${list.map(z => cell(s.by[z.id])).join('')}<td><b>${AR(s.avg)}٪</b></td><td>${arrow(s.tr)}</td><td><span class="pill ${lv(s.avg)[1]}">${lv(s.avg)[0]}</span></td></tr>`).join('')}</tbody></table></div>
+        <p class="small muted" style="margin-top:6px">الأرقام في رأس الجدول: ${list.map((z, i) => `${AR(i + 1)}) ${esc(z.title)}`).join(' · ')}. تُحسب أفضل محاولة للطالب في كل اختبار. الاتجاه = الفرق بين آخر اختبار وأول اختبار حلّه.</p>`;
+      $('#cuC', box).onchange = e => { fc = e.target.value; A.LS.set('cu_c', fc); draw(); };
+      $('#cuX', box).onclick = () => { const wb = XLSX.utils.book_new();
+        const s1 = XLSX.utils.json_to_sheet(S2.map(s => ({ الطالب: s.name, الفصل: cn(s.cls), ...Object.fromEntries(list.map((z, i) => [(i + 1) + ') ' + z.title.slice(0, 25), s.by[z.id] ?? ''])), 'المتوسط %': s.avg, الاتجاه: s.tr, المستوى: lv(s.avg)[0] })));
+        const s2 = XLSX.utils.json_to_sheet(lesL.map(c => ({ الدرس: lesson(c.k).lesson || 'بلا درس', 'الإتقان %': c.p })));
+        const s3 = XLSX.utils.json_to_sheet(clsL.map(x => ({ الفصل: cn(x.c), الطلاب: x.n, 'المتوسط %': x.avg, 'يحتاجون دعماً': x.weak })));
+        [s1, s2, s3].forEach(w => w['!views'] = [{ RTL: true }]);
+        XLSX.utils.book_append_sheet(wb, s1, 'الطلاب'); XLSX.utils.book_append_sheet(wb, s2, 'الدروس'); XLSX.utils.book_append_sheet(wb, s3, 'الفصول');
+        XLSX.writeFile(wb, `تقرير تراكمي - ${A.subjName(ctx.subj)} - ${gLabel(ctx.grade)}.xlsx`); };
+      $('#cuP', box).onclick = () => A.printDoc('التقرير التراكمي للتقويم', `${A.subjName(ctx.subj)} · ${gLabel(ctx.grade)} · ${list.length} اختبارات`,
+        `<h3>الفصول</h3><table><tr><th>الفصل</th><th>الطلاب</th><th>المتوسط</th><th>يحتاجون دعماً</th></tr>${clsL.map(x => `<tr><td>${esc(cn(x.c))}</td><td>${x.n}</td><td>${x.avg}٪</td><td>${x.weak}</td></tr>`).join('')}</table>
+         <h3>إتقان الدروس</h3><table><tr><th>الدرس</th><th>الإتقان</th></tr>${lesL.map(c => `<tr><td>${esc(lesson(c.k).lesson || 'بلا درس')}</td><td>${c.p}٪</td></tr>`).join('')}</table>
+         <h3>طلاب يحتاجون دعماً مستمراً</h3><table><tr><th>الطالب</th><th>الفصل</th><th>المتوسط</th><th>عدد الاختبارات</th></tr>${weak.map(s => `<tr><td>${esc(s.name)}</td><td>${esc(cn(s.cls))}</td><td>${s.avg}٪</td><td>${s.n}</td></tr>`).join('') || '<tr><td colspan="4">لا يوجد</td></tr>'}</table>`);
+    };
+    draw();
+  }
   async function tRes(box) {
     const list = (await api.list('quizzes', { school_id: sch(), subject_id: ctx.subj, grade_key: ctx.grade }, { order: 'created_at', desc: true })).filter(z => z.teacher_id === S.me.id || S.me.is_owner || A.hasModule('supervision'));
     let zid = A.LS.get('as_z'); if (!list.some(z => z.id === zid)) zid = (list[0] || {}).id;

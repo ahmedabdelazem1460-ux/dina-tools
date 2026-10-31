@@ -223,7 +223,7 @@
     const [e, n, x] = await Promise.all([api.entries(S.weekId), api.notes(S.weekId), api.extraPages(S.weekId).catch(() => [])]);
     S.entries = e; S.notes = n; S.extraPages = x;
     try { S.delegs = api.delegations ? await api.delegations(S.sectionId) : []; } catch (_) { S.delegs = []; }
-    if (window.APP_AFTER_WEEK) window.APP_AFTER_WEEK();
+    if (window.APP_AFTER_WEEK) { try { await window.APP_AFTER_WEEK(); } catch (_) {} }
   }
   async function refreshPeople() { const [st, me, su] = await Promise.all([api.reloadStaff(), api.reloadMemberships(), api.reloadSubjects()]); S.staff = st; S.memberships = me; S.subjects = su; }
 
@@ -240,7 +240,7 @@
     ['admin', 'الإدارة', () => S.me.is_owner || anyPerm('users', 'structure')],
     ['reports', 'التقارير', () => S.me.is_owner || anyPerm('review', 'export', 'users')],
     ['posts', 'إعلانات أولياء الأمور', () => S.me.is_owner || anyPerm('users', 'structure')],
-    ['assess', 'التقويم والاختبارات', () => S.me.is_owner || anyPerm('review') || (myMem() || {}).role === 'teacher' || S.entries.some(e => e.teacher_id === S.me.id)],
+    ['assess', 'التقويم والاختبارات', () => !!(APP.canAssess && APP.canAssess())],
     ['resources', 'المصادر', () => true],
     ['analysis', 'تحليل النتائج', () => !!(APP.hasModule && APP.hasModule('analysis'))],
     ['attendance', 'الحضور والسلوك', () => !!(APP.hasModule && (APP.hasModule('attendance') || APP.hasModule('counselor') || APP.hasModule('supervision')))],

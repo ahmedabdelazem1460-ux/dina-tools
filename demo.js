@@ -165,7 +165,7 @@
       upd: (t, id, p) => wait(upd(t, id, p)),
       del: (t, id) => wait(del(t, r => r.id === id)),
       async ups(t, rows, on) { D[t] = D[t] || []; const keys = on.split(','); return wait(rows.map(r => { const x = D[t].find(y => keys.every(k => y[k] === r[k])); if (x) { Object.assign(x, r); return clone(x); } return ins(t, { school_id: D.schools[0].id, by_staff: meId, ...r }); })); },
-      async rpc(n, a) { if (n === 'sup_acknowledge') { const r = find('sup_records', a.p_id); Object.assign(r, { status: 'acknowledged', ack_at: new Date().toISOString(), ack_name: a.p_name, ack_signature: a.p_signature, ack_note: a.p_note }); } return wait(null); },
+      async rpc(n, a) { if (n === 'week_quizzes') return wait(clone((D.quizzes || []).filter(z => z.week_id === a.p_week && z.status === 'published'))); if (n === 'sup_acknowledge') { const r = find('sup_records', a.p_id); Object.assign(r, { status: 'acknowledged', ack_at: new Date().toISOString(), ack_name: a.p_name, ack_signature: a.p_signature, ack_note: a.p_note }); } return wait(null); },
       resources: () => wait(clone(D.resources || (D.resources = []))),
       addResource: r => { D.resources = D.resources || []; return wait(ins('resources', { school_id: D.schools[0].id, created_by: meId, ...r })); },
       updateResource: (id, p) => wait(upd('resources', id, p)),

@@ -4,11 +4,11 @@
   const { api, S, $, $$, esc, AR, I } = A;
 
   // ---------- صلاحيات الأنظمة الخاصة (تحليل النتائج، سجلاتي…) ----------
-  const MODULES = [['analysis', 'تحليل النتائج والاختبارات التشخيصية', 'التحليل'], ['supervision', 'الإشراف التربوي', 'الإشراف'], ['attendance', 'الحضور والسلوك — مشرف دور', 'الحضور'], ['counselor', 'الإرشاد الطلابي — الإحالات', 'المرشد'], ['records', 'سجلاتي برو', 'سجلاتي']];
+  const MODULES = [['assess', 'التقويم والاختبارات (عند تفعيله «لمن أمنحه»)', 'التقويم'], ['analysis', 'تحليل النتائج والاختبارات التشخيصية', 'التحليل'], ['supervision', 'الإشراف التربوي', 'الإشراف'], ['attendance', 'الحضور والسلوك — مشرف دور', 'الحضور'], ['counselor', 'الإرشاد الطلابي — الإحالات', 'المرشد'], ['records', 'سجلاتي برو', 'سجلاتي']];
   A.hasModule = m => !!S.me && (S.me.is_owner || (S.grants || []).some(g => g.module === m && g.staff_id === S.me.id));
   async function loadGrants() { try { S.grants = await api.moduleGrants(); } catch (_) { S.grants = []; } }
   const prevAfter = window.APP_AFTER_WEEK;
-  window.APP_AFTER_WEEK = async function () { if (prevAfter) prevAfter.apply(this, arguments); if (S._grantsAt !== S.me.id) { S._grantsAt = S.me.id; await loadGrants(); A.renderNav && A.renderNav(); } };
+  window.APP_AFTER_WEEK = async function () { if (prevAfter) await prevAfter.apply(this, arguments); if (S._grantsAt !== S.me.id) { S._grantsAt = S.me.id; await loadGrants(); A.renderNav && A.renderNav(); } };
 
   // =====================================================================
   //  المصادر — روابط Drive وأوراق العمل وملفات المراجعة
@@ -120,6 +120,8 @@
     const secs = S.sections;
     let sel = new Set();
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>المسميات والصلاحيات</h2><p class="sub" style="margin:2px 0 0">مسمى وظيفي مخصص لكل موظف، وحزم صلاحيات جاهزة أو مخصصة تُمنح لعدة أشخاص دفعة واحدة. لا يتأثر أي إدخال للمعلمين.</p></div></div>
+      ${S.me.is_owner ? `<div class="sec-box" style="margin-bottom:14px"><b>إظهار بنود المنصة للمعلمين</b><p class="small muted" style="margin:2px 0 8px">الإخفاء يخفي البند من حسابات المعلمين فقط؛ كل ما أُدخل سابقاً يبقى محفوظاً، والروابط المنشورة للطلاب تبقى تعمل حتى تُغلقها.</p>
+        <div class="row" style="gap:8px"><span>التقويم والاختبارات:</span><div class="chip-filter" id="fAssess">${[['all', 'لكل المعلمين'], ['granted', 'لمن أمنحه فقط'], ['off', 'مخفي (للمالك فقط)']].map(([k, l]) => `<button data-v="${k}" class="${(((S.school.settings || {}).features || {}).assess || 'all') === k ? 'on' : ''}">${l}</button>`).join('')}</div></div></div>` : ''}
       <div class="sec-box" style="margin-bottom:14px"><div class="row" style="justify-content:space-between"><b>حزم الصلاحيات</b>${S.me.is_owner ? `<button class="btn ghost sm" id="psNew">${I.plus} حزمة مخصصة</button>` : ''}</div><div id="psL" style="margin-top:8px"></div></div>
       <div class="row" style="margin-bottom:10px;gap:8px"><input class="in" id="rq" placeholder="بحث بالاسم أو المسمى" style="max-width:260px"><span class="small muted" id="rsel"></span>
         <select class="in" id="rset" style="max-width:200px"><option value="">— حزمة للمحددين —</option></select>
@@ -156,6 +158,7 @@
       $$('[data-t]', root).forEach(i => i.onchange = () => A.run(null, async () => { const r = await api.updateStaff(i.dataset.t, { title: i.value.trim() || null }); const p = S.staff.find(x => x.id === i.dataset.t); if (p) p.title = r.title; A.toast('حُفظ المسمى', 'ok'); }));
       $$('[data-mg]', root).forEach(i => i.onchange = () => A.run(null, async () => { const [sid, mod] = i.dataset.mg.split('|'); if (i.checked) await api.grantModule(sid, mod); else await api.revokeModule(sid, mod); await loadGrants(); A.toast(i.checked ? 'مُنح النظام' : 'سُحب النظام', 'ok'); }));
     };
+    $$('#fAssess button', root).forEach(b => b.onclick = () => A.run(b, async () => { const settings = { ...(S.school.settings || {}) }; settings.features = { ...(settings.features || {}), assess: b.dataset.v }; const r = await api.updateSchool(S.school.id, { settings }); S.school.settings = r.settings || settings; $$('#fAssess button', root).forEach(x => x.classList.toggle('on', x === b)); A.renderNav && A.renderNav(); A.toast(b.dataset.v === 'all' ? 'التقويم والاختبارات ظاهر لكل المعلمين' : b.dataset.v === 'granted' ? 'يظهر لمن تمنحه فقط — استخدم عمود «التقويم» في الجدول' : 'أُخفي البند من حسابات المعلمين — البيانات محفوظة', 'ok'); }));
     $('#rq', root).oninput = draw;
     $('#rall', root).onchange = e => { people.forEach(p => e.target.checked ? sel.add(p.id) : sel.delete(p.id)); draw(); };
     $('#rgo', root).onclick = e => A.run(e.currentTarget, async () => {

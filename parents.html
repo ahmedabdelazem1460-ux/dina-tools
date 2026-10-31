@@ -80,7 +80,7 @@ footer{text-align:center;color:var(--faint);font-size:12px;padding:10px 16px 30p
 <header class="top"><div class="top-in"><img src="assets/logo_white.svg" alt="مدارس دينا العالمية"><h1>خطط أبنائي<small id="schName">مدارس دينا العالمية</small></h1></div></header>
 <main id="app"><div class="spin" role="status" aria-label="جارٍ التحميل"></div></main>
 <footer>مدارس دينا العالمية · Dinaaedu · 920035881</footer>
-<script src="config.js?v=1793129449"></script>
+<script src="config.js?v=1793416882"></script>
 <script>
 (function () {
   const C = window.APP_CONFIG, $ = s => document.querySelector(s), app = $('#app');
@@ -118,7 +118,7 @@ footer{text-align:center;color:var(--faint);font-size:12px;padding:10px 16px 30p
   }
   async function load(week) {
     app.innerHTML = kidsBar() + '<div class="spin" role="status" aria-label="جارٍ التحميل"></div>'; bindKids();
-    try { const [d, ps] = await Promise.all([rpc('parent_plan', { p_token: token, p_class: st.cur, p_week: week || null }), rpc('parent_posts_for', { p_token: token, p_class: st.cur }).catch(() => [])]); st.data = d; st.posts = ps || []; rpc('parent_resources', { p_token: token, p_class: st.cur }).then(r => { st.res = r || []; if (st.cur && !st.adding) render(); }).catch(() => { st.res = []; }); }
+    try { const [d, ps] = await Promise.all([rpc('parent_plan', { p_token: token, p_class: st.cur, p_week: week || null }), rpc('parent_posts_for', { p_token: token, p_class: st.cur }).catch(() => [])]); st.data = d; st.posts = ps || []; rpc('parent_resources', { p_token: token, p_class: st.cur }).then(r => { st.res = r || []; if (st.cur && !st.adding) render(); }).catch(() => { st.res = []; }); rpc('parent_quizzes', { p_token: token, p_class: st.cur, p_week: (d && d.week && d.week.id) || st.week || null }).then(r => { st.quz = r || []; if (st.cur && !st.adding) render(); }).catch(() => { st.quz = []; }); }
     catch (e) { app.innerHTML = kidsBar() + `<div class="card">${emptyBox('تعذّر تحميل الخطة', esc(e.message))}</div>`; bindKids(); return; }
     const w = st.data.week; st.week = w && w.id;
     if (w) { const t = Math.round((new Date(st.data.today + 'T00:00:00') - new Date(w.start + 'T00:00:00')) / 864e5); if (st.day == null || week) st.day = t >= 0 && t < st.data.class.days ? t : 0; }
@@ -187,7 +187,9 @@ footer{text-align:center;color:var(--faint);font-size:12px;padding:10px 16px 30p
     }
     const RK = { worksheet: 'ورقة عمل', review: 'ملف مراجعة', test: 'اختبار', presentation: 'عرض تقديمي', video: 'فيديو', folder: 'مجلد', link: 'رابط' };
     const resHtml = (st.res || []).length ? `<section class="card no-print" aria-label="مصادر للمراجعة"><h3 style="margin:0 0 8px">مصادر للمراجعة والتدريب <span class="small muted">(${AR(st.res.length)})</span></h3>${st.res.map(r => `<a class="resl" href="${esc(r.url)}" target="_blank" rel="noopener"><span class="rk">${esc(RK[r.kind] || 'رابط')}</span><span><b>${esc(r.title)}</b>${r.subject || r.note ? `<br><span class="small muted">${esc([r.subject, r.note].filter(Boolean).join(' · '))}</span>` : ''}</span></a>`).join('')}</section>` : '';
-    app.innerHTML = kidsBar() + postsHtml(st.posts) + `<div class="card" style="padding:12px 16px"><h2 style="margin:0">${esc(clsName(st.cur) || d.class.name)}</h2><span class="small muted">الخطة المعتمدة من المدرسة · تُحدَّث تلقائياً</span></div>` + body + resHtml;
+    const QK = { quiz: 'اختبار قصير', worksheet: 'ورقة عمل', homework: 'واجب إلكتروني', remedial: 'ورقة دعم' }, DN = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+    const quzHtml = (st.quz || []).length ? `<section class="card no-print" aria-label="الواجبات وأوراق العمل الإلكترونية"><h3 style="margin:0 0 8px">الواجبات وأوراق العمل الإلكترونية <span class="small muted">(${AR(st.quz.length)})</span></h3>${st.quz.map(z => `<a class="resl" href="student.html?q=${encodeURIComponent(z.code)}" target="_blank" rel="noopener"><span class="rk">${esc(QK[z.kind] || 'واجب')}</span><span><b>${esc(z.title)}</b><br><span class="small muted">${esc([z.subject, z.flex ? 'متاح طوال الفترة' : (z.day != null ? DN[z.day] : 'هذا الأسبوع')].filter(Boolean).join(' · '))}</span></span></a>`).join('')}</section>` : '';
+    app.innerHTML = kidsBar() + postsHtml(st.posts) + `<div class="card" style="padding:12px 16px"><h2 style="margin:0">${esc(clsName(st.cur) || d.class.name)}</h2><span class="small muted">الخطة المعتمدة من المدرسة · تُحدَّث تلقائياً</span></div>` + body + quzHtml + resHtml;
     bindKids(); bindPosts();
     app.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { st.view = b.dataset.v; LS.set('view', st.view); render(); });
     app.querySelectorAll('[data-d]').forEach(b => b.onclick = () => { st.day = +b.dataset.d; render(); });

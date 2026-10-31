@@ -208,7 +208,7 @@ body.band .foot{background:#082B5A;color:#fff;border-top:0;height:56px}
     });
     p.push('</table></div>');
     if (notes && notes.length) {
-      const items = notes.map(([a, b]) => '<li><span class="bl">●</span> ' + (a ? `<b>${ar(a)}:</b> ` : '') + `${ar(b)}</li>`).join('');
+      const items = notes.map(([a, b]) => '<li><span class="bl">●</span> ' + (a ? `<b>${ar(a)}:</b> ` : '') + `${withLinks(clean(b), x => esc(AR(x)))}</li>`).join('');
       p.push(`<div class="notes"><div class="nh">${icon('note', 20, NAVY)} ملاحظات اليوم</div><ul>${items}</ul></div>`);
     }
     p.push('</div>' + pageFooter(week, land) + '</div>');
@@ -275,7 +275,7 @@ body.band .foot{background:#082B5A;color:#fff;border-top:0;height:56px}
     return framePage(doc, land, x.title || 'صفحة', `<div class="xn"><div class="x">${arML(c.body)}</div></div>`);
   }
   function notesPage(doc, land) {
-    return framePage(doc, land, 'ملاحظات وتنبيهات', doc.extra.map(([a, b]) => '<div class="xn">' + (a ? `<div class="t">${ar(a)}</div>` : '') + `<div class="x">${arML(b)}</div></div>`).join(''));
+    return framePage(doc, land, 'ملاحظات وتنبيهات', doc.extra.map(([a, b]) => '<div class="xn">' + (a ? `<div class="t">${ar(a)}</div>` : '') + `<div class="x">${cleanML(b).split('\n').map(l => withLinks(l, x => esc(AR(x)))).join('<br>')}</div></div>`).join(''));
   }
 
   const TRIES = [[88, 15], [78, 14], [70, 13.5], [62, 13], [56, 12], [50, 11.5], [46, 11]];

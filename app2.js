@@ -30,6 +30,10 @@
   function buildDoc(c) {
     const w = A.week(), sec = A.section();
     const days = [], dayNotes = [], extra = [];
+    // الواجبات وأوراق العمل الإلكترونية المرتبطة بهذا الأسبوع وهذا الفصل
+    const QK = { quiz: 'اختبار قصير', worksheet: 'ورقة عمل', homework: 'واجب إلكتروني', remedial: 'ورقة دعم' };
+    const qURL = code => location.href.split('#')[0].replace(/[^/]*$/, '') + 'student.html?q=' + code;
+    const wq = (S.weekQuizzes || []).filter(z => (z.class_ids || []).includes(c.id));
     for (let d = 0; d < sec.days; d++) {
       const hol = A.holidayOf(d);
       const rows = [];
@@ -42,9 +46,12 @@
       const dn = [];
       if (!hol) S.entries.filter(x => x.class_id === c.id && x.day === d && (x.note || '').trim()).sort((a, b) => a.period - b.period).forEach(x => dn.push([A.subjName(x.subject_id), x.note]));
       S.notes.filter(n => n.placement === 'day' && n.day === d && (n.class_id === c.id || n.class_id === null)).forEach(n => dn.push([n.title, n.body]));
+      if (!hol) wq.filter(z => z.day === d).forEach(z => dn.push([`${QK[z.kind] || 'واجب إلكتروني'} — ${A.subjName(z.subject_id)}`, `${z.title}: ${qURL(z.code)}`]));
       dayNotes.push(dn);
     }
     S.notes.filter(n => n.placement === 'extra' && (n.class_id === c.id || n.class_id === null)).forEach(n => extra.push([n.title, n.body]));
+    const flex = wq.filter(z => z.day == null);
+    if (flex.length) extra.push(['الواجبات وأوراق العمل الإلكترونية هذا الأسبوع', flex.map(z => `${A.subjName(z.subject_id)} — ${QK[z.kind] || ''}: ${z.title}\n${qURL(z.code)}`).join('\n')]);
     const term = S.school.term_label || '';
     return {
       info: { name: c.name, stage: c.stage, grade_word: c.grade_word, class_label: c.class_label },

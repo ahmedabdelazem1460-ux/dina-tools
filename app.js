@@ -216,7 +216,7 @@
   async function loadSection(keepWeek) {
     const [c, w] = await Promise.all([api.classes(S.sectionId), api.weeks(S.sectionId)]);
     S.allClasses = c; S.weeks = w;
-    const order = ['KG', 'ابتدائي', 'Grade', 'متوسط', 'ثانوي'];
+    const order = ['KG', 'رياض الأطفال', 'ابتدائي', 'الابتدائية', 'Grade', 'متوسط', 'المتوسطة', 'ثانوي', 'الثانوية'];
     S.stages = [...new Set(c.map(stageOf))].sort((a, b) => (order.indexOf(a) + 1 || 9) - (order.indexOf(b) + 1 || 9));
     S.stage = LS.get('stage_' + S.sectionId) || 'all'; if (S.stage !== 'all' && !S.stages.includes(S.stage)) S.stage = 'all';
     S.classes = S.stage === 'all' ? c : c.filter(x => stageOf(x) === S.stage);

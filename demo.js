@@ -161,7 +161,7 @@
       },
       async resetPassword() { return wait(true); },
       async list(t, eq = {}, o = {}) { let l = (D[t] = D[t] || []).filter(r => Object.entries(eq).every(([k, v]) => Array.isArray(v) ? v.includes(r[k]) : (r[k] ?? null) === v) && Object.entries(o.gte || {}).every(([k, v]) => r[k] >= v) && Object.entries(o.lte || {}).every(([k, v]) => r[k] <= v)); if (o.order) l = l.slice().sort((a, b) => String(a[o.order]).localeCompare(String(b[o.order])) * (o.desc ? -1 : 1)); return wait(clone(l)); },
-      async ins(t, r) { D[t] = D[t] || []; return wait((Array.isArray(r) ? r : [r]).map(x => ins(t, { school_id: D.schools[0].id, by_staff: meId, created_by: meId, ...x }))); },
+      async ins(t, r) { D[t] = D[t] || []; const extra = t === 'quizzes' ? () => ({ code: Math.random().toString(16).slice(2, 14), status: 'draft' }) : t === 'remedial_plans' ? () => ({ token: Math.random().toString(16).slice(2, 18), support_quiz_ids: [], resource_links: [], progress: 0, status: 'active', gaps: [] }) : t === 'questions' ? () => ({ options: [], shared: true }) : () => ({}); return wait((Array.isArray(r) ? r : [r]).map(x => ins(t, { school_id: D.schools[0].id, by_staff: meId, created_by: meId, ...extra(), ...x }))); },
       upd: (t, id, p) => wait(upd(t, id, p)),
       del: (t, id) => wait(del(t, r => r.id === id)),
       async ups(t, rows, on) { D[t] = D[t] || []; const keys = on.split(','); return wait(rows.map(r => { const x = D[t].find(y => keys.every(k => y[k] === r[k])); if (x) { Object.assign(x, r); return clone(x); } return ins(t, { school_id: D.schools[0].id, by_staff: meId, ...r }); })); },

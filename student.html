@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>بوابة الطالب — مدارس دينا العالمية</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+<style>
+@font-face{font-family:'GE SS Two';font-weight:400 500;src:url(fonts/gess-two-medium.woff2) format('woff2');font-display:swap}
+@font-face{font-family:'GE SS Two';font-weight:600 900;src:url(fonts/gess-two-bold.woff2) format('woff2');font-display:swap}
+@font-face{font-family:'Myriad Pro';font-weight:400;src:url(fonts/myriad-pro-regular.woff2) format('woff2');font-display:swap}
+:root{--navy:#082B5A;--blue:#005499;--sky:#3AB1DB;--pale:#E4EBF5;--line:#C9D7EC;--ok:#17814a;--okbg:#e3f5ea;--bad:#c62d22;--badbg:#fde8e6;--warn:#a85d00;--warnbg:#fff1d6;--muted:#566384}
+*{box-sizing:border-box}html,body{margin:0}
+body{font-family:'GE SS Two','Myriad Pro',Tahoma,sans-serif;color:var(--navy);background:linear-gradient(180deg,#f2f6fc,#e6edf8);min-height:100vh;font-size:16px;line-height:1.7}
+header{background:var(--navy);color:#fff;padding:14px 16px;border-bottom:4px solid var(--sky);display:flex;align-items:center;gap:12px}
+header img{height:42px}header .t{font-weight:800;font-size:18px}header .s{font-size:13px;color:#BFD7EE}
+main{max-width:760px;margin:0 auto;padding:16px}
+.card{background:#fff;border:1px solid #dbe5f3;border-radius:20px;padding:18px;box-shadow:0 2px 3px rgba(8,43,90,.08),0 12px 26px -10px rgba(8,43,90,.25);margin-bottom:14px}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:18px;margin:0 0 8px}.muted{color:var(--muted)}.small{font-size:13.5px}
+label{display:block;font-weight:700;font-size:14px;margin:10px 0 4px}
+input,select,textarea{width:100%;font:inherit;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;background:#f7f9fd;color:var(--navy)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--sky);box-shadow:0 0 0 3px rgba(58,177,219,.3)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font:inherit;font-weight:800;border:0;border-radius:14px;padding:12px 20px;background:linear-gradient(180deg,#0a72c4,#005499);color:#fff;cursor:pointer;box-shadow:0 6px 0 -1px #022a56,0 10px 16px -6px rgba(0,84,153,.5);min-height:48px}
+.btn:active{transform:translateY(2px)}.btn.ghost{background:#fff;color:var(--blue);border:1.5px solid var(--line);box-shadow:none}.btn:disabled{opacity:.6}
+.q{border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px;background:#fff}
+.q .n{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:9px;background:var(--navy);color:#fff;font-weight:800;margin-inline-end:6px}
+.q .pts{font-size:12px;color:var(--blue)}.q img{max-width:100%;max-height:260px;border-radius:12px;margin:8px 0}
+.opt{display:flex;align-items:center;gap:10px;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px;cursor:pointer;background:#f7f9fd;font-weight:700}
+.opt input{width:22px;height:22px;accent-color:var(--blue);flex:none}.opt.on{border-color:var(--blue);background:#eaf3fc}
+.opt.right{border-color:var(--ok);background:var(--okbg)}.opt.wrong{border-color:var(--bad);background:var(--badbg)}
+.bar{height:10px;background:var(--pale);border-radius:99px;overflow:hidden}.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--sky),var(--blue))}
+.top{position:sticky;top:0;z-index:5;background:rgba(242,246,252,.95);backdrop-filter:blur(6px);padding:10px 0;display:flex;gap:10px;align-items:center}
+.timer{font-weight:800;background:var(--navy);color:#fff;border-radius:10px;padding:4px 10px;font-variant-numeric:tabular-nums}
+.res{text-align:center}.res .big{font-size:52px;font-weight:800;line-height:1.1}
+.tag{display:inline-block;border-radius:99px;padding:2px 10px;font-weight:800;font-size:13px}.tag.ok{background:var(--okbg);color:var(--ok)}.tag.bad{background:var(--badbg);color:var(--bad)}.tag.warn{background:var(--warnbg);color:var(--warn)}
+.exp{font-size:14px;background:var(--pale);border-radius:10px;padding:8px 10px;margin-top:8px}
+.gap{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px dashed var(--line)}
+a{color:var(--blue)}
+footer{text-align:center;color:var(--muted);font-size:12px;padding:20px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header><img src="assets/logo_white.svg" alt="مدارس دينا العالمية"><div><div class="t" id="ht">بوابة الطالب</div><div class="s" id="hs">مدارس دينا العالمية</div></div></header>
+<main id="m"><div class="card">جارٍ التحميل…</div></main>
+<footer>مدارس دينا العالمية · Dinaaedu · 920035881</footer>
+<script src="config.js?v=1793416011"></script>
+<script>
+(function () {
+  const C = window.APP_CONFIG, m = document.getElementById('m');
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const AR = s => String(s).replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+  const LV = { remember: 'تذكر', understand: 'فهم', apply: 'تطبيق', higher: 'مستويات عليا' };
+  async function rpc(fn, body) { const r = await fetch(`${C.supabaseUrl}/rest/v1/rpc/${fn}`, { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); const j = await r.json(); if (!r.ok) throw new Error(j.message || 'تعذّر الاتصال'); return j; }
+  const P = new URLSearchParams(location.search), code = P.get('q'), tok = P.get('r');
+  const LS = { get: k => { try { return localStorage.getItem(k); } catch (_) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (_) { } } };
+
+  async function quiz() {
+    let Q; try { Q = await rpc('quiz_public', { p_code: code }); } catch (e) { m.innerHTML = `<div class="card">${esc(e.message)}</div>`; return; }
+    if (Q.error) { m.innerHTML = `<div class="card"><h2>${esc(Q.error)}</h2><p class="muted">تأكد من الرابط الذي أرسله معلمك.</p></div>`; return; }
+    document.getElementById('ht').textContent = Q.title; document.getElementById('hs').textContent = [Q.subject, Q.teacher, Q.school].filter(Boolean).join(' · ');
+    if (Q.state !== 'open') { m.innerHTML = `<div class="card"><h2>${Q.state === 'closed' ? 'انتهى وقت هذا الاختبار' : 'لم يبدأ الاختبار بعد'}</h2></div>`; return; }
+    const st = Q.settings || {}; const saved = JSON.parse(LS.get('dina_stu') || '{}');
+    m.innerHTML = `<div class="card"><h1>${esc(Q.title)}</h1><p class="muted small">${AR(Q.questions.length)} سؤالاً${st.time ? ` · الوقت ${AR(st.time)} دقيقة` : ''}${st.attempts ? ` · ${st.attempts == 1 ? 'محاولة واحدة' : AR(st.attempts) + ' محاولات'}` : ''}</p>
+      <label for="nm">اسمك الكامل</label><input id="nm" autocomplete="name" value="${esc(saved.name || '')}" placeholder="الاسم الثلاثي">
+      <label for="cl">الفصل</label><select id="cl">${Q.classes.map(c => `<option value="${c.id}" ${saved.cls === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
+      <label for="no">رقم الطالب (اختياري)</label><input id="no" inputmode="numeric" value="${esc(saved.no || '')}">
+      <div style="margin-top:14px"><button class="btn" id="go">ابدأ</button></div><p class="small muted" id="er" role="alert"></p></div>`;
+    document.getElementById('go').onclick = () => { const name = document.getElementById('nm').value.trim().replace(/\s+/g, ' '); if (name.split(' ').length < 2) { document.getElementById('er').textContent = 'اكتب اسمك الكامل (الاسم الأول واسم العائلة على الأقل)'; return; } const who = { name, cls: document.getElementById('cl').value, no: document.getElementById('no').value.trim() }; LS.set('dina_stu', JSON.stringify(who)); take(Q, who); };
+  }
+  function take(Q, who) {
+    const st = Q.settings || {}; let qs = Q.questions.slice(); if (st.shuffle) qs.sort(() => Math.random() - .5);
+    const ans = {}; const key = 'dina_q_' + code; try { Object.assign(ans, JSON.parse(LS.get(key) || '{}')); } catch (_) { }
+    m.innerHTML = `<div class="top"><div class="bar" style="flex:1"><i id="pb" style="width:0"></i></div><span class="small" id="pc"></span>${st.time ? '<span class="timer" id="tm"></span>' : ''}</div>` +
+      qs.map((q, i) => `<div class="q" data-q="${q.id}"><div><span class="n">${AR(i + 1)}</span><b>${esc(q.body)}</b> <span class="pts">(${AR(q.points)} درجة)</span></div>${q.image ? `<img src="${esc(q.image)}" alt="">` : ''}
+        ${q.type === 'mcq' ? q.options.map((o, k) => `<label class="opt"><input type="radio" name="q${q.id}" value="${k}" ${ans[q.id] == k ? 'checked' : ''}> ${esc(o)}</label>`).join('')
+        : q.type === 'tf' ? ['صواب', 'خطأ'].map(o => `<label class="opt"><input type="radio" name="q${q.id}" value="${o}" ${ans[q.id] === o ? 'checked' : ''}> ${o}</label>`).join('')
+        : q.type === 'short' ? `<input data-t="${q.id}" value="${esc(ans[q.id] || '')}" placeholder="إجابتك" style="margin-top:8px">` : `<textarea data-t="${q.id}" rows="4" placeholder="اكتب إجابتك" style="margin-top:8px">${esc(ans[q.id] || '')}</textarea>`}</div>`).join('') +
+      `<div class="card" style="text-align:center"><button class="btn" id="sub">تسليم الإجابات</button><p class="small muted" id="er" role="alert"></p></div>`;
+    const prog = () => { const n = qs.filter(q => ans[q.id] !== undefined && ans[q.id] !== '').length; document.getElementById('pb').style.width = (n / qs.length * 100) + '%'; document.getElementById('pc').textContent = `${AR(n)} / ${AR(qs.length)}`; LS.set(key, JSON.stringify(ans)); };
+    m.querySelectorAll('input[type=radio]').forEach(r => r.onchange = () => { ans[r.name.slice(1)] = r.value; r.closest('.q').querySelectorAll('.opt').forEach(o => o.classList.toggle('on', o.contains(r))); prog(); });
+    m.querySelectorAll('[data-t]').forEach(t => t.oninput = () => { ans[t.dataset.t] = t.value; prog(); });
+    m.querySelectorAll('input[type=radio]:checked').forEach(r => r.closest('.opt').classList.add('on')); prog();
+    let timer;
+    const submit = async (auto) => {
+      const left = qs.filter(q => ans[q.id] === undefined || ans[q.id] === '').length;
+      if (!auto && left && !confirm(`لم تُجب عن ${left} سؤال. هل تسلّم الآن؟`)) return;
+      const b = document.getElementById('sub'); b.disabled = true; b.textContent = 'جارٍ التسليم…'; clearInterval(timer);
+      try { const r = await rpc('quiz_submit', { p_code: code, p_name: who.name, p_class: who.cls, p_no: who.no, p_answers: ans }); LS.set(key, '{}'); result(Q, qs, ans, r); }
+      catch (e) { b.disabled = false; b.textContent = 'تسليم الإجابات'; document.getElementById('er').textContent = e.message; }
+    };
+    document.getElementById('sub').onclick = () => submit(false);
+    if (st.time) { const end = Date.now() + st.time * 60000; const tick = () => { const s = Math.max(0, Math.round((end - Date.now()) / 1000)); document.getElementById('tm').textContent = AR(`${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`); if (!s) submit(true); }; tick(); timer = setInterval(tick, 1000); }
+  }
+  function result(Q, qs, ans, r) {
+    const p = r.max ? Math.round(r.score / r.max * 100) : 0; const [l, c] = p >= 80 ? ['ممتاز — متمكن', 'ok'] : p >= 50 ? ['جيد — واصل التدريب', 'warn'] : ['تحتاج إلى مراجعة', 'bad'];
+    const R = Object.fromEntries((r.review || []).map(x => [x.id, x]));
+    m.innerHTML = `<div class="card res"><p class="muted">تم تسليم إجاباتك يا ${esc(JSON.parse(LS.get('dina_stu') || '{}').name || '')}</p><div class="big">${AR(r.score)} / ${AR(r.max)}</div><p><span class="tag ${c}">${l}</span> ${AR(p)}٪</p>${r.pending ? '<p class="small muted">الأسئلة المقالية سيصححها معلمك.</p>' : ''}${r.left > 0 ? `<p class="small muted">بقي لك ${AR(r.left)} محاولة</p>` : ''}</div>` +
+      (r.review ? qs.map((q, i) => { const x = R[q.id] || {}; const mine = ans[q.id];
+        const body = q.type === 'mcq' ? q.options.map((o, k) => `<div class="opt ${String(k) === String(x.answer) ? 'right' : String(k) === String(mine) ? 'wrong' : ''}">${esc(o)}${String(k) === String(x.answer) ? ' ✓' : ''}</div>`).join('') : `<div class="small">إجابتك: <b>${esc(mine || '—')}</b>${q.type !== 'essay' ? ` · الصحيح: <b>${esc(String(x.answer || '').split('|')[0])}</b>` : ''}</div>`;
+        return `<div class="q"><div><span class="n">${AR(i + 1)}</span><b>${esc(q.body)}</b> ${x.ok === true ? '<span class="tag ok">صحيح</span>' : x.ok === false ? '<span class="tag bad">خطأ</span>' : '<span class="tag warn">يُصحَّح يدوياً</span>'}</div>${body}${x.explanation ? `<div class="exp">${esc(x.explanation)}</div>` : ''}</div>`; }).join('') : '');
+    window.scrollTo(0, 0);
+  }
+  async function plan() {
+    let R; try { R = await rpc('remedial_public', { p_token: tok }); } catch (e) { m.innerHTML = `<div class="card">${esc(e.message)}</div>`; return; }
+    if (!R) { m.innerHTML = '<div class="card"><h2>الرابط غير صالح</h2></div>'; return; }
+    document.getElementById('ht').textContent = R.kind === 'enrichment' ? 'خطتي الإثرائية' : 'خطتي العلاجية'; document.getElementById('hs').textContent = [R.teacher, R.school].filter(Boolean).join(' · ');
+    m.innerHTML = `<div class="card"><h1>${esc(R.student)}</h1><p class="muted">${R.kind === 'enrichment' ? 'أحسنت! هذه أنشطة تزيد تميّزك.' : 'هذه المهارات تحتاج تدريباً إضافياً — اتبع الخطوات بالترتيب.'}</p><div class="bar"><i style="width:${R.progress}%"></i></div><p class="small">التقدم ${AR(R.progress)}٪${R.status === 'done' ? ' · <span class="tag ok">اكتملت</span>' : ''}</p></div>
+      ${R.gaps && R.gaps.length ? `<div class="card"><h2>المهارات المطلوب تحسينها</h2>${R.gaps.map(g => `<div class="gap"><span>${esc(g.lesson)} — ${LV[g.level] || ''}</span><span class="tag ${g.p >= 60 ? 'warn' : 'bad'}">${AR(g.p)}٪</span></div>`).join('')}</div>` : ''}
+      ${R.actions ? `<div class="card"><h2>الخطوات</h2><p style="white-space:pre-line;margin:0">${esc(R.actions)}</p></div>` : ''}
+      ${(R.resources || []).length ? `<div class="card"><h2>شرح ومصادر</h2>${R.resources.map(x => `<p style="margin:6px 0"><a href="${esc(x.u)}" target="_blank" rel="noopener">${esc(x.t || x.u)}</a></p>`).join('')}</div>` : ''}
+      ${(R.quizzes || []).length ? `<div class="card"><h2>أوراق الدعم والتحقق</h2>${R.quizzes.map(z => `<p style="margin:8px 0"><a class="btn ghost" href="student.html?q=${encodeURIComponent(z.code)}">${esc(z.title)}</a></p>`).join('')}</div>` : ''}`;
+  }
+  if (code) quiz(); else if (tok) plan(); else m.innerHTML = '<div class="card"><h2>بوابة الطالب</h2><p class="muted">افتح الرابط الذي أرسله معلمك.</p></div>';
+})();
+</script>
+</body>
+</html>

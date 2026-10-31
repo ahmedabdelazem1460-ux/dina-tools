@@ -11,20 +11,35 @@
   const LABELS = { ar: { mcq: ['أ', 'ب', 'ج', 'د', 'هـ'], tf: ['ص', 'خ'], match: ['أ', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح', 'ط', 'ي', 'ك', 'ل', 'م', 'ن'] },
     en: { mcq: ['A', 'B', 'C', 'D', 'E'], tf: ['T', 'F'], match: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'] } };
   // spec: { lang, parts:[{type, count, options}] } ← قائمة الأسئلة [{n, lab, type, part}]
-  function expand(spec) { const lang = spec.lang === 'en' ? 'en' : 'ar', qs = []; (spec.parts || []).forEach((p, pi) => { const t = p.type || 'mcq', n = t === 'tf' ? 2 : Math.max(2, Math.min(t === 'match' ? 14 : 5, +p.options || 4)); for (let i = 0; i < (+p.count || 0); i++) qs.push({ n, lab: LABELS[lang][t].slice(0, n), type: t, part: pi }); }); return { lang, dir: lang === 'en' ? 'ltr' : 'rtl', qs }; }
+  // المقالي: صف درجات يظلله المعلم وحده (٠ … الدرجة القصوى، وأنصاف اختيارية)
+  const essayVals = p => { const half = !!p.half, mx = Math.max(1, Math.min(half ? 6.5 : 13, +p.max || 5)), v = []; for (let x = 0; x <= mx + 1e-9; x += half ? 0.5 : 1) v.push(+x.toFixed(1)); return v; };
+  const fmtV = (x, lang) => { const w = Math.floor(x), h = x - w > 0; const d = lang === 'en' ? String(w) : String(w).replace(/\d/g, c => '٠١٢٣٤٥٦٧٨٩'[c]); return h ? (w ? d : '') + '½' : d; };
+  function expand(spec) { const lang = spec.lang === 'en' ? 'en' : 'ar', qs = []; (spec.parts || []).forEach((p, pi) => { const t = p.type || 'mcq';
+      if (t === 'essay') { const vals = essayVals(p); for (let i = 0; i < (+p.count || 0); i++) qs.push({ n: vals.length, lab: vals.map(x => fmtV(x, lang)), vals, type: t, part: pi, teacher: true, max: vals[vals.length - 1] }); return; }
+      const n = t === 'tf' ? 2 : Math.max(2, Math.min(t === 'match' ? 14 : 5, +p.options || 4)); for (let i = 0; i < (+p.count || 0); i++) qs.push({ n, lab: LABELS[lang][t].slice(0, n), type: t, part: pi }); });
+    return { lang, dir: lang === 'en' ? 'ltr' : 'rtl', qs }; }
   const norm = (a, b) => typeof a === 'number' ? { dir: 'rtl', qs: Array.from({ length: a }, () => ({ n: b, lab: LET.slice(0, b) })) } : (a.qs ? a : expand(a));
-  const AV = 186, MAXR = 26;
+  const AV = 186, Y0 = 73, YMAX = 276, HEAD = 5.2, GAP = 2.6;
+  // كل قسم (نوع أسئلة) في كتلة مستقلة بعنوانه وترقيمه الخاص، والكتل متتالية من أعلى إلى أسفل
   function layout(a, b) {
-    const sp = norm(a, b), qs = sp.qs, nq = qs.length, rtl = sp.dir !== 'ltr', maxO = Math.max(2, ...qs.map(q => q.n));
-    let dx = OPT_DX; const cw = () => NUM_W + maxO * dx + 4;
-    let cols = Math.max(1, Math.ceil(nq / PER_COL));
-    while (cols * cw() > AV && dx > 5.3) dx = +(dx - 0.1).toFixed(2);
-    if (cols * cw() > AV) cols = Math.max(1, Math.floor(AV / cw()));
-    const per = Math.ceil(nq / cols), colW = cw(), total = cols * colW, x0 = (W - total) / 2;
-    const cr = q => [Math.floor(q / per), q % per];
-    const pos = (q, o) => { const [c, r] = cr(q), y = TOP + r * ROW_H + ROW_H / 2; return rtl ? [W - x0 - c * colW - NUM_W - (o + 0.5) * dx, y] : [x0 + c * colW + NUM_W + (o + 0.5) * dx, y]; };
-    const num = q => { const [c, r] = cr(q), y = TOP + r * ROW_H + ROW_H / 2; return [rtl ? W - x0 - c * colW - NUM_W / 2 : x0 + c * colW + NUM_W / 2, y]; };
-    return { cols, per, colW, dx, x0, pos, num, qs, rtl, overflow: per > MAXR || total > AV + 0.5 };
+    const sp = norm(a, b), qs = sp.qs, rtl = sp.dir !== 'ltr';
+    const groups = []; qs.forEach((Q, q) => { const pi = Q.part || 0, g = groups[groups.length - 1]; if (g && g.part === pi) g.qs.push(q); else groups.push({ part: pi, qs: [q] }); });
+    const P = [], N = [], local = [], heads = []; let y = Y0, overflow = false;
+    groups.forEach((g, gi) => {
+      const n = g.qs.length, maxO = Math.max(2, ...g.qs.map(q => qs[q].n)); let dx = OPT_DX; const cw = () => NUM_W + maxO * dx + 4;
+      while (cw() > AV && dx > 5.3) dx = +(dx - 0.1).toFixed(2);
+      let C = Math.max(1, Math.min(n, Math.floor(AV / cw()))); const rows = Math.ceil(n / C); C = Math.ceil(n / rows);
+      const colW = cw(), tw = C * colW, x0 = (W - tw) / 2;
+      heads.push({ y, x0, w: tw, part: g.part, idx: gi, from: g.qs[0], n, type: qs[g.qs[0]].type, teacher: !!qs[g.qs[0]].teacher });
+      y += HEAD;
+      g.qs.forEach((q, i) => { const c = Math.floor(i / rows), r = i % rows, cy = y + r * ROW_H + ROW_H / 2; local[q] = i + 1;
+        N[q] = [rtl ? W - x0 - c * colW - NUM_W / 2 : x0 + c * colW + NUM_W / 2, cy];
+        P[q] = Array.from({ length: qs[q].n }, (_, o) => [rtl ? W - x0 - c * colW - NUM_W - (o + 0.5) * dx : x0 + c * colW + NUM_W + (o + 0.5) * dx, cy]); });
+      heads[heads.length - 1].h = HEAD + rows * ROW_H + 0.6;
+      y += rows * ROW_H + GAP;
+    });
+    if (y - GAP > YMAX) overflow = true;
+    return { pos: (q, o) => P[q][o], num: q => N[q], local, heads, qs, rtl, overflow, groups: groups.length };
   }
   const capacity = spec => !layout(spec).overflow;
   const idPos = b => [ID_X0 + b * ID_STEP + ID_S / 2, ID_Y + ID_S / 2];
@@ -34,7 +49,7 @@
   // صفحة ورقة واحدة (HTML بإحداثيات مطلقة بالمليمتر)
   function sheetHTML(o) {
     const sp = o.spec ? norm(o.spec) : norm(o.nq, o.no), L = layout(sp), bits = encode(o.idx || 0, o.model || 0), en = sp.dir === 'ltr';
-    const T = en ? { name: 'Name', cls: 'Class', model: 'Model', ins: 'Fill one bubble per question completely with a dark pen or pencil. Do not write in the boxes above.' } : { name: 'الاسم', cls: 'الفصل', model: 'نموذج', ins: 'ظلّل دائرة واحدة لكل سؤال تظليلاً كاملاً بقلم رصاص أو أزرق داكن. لا تكتب في المربعات أعلاه.' };
+    const T = en ? { name: 'Name', cls: 'Class', model: 'Model', ins: 'Fill one bubble per question completely with a dark pen or pencil. Do not write in the boxes above.' + (sp.qs.some(q => q.teacher) ? ' Grey rows are for the teacher only (essay marks).' : '') } : { name: 'الاسم', cls: 'الفصل', model: 'نموذج', ins: 'ظلّل دائرة واحدة لكل سؤال تظليلاً كاملاً بقلم رصاص أو أزرق داكن. لا تكتب في المربعات أعلاه.' + (sp.qs.some(q => q.teacher) ? ' الصفوف الرمادية خاصة بالمعلم لرصد درجات الأسئلة المقالية — لا يظللها الطالب.' : '') };
     const mm = v => v.toFixed(2) + 'mm', dir = en ? 'ltr' : 'rtl';
     let h = `<div class="omr-page" dir="${dir}" style="${en ? "font-family:'Myriad Pro',Arial,'GE SS Two',sans-serif" : ''}">`;
     MARKS.forEach(([x, y]) => { h += `<div style="position:absolute;left:${mm(x)};top:${mm(y)};width:${mm(MK)};height:${mm(MK)};background:#000"></div>`; });
@@ -42,9 +57,15 @@
     h += `<div style="position:absolute;right:22mm;left:22mm;top:31mm;display:flex;gap:6mm;direction:${dir};font-size:11pt"><div style="flex:2;border:0.4mm solid #082B5A;border-radius:2mm;padding:1.5mm 3mm">${T.name}: <b>${o.name || ''}</b></div><div style="flex:1;border:0.4mm solid #082B5A;border-radius:2mm;padding:1.5mm 3mm">${T.cls}: <b>${o.cls || ''}</b></div><div style="width:24mm;border:0.4mm solid #082B5A;border-radius:2mm;padding:1.5mm 3mm;text-align:center">${T.model} <b>${o.modelName || 'A'}</b></div></div>`;
     bits.forEach((b, i) => { const [x, y] = [ID_X0 + i * ID_STEP, ID_Y]; h += `<div style="position:absolute;left:${mm(x)};top:${mm(y)};width:${mm(ID_S)};height:${mm(ID_S)};box-sizing:border-box;border:0.3mm solid #000;${b ? 'background:#000' : ''}"></div>`; });
     h += `<div style="position:absolute;right:22mm;left:22mm;top:${mm(ID_Y + 7.2)};font-size:8pt;color:#555;direction:${dir};line-height:1.45;text-align:${en ? 'left' : 'right'}">${T.ins}${o.legend ? `<br><b style="color:#082B5A">${o.legend}</b>` : ''}</div>`;
+    const ORD = ['الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر'];
+    const TN = en ? { mcq: 'Multiple choice — shade the correct letter', tf: 'True / False — T = True, F = False', match: 'Matching — shade the letter of the matching item', essay: 'Essay — TEACHER ONLY: shade the mark awarded' } : { mcq: 'اختيار من متعدد — ظلّل حرف الإجابة الصحيحة', tf: 'صح وخطأ — ص = صح، خ = خطأ', match: 'مزاوجة — ظلّل حرف العبارة المناسبة', essay: 'مقالي — خاص بالمعلم: يظلل الدرجة المستحقة' };
+    if (L.groups > 1 || L.heads.some(x => x.teacher)) L.heads.forEach(hd => { h += `<div style="position:absolute;left:${mm(hd.x0 - 2.5)};top:${mm(hd.y - 0.8)};width:${mm(hd.w + 5)};height:${mm(hd.h + 1)};box-sizing:border-box;border:0.3mm solid ${hd.teacher ? '#8a97a8' : '#b9c9de'};${hd.teacher ? 'border-style:dashed;' : ''}border-radius:2mm;background:${hd.teacher ? '#f6f7f9' : '#fbfdff'}"></div>`; h += `<div style="position:absolute;left:${mm(hd.x0)};top:${mm(hd.y)};width:${mm(hd.w)};height:4.4mm;box-sizing:border-box;border-bottom:0.35mm solid ${hd.teacher ? '#8a97a8' : '#005499'};direction:${dir};text-align:${en ? 'left' : 'right'};font-size:8pt;font-weight:800;color:${hd.teacher ? '#5b6b82' : '#082B5A'};line-height:4mm;white-space:nowrap;overflow:hidden">${en ? 'Question ' + (hd.idx + 1) : 'السؤال ' + (ORD[hd.idx] || hd.idx + 1)}: <span style="font-weight:600">${TN[hd.type || 'mcq']}</span> <span style="color:#6b7aa3;font-weight:600">(${hd.n})</span></div>`; });
     for (let q = 0; q < sp.qs.length; q++) {
-      const Q = sp.qs[q], [nx, ny] = L.num(q); h += `<div style="position:absolute;left:${mm(nx - 4.5)};top:${mm(ny - 2.6)};width:9mm;text-align:center;font-size:9pt;font-weight:800">${q + 1}</div>`;
-      for (let k = 0; k < Q.n; k++) { const [x, y] = L.pos(q, k), f = o.fill && o.fill[q] === k; h += `<div style="position:absolute;left:${mm(x - R)};top:${mm(y - R)};width:${mm(2 * R)};height:${mm(2 * R)};box-sizing:border-box;border:0.3mm solid #333;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:5.4pt;font-weight:700;line-height:1;color:#c4c4c4;${f ? 'background:#111' : ''}">${f ? '' : (Q.lab[k] || '')}</div>`; }
+      const Q = sp.qs[q], [nx, ny] = L.num(q);
+      if (Q.teacher) { const [x1] = L.pos(q, 0), [x2] = L.pos(q, Q.n - 1), a = Math.min(nx - 4.5, x1 - R - 1, x2 - R - 1), b = Math.max(nx + 4.5, x1 + R + 1, x2 + R + 1);
+        h += `<div style="position:absolute;left:${mm(a)};top:${mm(ny - 3.4)};width:${mm(b - a)};height:6.8mm;box-sizing:border-box;background:#eceff3;border:0.25mm dashed #8a97a8;border-radius:1.5mm"></div>`; }
+      h += `<div style="position:absolute;left:${mm(nx - 4.5)};top:${mm(ny - 2.6)};width:9mm;text-align:center;font-size:9pt;font-weight:800">${L.groups > 1 ? L.local[q] : q + 1}</div>`;
+      for (let k = 0; k < Q.n; k++) { const [x, y] = L.pos(q, k), f = o.fill && o.fill[q] === k; h += `<div style="position:absolute;left:${mm(x - R)};top:${mm(y - R)};width:${mm(2 * R)};height:${mm(2 * R)};box-sizing:border-box;border:0.3mm solid #333;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:5.4pt;font-weight:700;line-height:1;color:#c4c4c4;${Q.teacher ? 'direction:ltr;unicode-bidi:isolate;' : ''}${f ? 'background:#111' : ''}">${f ? '' : (Q.lab[k] || '')}</div>`; }
     }
     h += `<div style="position:absolute;bottom:12mm;left:22mm;right:22mm;text-align:center;font-size:8pt;color:#777">${o.foot || ''}</div></div>`;
     return h;

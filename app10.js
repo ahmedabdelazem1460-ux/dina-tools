@@ -36,7 +36,7 @@
       const l = list();
       $('#rsL', root).innerHTML = l.map(r => { const [, kl, kc] = kindOf(r.kind); const cl = (r.class_ids || []).map(id => (A.cls(id) || {}).name).filter(Boolean);
         return `<div class="res"><div class="rk" style="--k:${kc}">${kl}</div><a class="rt" href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title)}</a>
-          <div class="small muted">${esc(A.subjName(r.subject_id) || 'عام')}${cl.length ? ' · ' + esc(cl.join('، ')) : ''}</div>${r.note ? `<div class="small" style="margin-top:4px">${esc(r.note)}</div>` : ''}
+          <div class="small muted">${esc(A.subjName(r.subject_id) || 'عام')}${cl.length ? ' · ' + esc(cl.join('، ')) : ''}${r.visible_to_parents ? ' · <span class="pill st-approved">يظهر لأولياء الأمور</span>' : ''}</div>${r.note ? `<div class="small" style="margin-top:4px">${esc(r.note)}</div>` : ''}
           <div class="rf"><span class="small faint">${isDrive(r.url) ? 'Google Drive' : esc(host(r.url))} · ${esc(A.personName(r.created_by) || '')}</span><span class="row" style="gap:4px"><button class="btn ghost sm" data-cp="${r.id}" title="نسخ الرابط" aria-label="نسخ الرابط">نسخ</button>${canEd(r) ? `<button class="btn ghost sm" data-ed="${r.id}">تعديل</button><button class="btn bad sm" data-del="${r.id}" aria-label="حذف">×</button>` : ''}</span></div></div>`; }).join('') || A.emptyBox('لا توجد مصادر بعد', 'أضف رابط ملف أو مجلد من Drive، وحدّد المادة والفصول.');
       $$('[data-cp]', root).forEach(b => b.onclick = () => { const r = RES.find(x => x.id === b.dataset.cp); navigator.clipboard.writeText(r.url).then(() => A.toast('نُسخ الرابط', 'ok')); });
       $$('[data-ed]', root).forEach(b => b.onclick = () => edit(RES.find(x => x.id === b.dataset.ed)));
@@ -50,14 +50,15 @@
         <div class="field"><label for="reK">النوع</label><select class="in" id="reK">${KINDS.map(([k, l]) => `<option value="${k}" ${r.kind === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
         <div class="field"><label for="reS">المادة</label><select class="in" id="reS"><option value="">عام</option>${S.subjects.map(s => `<option value="${s.id}" ${r.subject_id === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>
         <div class="field"><label for="reN">ملاحظة (اختياري)</label><input class="in" id="reN" value="${esc(r.note || '')}"></div></div>
+        <label class="chk" style="margin-bottom:8px"><input type="checkbox" id="reP" ${r.visible_to_parents ? 'checked' : ''}> يظهر لأولياء الأمور في بوابتهم مع خطة الأسبوع</label>
         <div class="field"><label>الفصول (اتركها كلها فارغة ليظهر للجميع)</label><div class="perm-grid">${secClasses.map(c => `<label class="chk"><input type="checkbox" value="${c.id}" ${(r.class_ids || []).includes(c.id) ? 'checked' : ''}> ${esc(c.name)}</label>`).join('')}</div></div>
         <div class="acts"><button class="btn" id="reGo">حفظ</button></div>`, { cls: 'wide' });
       const u = m.el.querySelector('#reU'); u.onchange = () => { const k = m.el.querySelector('#reK'); if (/\/folders\//.test(u.value)) k.value = 'folder'; else if (/presentation/.test(u.value)) k.value = 'presentation'; else if (/youtu/.test(u.value)) k.value = 'video'; };
       m.el.querySelector('#reGo').onclick = e => A.run(e.currentTarget, async () => {
         const url = u.value.trim(); if (!/^https?:\/\//i.test(url)) throw new Error('الرابط يجب أن يبدأ بـ https://');
-        const row = { url, title: m.el.querySelector('#reT').value.trim() || host(url), kind: m.el.querySelector('#reK').value, subject_id: m.el.querySelector('#reS').value || null, note: m.el.querySelector('#reN').value.trim(), class_ids: $$('.perm-grid input:checked', m.el).map(i => i.value), section_id: S.sectionId, school_id: S.school.id };
+        const row = { url, title: m.el.querySelector('#reT').value.trim() || host(url), kind: m.el.querySelector('#reK').value, subject_id: m.el.querySelector('#reS').value || null, note: m.el.querySelector('#reN').value.trim(), visible_to_parents: m.el.querySelector('#reP').checked, class_ids: $$('.perm-grid input:checked', m.el).map(i => i.value), section_id: S.sectionId, school_id: S.school.id };
         if (r.id) { const x = await api.updateResource(r.id, row); Object.assign(r, x); } else RES.unshift(await api.addResource(row));
-        m.close(); draw(); A.toast('حُفظ المصدر', 'ok');
+        m.close(); S._resAt = 0; draw(); A.toast('حُفظ المصدر', 'ok');
       });
     };
     $('#rsAdd', root).onclick = () => edit();
@@ -71,6 +72,21 @@
       A.printDoc ? A.printDoc('قائمة المصادر', A.section().name, body) : window.print();
     };
     draw();
+  };
+
+  // ---------- منتقي المصادر (يُستدعى من بطاقة الحصة ومن الخطط العلاجية) ----------
+  async function fetchRes() { if (!S._resAt || Date.now() - S._resAt > 60000) { try { S.resCache = await api.resources(); S._resAt = Date.now(); } catch (_) { S.resCache = S.resCache || []; } } return S.resCache; }
+  A.fetchResources = fetchRes;
+  A.pickResource = async function (subjectId, classId, onPick) {
+    const all = await fetchRes();
+    const fit = r => (!r.section_id || r.section_id === S.sectionId) && (!r.class_ids || !r.class_ids.length || !classId || r.class_ids.includes(classId));
+    let onlySubj = true;
+    const m = A.modal(`<h3>إرفاق مصدر</h3><p class="sub">اختر مصدراً ليُضاف رابطه إلى واجب الحصة. أضف مصادر جديدة من صفحة «المصادر».</p>
+      <div class="row" style="margin-bottom:8px"><input class="in" id="prq" placeholder="بحث" style="max-width:240px"><label class="chk"><input type="checkbox" id="prs" checked> مصادر ${esc(A.subjName(subjectId) || 'المادة')} فقط</label></div><div id="prl" style="max-height:52vh;overflow:auto"></div>`, { cls: 'wide' });
+    const draw = () => { const q = A.normKey(m.el.querySelector('#prq').value || ''); const l = all.filter(fit).filter(r => (!onlySubj || r.subject_id === subjectId || !r.subject_id) && (!q || A.normKey(r.title + ' ' + r.note).includes(q)));
+      m.el.querySelector('#prl').innerHTML = l.map(r => { const [, kl, kc] = kindOf(r.kind); return `<button type="button" class="pick-r" data-id="${r.id}"><span class="rk" style="--k:${kc}">${kl}</span><span><b>${esc(r.title)}</b><br><span class="small muted">${esc(A.subjName(r.subject_id) || 'عام')}${r.note ? ' · ' + esc(r.note) : ''}</span></span></button>`; }).join('') || A.emptyBox('لا توجد مصادر مطابقة', 'أضفها من صفحة «المصادر».');
+      $$('[data-id]', m.el).forEach(b => b.onclick = () => { const r = all.find(x => x.id === b.dataset.id); m.close(); onPick(r); }); };
+    m.el.querySelector('#prq').oninput = draw; m.el.querySelector('#prs').onchange = e => { onlySubj = e.target.checked; draw(); }; draw();
   };
 
   // =====================================================================

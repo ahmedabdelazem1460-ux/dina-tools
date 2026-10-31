@@ -493,6 +493,7 @@
           <div class="grid g3" style="margin-top:8px"><div class="field"><label>نوع المهمة</label><select class="in" data-p="type" ${ro ? 'disabled' : ''}><option value="">— اختر —</option>${PERF.map(([k, l]) => `<option value="${k}" ${e.perf_task && e.perf_task.type === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
           <div class="field" style="grid-column:span 2"><label>نص المهمة</label><input class="in" data-p="text" ${ro ? 'readonly' : ''} value="${esc((e.perf_task || {}).text || '')}" placeholder="اختر النوع ليظهر مثال"></div>
           <div class="field"><label>موعد التسليم</label><input class="in" data-p="due" ${ro ? 'readonly' : ''} value="${esc((e.perf_task || {}).due || '')}" placeholder="مثال: الخميس القادم"></div></div></details>
+        ${ro ? '' : `<div class="full"><button type="button" class="btn ghost sm" data-attach>${I.plus} إرفاق مصدر من المصادر</button></div>`}
       </div>`;
     if (!ro) {
       const save = async () => {
@@ -513,6 +514,7 @@
       };
       const deb = debounce(save, 900);
       $$('[data-k],[data-p]', el).forEach(i => { i.addEventListener(i.tagName === 'SELECT' ? 'change' : 'input', () => { pending.set(e.id, save); deb(); }); i.addEventListener('blur', () => { if (pending.has(e.id)) save(); }); });
+      const at = $('[data-attach]', el); if (at) at.onclick = () => APP.pickResource ? APP.pickResource(e.subject_id, e.class_id, r => { const hw = $('[data-k=homework]', el); hw.value = ((hw.value || '').trim() + ' ' + r.title + ': ' + r.url).trim(); hw.dispatchEvent(new Event('input')); save(); toast('أُضيف رابط المصدر إلى الواجب', 'ok'); }) : null;
       const ps = $('[data-p=type]', el), pi = $('[data-p=text]', el); if (ps) ps.addEventListener('change', () => { const x = PERF.find(y => y[0] === ps.value); pi.placeholder = x ? 'مثال: ' + x[2] : 'اختر النوع ليظهر مثال'; });
       const ta = $('textarea', el); const fit = () => { ta.style.height = 'auto'; ta.style.height = Math.max(44, ta.scrollHeight + 2) + 'px'; }; ta.addEventListener('input', fit); setTimeout(fit, 0);
     }

@@ -65,6 +65,7 @@ footer{text-align:center;color:var(--faint);font-size:12px;padding:10px 16px 30p
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:12px;box-shadow:var(--sh2);z-index:20;font-weight:700}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media print{.top,.no-print,footer,.toast{display:none!important}body{background:#fff}main{padding:0}.card,.ls{box-shadow:none;break-inside:avoid}.print-head{display:block!important}.print-only{display:flex!important}}
+.resl{display:flex;gap:10px;align-items:center;padding:10px;border:1px solid #dbe5f3;border-radius:14px;margin-top:8px;text-decoration:none;color:inherit;background:#fff}.resl:hover,.resl:focus-visible{border-color:#3AB1DB;outline:none;box-shadow:0 0 0 3px rgba(58,177,219,.25)}.resl .rk{flex:none;background:#082B5A;color:#fff;border-radius:10px;padding:2px 10px;font-size:12px;font-weight:800}
 .posts{margin-bottom:14px}.posts h3{display:flex;align-items:center;gap:8px}
 .pst{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--sh1);margin-bottom:10px}
 .pst img{width:100%;max-height:420px;object-fit:contain;background:var(--pale);display:block;cursor:zoom-in}
@@ -117,7 +118,7 @@ footer{text-align:center;color:var(--faint);font-size:12px;padding:10px 16px 30p
   }
   async function load(week) {
     app.innerHTML = kidsBar() + '<div class="spin" role="status" aria-label="جارٍ التحميل"></div>'; bindKids();
-    try { const [d, ps] = await Promise.all([rpc('parent_plan', { p_token: token, p_class: st.cur, p_week: week || null }), rpc('parent_posts_for', { p_token: token, p_class: st.cur }).catch(() => [])]); st.data = d; st.posts = ps || []; }
+    try { const [d, ps] = await Promise.all([rpc('parent_plan', { p_token: token, p_class: st.cur, p_week: week || null }), rpc('parent_posts_for', { p_token: token, p_class: st.cur }).catch(() => [])]); st.data = d; st.posts = ps || []; rpc('parent_resources', { p_token: token, p_class: st.cur }).then(r => { st.res = r || []; if (st.cur && !st.adding) render(); }).catch(() => { st.res = []; }); }
     catch (e) { app.innerHTML = kidsBar() + `<div class="card">${emptyBox('تعذّر تحميل الخطة', esc(e.message))}</div>`; bindKids(); return; }
     const w = st.data.week; st.week = w && w.id;
     if (w) { const t = Math.round((new Date(st.data.today + 'T00:00:00') - new Date(w.start + 'T00:00:00')) / 864e5); if (st.day == null || week) st.day = t >= 0 && t < st.data.class.days ? t : 0; }
@@ -184,7 +185,9 @@ footer{text-align:center;color:var(--faint);font-size:12px;padding:10px 16px 30p
       if (extra.length && st.view !== 'hw') body += `<div class="card"><h3>ملاحظات وتنبيهات</h3>${extra.map(n => `<div class="notice">${n.title ? `<b>${esc(n.title)}</b><br>` : ''}${esc(n.body)}</div>`).join('')}</div>`;
       body += `<div class="acts no-print"><button class="btn" id="pr">طباعة / PDF</button><button class="btn" id="sh">مشاركة الرابط</button></div>`;
     }
-    app.innerHTML = kidsBar() + postsHtml(st.posts) + `<div class="card" style="padding:12px 16px"><h2 style="margin:0">${esc(clsName(st.cur) || d.class.name)}</h2><span class="small muted">الخطة المعتمدة من المدرسة · تُحدَّث تلقائياً</span></div>` + body;
+    const RK = { worksheet: 'ورقة عمل', review: 'ملف مراجعة', test: 'اختبار', presentation: 'عرض تقديمي', video: 'فيديو', folder: 'مجلد', link: 'رابط' };
+    const resHtml = (st.res || []).length ? `<section class="card no-print" aria-label="مصادر للمراجعة"><h3 style="margin:0 0 8px">مصادر للمراجعة والتدريب <span class="small muted">(${AR(st.res.length)})</span></h3>${st.res.map(r => `<a class="resl" href="${esc(r.url)}" target="_blank" rel="noopener"><span class="rk">${esc(RK[r.kind] || 'رابط')}</span><span><b>${esc(r.title)}</b>${r.subject || r.note ? `<br><span class="small muted">${esc([r.subject, r.note].filter(Boolean).join(' · '))}</span>` : ''}</span></a>`).join('')}</section>` : '';
+    app.innerHTML = kidsBar() + postsHtml(st.posts) + `<div class="card" style="padding:12px 16px"><h2 style="margin:0">${esc(clsName(st.cur) || d.class.name)}</h2><span class="small muted">الخطة المعتمدة من المدرسة · تُحدَّث تلقائياً</span></div>` + body + resHtml;
     bindKids(); bindPosts();
     app.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { st.view = b.dataset.v; LS.set('view', st.view); render(); });
     app.querySelectorAll('[data-d]').forEach(b => b.onclick = () => { st.day = +b.dataset.d; render(); });

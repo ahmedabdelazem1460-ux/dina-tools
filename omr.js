@@ -19,7 +19,7 @@
       const n = t === 'tf' ? 2 : Math.max(2, Math.min(t === 'match' ? 14 : 5, +p.options || 4)); for (let i = 0; i < (+p.count || 0); i++) qs.push({ n, lab: LABELS[lang][t].slice(0, n), type: t, part: pi }); });
     return { lang, dir: lang === 'en' ? 'ltr' : 'rtl', qs }; }
   const norm = (a, b) => typeof a === 'number' ? { dir: 'rtl', qs: Array.from({ length: a }, () => ({ n: b, lab: LET.slice(0, b) })) } : (a.qs ? a : expand(a));
-  const AV = 186, Y0 = 73, YMAX = 276, HEAD = 5.2, GAP = 2.6;
+  const AV = 178, Y0 = 73, YMAX = 276, HEAD = 5.2, GAP = 2.6;
   // كل قسم (نوع أسئلة) في كتلة مستقلة بعنوانه وترقيمه الخاص، والكتل متتالية من أعلى إلى أسفل
   function layout(a, b) {
     const sp = norm(a, b), qs = sp.qs, rtl = sp.dir !== 'ltr';

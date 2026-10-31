@@ -4,11 +4,11 @@
   const { api, S, $, $$, esc, AR, I } = A;
 
   // ---------- صلاحيات الأنظمة الخاصة (تحليل النتائج، سجلاتي…) ----------
-  const MODULES = [['analysis', 'تحليل النتائج والاختبارات التشخيصية'], ['records', 'سجلاتي برو']];
+  const MODULES = [['analysis', 'تحليل النتائج والاختبارات التشخيصية', 'التحليل'], ['supervision', 'الإشراف التربوي', 'الإشراف'], ['attendance', 'الحضور والسلوك — مشرف دور', 'الحضور'], ['counselor', 'الإرشاد الطلابي — الإحالات', 'المرشد'], ['records', 'سجلاتي برو', 'سجلاتي']];
   A.hasModule = m => !!S.me && (S.me.is_owner || (S.grants || []).some(g => g.module === m && g.staff_id === S.me.id));
   async function loadGrants() { try { S.grants = await api.moduleGrants(); } catch (_) { S.grants = []; } }
   const prevAfter = window.APP_AFTER_WEEK;
-  window.APP_AFTER_WEEK = async function () { if (prevAfter) prevAfter.apply(this, arguments); if (!S._grantsAt) { S._grantsAt = Date.now(); await loadGrants(); A.renderNav && A.renderNav(); } };
+  window.APP_AFTER_WEEK = async function () { if (prevAfter) prevAfter.apply(this, arguments); if (S._grantsAt !== S.me.id) { S._grantsAt = S.me.id; await loadGrants(); A.renderNav && A.renderNav(); } };
 
   // =====================================================================
   //  المصادر — روابط Drive وأوراق العمل وملفات المراجعة
@@ -134,7 +134,7 @@
       const l = people.filter(p => !q || A.normKey(p.full_name + ' ' + (p.title || '') + ' ' + (p.specialty || '')).includes(q));
       $('#rb', root).innerHTML = l.map(p => `<tr><td><input type="checkbox" data-s="${p.id}" ${sel.has(p.id) ? 'checked' : ''} aria-label="تحديد ${esc(p.full_name)}"></td><td><b>${esc(p.full_name)}</b><div class="small muted">${esc(p.specialty || '')}${p.email ? ' · ' + esc(p.email) : ''}</div></td>
         <td><input class="in" data-t="${p.id}" value="${esc(p.title || '')}" placeholder="اكتب المسمى…" style="padding:6px 10px"></td>${secs.map(s => `<td>${roleCell(p, s)}</td>`).join('')}
-        ${S.me.is_owner ? `<td>${MODULES.map(([k, lb]) => `<label class="chk small" title="${lb}"><input type="checkbox" data-mg="${p.id}|${k}" ${(S.grants || []).some(g => g.staff_id === p.id && g.module === k) ? 'checked' : ''}> ${k === 'analysis' ? 'التحليل' : 'سجلاتي'}</label>`).join(' ')}</td>` : ''}</tr>`).join('') || `<tr><td colspan="9">${A.emptyBox('لا يوجد موظفون')}</td></tr>`;
+        ${S.me.is_owner ? `<td><div class="mg-grid">${MODULES.map(([k, lb, sh]) => `<label class="chk small" title="${lb}"><input type="checkbox" data-mg="${p.id}|${k}" ${(S.grants || []).some(g => g.staff_id === p.id && g.module === k) ? 'checked' : ''}> ${sh}</label>`).join('')}</div></td>` : ''}</tr>`).join('') || `<tr><td colspan="9">${A.emptyBox('لا يوجد موظفون')}</td></tr>`;
       $('#rsel', root).textContent = sel.size ? `محدد: ${AR(sel.size)}` : '';
       $$('[data-s]', root).forEach(i => i.onchange = () => { i.checked ? sel.add(i.dataset.s) : sel.delete(i.dataset.s); $('#rsel', root).textContent = sel.size ? `محدد: ${AR(sel.size)}` : ''; });
       $$('[data-t]', root).forEach(i => i.onchange = () => A.run(null, async () => { const r = await api.updateStaff(i.dataset.t, { title: i.value.trim() || null }); const p = S.staff.find(x => x.id === i.dataset.t); if (p) p.title = r.title; A.toast('حُفظ المسمى', 'ok'); }));

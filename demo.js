@@ -53,6 +53,9 @@
     const ret = D.plan_entries.find(e => e.status === 'submitted'); if (ret) { ret.status = 'returned'; ret.review_note = 'يرجى تحديد رقم الصفحة في الواجب'; }
     D.notes.push({ id: uid(), week_id: D.weeks[0].id, class_id: null, placement: 'day', day: 3, title: 'تنبيه', body: 'اختبار قصير في الرياضيات يوم الأربعاء', created_at: new Date().toISOString() });
     D.join_codes.push({ code: 'DEMOJOIN', section_id: g.id, role: 'teacher', active: true, uses: 0 });
+    const FN = ['نورة', 'سارة', 'ريم', 'لمى', 'جود', 'شهد', 'رهف', 'دانة', 'ليان', 'مها', 'هيا', 'جنى'], MN = ['عبدالله', 'محمد', 'فيصل', 'خالد', 'يوسف', 'عمر', 'تركي', 'نواف', 'بدر', 'زياد', 'فارس', 'سعود'], LN = ['العتيبي', 'الغامدي', 'الحربي', 'الزهراني', 'القحطاني', 'الشهري'];
+    D.students = []; D.classes.forEach((c, ci) => { for (let i = 0; i < 12; i++) D.students.push({ id: uid(), school_id: D.schools[0].id, section_id: c.section_id, class_id: c.id, full_name: (c.section_id === g.id ? FN : MN)[(i + ci) % 12] + ' ' + LN[(i * 5 + ci) % 6], student_no: String(1000 + i), guardian_phone: '05' + String(10000000 + i * 7919), active: true }); });
+    D.attendance = []; D.behaviors = []; D.sup_templates = []; D.sup_records = []; D.module_grants = [];
     return { D, owner, sup, T };
   }
 
@@ -157,6 +160,12 @@
         return wait({ count: n, unpublished: un });
       },
       async resetPassword() { return wait(true); },
+      async list(t, eq = {}, o = {}) { let l = (D[t] = D[t] || []).filter(r => Object.entries(eq).every(([k, v]) => Array.isArray(v) ? v.includes(r[k]) : (r[k] ?? null) === v) && Object.entries(o.gte || {}).every(([k, v]) => r[k] >= v) && Object.entries(o.lte || {}).every(([k, v]) => r[k] <= v)); if (o.order) l = l.slice().sort((a, b) => String(a[o.order]).localeCompare(String(b[o.order])) * (o.desc ? -1 : 1)); return wait(clone(l)); },
+      async ins(t, r) { D[t] = D[t] || []; return wait((Array.isArray(r) ? r : [r]).map(x => ins(t, { school_id: D.schools[0].id, by_staff: meId, created_by: meId, ...x }))); },
+      upd: (t, id, p) => wait(upd(t, id, p)),
+      del: (t, id) => wait(del(t, r => r.id === id)),
+      async ups(t, rows, on) { D[t] = D[t] || []; const keys = on.split(','); return wait(rows.map(r => { const x = D[t].find(y => keys.every(k => y[k] === r[k])); if (x) { Object.assign(x, r); return clone(x); } return ins(t, { school_id: D.schools[0].id, by_staff: meId, ...r }); })); },
+      async rpc(n, a) { if (n === 'sup_acknowledge') { const r = find('sup_records', a.p_id); Object.assign(r, { status: 'acknowledged', ack_at: new Date().toISOString(), ack_name: a.p_name, ack_signature: a.p_signature, ack_note: a.p_note }); } return wait(null); },
       resources: () => wait(clone(D.resources || (D.resources = []))),
       addResource: r => { D.resources = D.resources || []; return wait(ins('resources', { school_id: D.schools[0].id, created_by: meId, ...r })); },
       updateResource: (id, p) => wait(upd('resources', id, p)),

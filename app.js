@@ -46,6 +46,9 @@
     admin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><path d="M17 11l1.5 1.5L21.5 9"/></svg>',
     nisab: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h2M12 12h2M8 16h2M12 16h2"/></svg>',
     builder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v11M15 10v11"/><path d="M8 2v4M16 2v4"/></svg>',
+    attendance: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18M8.5 15l2 2 4-4"/></svg>',
+    supervision: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6l1 2h3v16H5V5h3z"/><path d="M9 12l2 2 4-4M9 17h6"/></svg>',
+    myreports: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>',
     resources: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg>',
     analysis: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
     roles: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M17 11l2 2 3.5-4"/></svg>',
@@ -238,6 +241,9 @@
     ['posts', 'إعلانات أولياء الأمور', () => S.me.is_owner || anyPerm('users', 'structure')],
     ['resources', 'المصادر', () => true],
     ['analysis', 'تحليل النتائج', () => !!(APP.hasModule && APP.hasModule('analysis'))],
+    ['attendance', 'الحضور والسلوك', () => !!(APP.hasModule && (APP.hasModule('attendance') || APP.hasModule('counselor') || APP.hasModule('supervision')))],
+    ['supervision', 'الإشراف التربوي', () => !!(APP.hasModule && APP.hasModule('supervision'))],
+    ['myreports', 'تقاريري', () => !!S.supCount],
     ['roles', 'المسميات والصلاحيات', () => S.me.is_owner || anyPerm('users')],
     ['archive', 'الأرشيف', () => S.me.is_owner],
     ['dev', 'لوحة المطوّر', () => S.me.is_owner],
@@ -277,7 +283,7 @@
     $('#nav').innerHTML = items.map(([k, l]) => `<a href="#/${k}" class="${S.view === k ? 'on' : ''}" ${S.view === k ? 'aria-current="page"' : ''}>${I[k]}<span>${l}</span>${k === 'my' && myCount ? `<span class="cnt">${AR(myCount)}</span>` : ''}</a>`).join('');
     const bn = $('#bnav'); if (bn) {
       const prim = items.length > 5 ? items.slice(0, 4) : items, rest = items.length > 5 ? items.slice(4) : [];
-      const SHORT = { resources: 'المصادر', analysis: 'التحليل', roles: 'الصلاحيات', dash: 'المتابعة', classes: 'الفصول', timetable: 'الجدول', builder: 'الجدول الآلي', nisab: 'النصاب', dev: 'المطوّر', posts: 'الإعلانات' };
+      const SHORT = { attendance: 'الحضور', supervision: 'الإشراف', myreports: 'تقاريري', resources: 'المصادر', analysis: 'التحليل', roles: 'الصلاحيات', dash: 'المتابعة', classes: 'الفصول', timetable: 'الجدول', builder: 'الجدول الآلي', nisab: 'النصاب', dev: 'المطوّر', posts: 'الإعلانات' };
       bn.innerHTML = prim.map(([k, l]) => `<a href="#/${k}" class="${S.view === k ? 'on' : ''}">${I[k]}<span>${SHORT[k] || l}</span></a>`).join('') +
         (rest.length ? `<button type="button" id="moreBtn" class="${rest.some(r => r[0] === S.view) ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg><span>المزيد</span></button>` : '');
       const mb = $('#moreBtn'); if (mb) mb.onclick = () => moreSheet(rest);

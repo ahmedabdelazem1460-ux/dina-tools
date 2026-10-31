@@ -73,6 +73,13 @@
       slotConflicts: s => sb.rpc('slot_conflicts', { p_section: s }).then(ok),
       slotConflictApply: id => sb.rpc('slot_conflict_apply', { p_entry: id }).then(ok),
       bulkReview: (w, classes, action) => sb.rpc('bulk_review', { p_week: w, p_classes: classes && classes.length ? classes : null, p_action: action }).then(ok),
+      // واجهة عامة للوحدات الجديدة (الطلاب، الحضور، السلوك، الإشراف) — تخضع لصلاحيات الصفوف في قاعدة البيانات
+      async list(t, eq = {}, o = {}) { let q = T(t).select(o.select || '*'); Object.entries(eq).forEach(([k, v]) => { q = v === null ? q.is(k, null) : Array.isArray(v) ? q.in(k, v) : q.eq(k, v); }); Object.entries(o.gte || {}).forEach(([k, v]) => q = q.gte(k, v)); Object.entries(o.lte || {}).forEach(([k, v]) => q = q.lte(k, v)); if (o.order) q = q.order(o.order, { ascending: !o.desc }); let all = [], from = 0; for (;;) { const r = ok(await q.range(from, from + 999)); all = all.concat(r); if (r.length < 1000) break; from += 1000; } return all; },
+      ins: (t, r) => T(t).insert(r).select().then(ok),
+      upd: (t, id, p) => T(t).update(p).eq('id', id).select().single().then(ok),
+      del: (t, id) => T(t).delete().eq('id', id).then(ok),
+      ups: (t, rows, on) => T(t).upsert(rows, { onConflict: on }).select().then(ok),
+      rpc: (n, a) => sb.rpc(n, a).then(ok),
       resources: () => T('resources').select('*').order('created_at', { ascending: false }).then(ok),
       addResource: r => T('resources').insert(r).select().single().then(ok),
       updateResource: (id, p) => T('resources').update(p).eq('id', id).select().single().then(ok),

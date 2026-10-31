@@ -55,7 +55,7 @@
   //  الرسائل الداخلية
   // =====================================================================
   let MSG = [];
-  async function loadMsgs() { try { MSG = await api.messages(); } catch (e) { MSG = []; } badge(); }
+  async function loadMsgs() { try { MSG = S.realMe ? await api.messagesAs(S.me.id) : await api.messages(); } catch (e) { MSG = []; } badge(); }
   const myId = () => S.me.id;
   function badge() { const n = MSG.filter(m => m.recipient_id === myId() && !m.read_at).length; const b = $('#inboxN'); if (b) { b.textContent = AR(n); b.classList.toggle('hidden', !n); } }
   const KIND = { message: 'رسالة', language: 'ملاحظة لغوية', return: 'إرجاع حصة', reminder: 'تذكير', system: 'النظام' };
@@ -63,7 +63,7 @@
     const threads = {};
     MSG.forEach(m => { const other = m.sender_id === myId() ? m.recipient_id : m.sender_id; (threads[other] = threads[other] || []).push(m); });
     const order = Object.entries(threads).sort((a, b) => b[1][0].created_at.localeCompare(a[1][0].created_at));
-    const m = A.modal(`<div class="head" style="margin-bottom:10px"><div class="grow"><h3 style="margin:0">الرسائل</h3></div><button class="btn sm" id="newMsg">${I.plus} رسالة جديدة</button></div>
+    const m = A.modal(`<div class="head" style="margin-bottom:10px"><div class="grow"><h3 style="margin:0">الرسائل</h3></div>${S.realMe ? '' : `<button class="btn sm" id="newMsg">${I.plus} رسالة جديدة</button>`}</div>${S.realMe ? `<div class="notice info" style="margin-bottom:10px">اطلاع فقط على رسائل ${esc(S.me.full_name)} — لا يمكن الإرسال أو الرد باسمه، ويُسجَّل هذا الاطلاع في سجل العمليات.</div>` : ''}
       <div class="inbox"><div class="lst" id="ibL"></div><div class="rd" id="ibR">${A.emptyBox(order.length ? 'اختر محادثة' : 'لا توجد رسائل بعد', 'راسل أي زميل من «رسالة جديدة».')}</div></div>`, { cls: 'wide' });
     const L = m.el.querySelector('#ibL');
     L.innerHTML = order.map(([pid, list]) => { const un = list.some(x => x.recipient_id === myId() && !x.read_at); return `<button data-p="${pid}" class="${un ? 'unread' : ''}"><b>${esc(A.personName(pid) || '—')}</b><div class="small muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(list[0].subject || list[0].body)}</div><div class="small faint">${A.fmtDT(list[0].created_at)}</div></button>`; }).join('');
@@ -71,13 +71,14 @@
       $$('button', L).forEach(b => b.classList.toggle('on', b.dataset.p === pid));
       const list = (threads[pid] || []).slice().reverse();
       m.el.querySelector('#ibR').innerHTML = `<h3>${esc(A.personName(pid))}</h3>` + list.map(x => `<div class="msg ${x.sender_id === myId() ? 'me' : ''}"><div class="small muted">${x.sender_id === myId() ? 'أنت' : esc(A.personName(x.sender_id))} · ${A.fmtDT(x.created_at)} · ${KIND[x.kind] || ''}</div>${x.subject ? `<b>${esc(x.subject)}</b><br>` : ''}${esc(x.body)}</div>`).join('') +
-        `<div class="field" style="margin-top:12px"><textarea class="in" id="rpl" rows="3" placeholder="اكتب ردك"></textarea></div><button class="btn sm" id="rplGo">${I.send} إرسال</button>`;
-      m.el.querySelector('#rplGo').onclick = e => A.run(e.currentTarget, async () => { const body = m.el.querySelector('#rpl').value.trim(); if (!body) return; await api.sendMessage({ recipient_id: pid, body }); await loadMsgs(); m.close(); inbox(pid); });
+        (S.realMe ? '' : `<div class="field" style="margin-top:12px"><textarea class="in" id="rpl" rows="3" placeholder="اكتب ردك"></textarea></div><button class="btn sm" id="rplGo">${I.send} إرسال</button>`);
+      if (m.el.querySelector('#rplGo')) m.el.querySelector('#rplGo').onclick = e => A.run(e.currentTarget, async () => { const body = m.el.querySelector('#rpl').value.trim(); if (!body) return; await api.sendMessage({ recipient_id: pid, body }); await loadMsgs(); m.close(); inbox(pid); });
       const unread = list.filter(x => x.recipient_id === myId() && !x.read_at).map(x => x.id);
       if (unread.length && !S.realMe) { await api.markRead(unread).catch(() => { }); unread.forEach(id => { const x = MSG.find(y => y.id === id); if (x) x.read_at = new Date().toISOString(); }); badge(); }
     };
     $$('button', L).forEach(b => b.onclick = () => openThread(b.dataset.p));
-    m.el.querySelector('#newMsg').onclick = () => { m.close(); compose(); };
+    const nm = m.el.querySelector('#newMsg'); if (nm) nm.onclick = () => { m.close(); compose(); };
+    if (S.realMe && !inbox._logged) { inbox._logged = S.me.id; api.logMessagesView && api.logMessagesView(S.me.id).catch(() => {}); } else if (S.realMe && inbox._logged !== S.me.id) { inbox._logged = S.me.id; api.logMessagesView(S.me.id).catch(() => {}); }
     if (openWith) openThread(openWith);
   }
   // ---- رسالة جديدة: اختيار بالمربعات مع صفة كل موظف، وإرسال جماعي

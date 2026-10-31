@@ -117,6 +117,8 @@
       async approvedSlots(section) { const v = ok(await T('timetable_versions').select('id').eq('section_id', section).eq('status', 'approved').maybeSingle()); return v ? ok(await T('timetable_slots').select('*').eq('version_id', v.id)) : []; },
       // ---- مراسلات
       messages: () => T('messages').select('*').order('created_at', { ascending: false }).limit(300).then(ok),
+      messagesAs: id => sb.rpc('messages_as', { p_staff: id }).then(ok),
+      logMessagesView: id => sb.rpc('log_messages_view', { p_staff: id }).then(ok),
       sendMessage: r => T('messages').insert(r).select().single().then(ok),
       sendMessages: rows => T('messages').insert(rows).then(ok),
       markRead: ids => T('messages').update({ read_at: new Date().toISOString() }).in('id', ids).then(ok),

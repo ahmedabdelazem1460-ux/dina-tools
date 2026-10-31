@@ -227,6 +227,8 @@
       },
       async approvedSlots(section) { const v = D.timetable_versions.find(x => x.section_id === section && x.status === 'approved'); return wait(v ? pick('timetable_slots', x => x.version_id === v.id) : []); },
       messages: () => wait(pick('messages', m => m.recipient_id === meId || m.sender_id === meId).sort((a, b) => b.created_at.localeCompare(a.created_at))),
+      messagesAs: id => wait(pick('messages', m => m.recipient_id === id || m.sender_id === id).sort((a, b) => b.created_at.localeCompare(a.created_at))),
+      logMessagesView: () => wait(true),
       sendMessage: r => wait(ins('messages', { sender_id: meId, kind: 'message', read_at: null, ...r })),
       sendMessages: rows => { rows.forEach(r => ins('messages', { sender_id: meId, kind: 'message', read_at: null, ...r })); return wait(true); },
       markRead: ids => { ids.forEach(id => { const m = find('messages', id); if (m) m.read_at = new Date().toISOString(); }); return wait(true); },

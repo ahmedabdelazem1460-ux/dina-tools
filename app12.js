@@ -24,7 +24,7 @@
   window.APP_AFTER_WEEK = async function () { if (prevAfter) await prevAfter.apply(this, arguments); try { S.weekQuizzes = S.weekId ? await api.rpc('week_quizzes', { p_week: S.weekId }) : []; } catch (_) { S.weekQuizzes = []; } };
   // ظهور البند للمعلمين يتحكم فيه المالك (للجميع / لمن يُمنح / مخفي) — البيانات تبقى كما هي
   A.assessMode = () => A.featMode ? A.featMode('assess') : 'all';
-  A.canAssess = () => { if (!S.me) return false; if (S.me.is_owner || (A.hasModule && A.hasModule('supervision'))) return true; const md = A.assessMode(); if (md === 'off') return false; if (md === 'granted') return !!(A.hasModule && A.hasModule('assess')); return A.anyPerm('review') || (A.myMem() || {}).role === 'teacher' || S.entries.some(e => e.teacher_id === S.me.id); };
+  A.canAssess = () => { if (!S.me) return false; if (S.me.is_owner || (A.hasModule && A.hasModule('supervision'))) return true; if (A.coordOnly && A.coordOnly()) return false; const md = A.assessMode(); if (md === 'off') return false; if (md === 'granted') return !!(A.hasModule && A.hasModule('assess')); return A.anyPerm('review') || (A.myMem() || {}).role === 'teacher' || S.entries.some(e => e.teacher_id === S.me.id); };
   V.assess = async function (root) {
     if (!A.canAssess()) { root.innerHTML = `<div class="card">${A.emptyBox('هذا البند غير مفعّل لحسابك', 'يفعّله مالك النظام.')}</div>`; return; }
     const subs = mySubjects(), grades = [...new Set(myClasses().map(gk))];

@@ -194,14 +194,14 @@
       updateExtraPage: (id, p) => wait(upd('extra_pages', id, p)),
       deleteExtraPage: id => wait(del('extra_pages', x => x.id === id)),
       joinCodes: () => wait(clone(D.join_codes)),
-      createJoinCode: (section_id, role) => wait(ins('join_codes', { code: 'DEMO' + Math.random().toString(36).slice(2, 8).toUpperCase(), section_id, role, active: true, uses: 0 })),
+      createJoinCode: (section_id, role, o = {}) => wait(ins('join_codes', { code: 'DEMO' + Math.random().toString(36).slice(2, 8).toUpperCase(), section_id, role, active: true, uses: 0, extra: {}, ...o })),
       updateJoinCode: (code, p) => { const x = D.join_codes.find(j => j.code === code); Object.assign(x, p); return wait(clone(x)); },
-      async joinInfo(code) { const j = D.join_codes.find(x => x.code === code && x.active); if (!j) return null; return wait({ section: find('sections', j.section_id).name, school: D.schools[0].name, role: j.role }); },
+      async joinInfo(code) { const j = D.join_codes.find(x => x.code === code && x.active); if (!j) return null; return wait({ section: find('sections', j.section_id).name, school: D.schools[0].name, role: j.role, title: j.title, label: j.label }); },
       async joinWithCode(code, name, email) {
         const j = D.join_codes.find(x => x.code === code && x.active); if (!j) throw new Error('رابط الانضمام غير صالح أو أُوقف');
         if (D.staff.some(s => s.email === email.toLowerCase())) throw new Error('هذا البريد مسجّل مسبقاً — سجّل الدخول به');
         const p = ins('staff', { school_id: D.schools[0].id, user_id: uid(), full_name: name, email: email.toLowerCase(), active: true, is_owner: false });
-        D.memberships.push({ id: uid(), staff_id: p.id, section_id: j.section_id, role: j.role }); j.uses++; accounts[email.toLowerCase()] = p.id; return wait({ ok: true });
+        D.memberships.push({ id: uid(), staff_id: p.id, section_id: j.section_id, role: j.role, extra: j.extra || {} }); if (j.title) p.title = j.title; j.uses++; accounts[email.toLowerCase()] = p.id; return wait({ ok: true });
       },
       async claim(c, s, release) {
         const cl = find('classes', c); const v = D.timetable_versions.find(x => x.section_id === cl.section_id && x.status === 'approved');

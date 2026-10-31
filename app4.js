@@ -114,13 +114,34 @@
     const base = location.origin + location.pathname.replace(/[^/]*$/, '') + (A.DEMO ? '?demo=1&join=' : '?join=');
     const secs = S.sections.filter(s => S.me.is_owner || A.perm('users', s.id));
     box.innerHTML = `<div class="sec-box" style="border-color:var(--sky);background:#F4FBFE"><div class="head" style="margin-bottom:8px"><div class="grow"><h3 style="margin:0">روابط انضمام المعلمين</h3><p class="sub" style="margin:2px 0 0">أرسل الرابط لمعلمي القسم: كل معلم ينشئ حسابه بنفسه ثم يختار مواده وفصوله. أوقف الرابط بعد اكتمال التسجيل.</p></div></div>
-      ${secs.map(s => { const list = codes.filter(c => c.section_id === s.id); return `<div style="margin-bottom:10px"><b>${esc(s.name)}</b>${list.map(c => `<div class="row" style="margin-top:6px;flex-wrap:nowrap"><input class="in" readonly dir="ltr" value="${esc(base + c.code)}" style="flex:1;${c.active ? '' : 'opacity:.5;text-decoration:line-through'}"><span class="pill ${c.active ? 'st-approved' : 'st-empty'}">${c.active ? 'فعّال' : 'موقوف'} · ${A.cnt(c.uses, 'تسجيل', 'تسجيلات')}</span>${c.role === 'supervisor' ? '<span class="pill st-submitted">مشرفون</span>' : ''}<button class="btn ghost sm" data-copy="${esc(base + c.code)}">نسخ</button><button class="btn ghost sm" data-msg="${esc(base + c.code)}" data-sec="${esc(s.name)}">نص الرسالة</button><button class="btn ${c.active ? 'bad' : 'ghost'} sm" data-tog="${c.code}" data-a="${c.active ? 0 : 1}">${c.active ? 'إيقاف' : 'تفعيل'}</button></div>`).join('')}
-        <div class="row" style="margin-top:6px"><button class="btn ghost sm" data-new="${s.id}" data-role="teacher">${I.plus} رابط للمعلمين</button><button class="btn ghost sm" data-new="${s.id}" data-role="supervisor">${I.plus} رابط للمشرفين</button></div></div>`; }).join('')}</div>`;
+      ${secs.map(s => { const list = codes.filter(c => c.section_id === s.id); return `<div style="margin-bottom:10px"><b>${esc(s.name)}</b>${list.map(c => `<div class="row" style="margin-top:6px;flex-wrap:nowrap"><input class="in" readonly dir="ltr" value="${esc(base + c.code)}" style="flex:1;${c.active ? '' : 'opacity:.5;text-decoration:line-through'}"><span class="pill ${c.active ? 'st-approved' : 'st-empty'}">${c.active ? 'فعّال' : 'موقوف'} · ${A.cnt(c.uses, 'تسجيل', 'تسجيلات')}</span>${c.role === 'supervisor' ? '<span class="pill st-submitted">مشرفون</span>' : ''}${c.title ? `<span class="pill st-submitted" title="${esc(jcDesc(c))}">${esc(c.title)}${((c.extra || {}).stages || []).length ? ' · ' + esc(c.extra.stages.join('، ')) : ''}</span>` : ''}<button class="btn ghost sm" data-copy="${esc(base + c.code)}">نسخ</button><button class="btn ghost sm" data-msg="${esc(base + c.code)}" data-sec="${esc(s.name)}">نص الرسالة</button><button class="btn ${c.active ? 'bad' : 'ghost'} sm" data-tog="${c.code}" data-a="${c.active ? 0 : 1}">${c.active ? 'إيقاف' : 'تفعيل'}</button></div>`).join('')}
+        <div class="row" style="margin-top:6px"><button class="btn ghost sm" data-new="${s.id}" data-role="teacher">${I.plus} رابط للمعلمين</button><button class="btn ghost sm" data-new="${s.id}" data-role="supervisor">${I.plus} رابط للمشرفين</button>${S.me.is_owner ? `<button class="btn sky sm" data-coord="${s.id}">${I.plus} رابط للمنسقين</button>` : ''}</div></div>`; }).join('')}</div>`;
     $$('[data-copy]', box).forEach(b => b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.copy); A.toast('نُسخ الرابط', 'ok'); } catch (e) { b.previousElementSibling.previousElementSibling.select(); } });
     $$('[data-msg]', box).forEach(b => b.onclick = () => teacherMessage(b.dataset.msg, b.dataset.sec));
     $$('[data-tog]', box).forEach(b => b.onclick = () => A.run(b, async () => { await api.updateJoinCode(b.dataset.tog, { active: b.dataset.a === '1' }); V._joinPanel(box); }));
     $$('[data-new]', box).forEach(b => b.onclick = () => A.run(b, async () => { await api.createJoinCode(b.dataset.new, b.dataset.role); V._joinPanel(box); }));
+    $$('[data-coord]', box).forEach(b => b.onclick = () => coordDialog(b.dataset.coord, () => V._joinPanel(box)));
   };
+  const jcDesc = c => { const v = (c.extra || {}).view || []; return 'صلاحيات اطلاع: ' + (A.VIEW_PERMS.filter(([k]) => v.includes(k)).map(x => x[1]).join('، ') || '—') + (((c.extra || {}).stages || []).length ? ' · المراحل: ' + c.extra.stages.join('، ') : ' · كل المراحل'); };
+  // رابط انضمام للمنسقين: صلاحية متابعة الإدخال والنسب فقط (اطلاع بلا تعديل) ومحدد بمرحلة أو أكثر — من حساب المالك فقط
+  async function coordDialog(secId, done) {
+    const cls = secId === S.sectionId ? S.allClasses : await api.classes(secId);
+    const stages = [...new Set((cls || []).map(A.stageOf))];
+    const m = A.modal(`<h3>رابط انضمام للمنسقين — ${esc((S.sections.find(x => x.id === secId) || {}).name || '')}</h3>
+      <p class="sub">من يسجّل بهذا الرابط يحصل على المسمى والصلاحيات المحددة هنا فقط — اطلاع بلا أي تعديل، وفي المراحل التي تختارها. يمكنك تعديل صلاحيات أي منسق لاحقاً من ملفه في «الإدارة ← الموظفين».</p>
+      <div class="grid g2"><div class="field"><label for="cdT">المسمى</label><input class="in" id="cdT" list="cdTL" value="منسقة"><datalist id="cdTL">${['منسق', 'منسقة', 'منسق مادة', 'منسقة مادة', 'منسق مرحلة', 'منسقة مرحلة'].map(t => `<option value="${t}">`).join('')}</datalist></div>
+        <div class="field"><label for="cdL">وصف الرابط (لك فقط)</label><input class="in" id="cdL" placeholder="مثال: منسقات المرحلة الابتدائية"></div></div>
+      <div class="field"><label>المرحلة / المراحل (بلا اختيار = كل مراحل القسم)</label><div class="perm-grid" id="cdS">${stages.map(x => `<label class="chk"><input type="checkbox" value="${esc(x)}"> ${esc(x)}</label>`).join('') || '<span class="small muted">لا توجد فصول في القسم بعد</span>'}</div></div>
+      <div class="field"><label>صلاحيات الاطلاع</label><div class="perm-grid" id="cdV">${A.VIEW_PERMS.map(([k, l]) => `<label class="chk"><input type="checkbox" value="${k}" ${k === 'progress' ? 'checked' : ''}> ${l}</label>`).join('')}</div></div>
+      <div class="acts"><button class="btn" id="cdGo">إنشاء الرابط</button></div>`, { cls: 'wide' });
+    m.el.querySelector('#cdGo').onclick = ev => A.run(ev.currentTarget, async () => {
+      const view = $$('#cdV input:checked', m.el).map(i => i.value), st = $$('#cdS input:checked', m.el).map(i => i.value);
+      if (!view.length) throw new Error('اختر صلاحية اطلاع واحدة على الأقل');
+      const title = m.el.querySelector('#cdT').value.trim() || 'منسق';
+      await api.createJoinCode(secId, 'teacher', { title, label: m.el.querySelector('#cdL').value.trim() || null, extra: Object.assign({ coord: true, view }, st.length ? { stages: st } : {}) });
+      m.close(); A.toast('أُنشئ رابط المنسقين — انسخه وأرسله', 'ok'); done();
+    });
+  }
   function teacherMessage(link, sec) {
     const w = A.week();
     const txt = `السلام عليكم ورحمة الله وبركاته

@@ -109,7 +109,7 @@
       updateExtraPage: (id, p) => T('extra_pages').update(p).eq('id', id).select().single().then(ok),
       deleteExtraPage: id => T('extra_pages').delete().eq('id', id).then(ok),
       joinCodes: () => T('join_codes').select('*').order('created_at').then(ok),
-      createJoinCode: (section_id, role) => { const a = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'; let c = ''; crypto.getRandomValues(new Uint32Array(12)).forEach(x => c += a[x % a.length]); return T('join_codes').insert({ code: c, section_id, role }).select().single().then(ok); },
+      createJoinCode: (section_id, role, o = {}) => { const a = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'; let c = ''; crypto.getRandomValues(new Uint32Array(12)).forEach(x => c += a[x % a.length]); return T('join_codes').insert({ code: c, section_id, role, ...o }).select().single().then(ok); },
       updateJoinCode: (code, p) => T('join_codes').update(p).eq('code', code).select().single().then(ok),
       joinInfo: code => sb.rpc('join_info', { p_code: code }).then(ok),
       joinWithCode: (code, name, email, pw) => sb.rpc('join_with_code', { p_code: code, p_full_name: name, p_email: email, p_password: pw }).then(ok),

@@ -95,6 +95,8 @@
     return !!m[PKEY[p]];
   }
   const anyPerm = (...ps) => ps.some(p => perm(p));
+  // منسق بصلاحية اطلاع فقط وليس لديه حصص: لا تظهر له أدوات المعلم
+  const coordOnly = () => !S.me.is_owner && !!((myMem() || {}).extra || {}).coord && !S.entries.some(e => e.teacher_id === S.me.id);
   const viewOK = (k, sec = S.sectionId) => S.me.is_owner || (((myMem(sec) || {}).extra || {}).view || []).includes(k);
   const holidayOf = di => ((week() || {}).holidays || []).find(h => h.day === di);
   const required = e => e.subject_id && !(subj(e.subject_id) || {}).is_activity && !holidayOf(e.day);
@@ -218,13 +220,16 @@
     shell();
     route();
   }
+  // المراحل المسموحة لهذا الحساب في القسم (يحددها المالك) — فارغة = كل المراحل
+  const stageLim = () => { if (!S.me || S.me.is_owner) return null; const l = ((myMem() || {}).extra || {}).stages; return l && l.length ? l : null; };
   async function loadSection(keepWeek) {
     const [c, w] = await Promise.all([api.classes(S.sectionId), api.weeks(S.sectionId)]);
     S.allClasses = c; S.weeks = w;
     const order = ['KG', 'رياض الأطفال', 'ابتدائي', 'الابتدائية', 'Grade', 'متوسط', 'المتوسطة', 'ثانوي', 'الثانوية'];
     S.stages = [...new Set(c.map(stageOf))].sort((a, b) => (order.indexOf(a) + 1 || 9) - (order.indexOf(b) + 1 || 9));
+    const lim = stageLim(); const cA = lim ? c.filter(x => lim.includes(stageOf(x))) : c; if (lim) S.stages = S.stages.filter(x => lim.includes(x));
     S.stage = LS.get('stage_' + S.sectionId) || 'all'; if (S.stage !== 'all' && !S.stages.includes(S.stage)) S.stage = 'all';
-    S.classes = S.stage === 'all' ? c : c.filter(x => stageOf(x) === S.stage);
+    S.classes = S.stage === 'all' ? cA : cA.filter(x => stageOf(x) === S.stage);
     const savedW = keepWeek || LS.get('week_' + S.sectionId);
     const open = w.filter(x => x.status === 'open' && !x.archived).sort((a, b) => a.number - b.number);
     S.weekId = w.some(x => x.id === savedW) ? savedW : (open[0] || w[0] || {}).id || null;
@@ -234,7 +239,7 @@
     if (!S.weekId) { S.entries = []; S.notes = []; return; }
     const [e, n, x] = await Promise.all([api.entries(S.weekId), api.notes(S.weekId), api.extraPages(S.weekId).catch(() => [])]);
     S.allEntries = e; S.notes = n; S.extraPages = x;
-    if (S.stage && S.stage !== 'all') { const ids = new Set(S.classes.map(c => c.id)); S.entries = e.filter(x => ids.has(x.class_id) || x.teacher_id === (S.me || {}).id); } else S.entries = e;
+    if ((S.stage && S.stage !== 'all') || stageLim()) { const ids = new Set(S.classes.map(c => c.id)); S.entries = e.filter(x => ids.has(x.class_id) || x.teacher_id === (S.me || {}).id); } else S.entries = e;
     try { S.delegs = api.delegations ? await api.delegations(S.sectionId) : []; } catch (_) { S.delegs = []; }
     if (window.APP_AFTER_WEEK) { try { await window.APP_AFTER_WEEK(); } catch (_) {} }
   }
@@ -243,7 +248,7 @@
   // ---------- الإطار ----------
   const NAV = [
     ['home', 'الرئيسية', () => true],
-    ['my', 'خطتي', () => S.entries.some(e => e.teacher_id === S.me.id || (S.delegs || []).some(d => d.to_teacher === S.me.id)) || (myMem() || {}).role === 'teacher'],
+    ['my', 'خطتي', () => S.entries.some(e => e.teacher_id === S.me.id || (S.delegs || []).some(d => d.to_teacher === S.me.id)) || ((myMem() || {}).role === 'teacher' && !((myMem() || {}).extra || {}).coord)],
     ['dash', 'لوحة المتابعة', () => anyPerm('review', 'export', 'structure', 'users') || viewOK('progress')],
     ['classes', 'خطط الفصول', () => anyPerm('review', 'export', 'structure', 'users', 'timetable_edit', 'exec_confirm') || viewOK('plans')],
     ['export', 'التصدير', () => perm('export')],
@@ -258,8 +263,8 @@
     ['posts', 'إعلانات أولياء الأمور', () => S.me.is_owner || anyPerm('users', 'structure')],
     ['assess', 'التقويم والاختبارات', () => !!(APP.canAssess && APP.canAssess())],
     ['paper', 'الاختبارات الورقية', () => !!(APP.canAssess && APP.canAssess())],
-    ['records', 'سجل المتابعة', () => true],
-    ['resources', 'المصادر', () => true],
+    ['records', 'سجل المتابعة', () => !coordOnly()],
+    ['resources', 'المصادر', () => !coordOnly()],
     ['analysis', 'تحليل النتائج', () => !!(APP.hasModule && APP.hasModule('analysis'))],
     ['attendance', 'الحضور والسلوك', () => !!(APP.hasModule && (APP.hasModule('attendance') || APP.hasModule('counselor') || APP.hasModule('supervision')))],
     ['supervision', 'الإشراف التربوي', () => !!(APP.hasModule && APP.hasModule('supervision'))],
@@ -279,7 +284,7 @@
       <div class="ttl">منصة دينا للتخطيط الدراسي<small>${esc(S.school.name)}</small></div>
       <div class="grow"></div>
       <div class="pick"><label>القسم</label><select id="secSel">${S.sections.map(s => `<option value="${s.id}" ${s.id === S.sectionId ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>
-      ${(S.stages || []).length > 1 ? `<div class="pick"><label>المرحلة</label><select id="stSel"><option value="all">كل المراحل</option>${S.stages.map(x => `<option value="${esc(x)}" ${S.stage === x ? 'selected' : ''}>${esc(STAGE_L[x] || x)}</option>`).join('')}</select></div>` : ''}
+      ${(S.stages || []).length > 1 ? `<div class="pick"><label>المرحلة</label><select id="stSel"><option value="all">${stageLim() ? 'كل مراحلي' : 'كل المراحل'}</option>${S.stages.map(x => `<option value="${esc(x)}" ${S.stage === x ? 'selected' : ''}>${esc(STAGE_L[x] || x)}</option>`).join('')}</select></div>` : ''}
       <div class="pick"><label>الأسبوع</label><select id="weekSel">${S.weeks.length ? S.weeks.map(w => `<option value="${w.id}" ${w.id === S.weekId ? 'selected' : ''}>الأسبوع ${esc(w.word)} ${w.archived ? '· أرشيف' : w.status !== 'open' ? '· ' + WSTATUS[w.status] : ''}</option>`).join('') : '<option>لا توجد أسابيع</option>'}</select></div>
       <button class="userbtn icon-only" id="inboxBtn" aria-label="الرسائل"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H7l-3 3z"/></svg><span class="badge hidden" id="inboxN"></span></button>
       <button class="userbtn" id="ub"><span class="avatar">${esc((S.me.full_name.replace(/^(أ\.|Ms\.|Mr\.|د\.)\s*/, '')[0]) || '؟')}</span><span class="small" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.me.full_name)}</span></button>
@@ -395,7 +400,7 @@
       <div><h1>انضم إلى<br>منصة دينا</h1><p>${bad ? '' : `أنشئ حسابك في ${esc(info.section)} لتكتب خطتك الأسبوعية وترسلها للمراجعة.`}</p></div><div class="small" style="color:#8FB3D9">رحلتهم الكبرى... تبدأ من هنا</div></div>
       <div class="form"><form class="box card" id="jf">
         ${bad ? `<h2>الرابط غير صالح</h2><p class="sub">رابط الانضمام غير صحيح أو أوقفته الإدارة. اطلب رابطاً جديداً، أو سجّل الدخول إن كان لديك حساب.</p><a class="btn" href="${location.pathname}">تسجيل الدخول</a>` : `
-        <h2>إنشاء حساب — ${esc(info.section)}</h2><p class="sub">${esc(info.school)} · ${info.role === 'supervisor' ? 'مشرف' : 'معلم'}</p>
+        <h2>إنشاء حساب — ${esc(info.section)}</h2><p class="sub">${esc(info.school)} · ${esc(info.title || (info.role === 'supervisor' ? 'مشرف' : 'معلم'))}</p>
         <div class="field"><label for="jn">الاسم كما يظهر في الخطة</label><input class="in" id="jn" required placeholder="أ. الاسم الثلاثي" autocomplete="name"></div>
         <div class="field"><label for="je">البريد الإلكتروني (المدرسي إن وُجد)</label><input class="in" id="je" type="email" dir="ltr" required autocomplete="username"></div>
         <div class="grid g2" style="gap:0 12px"><div class="field"><label for="jph">الجوال</label><input class="in" id="jph" type="tel" dir="ltr" autocomplete="tel" placeholder="05xxxxxxxx"></div>
@@ -805,7 +810,7 @@
   }
 
   // ---------- مشترك مع الملفات الأخرى ----------
-  window.APP = { NAV, navOK, ownerStamp, VIEW_PERMS, TITLE_SUGG, viewOK, stageOf, featMode, featGate, FEAT_DEF, PERF, perfName, start: () => start(), TOOL_PERMS, TOOL_KEYS, cnt, api, S, $, $$, esc, AR, DAYS, PER, ORD, STATUS, WSTATUS, ROLES, PERMS, ROLE_DEFAULTS, I, parseDate, isoDate, dmy, weekDates, fmtDT, pct, norm, normKey, genPass, toast, modal, confirmBox, run, pill, bar, emptyBox, download, section, week, subj, subjName, person, personName, cls, myMem, perm, anyPerm, holidayOf, required, filled, stats, loadSection, loadWeek, refreshPeople, refreshMyCards, delegOf, shell, route, renderNav, LS, DEMO };
+  window.APP = { coordOnly, NAV, navOK, ownerStamp, VIEW_PERMS, TITLE_SUGG, viewOK, stageOf, featMode, featGate, FEAT_DEF, PERF, perfName, start: () => start(), TOOL_PERMS, TOOL_KEYS, cnt, api, S, $, $$, esc, AR, DAYS, PER, ORD, STATUS, WSTATUS, ROLES, PERMS, ROLE_DEFAULTS, I, parseDate, isoDate, dmy, weekDates, fmtDT, pct, norm, normKey, genPass, toast, modal, confirmBox, run, pill, bar, emptyBox, download, section, week, subj, subjName, person, personName, cls, myMem, perm, anyPerm, holidayOf, required, filled, stats, loadSection, loadWeek, refreshPeople, refreshMyCards, delegOf, shell, route, renderNav, LS, DEMO };
 
   // ---------- تشغيل ----------
   window.addEventListener('DOMContentLoaded', async () => {

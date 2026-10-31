@@ -29,7 +29,7 @@
       if (dirty && local && hasData(local) && local !== JSON.stringify(row.data)) { ls.set(LK(me) + '-local-copy', local); conflict = true; }
       ls.set(LK(me), JSON.stringify(row.data)); ls.del(DK(me)); ls.set(BK, row.updated_at);
     }
-    const leads = (S.me.is_owner || (A.hasModule && A.hasModule('supervision')));
+    const leads = (S.me.is_owner || (A.hasModule && A.hasModule('supervision')) || (A.viewOK && A.viewOK('records')));
     root.innerHTML = `<div class="card rec-card"><div class="head"><div class="grow"><h2>سجل المتابعة</h2><p class="sub" style="margin:2px 0 0">سجل درجات ومتابعة مرن لكل مادة وفصل — يُحفظ تلقائياً في حسابك على المنصة ويفتح من أي جهاز. أسماء طلاب فصولك تُضاف من المنصة تلقائياً.</p></div>
         <div class="row" style="gap:8px"><span class="rec-st" id="recSt" role="status" aria-live="polite">${pendingUpload ? 'يرفع نسختك المحلية…' : row ? 'محفوظ في السحابة · ' + A.fmtDT(row.updated_at) : 'جاهز'}</span>
         ${leads ? '<button class="btn ghost sm" id="recView">سجلات المعلمين</button>' : ''}
@@ -48,7 +48,9 @@
     const onStore = e => { if (e.key !== LK(me) || e.newValue == null) return; ls.set(DK(me), '1'); clearTimeout(tm); st.textContent = 'تعديلات غير محفوظة…'; st.className = 'rec-st'; tm = setTimeout(upload, 2500); };
     const onMsg = e => {
       if (e.origin !== location.origin || !e.data || e.source !== fr.contentWindow) return;
-      if (e.data.type === 'dina-rec-ready' && students.length) fr.contentWindow.postMessage({ type: 'dina-rec-students', list: students }, location.origin);
+      if (e.data.type === 'dina-rec-ready') { const mine = (S.allEntries || S.entries).filter(x => x.teacher_id === me && x.subject_id); const uniq = a => [...new Set(a.filter(Boolean))].join('، ');
+        fr.contentWindow.postMessage({ type: 'dina-rec-cover', v: { teacher: (A.person(me) || S.me).full_name, subjects: uniq(mine.map(x => A.subjName(x.subject_id))), classes: uniq(mine.map(x => (A.cls(x.class_id) || {}).name)) } }, location.origin);
+        if (students.length) fr.contentWindow.postMessage({ type: 'dina-rec-students', list: students }, location.origin); }
       if (e.data.type === 'dina-rec-added' && e.data.n) A.toast(`أُضيف ${AR(e.data.n)} من طلاب فصولك إلى قاعدة الطلاب في السجل`, 'ok');
       if (e.data.type === 'dina-rec-flushed') { clearTimeout(tm); upload(); }
     };

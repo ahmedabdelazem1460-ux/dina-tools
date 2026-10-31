@@ -404,7 +404,7 @@
     Object.entries(rmap).forEach(([kk, set]) => { if (set.size > 1) { const [k, r] = kk.split('|'); out.push(`تعارض قاعة «${((P.rooms || []).find(x => x.id === r) || {}).name || ''}» ${A.DAYS[Math.floor(k / Pn)]} الحصة ${+k % Pn + 1}`); } });
     return [...new Set(out)];
   }
-  A._planState = () => P; A._lastGen = () => lastGen;
+  A._planState = () => P; A._lastGen = () => lastGen; A._planReload = () => { PSEC = null; P = null; };
   function tGen(box, root) {
     const cls = secClasses().filter(c => rowTot(c.id)); const miss = []; cls.forEach(c => allSubs().forEach(s => { if (H(c.id, s) && !T(c.id, s)) miss.push(1); }));
     const ld = {}; cls.forEach(c => allSubs().forEach(s => { const t = T(c.id, s); if (t) ld[t] = (ld[t] || 0) + H(c.id, s); }));

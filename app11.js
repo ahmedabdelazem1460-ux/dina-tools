@@ -217,10 +217,10 @@
     root.innerHTML = '<div class="spinner"></div>';
     let [tpls, recs] = await Promise.all([api.list('sup_templates', { school_id: sch() }, { order: 'created_at' }), api.list('sup_records', { school_id: sch() }, { order: 'created_at', desc: true })]);
     const allT = () => BUILT.filter(b => !tpls.some(t => t.title === b.title)).map(b => ({ ...b, id: b.key, builtin: true })).concat(tpls);
-    let tab = A.LS.get('suptab') || 'records';
+    let tab = A.LS.get('suptab') || 'forms';
     const teachers = S.staff.filter(p => p.active && !p.is_owner);
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>الإشراف التربوي</h2><p class="sub" style="margin:2px 0 0">تقارير خاصة تُرسل للمعلم، يُقرّ بها بتوقيع إلكتروني تُحفظ معه، وخطط علاجية تظهر في حسابه.</p></div><button class="btn" id="spNew">${I.plus} تقرير جديد</button></div>
-      <div class="tabs"><button data-t="records" class="${tab === 'records' ? 'on' : ''}">التقارير المرسلة</button><button data-t="templates" class="${tab === 'templates' ? 'on' : ''}">القوالب</button></div><div id="spb"></div></div>`;
+      <div class="tabs"><button data-t="forms" class="${tab === 'forms' ? 'on' : ''}">نماذج الإشراف الكاملة</button><button data-t="records" class="${tab === 'records' ? 'on' : ''}">التقارير المرسلة</button><button data-t="templates" class="${tab === 'templates' ? 'on' : ''}">القوالب</button></div><div id="spb"></div></div>`;
     $$('.tabs button', root).forEach(b => b.onclick = () => { A.LS.set('suptab', b.dataset.t); V.supervision(root); });
     const box = $('#spb', root);
     const reload = async () => { [tpls, recs] = await Promise.all([api.list('sup_templates', { school_id: sch() }, { order: 'created_at' }), api.list('sup_records', { school_id: sch() }, { order: 'created_at', desc: true })]); draw(); };
@@ -262,6 +262,11 @@
       const td = m.el.querySelector('#tdel'); if (td) td.onclick = e => A.run(e.currentTarget, async () => { await api.del('sup_templates', t.id); m.close(); await reload(); });
     };
     const draw = () => {
+      if (tab === 'forms') {
+        box.innerHTML = `<div class="row" style="margin:10px 0;gap:8px"><span class="small muted">كل نماذج «خطة ونماذج الإشراف ١٤٤٨هـ» (${'الخطط والجداول، النماذج واللقاءات، بطاقات التقويم والزيارات، التقارير والقرارات، التعاميم والتكليفات والمساءلات، التطوير المهني'}) بهوية دينا، قابلة للتعديل والإضافة والحذف، وتُحفظ في قاعدة بيانات المنصة. المعلمون يُضافون تلقائياً من حسابات المنصة.</span><div class="grow"></div><a class="btn ghost sm" href="tools/supervision.html" target="_blank" rel="noopener">صفحة كاملة</a></div>
+          <iframe class="sup-frame" src="tools/supervision.html?v=${Date.now().toString(36).slice(0, 5)}" title="نماذج الإشراف التربوي"></iframe>`;
+        return;
+      }
       if (tab === 'templates') {
         box.innerHTML = `<div class="row" style="margin:12px 0"><button class="btn ghost" id="tNew">${I.plus} قالب مخصص</button><span class="small muted">القوالب المعتمدة (ومنها الخطط العلاجية) تظهر للمعلم عند إرسالها له.</span></div><div class="res-grid">${allT().map(t => `<div class="res"><div class="rk" style="--k:${t.kind === 'remedial' ? '#C9A44C' : t.kind === 'visit' ? '#2E7FC9' : '#3AB1DB'}">${KINDS[t.kind]}</div><div class="rt">${esc(t.title)}</div><div class="small muted">${A.cnt(t.fields.length, 'حقل', 'حقول')}${t.requires_ack ? ' · يتطلب إقراراً' : ''}${t.builtin ? ' · قالب جاهز' : ''}</div><div class="rf"><span></span><span class="row" style="gap:4px"><button class="btn ghost sm" data-use="${t.id}">استخدام</button><button class="btn ghost sm" data-et="${t.id}">${t.builtin ? 'تخصيص' : 'تعديل'}</button></span></div></div>`).join('')}</div>`;
         $('#tNew', box).onclick = () => editTpl();

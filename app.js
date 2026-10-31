@@ -22,6 +22,9 @@
   const PKEY = { users: 'can_manage_users', structure: 'can_manage_structure', timetable_edit: 'can_edit_timetable', timetable_approve: 'can_approve_timetable', review: 'can_review_plans', export: 'can_export', nisab: 'can_use_nisab', tt_builder: 'can_use_tt_builder', exec_confirm: 'can_confirm_exec' };
   const TOOL_PERMS = [['can_use_nisab', 'احتساب النصاب'], ['can_use_tt_builder', 'الجدول الآلي'], ['can_confirm_exec', 'التأكيد اليومي نيابةً عن المعلمين']];
   const TOOL_KEYS = ['nisab', 'tt_builder', 'exec_confirm'];
+  // صلاحيات اطلاع فقط (محددة لا عامة) — يمنحها المالك، ولا تتيح أي تعديل
+  const VIEW_PERMS = [['progress', 'الاطلاع على نسب الإدخال ولوحة المتابعة'], ['plans', 'الاطلاع على خطط الفصول'], ['reports', 'الاطلاع على التقارير'], ['records', 'الاطلاع على سجلات متابعة المعلمين'], ['timetable', 'الاطلاع على الجدول الدراسي']];
+  const TITLE_SUGG = ['معلم', 'معلمة', 'منسق', 'منسقة', 'منسق مادة', 'منسقة مادة', 'مشرف تربوي', 'مشرفة تربوية', 'مدير القسم', 'مديرة القسم', 'وكيل', 'وكيلة', 'مرشد طلابي', 'مرشدة طلابية', 'رائد نشاط', 'رائدة نشاط', 'أمين مصادر', 'أمينة مصادر', 'إداري', 'إدارية'];
   const ROLE_DEFAULTS = { admin: {}, supervisor: { can_review_plans: true, can_export: true }, teacher: {} };
 
   const parseDate = s => { const [y, m, d] = String(s).slice(0, 10).split('-').map(Number); return new Date(y, m - 1, d); };
@@ -88,10 +91,11 @@
   function perm(p, sec = S.sectionId) {
     if (S.me.is_owner) return true;
     const m = myMem(sec); if (!m) return false;
-    if (m.role === 'admin' && !TOOL_KEYS.includes(p)) return true;
+    if (m.role === 'admin' && !(m.extra || {}).restricted && !TOOL_KEYS.includes(p)) return true;
     return !!m[PKEY[p]];
   }
   const anyPerm = (...ps) => ps.some(p => perm(p));
+  const viewOK = (k, sec = S.sectionId) => S.me.is_owner || (((myMem(sec) || {}).extra || {}).view || []).includes(k);
   const holidayOf = di => ((week() || {}).holidays || []).find(h => h.day === di);
   const required = e => e.subject_id && !(subj(e.subject_id) || {}).is_activity && !holidayOf(e.day);
   // أنواع المهام الأدائية العشرة مع مثال لكل نوع (من دليل المدرسة)
@@ -200,6 +204,7 @@
       return;
     }
     Object.assign(S, b); S.realMe = null; S.allSections = b.sections;
+    if (!DEMO && api.rpc) api.rpc('log_login', { p_device: (/Mobi|Android|iPhone/i.test(navigator.userAgent) ? 'جوال' : 'حاسب') + ' · ' + ((navigator.userAgent.match(/(Edg|Chrome|Safari|Firefox)\/[\d]+/) || [''])[0]) }).catch(() => {});
     const va = LS.get('viewas');
     if (va && b.me.is_owner) { const t = b.staff.find(x => x.id === va && !x.is_owner); if (t) { S.realMe = b.me; S.me = t; } else LS.set('viewas', ''); }
     S.sections = S.me.is_owner ? S.sections : S.sections.filter(s => S.memberships.some(m => m.staff_id === S.me.id && m.section_id === s.id));
@@ -237,19 +242,22 @@
 
   // ---------- الإطار ----------
   const NAV = [
+    ['home', 'الرئيسية', () => true],
     ['my', 'خطتي', () => S.entries.some(e => e.teacher_id === S.me.id || (S.delegs || []).some(d => d.to_teacher === S.me.id)) || (myMem() || {}).role === 'teacher'],
-    ['dash', 'لوحة المتابعة', () => anyPerm('review', 'export', 'structure', 'users')],
-    ['classes', 'خطط الفصول', () => anyPerm('review', 'export', 'structure', 'users', 'timetable_edit', 'exec_confirm')],
+    ['dash', 'لوحة المتابعة', () => anyPerm('review', 'export', 'structure', 'users') || viewOK('progress')],
+    ['classes', 'خطط الفصول', () => anyPerm('review', 'export', 'structure', 'users', 'timetable_edit', 'exec_confirm') || viewOK('plans')],
     ['export', 'التصدير', () => perm('export')],
-    ['timetable', 'الجدول الدراسي', () => anyPerm('timetable_edit', 'timetable_approve', 'structure')],
+    ['studio', 'الجداول والأنصبة', () => S.me.is_owner],
+    ['timetable', 'الجدول الدراسي', () => !S.me.is_owner && (anyPerm('timetable_edit', 'timetable_approve', 'structure') || viewOK('timetable'))],
     ['weeks', 'الأسابيع', () => perm('structure')],
-    ['nisab', 'احتساب النصاب', () => perm('nisab')],
-    ['plan', 'توزيع الحصص', () => !!(APP.canPlan && APP.canPlan())],
-    ['builder', 'الجدول الآلي', () => perm('tt_builder')],
+    ['nisab', 'احتساب النصاب', () => !S.me.is_owner && perm('nisab')],
+    ['plan', 'توزيع الحصص', () => !S.me.is_owner && !!(APP.canPlan && APP.canPlan())],
+    ['builder', 'الجدول الآلي', () => !S.me.is_owner && perm('tt_builder')],
     ['admin', 'الإدارة', () => S.me.is_owner || anyPerm('users', 'structure')],
-    ['reports', 'التقارير', () => S.me.is_owner || anyPerm('review', 'export', 'users')],
+    ['reports', 'التقارير', () => S.me.is_owner || anyPerm('review', 'export', 'users') || viewOK('reports')],
     ['posts', 'إعلانات أولياء الأمور', () => S.me.is_owner || anyPerm('users', 'structure')],
     ['assess', 'التقويم والاختبارات', () => !!(APP.canAssess && APP.canAssess())],
+    ['paper', 'الاختبارات الورقية', () => !!(APP.canAssess && APP.canAssess())],
     ['records', 'سجل المتابعة', () => true],
     ['resources', 'المصادر', () => true],
     ['analysis', 'تحليل النتائج', () => !!(APP.hasModule && APP.hasModule('analysis'))],
@@ -257,6 +265,7 @@
     ['supervision', 'الإشراف التربوي', () => !!(APP.hasModule && APP.hasModule('supervision'))],
     ['myreports', 'تقاريري', () => !!S.supCount],
     ['roles', 'المسميات والصلاحيات', () => S.me.is_owner],
+    ['activity', 'النشاط والدخول', () => S.me.is_owner],
     ['archive', 'الأرشيف', () => S.me.is_owner],
     ['dev', 'لوحة المطوّر', () => S.me.is_owner],
   ];
@@ -302,7 +311,7 @@
     $('#nav').innerHTML = items.map(([k, l]) => `<a href="#/${k}" class="${S.view === k ? 'on' : ''}" ${S.view === k ? 'aria-current="page"' : ''}>${I[k]}<span>${l}</span>${k === 'my' && myCount ? `<span class="cnt">${AR(myCount)}</span>` : ''}</a>`).join('');
     const bn = $('#bnav'); if (bn) {
       const prim = items.length > 5 ? items.slice(0, 4) : items, rest = items.length > 5 ? items.slice(4) : [];
-      const SHORT = { plan: 'التوزيع', records: 'السجل', assess: 'التقويم', attendance: 'الحضور', supervision: 'الإشراف', myreports: 'تقاريري', resources: 'المصادر', analysis: 'التحليل', roles: 'الصلاحيات', dash: 'المتابعة', classes: 'الفصول', timetable: 'الجدول', builder: 'الجدول الآلي', nisab: 'النصاب', dev: 'المطوّر', posts: 'الإعلانات' };
+      const SHORT = { home: 'الرئيسية', studio: 'الجداول', activity: 'النشاط', paper: 'الورقية', plan: 'التوزيع', records: 'السجل', assess: 'التقويم', attendance: 'الحضور', supervision: 'الإشراف', myreports: 'تقاريري', resources: 'المصادر', analysis: 'التحليل', roles: 'الصلاحيات', dash: 'المتابعة', classes: 'الفصول', timetable: 'الجدول', builder: 'الجدول الآلي', nisab: 'النصاب', dev: 'المطوّر', posts: 'الإعلانات' };
       bn.innerHTML = prim.map(([k, l]) => `<a href="#/${k}" class="${S.view === k ? 'on' : ''}">${I[k]}<span>${SHORT[k] || l}</span></a>`).join('') +
         (rest.length ? `<button type="button" id="moreBtn" class="${rest.some(r => r[0] === S.view) ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg><span>المزيد</span></button>` : '');
       const mb = $('#moreBtn'); if (mb) mb.onclick = () => moreSheet(rest);
@@ -332,7 +341,8 @@
   const VIEWS = {};
   window.VIEWS = VIEWS;
   function route() {
-    const k = (location.hash.match(/^#\/(\w+)/) || [])[1];
+    let k = (location.hash.match(/^#\/(\w+)/) || [])[1];
+    if (S.me.is_owner && ['timetable', 'nisab', 'plan', 'builder'].includes(k)) { LS.set('studio_t', k); k = 'studio'; }
     const allowed = NAV.filter(navOK).map(n => n[0]);
     let v = allowed.includes(k) ? k : (LS.get('view') && allowed.includes(LS.get('view')) ? LS.get('view') : (anyPerm('review', 'export', 'structure', 'users') && !S.entries.some(e => e.teacher_id === S.me.id) ? 'dash' : (allowed.includes('my') ? 'my' : allowed[0])));
     S.view = v; LS.set('view', v);
@@ -667,6 +677,8 @@
   // =====================================================================
   //  خطط الفصول (عرض + مراجعة + ملاحظات)
   // =====================================================================
+  // توقيت الإدخال: يظهر لحساب المالك فقط
+  const ownerStamp = e => { if (!(S.realMe || S.me).is_owner || !e.updated_at || !(e.topic || e.homework || e.note)) return ''; const by = e.updated_by ? personName(e.updated_by) : ''; return `<div class="own-stamp" title="يظهر لك فقط">${by ? esc(by) + ' · ' : ''}${fmtDT(e.updated_at)}${e.submitted_at ? `<br>أُرسلت: ${fmtDT(e.submitted_at)}` : ''}${e.approved_at ? `<br>اعتُمدت: ${fmtDT(e.approved_at)}` : ''}</div>`; };
   VIEWS.classes = function (root) {
     const w = week();
     if (!w) { root.innerHTML = `<div class="card">${emptyBox('لا توجد أسابيع بعد')}</div>`; return; }
@@ -703,7 +715,7 @@
           <td class="per">${AR(e.period + 1)}</td>
           <td><b>${esc(subjName(e.subject_id) || '—')}</b>${ttEd ? ` <button class="ldx" data-es="${e.id}" title="تعديل هذه الحصة في الجدول المعتمد" aria-label="تعديل الحصة في الجدول">✎</button>` : ''}<div class="small ${e.teacher_id ? 'muted' : ''}" style="${e.teacher_id ? '' : 'color:var(--bad)'}">${e.subject_id ? (e.teacher_id ? esc(personName(e.teacher_id)) : `<a href="#" class="assignlink" data-assign-c="${e.class_id}" data-assign-s="${e.subject_id}">بلا معلم — إسناد</a>`) : ''}</div></td>
           ${['topic', 'homework', 'note'].map(k2 => `<td>${ed ? `<textarea data-k="${k2}" rows="1">${esc(e[k2])}</textarea>` : `<div style="padding:6px">${esc(e[k2]) || '<span class="faint">–</span>'}</div>`}</td>`).join('')}
-          <td>${pill(e.status)}${e.subject_id && APP.exPill ? `<div style="margin-top:4px">${APP.exPill(e.exec_status)}</div>` : ''}${e.review_note ? `<div class="small" style="color:var(--warn);margin-top:4px">${esc(e.review_note)}</div>` : ''}${e.perf_task && e.perf_task.text ? `<div class="small" style="margin-top:4px" title="${esc(e.perf_task.text)}${e.perf_task.due ? ' — ' + esc(e.perf_task.due) : ''}"><span class="pill st-submitted">مهمة: ${esc(perfName(e.perf_task.type) || 'أدائية')}</span></div>` : ''}</td>`;
+          <td>${pill(e.status)}${ownerStamp(e)}${e.subject_id && APP.exPill ? `<div style="margin-top:4px">${APP.exPill(e.exec_status)}</div>` : ''}${e.review_note ? `<div class="small" style="color:var(--warn);margin-top:4px">${esc(e.review_note)}</div>` : ''}${e.perf_task && e.perf_task.text ? `<div class="small" style="margin-top:4px" title="${esc(e.perf_task.text)}${e.perf_task.due ? ' — ' + esc(e.perf_task.due) : ''}"><span class="pill st-submitted">مهمة: ${esc(perfName(e.perf_task.type) || 'أدائية')}</span></div>` : ''}</td>`;
         if (ed) {
           const save = async () => {
             const patch = {}; $$('[data-k]', tr).forEach(i => patch[i.dataset.k] = i.value.trim());
@@ -793,7 +805,7 @@
   }
 
   // ---------- مشترك مع الملفات الأخرى ----------
-  window.APP = { stageOf, featMode, featGate, FEAT_DEF, PERF, perfName, start: () => start(), TOOL_PERMS, TOOL_KEYS, cnt, api, S, $, $$, esc, AR, DAYS, PER, ORD, STATUS, WSTATUS, ROLES, PERMS, ROLE_DEFAULTS, I, parseDate, isoDate, dmy, weekDates, fmtDT, pct, norm, normKey, genPass, toast, modal, confirmBox, run, pill, bar, emptyBox, download, section, week, subj, subjName, person, personName, cls, myMem, perm, anyPerm, holidayOf, required, filled, stats, loadSection, loadWeek, refreshPeople, refreshMyCards, delegOf, shell, route, renderNav, LS, DEMO };
+  window.APP = { NAV, navOK, ownerStamp, VIEW_PERMS, TITLE_SUGG, viewOK, stageOf, featMode, featGate, FEAT_DEF, PERF, perfName, start: () => start(), TOOL_PERMS, TOOL_KEYS, cnt, api, S, $, $$, esc, AR, DAYS, PER, ORD, STATUS, WSTATUS, ROLES, PERMS, ROLE_DEFAULTS, I, parseDate, isoDate, dmy, weekDates, fmtDT, pct, norm, normKey, genPass, toast, modal, confirmBox, run, pill, bar, emptyBox, download, section, week, subj, subjName, person, personName, cls, myMem, perm, anyPerm, holidayOf, required, filled, stats, loadSection, loadWeek, refreshPeople, refreshMyCards, delegOf, shell, route, renderNav, LS, DEMO };
 
   // ---------- تشغيل ----------
   window.addEventListener('DOMContentLoaded', async () => {

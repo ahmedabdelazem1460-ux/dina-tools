@@ -373,39 +373,94 @@ td.ldn b{font-size:22px;color:var(--navy)}
 html.lang-en body,html.lang-en input,html.lang-en select,html.lang-en textarea,html.lang-en button{font-family:'Myriad Pro','Tajawal','GE SS Two',system-ui,sans-serif}
 html.lang-en .menu{left:auto;right:22px}html.lang-en .kpi::after{left:auto;right:-18px}html.lang-en .modal .x{left:auto;right:14px}
 html.lang-en .login .art .deco{left:auto;right:-80px}html.lang-en .badge{left:auto;right:-6px}html.lang-en .kpi .more{left:auto;right:14px}
+.pk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:6px 14px}
+.pk-row{display:flex;align-items:center;gap:6px;padding:4px 6px;border:1px solid var(--border);border-radius:10px;background:var(--card,#fff)}
+.pk-n{min-width:26px;text-align:center;color:var(--navy,#082B5A)}.pk-opts{display:flex;gap:4px}
+.pk-o{width:32px;height:32px;border-radius:50%;border:1.5px solid #9fb3cc;background:#fff;font:700 13px/1 inherit;color:#082B5A;cursor:pointer}
+.pk-o.on{background:#082B5A;border-color:#082B5A;color:#fff}.pk-o:focus-visible{outline:3px solid #3AB1DB;outline-offset:2px}.pk-o:disabled{cursor:default;opacity:.8}
+.pk-w{width:62px!important;padding:4px 6px!important}.pk-s{flex:1;min-width:0;padding:4px 6px!important;font-size:12px}
+.it-ok{background:rgba(46,158,91,.14);font-weight:700}
+.drop{display:flex;flex-direction:column;align-items:center;gap:4px;padding:22px;border:2px dashed #9fb3cc;border-radius:14px;cursor:pointer;text-align:center;background:#f6f9fd}
+.drop.over,.drop:focus-visible{border-color:#3AB1DB;background:#eaf6fb;outline:none}
+button.link{background:none;border:0;color:var(--blue,#005499);text-decoration:underline;cursor:pointer;font:inherit;padding:0}
+@media (max-width:480px){.pk-grid{grid-template-columns:1fr}.pk-row{flex-wrap:wrap}.pk-s{flex-basis:100%}}
+.own-stamp{margin-top:4px;font-size:10.5px;line-height:1.5;color:#5b6b82;background:#f3f7fc;border:1px dashed #c9d6e6;border-radius:6px;padding:2px 6px}
+.act-bars{display:flex;align-items:flex-end;gap:3px;height:120px;margin-top:10px;padding-bottom:18px;overflow-x:auto}
+.act-b{flex:1 0 14px;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;position:relative}
+.act-b i{display:block;width:100%;min-height:2px;background:linear-gradient(180deg,#3AB1DB,#005499);border-radius:4px 4px 0 0}
+.act-b span{position:absolute;bottom:-17px;font-size:10px;color:#5b6b82}
+.vp-grid{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
+.logo-link{display:inline-flex;border-radius:10px;transition:transform .2s}.logo-link:hover{transform:scale(1.05)}.logo-link:focus-visible{outline:3px solid #3AB1DB;outline-offset:3px}
+.hm-hero{position:relative;overflow:hidden;border-radius:22px;padding:26px 28px 20px;color:#fff;background:radial-gradient(120% 140% at 0% 0%,#1b6fc2 0%,#0b3f8a 45%,#082B5A 100%);box-shadow:0 18px 40px -18px rgba(8,43,90,.6);margin-bottom:18px}
+.hm-hero:before{content:"";position:absolute;inset:auto -60px -90px auto;width:280px;height:280px;border-radius:50%;border:2px solid rgba(58,177,219,.35);box-shadow:0 0 0 30px rgba(58,177,219,.08)}
+.hm-hero-in{display:flex;align-items:center;justify-content:space-between;gap:16px;position:relative}
+.hm-hero h1{margin:4px 0 2px;font-size:clamp(22px,3vw,32px);color:#fff}.hm-hi{margin:0;color:#9fdcf3;font-weight:700}.hm-sub{margin:0;color:#cfe3f7;font-size:14px}
+.hm-logo{height:64px;opacity:.95}
+.hm-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:18px;position:relative}
+.hm-kpi{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(6px);transition:background .2s,transform .2s}
+.hm-kpi:hover{background:rgba(255,255,255,.18);transform:translateY(-2px)}.hm-kpi:focus-visible{outline:3px solid #3AB1DB}
+.hm-kpi b{font-size:26px;line-height:1.2}.hm-kl{font-size:13px;color:#cfe3f7}.hm-kd{font-size:12px;color:#9fdcf3}
+.hm-tools{display:flex;align-items:center;gap:10px;margin:0 0 6px}.hm-tools .in{max-width:420px}
+.hm-grp h2{font-size:16px;margin:18px 0 10px;color:var(--navy,#082B5A);display:flex;align-items:center;gap:8px}.hm-grp h2:before{content:"";width:6px;height:18px;border-radius:3px;background:#3AB1DB}
+.hm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.hm-card{position:relative;display:flex;flex-direction:column;gap:6px;padding:16px 16px 14px;border-radius:16px;background:#fff;border:1px solid #e3eaf3;box-shadow:0 1px 0 #fff inset,0 8px 20px -14px rgba(8,43,90,.35);color:inherit;text-decoration:none;transition:transform .18s ease,box-shadow .18s ease,border-color .18s;will-change:transform}
+.hm-card:hover{border-color:#3AB1DB;box-shadow:0 16px 30px -16px rgba(0,84,153,.45)}.hm-card:focus-visible{outline:3px solid #3AB1DB;outline-offset:2px}
+.hm-card b{font-size:15.5px;color:#082B5A}.hm-d{font-size:12.5px;color:#5b6b82;line-height:1.6}
+.hm-ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;color:#fff;background:linear-gradient(145deg,#3AB1DB,#005499);box-shadow:0 6px 14px -6px rgba(0,84,153,.6)}.hm-ic svg{width:22px;height:22px}
+.hm-go{position:absolute;inset-inline-end:14px;top:16px;color:#3AB1DB;font-weight:800;opacity:0;transition:opacity .2s}.hm-card:hover .hm-go{opacity:1}
+@media (max-width:600px){.hm-kpis{grid-template-columns:1fr 1fr;gap:8px}.hm-kpi{padding:10px}.hm-kpi b{font-size:20px}.hm-hero{padding:18px 16px}.hm-logo{display:none}.hm-grid{grid-template-columns:1fr 1fr}.hm-card{padding:12px}.hm-d{display:none}}
+@media (prefers-reduced-motion:reduce){.hm-card,.hm-kpi,.logo-link{transition:none}}
+html.lang-en .hm-go{transform:scaleX(-1)}
+.st-head{padding-bottom:12px}
+.st-secs{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}.st-secs button{border:1px solid #cfdbea;background:#fff;border-radius:999px;padding:7px 14px;font:inherit;font-weight:700;color:#082B5A;cursor:pointer}
+.st-secs button.on{background:#082B5A;border-color:#082B5A;color:#fff}.st-secs button:focus-visible,.st-steps button:focus-visible{outline:3px solid #3AB1DB;outline-offset:2px}
+.st-steps{list-style:none;display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;counter-reset:s}
+.st-steps button{display:flex;align-items:center;gap:8px;border:0;background:#eef4fb;color:#082B5A;border-radius:12px;padding:9px 14px;font:inherit;font-weight:700;cursor:pointer;transition:background .2s}
+.st-steps button i{font-style:normal;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#fff;color:#005499;font-size:13px;box-shadow:0 1px 3px rgba(8,43,90,.2)}
+.st-steps button.on{background:linear-gradient(135deg,#005499,#082B5A);color:#fff}.st-steps button.on i{background:#3AB1DB;color:#fff}
+.st-steps button.aux{background:transparent;border:1px dashed #b9c9dd;font-weight:500}
+.st-bridge{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:12px;padding:10px 14px;border-radius:12px;background:linear-gradient(90deg,#eaf7fc,#f5f9fe);border:1px solid #cfe7f3}
+.st-bridge>div{display:flex;flex-direction:column;gap:2px;max-width:780px}
+@media (max-width:600px){.st-steps button{padding:8px 10px;font-size:13px}}
+.sup-frame{width:100%;height:calc(100vh - 230px);min-height:640px;border:1px solid var(--border,#d3dbea);border-radius:14px;background:#eef2f9;display:block}
 </style>
-<script src="i18n_en.js?v=1793440320"></script>
-<script src="i18n.js?v=1793440320"></script>
+<script src="i18n_en.js?v=1793453680"></script>
+<script src="i18n.js?v=1793453680"></script>
 </head>
 <body>
 <div id="app"><div class="spinner"></div></div>
 <div id="toasts"></div>
 <script>window.DINA_RECOVERY=/type=recovery/.test(location.hash)||/type=recovery/.test(location.search);</script>
-<script src="config.js?v=1793440320"></script>
+<script src="config.js?v=1793453680"></script>
 <script src="vendor/supabase.js"></script>
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/html2canvas.min.js"></script>
 <script src="vendor/jspdf.umd.min.js"></script>
 <script src="vendor/jszip.min.js"></script>
-<script src="tpl_consts.js?v=1793440320"></script>
-<script src="export.js?v=1793440320"></script>
-<script src="api.js?v=1793440320"></script>
-<script src="demo.js?v=1793440320"></script>
-<script src="app.js?v=1793440320"></script>
-<script src="app2.js?v=1793440320"></script>
-<script src="app3.js?v=1793440320"></script>
-<script src="app4.js?v=1793440320"></script>
-<script src="lang.js?v=1793440320"></script>
-<script src="app5.js?v=1793440320"></script>
-<script src="app6.js?v=1793440320"></script>
-<script src="app7.js?v=1793440320"></script>
-<script src="app8.js?v=1793440320"></script>
-<script src="app9.js?v=1793440320"></script>
-<script src="app10.js?v=1793440320"></script>
-<script src="app11.js?v=1793440320"></script>
-<script src="app12.js?v=1793440320"></script>
-<script src="app13.js?v=1793440320"></script>
-<script src="app14.js?v=1793440320"></script>
-<script src="app15.js?v=1793440320"></script>
+<script src="tpl_consts.js?v=1793453680"></script>
+<script src="export.js?v=1793453680"></script>
+<script src="api.js?v=1793453680"></script>
+<script src="demo.js?v=1793453680"></script>
+<script src="app.js?v=1793453680"></script>
+<script src="app2.js?v=1793453680"></script>
+<script src="app3.js?v=1793453680"></script>
+<script src="app4.js?v=1793453680"></script>
+<script src="lang.js?v=1793453680"></script>
+<script src="app5.js?v=1793453680"></script>
+<script src="app6.js?v=1793453680"></script>
+<script src="app7.js?v=1793453680"></script>
+<script src="app8.js?v=1793453680"></script>
+<script src="app9.js?v=1793453680"></script>
+<script src="app10.js?v=1793453680"></script>
+<script src="app11.js?v=1793453680"></script>
+<script src="app12.js?v=1793453680"></script>
+<script src="app13.js?v=1793453680"></script>
+<script src="app14.js?v=1793453680"></script>
+<script src="app15.js?v=1793453680"></script>
+<script src="omr.js?v=1793453680"></script>
+<script src="app16.js?v=1793453680"></script>
+<script src="app17.js?v=1793453680"></script>
+<script src="app18.js?v=1793453680"></script>
+<script src="app19.js?v=1793453680"></script>
 </body>
 </html>

@@ -55,6 +55,7 @@
     D.join_codes.push({ code: 'DEMOJOIN', section_id: g.id, role: 'teacher', active: true, uses: 0 });
     const FN = ['نورة', 'سارة', 'ريم', 'لمى', 'جود', 'شهد', 'رهف', 'دانة', 'ليان', 'مها', 'هيا', 'جنى'], MN = ['عبدالله', 'محمد', 'فيصل', 'خالد', 'يوسف', 'عمر', 'تركي', 'نواف', 'بدر', 'زياد', 'فارس', 'سعود'], LN = ['العتيبي', 'الغامدي', 'الحربي', 'الزهراني', 'القحطاني', 'الشهري'];
     D.students = []; D.classes.forEach((c, ci) => { for (let i = 0; i < 12; i++) D.students.push({ id: uid(), school_id: D.schools[0].id, section_id: c.section_id, class_id: c.id, full_name: (c.section_id === g.id ? FN : MN)[(i + ci) % 12] + ' ' + LN[(i * 5 + ci) % 6], student_no: String(1000 + i), guardian_phone: '05' + String(10000000 + i * 7919), active: true }); });
+    D.login_events = []; { const ppl = D.staff.filter(x => !x.is_owner); for (let d = 0; d < 20; d++) ppl.forEach((x, i) => { if ((d + i) % 3) D.login_events.push({ id: uid(), school_id: D.schools[0].id, staff_id: x.id, at: new Date(Date.now() - d * 864e5 - i * 3600e3).toISOString(), device: i % 2 ? 'جوال · Safari/17' : 'حاسب · Chrome/130' }); }); }
     D.attendance = []; D.behaviors = []; D.sup_templates = []; D.sup_records = []; D.module_grants = [];
     return { D, owner, sup, T };
   }
@@ -164,7 +165,7 @@
       async ins(t, r) { D[t] = D[t] || []; const extra = t === 'quizzes' ? () => ({ code: Math.random().toString(16).slice(2, 14), status: 'draft' }) : t === 'remedial_plans' ? () => ({ token: Math.random().toString(16).slice(2, 18), support_quiz_ids: [], resource_links: [], progress: 0, status: 'active', gaps: [] }) : t === 'questions' ? () => ({ options: [], shared: true }) : () => ({}); return wait((Array.isArray(r) ? r : [r]).map(x => ins(t, { school_id: D.schools[0].id, by_staff: meId, created_by: meId, ...extra(), ...x }))); },
       upd: (t, id, p) => wait(upd(t, id, p)),
       del: (t, id) => wait(del(t, r => r.id === id)),
-      async ups(t, rows, on) { D[t] = D[t] || []; const keys = on.split(','); return wait(rows.map(r => { const x = D[t].find(y => keys.every(k => y[k] === r[k])); if (x) { Object.assign(x, r); return clone(x); } return ins(t, { school_id: D.schools[0].id, by_staff: meId, ...r }); })); },
+      async ups(t, rows, on) { D[t] = D[t] || []; const keys = on.split(','); return wait(rows.map(r => { const x = D[t].find(y => keys.every(k => y[k] === r[k])); if (x) { Object.assign(x, r); return clone(x); } return ins(t, { school_id: D.schools[0].id, by_staff: meId, ...(t === 'paper_results' ? { token: Math.random().toString(16).slice(2, 18) } : {}), ...r }); })); },
       async rpc(n, a) { if (n === 'week_quizzes') return wait(clone((D.quizzes || []).filter(z => z.week_id === a.p_week && z.status === 'published'))); if (n === 'sup_acknowledge') { const r = find('sup_records', a.p_id); Object.assign(r, { status: 'acknowledged', ack_at: new Date().toISOString(), ack_name: a.p_name, ack_signature: a.p_signature, ack_note: a.p_note }); } return wait(null); },
       resources: () => wait(clone(D.resources || (D.resources = []))),
       addResource: r => { D.resources = D.resources || []; return wait(ins('resources', { school_id: D.schools[0].id, created_by: meId, ...r })); },

@@ -108,6 +108,7 @@
   const BUILTIN = [
     { id: 'teacher', name: 'معلم', role: 'teacher', perms: {} },
     { id: 'coord', name: 'منسق مادة', role: 'supervisor', perms: { can_review_plans: true, can_export: true } },
+    { id: 'coordv', name: 'منسق / منسقة — اطلاع على نسب الإدخال', role: 'teacher', perms: {}, view: ['progress'] },
     { id: 'sup', name: 'مشرف تربوي', role: 'supervisor', perms: { can_review_plans: true, can_export: true } },
     { id: 'counselor', name: 'مرشد طلابي', role: 'supervisor', perms: { can_export: true } },
     { id: 'deputy', name: 'وكيل', role: 'supervisor', perms: { can_review_plans: true, can_export: true, can_manage_structure: true, can_edit_timetable: true } },
@@ -130,7 +131,7 @@
         <select class="in" id="rsec" style="max-width:170px"><option value="all">كل الأقسام</option>${secs.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select>
         <label class="chk"><input type="checkbox" id="rtitle" checked> اجعل اسم الحزمة مسمى وظيفياً</label>
         <button class="btn sm" id="rgo">تطبيق على المحددين</button></div>
-      <div class="scroll"><table class="tbl"><thead><tr><th style="width:34px"><input type="checkbox" id="rall" aria-label="تحديد الكل"></th><th>الموظف</th><th style="width:22%">المسمى الوظيفي</th>${secs.map(s => `<th>${esc(s.short_name || s.name)}</th>`).join('')}${S.me.is_owner ? '<th>أنظمة خاصة</th>' : ''}</tr></thead><tbody id="rb"></tbody></table></div></div>`;
+      <datalist id="ttlSugg">${A.TITLE_SUGG.map(t => `<option value="${esc(t)}">`).join('')}</datalist><div class="scroll"><table class="tbl"><thead><tr><th style="width:34px"><input type="checkbox" id="rall" aria-label="تحديد الكل"></th><th>الموظف</th><th style="width:22%">المسمى الوظيفي</th>${secs.map(s => `<th>${esc(s.short_name || s.name)}</th>`).join('')}${S.me.is_owner ? '<th>أنظمة خاصة</th>' : ''}</tr></thead><tbody id="rb"></tbody></table></div></div>`;
     const drawSets = () => {
       $('#psL', root).innerHTML = sets().map(p => `<span class="ldc" title="${esc(ALLP.filter(([k]) => p.perms[k]).map(([, l]) => l).join('، ') || 'بلا صلاحيات إضافية')}"><b style="background:var(--blue)">${A.ROLES[p.role] || p.role}</b> ${esc(p.name)}${S.me.is_owner && !BUILTIN.some(b => b.id === p.id && !((S.school.settings || {}).perm_sets || []).some(x => x.id === p.id)) ? `<button class="ldx" data-pe="${p.id}" aria-label="تعديل">✎</button>` : S.me.is_owner ? `<button class="ldx" data-pe="${p.id}" aria-label="تخصيص">✎</button>` : ''}</span>`).join('');
       $('#rset', root).innerHTML = '<option value="">— حزمة للمحددين —</option>' + sets().map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
@@ -142,18 +143,20 @@
         <div class="grid g2"><div class="field"><label for="pn">اسم الحزمة / المسمى</label><input class="in" id="pn" value="${esc(p.name)}" placeholder="مثال: رائد نشاط"></div>
         <div class="field"><label for="pr">الدور الأساسي</label><select class="in" id="pr">${Object.entries(A.ROLES).map(([k, l]) => `<option value="${k}" ${p.role === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div></div>
         <div class="perm-grid">${ALLP.map(([k, l]) => `<label class="chk"><input type="checkbox" value="${k}" ${p.perms[k] ? 'checked' : ''}> ${l}</label>`).join('')}</div>
+        <div class="vp-grid perm-grid2" style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border)"><span class="small muted">اطلاع فقط (بلا تعديل):</span>${A.VIEW_PERMS.map(([k, l]) => `<label class="chk"><input type="checkbox" value="${k}" ${(p.view || []).includes(k) ? 'checked' : ''}> ${l}</label>`).join('')}</div>
+        <label class="chk" style="margin-top:8px"><input type="checkbox" id="prs" ${p.restricted ? 'checked' : ''}> إن كان الدور «مدير القسم»: يقتصر على الصلاحيات المحددة أعلاه فقط</label>
         <div class="acts">${((S.school.settings || {}).perm_sets || []).some(x => x.id === p.id) ? '<button class="btn bad" id="pdel">حذف الحزمة</button>' : ''}<button class="btn" id="pgo">حفظ</button></div>`, { cls: 'wide' });
-      const save = async (del) => { const cur = ((S.school.settings || {}).perm_sets || []).filter(x => x.id !== p.id); if (!del) { p.name = m.el.querySelector('#pn').value.trim(); if (!p.name) throw new Error('اكتب اسم الحزمة'); p.role = m.el.querySelector('#pr').value; p.perms = {}; $$('.perm-grid input:checked', m.el).forEach(i => p.perms[i.value] = true); cur.push(p); }
+      const save = async (del) => { const cur = ((S.school.settings || {}).perm_sets || []).filter(x => x.id !== p.id); if (!del) { p.name = m.el.querySelector('#pn').value.trim(); if (!p.name) throw new Error('اكتب اسم الحزمة'); p.role = m.el.querySelector('#pr').value; p.perms = {}; $$('.perm-grid input:checked', m.el).forEach(i => p.perms[i.value] = true); p.view = $$('.vp-grid input:checked', m.el).map(i => i.value); p.restricted = m.el.querySelector('#prs').checked; cur.push(p); }
         const settings = { ...(S.school.settings || {}), perm_sets: cur }; const r = await api.updateSchool(S.school.id, { settings }); S.school.settings = r.settings || settings; m.close(); drawSets(); A.toast(del ? 'حُذفت الحزمة' : 'حُفظت الحزمة', 'ok'); };
       m.el.querySelector('#pgo').onclick = e => A.run(e.currentTarget, () => save(false));
       const pd = m.el.querySelector('#pdel'); if (pd) pd.onclick = e => A.run(e.currentTarget, () => save(true));
     };
-    const roleCell = (p, s) => { const m = memOf(p.id, s.id); if (!m) return '<span class="faint small">—</span>'; const n = ALLP.filter(([k]) => m[k]).length; return `<span class="pill ${m.role === 'admin' ? 'st-approved' : m.role === 'supervisor' ? 'st-submitted' : 'st-empty'}">${A.ROLES[m.role]}</span>${n ? ` <span class="small muted">+${AR(n)}</span>` : ''}`; };
+    const roleCell = (p, s) => { const m = memOf(p.id, s.id); if (!m) return '<span class="faint small">—</span>'; const n = ALLP.filter(([k]) => m[k]).length; const v = ((m.extra || {}).view || []).length; return `<span class="pill ${m.role === 'admin' ? 'st-approved' : m.role === 'supervisor' ? 'st-submitted' : 'st-empty'}">${A.ROLES[m.role]}${m.role === 'admin' && (m.extra || {}).restricted ? ' (محدد)' : ''}</span>${n ? ` <span class="small muted">+${AR(n)}</span>` : ''}${v ? ` <span class="small muted" title="${esc(A.VIEW_PERMS.filter(([k]) => m.extra.view.includes(k)).map(x => x[1]).join('، '))}">اطلاع ${AR(v)}</span>` : ''}`; };
     const draw = () => {
       const q = A.normKey($('#rq', root).value || '');
       const l = people.filter(p => !q || A.normKey(p.full_name + ' ' + (p.title || '') + ' ' + (p.specialty || '')).includes(q));
       $('#rb', root).innerHTML = l.map(p => `<tr><td><input type="checkbox" data-s="${p.id}" ${sel.has(p.id) ? 'checked' : ''} aria-label="تحديد ${esc(p.full_name)}"></td><td><b>${esc(p.full_name)}</b><div class="small muted">${esc(p.specialty || '')}${p.email ? ' · ' + esc(p.email) : ''}</div></td>
-        <td><input class="in" data-t="${p.id}" value="${esc(p.title || '')}" placeholder="اكتب المسمى…" style="padding:6px 10px"><button class="drv-link ${p.drive_url ? 'on' : ''}" data-dv="${p.id}" title="${p.drive_url ? 'مجلد Drive مربوط — اضغط للتعديل' : 'ربط مجلد Drive'}">${p.drive_url ? '✓ مجلد Drive' : '+ مجلد Drive'}</button></td>${secs.map(s => `<td>${roleCell(p, s)}</td>`).join('')}
+        <td><input class="in" data-t="${p.id}" list="ttlSugg" value="${esc(p.title || '')}" placeholder="اختر أو اكتب المسمى…" style="padding:6px 10px"><button class="drv-link ${p.drive_url ? 'on' : ''}" data-dv="${p.id}" title="${p.drive_url ? 'مجلد Drive مربوط — اضغط للتعديل' : 'ربط مجلد Drive'}">${p.drive_url ? '✓ مجلد Drive' : '+ مجلد Drive'}</button></td>${secs.map(s => `<td>${roleCell(p, s)}</td>`).join('')}
         ${S.me.is_owner ? `<td><div class="mg-grid">${MODULES.map(([k, lb, sh]) => `<label class="chk small" title="${lb}"><input type="checkbox" data-mg="${p.id}|${k}" ${(S.grants || []).some(g => g.staff_id === p.id && g.module === k) ? 'checked' : ''}> ${sh}</label>`).join('')}</div></td>` : ''}</tr>`).join('') || `<tr><td colspan="9">${A.emptyBox('لا يوجد موظفون')}</td></tr>`;
       $('#rsel', root).textContent = sel.size ? `محدد: ${AR(sel.size)}` : '';
       $$('[data-s]', root).forEach(i => i.onchange = () => { i.checked ? sel.add(i.dataset.s) : sel.delete(i.dataset.s); $('#rsel', root).textContent = sel.size ? `محدد: ${AR(sel.size)}` : ''; });
@@ -170,7 +173,7 @@
       if (!(await A.confirmBox(`تطبيق حزمة «${esc(p.name)}» على ${A.cnt(sel.size, 'موظف', 'موظفين')} في ${sv === 'all' ? 'كل الأقسام' : esc((secs.find(s => s.id === sv) || {}).name || '')}؟<br><span class="small muted">تُستبدل صلاحياتهم في هذه الأقسام بصلاحيات الحزمة. خططهم ومدخلاتهم لا تتأثر.</span>`, 'تطبيق'))) return;
       const tools = S.me.is_owner ? A.TOOL_PERMS.map(([k]) => k) : [];
       for (const sid of sel) for (const sec of targets) {
-        const row = { staff_id: sid, section_id: sec, role: p.role }; A.PERMS.forEach(([k]) => row[k] = !!p.perms[k]); tools.forEach(k => row[k] = !!p.perms[k]);
+        const row = { staff_id: sid, section_id: sec, role: p.role }; A.PERMS.forEach(([k]) => row[k] = !!p.perms[k]); tools.forEach(k => row[k] = !!p.perms[k]); row.extra = Object.assign({}, (p.view || []).length ? { view: p.view } : {}, p.restricted ? { restricted: true } : {});
         await api.upsertMembership(row);
         if ($('#rtitle', root).checked) { const r = await api.updateStaff(sid, { title: p.name }); const x = S.staff.find(y => y.id === sid); if (x) x.title = r.title; }
       }

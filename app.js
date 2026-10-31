@@ -241,6 +241,7 @@
     ['reports', 'التقارير', () => S.me.is_owner || anyPerm('review', 'export', 'users')],
     ['posts', 'إعلانات أولياء الأمور', () => S.me.is_owner || anyPerm('users', 'structure')],
     ['assess', 'التقويم والاختبارات', () => !!(APP.canAssess && APP.canAssess())],
+    ['records', 'سجل المتابعة', () => true],
     ['resources', 'المصادر', () => true],
     ['analysis', 'تحليل النتائج', () => !!(APP.hasModule && APP.hasModule('analysis'))],
     ['attendance', 'الحضور والسلوك', () => !!(APP.hasModule && (APP.hasModule('attendance') || APP.hasModule('counselor') || APP.hasModule('supervision')))],
@@ -279,7 +280,7 @@
     document.body.appendChild(o); o.onclick = e => { if (e.target === o || e.target.closest('a')) o.remove(); };
   }
   // ظهور البنود للمعلمين بقرار المالك — الإخفاء لا يمس البيانات
-  const FEAT_DEF = { assess: 'all', resources: 'all', analysis: 'granted', attendance: 'granted', supervision: 'granted' };
+  const FEAT_DEF = { assess: 'all', records: 'all', resources: 'all', analysis: 'granted', attendance: 'granted', supervision: 'granted' };
   const featMode = k => ((((S.school || {}).settings || {}).features || {})[k]) || FEAT_DEF[k];
   const featGate = k => { if (!(k in FEAT_DEF) || !S.me || S.me.is_owner) return true; const m = featMode(k); if (m === 'off') return false; if (m === 'granted' && FEAT_DEF[k] === 'all') return !!(APP.hasModule && APP.hasModule(k)); return true; };
   const navOK = n => n[2]() && featGate(n[0]) && (n[0] !== 'myreports' || featGate('supervision'));
@@ -290,7 +291,7 @@
     $('#nav').innerHTML = items.map(([k, l]) => `<a href="#/${k}" class="${S.view === k ? 'on' : ''}" ${S.view === k ? 'aria-current="page"' : ''}>${I[k]}<span>${l}</span>${k === 'my' && myCount ? `<span class="cnt">${AR(myCount)}</span>` : ''}</a>`).join('');
     const bn = $('#bnav'); if (bn) {
       const prim = items.length > 5 ? items.slice(0, 4) : items, rest = items.length > 5 ? items.slice(4) : [];
-      const SHORT = { assess: 'التقويم', attendance: 'الحضور', supervision: 'الإشراف', myreports: 'تقاريري', resources: 'المصادر', analysis: 'التحليل', roles: 'الصلاحيات', dash: 'المتابعة', classes: 'الفصول', timetable: 'الجدول', builder: 'الجدول الآلي', nisab: 'النصاب', dev: 'المطوّر', posts: 'الإعلانات' };
+      const SHORT = { records: 'السجل', assess: 'التقويم', attendance: 'الحضور', supervision: 'الإشراف', myreports: 'تقاريري', resources: 'المصادر', analysis: 'التحليل', roles: 'الصلاحيات', dash: 'المتابعة', classes: 'الفصول', timetable: 'الجدول', builder: 'الجدول الآلي', nisab: 'النصاب', dev: 'المطوّر', posts: 'الإعلانات' };
       bn.innerHTML = prim.map(([k, l]) => `<a href="#/${k}" class="${S.view === k ? 'on' : ''}">${I[k]}<span>${SHORT[k] || l}</span></a>`).join('') +
         (rest.length ? `<button type="button" id="moreBtn" class="${rest.some(r => r[0] === S.view) ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg><span>المزيد</span></button>` : '');
       const mb = $('#moreBtn'); if (mb) mb.onclick = () => moreSheet(rest);

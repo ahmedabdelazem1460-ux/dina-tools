@@ -5,8 +5,8 @@
 
   // ---------- صلاحيات الأنظمة الخاصة (تحليل النتائج، سجلاتي…) ----------
   const FOPT = { all: 'لكل المعلمين', granted: 'لمن أمنحه فقط', off: 'مخفي (للمالك فقط)' };
-  const FEATS = [['assess', 'التقويم والاختبارات', ['all', 'granted', 'off']], ['resources', 'المصادر', ['all', 'granted', 'off']], ['analysis', 'تحليل النتائج', ['granted', 'off']], ['attendance', 'الحضور والسلوك والإرشاد', ['granted', 'off']], ['supervision', 'الإشراف التربوي وتقاريري', ['granted', 'off']]];
-  const MODULES = [['assess', 'التقويم والاختبارات (عند تفعيله «لمن أمنحه»)', 'التقويم'], ['analysis', 'تحليل النتائج والاختبارات التشخيصية', 'التحليل'], ['supervision', 'الإشراف التربوي', 'الإشراف'], ['attendance', 'الحضور والسلوك — مشرف دور', 'الحضور'], ['counselor', 'الإرشاد الطلابي — الإحالات', 'المرشد'], ['records', 'سجلاتي برو', 'سجلاتي'], ['resources', 'المصادر (عند تفعيلها «لمن أمنحه»)', 'المصادر']];
+  const FEATS = [['assess', 'التقويم والاختبارات', ['all', 'granted', 'off']], ['records', 'سجل المتابعة', ['all', 'granted', 'off']], ['resources', 'المصادر', ['all', 'granted', 'off']], ['analysis', 'تحليل النتائج', ['granted', 'off']], ['attendance', 'الحضور والسلوك والإرشاد', ['granted', 'off']], ['supervision', 'الإشراف التربوي وتقاريري', ['granted', 'off']]];
+  const MODULES = [['assess', 'التقويم والاختبارات (عند تفعيله «لمن أمنحه»)', 'التقويم'], ['analysis', 'تحليل النتائج والاختبارات التشخيصية', 'التحليل'], ['supervision', 'الإشراف التربوي', 'الإشراف'], ['attendance', 'الحضور والسلوك — مشرف دور', 'الحضور'], ['counselor', 'الإرشاد الطلابي — الإحالات', 'المرشد'], ['records', 'سجل المتابعة (عند تفعيله «لمن أمنحه»)', 'السجل'], ['resources', 'المصادر (عند تفعيلها «لمن أمنحه»)', 'المصادر']];
   A.hasModule = m => !!S.me && (S.me.is_owner || (S.grants || []).some(g => g.module === m && g.staff_id === S.me.id));
   async function loadGrants() { try { S.grants = await api.moduleGrants(); } catch (_) { S.grants = []; } }
   const prevAfter = window.APP_AFTER_WEEK;

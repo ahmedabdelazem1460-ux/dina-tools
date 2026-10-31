@@ -36,7 +36,7 @@
     return list.map(x => [x.name, +((x.hours || [])[idx]) || 0]).filter(([, n]) => n > 0);
   }
   async function approveNisab(root) {
-    const st = readNisab();
+    const st = A.readNisabAny ? await A.readNisabAny() : readNisab();
     if (!st) return A.toast('لا توجد بيانات في أداة النصاب على هذا الجهاز بعد — افتح تبويب «النصاب» وأدخلها أولاً', 'warn');
     const cls = S.classes.filter(c => c.active), map = cls.map(c => [c, nisabHours(st, c)]), ok = map.filter(([, h]) => h && h.length), skip = map.filter(([, h]) => !h || !h.length);
     if (!ok.length) return A.toast('لم يُتعرَّف على صفوف هذا القسم في النصاب (ابتدائي/متوسط/ثانوي). للقسم العالمي استخدم «توزيع القسم العالمي الجاهز» أو اللصق من Excel.', 'warn');

@@ -731,11 +731,11 @@
       <p class="small muted">الفصل الجديد يظهر في الأسابيع التي تُنشأ بعد إضافته، بعد إضافة حصصه في الجدول واعتماده.</p>`;
     $('#ac', box).onclick = e => A.run(e.currentTarget, async () => {
       const info = parseClassName($('#nc', box).value); if (!info) throw new Error('الاسم لا يتبع التسمية المعتمدة، مثل: سادس ابتدائي ب');
-      await api.addClass({ section_id: S.sectionId, ...info, sort: S.classes.length }); S.classes = await api.classes(S.sectionId); again(); A.toast('أُضيف الفصل', 'ok');
+      await api.addClass({ section_id: S.sectionId, ...info, sort: S.classes.length }); S.allClasses = S.classes = await api.classes(S.sectionId); again(); A.toast('أُضيف الفصل', 'ok');
     });
-    $$('[data-o]', box).forEach(i => i.onchange = () => A.run(null, async () => { await api.updateClass(i.dataset.o, { sort: +i.value }); S.classes = await api.classes(S.sectionId); }));
-    $$('[data-l]', box).forEach(i => i.onchange = () => A.run(null, async () => { await api.updateClass(i.dataset.l, { class_label: i.value.trim() }); S.classes = await api.classes(S.sectionId); A.toast('حُفظ', 'ok'); }));
-    $$('[data-act]', box).forEach(i => i.onchange = () => A.run(null, async () => { await api.updateClass(i.dataset.act, { active: i.checked }); S.classes = await api.classes(S.sectionId); }));
+    $$('[data-o]', box).forEach(i => i.onchange = () => A.run(null, async () => { await api.updateClass(i.dataset.o, { sort: +i.value }); S.allClasses = S.classes = await api.classes(S.sectionId); }));
+    $$('[data-l]', box).forEach(i => i.onchange = () => A.run(null, async () => { await api.updateClass(i.dataset.l, { class_label: i.value.trim() }); S.allClasses = S.classes = await api.classes(S.sectionId); A.toast('حُفظ', 'ok'); }));
+    $$('[data-act]', box).forEach(i => i.onchange = () => A.run(null, async () => { await api.updateClass(i.dataset.act, { active: i.checked }); S.allClasses = S.classes = await api.classes(S.sectionId); }));
   }
   function admOrg(box, again) {
     box.innerHTML = `<div class="grid g2"><div class="field"><label>اسم المدرسة</label><input class="in" id="on" value="${esc(S.school.name)}"></div><div class="field"><label>سطر الفصل الدراسي في الغلاف</label><input class="in" id="ot" value="${esc(S.school.term_label)}"></div></div>

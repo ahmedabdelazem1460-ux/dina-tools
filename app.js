@@ -80,7 +80,10 @@
   const subjName = id => (subj(id) || {}).name || '';
   const person = id => S.staff.find(s => s.id === id);
   const personName = id => (person(id) || {}).full_name || '';
-  const cls = id => S.classes.find(c => c.id === id);
+  const cls = id => S.classes.find(c => c.id === id) || (S.allClasses || []).find(c => c.id === id);
+  // المراحل داخل القسم: عرض مرحلة واحدة أو الكل (لا يغيّر أي بيانات)
+  const stageOf = c => (c.stage || '').trim() || (/ابتدائي/.test(c.name) ? 'ابتدائي' : /متوسط/.test(c.name) ? 'متوسط' : /ثانوي/.test(c.name) ? 'ثانوي' : /^KG/i.test(c.name) ? 'KG' : 'أخرى');
+  const STAGE_L = { 'ابتدائي': 'الابتدائية', 'متوسط': 'المتوسطة', 'ثانوي': 'الثانوية', KG: 'رياض الأطفال', Grade: 'Grades 1–12' };
   const myMem = (sec = S.sectionId) => S.memberships.find(m => m.staff_id === S.me.id && m.section_id === sec);
   function perm(p, sec = S.sectionId) {
     if (S.me.is_owner) return true;
@@ -212,7 +215,11 @@
   }
   async function loadSection(keepWeek) {
     const [c, w] = await Promise.all([api.classes(S.sectionId), api.weeks(S.sectionId)]);
-    S.classes = c; S.weeks = w;
+    S.allClasses = c; S.weeks = w;
+    const order = ['KG', 'ابتدائي', 'Grade', 'متوسط', 'ثانوي'];
+    S.stages = [...new Set(c.map(stageOf))].sort((a, b) => (order.indexOf(a) + 1 || 9) - (order.indexOf(b) + 1 || 9));
+    S.stage = LS.get('stage_' + S.sectionId) || 'all'; if (S.stage !== 'all' && !S.stages.includes(S.stage)) S.stage = 'all';
+    S.classes = S.stage === 'all' ? c : c.filter(x => stageOf(x) === S.stage);
     const savedW = keepWeek || LS.get('week_' + S.sectionId);
     const open = w.filter(x => x.status === 'open' && !x.archived).sort((a, b) => a.number - b.number);
     S.weekId = w.some(x => x.id === savedW) ? savedW : (open[0] || w[0] || {}).id || null;
@@ -221,7 +228,8 @@
   async function loadWeek() {
     if (!S.weekId) { S.entries = []; S.notes = []; return; }
     const [e, n, x] = await Promise.all([api.entries(S.weekId), api.notes(S.weekId), api.extraPages(S.weekId).catch(() => [])]);
-    S.entries = e; S.notes = n; S.extraPages = x;
+    S.allEntries = e; S.notes = n; S.extraPages = x;
+    if (S.stage && S.stage !== 'all') { const ids = new Set(S.classes.map(c => c.id)); S.entries = e.filter(x => ids.has(x.class_id) || x.teacher_id === (S.me || {}).id); } else S.entries = e;
     try { S.delegs = api.delegations ? await api.delegations(S.sectionId) : []; } catch (_) { S.delegs = []; }
     if (window.APP_AFTER_WEEK) { try { await window.APP_AFTER_WEEK(); } catch (_) {} }
   }
@@ -262,6 +270,7 @@
       <div class="ttl">منصة دينا للتخطيط الدراسي<small>${esc(S.school.name)}</small></div>
       <div class="grow"></div>
       <div class="pick"><label>القسم</label><select id="secSel">${S.sections.map(s => `<option value="${s.id}" ${s.id === S.sectionId ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>
+      ${(S.stages || []).length > 1 ? `<div class="pick"><label>المرحلة</label><select id="stSel"><option value="all">كل المراحل</option>${S.stages.map(x => `<option value="${esc(x)}" ${S.stage === x ? 'selected' : ''}>${esc(STAGE_L[x] || x)}</option>`).join('')}</select></div>` : ''}
       <div class="pick"><label>الأسبوع</label><select id="weekSel">${S.weeks.length ? S.weeks.map(w => `<option value="${w.id}" ${w.id === S.weekId ? 'selected' : ''}>الأسبوع ${esc(w.word)} ${w.archived ? '· أرشيف' : w.status !== 'open' ? '· ' + WSTATUS[w.status] : ''}</option>`).join('') : '<option>لا توجد أسابيع</option>'}</select></div>
       <button class="userbtn icon-only" id="inboxBtn" aria-label="الرسائل"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H7l-3 3z"/></svg><span class="badge hidden" id="inboxN"></span></button>
       <button class="userbtn" id="ub"><span class="avatar">${esc((S.me.full_name.replace(/^(أ\.|Ms\.|Mr\.|د\.)\s*/, '')[0]) || '؟')}</span><span class="small" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.me.full_name)}</span></button>
@@ -269,6 +278,7 @@
     <nav class="nav" id="nav"></nav>
     <main id="main"></main><nav class="bnav" id="bnav" aria-label="التنقل"></nav>`;
     $('#secSel').onchange = async e => { S.sectionId = e.target.value; LS.set('section', S.sectionId); $('#main').innerHTML = '<div class="spinner"></div>'; await loadSection(); shell(); route(); };
+    const stS = $('#stSel'); if (stS) stS.onchange = async e => { LS.set('stage_' + S.sectionId, e.target.value); $('#main').innerHTML = '<div class="spinner"></div>'; await loadSection(S.weekId); shell(); route(); };
     $('#weekSel').onchange = async e => { S.weekId = e.target.value; LS.set('week_' + S.sectionId, S.weekId); $('#main').innerHTML = '<div class="spinner"></div>'; await loadWeek(); route(); };
     $('#ub').onclick = e => { e.stopPropagation(); userMenu(); };
     const bm = $('#backMe'); if (bm) bm.onclick = () => { LS.set('viewas', ''); location.hash = '#/dev'; start(); };
@@ -783,7 +793,7 @@
   }
 
   // ---------- مشترك مع الملفات الأخرى ----------
-  window.APP = { featMode, featGate, FEAT_DEF, PERF, perfName, start: () => start(), TOOL_PERMS, TOOL_KEYS, cnt, api, S, $, $$, esc, AR, DAYS, PER, ORD, STATUS, WSTATUS, ROLES, PERMS, ROLE_DEFAULTS, I, parseDate, isoDate, dmy, weekDates, fmtDT, pct, norm, normKey, genPass, toast, modal, confirmBox, run, pill, bar, emptyBox, download, section, week, subj, subjName, person, personName, cls, myMem, perm, anyPerm, holidayOf, required, filled, stats, loadSection, loadWeek, refreshPeople, refreshMyCards, delegOf, shell, route, renderNav, LS, DEMO };
+  window.APP = { stageOf, featMode, featGate, FEAT_DEF, PERF, perfName, start: () => start(), TOOL_PERMS, TOOL_KEYS, cnt, api, S, $, $$, esc, AR, DAYS, PER, ORD, STATUS, WSTATUS, ROLES, PERMS, ROLE_DEFAULTS, I, parseDate, isoDate, dmy, weekDates, fmtDT, pct, norm, normKey, genPass, toast, modal, confirmBox, run, pill, bar, emptyBox, download, section, week, subj, subjName, person, personName, cls, myMem, perm, anyPerm, holidayOf, required, filled, stats, loadSection, loadWeek, refreshPeople, refreshMyCards, delegOf, shell, route, renderNav, LS, DEMO };
 
   // ---------- تشغيل ----------
   window.addEventListener('DOMContentLoaded', async () => {

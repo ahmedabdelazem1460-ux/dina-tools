@@ -115,7 +115,7 @@
   ];
   const ALLP = A.PERMS.concat(A.TOOL_PERMS);
   V.roles = function (root) {
-    if (!(S.me.is_owner || A.perm('users'))) { root.innerHTML = `<div class="card">${A.emptyBox('غير متاح')}</div>`; return; }
+    if (!S.me.is_owner) { root.innerHTML = `<div class="card">${A.emptyBox('الصلاحيات تُدار من حساب المالك فقط')}</div>`; return; }
     const sets = () => { const c = ((S.school.settings || {}).perm_sets) || []; return BUILTIN.filter(b => !c.some(x => x.id === b.id)).concat(c); };
     const people = S.staff.filter(p => p.active && !p.is_owner);
     const memOf = (sid, sec) => S.memberships.find(m => m.staff_id === sid && m.section_id === sec);

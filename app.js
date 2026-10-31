@@ -256,7 +256,7 @@
     ['attendance', 'الحضور والسلوك', () => !!(APP.hasModule && (APP.hasModule('attendance') || APP.hasModule('counselor') || APP.hasModule('supervision')))],
     ['supervision', 'الإشراف التربوي', () => !!(APP.hasModule && APP.hasModule('supervision'))],
     ['myreports', 'تقاريري', () => !!S.supCount],
-    ['roles', 'المسميات والصلاحيات', () => S.me.is_owner || anyPerm('users')],
+    ['roles', 'المسميات والصلاحيات', () => S.me.is_owner],
     ['archive', 'الأرشيف', () => S.me.is_owner],
     ['dev', 'لوحة المطوّر', () => S.me.is_owner],
   ];

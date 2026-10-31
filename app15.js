@@ -306,6 +306,13 @@
     cards.forEach(cd => { if (cd.j) (jcards[cd.j] = jcards[cd.j] || []).push(cd.id); });
     return { D, Pn, N, cls, ci, cards, jcards };
   }
+  // انشغال المعلم المشترك في الأقسام الأخرى (من جداولها المعتمدة) — يُمنع التعارض بين الأقسام
+  let EXT = {};
+  async function loadExt() {
+    EXT = {}; const secs = (S.allSections || S.sections || []).filter(x => x.id !== S.sectionId);
+    for (const sc of secs) { let sl = []; try { sl = await api.approvedSlots(sc.id); } catch (_) {} sl.forEach(x => { if (x.teacher_id) (EXT[x.teacher_id] = EXT[x.teacher_id] || new Map()).set(x.day + '-' + x.period, sc.name); }); }
+    return EXT;
+  }
   function solve(opt) {
     const M = build(), { D, Pn, N, cls, cards, jcards } = M, mx = P.maxDay || 2;
     const blk = Object.fromEntries(Object.entries(P.blocks || {}).map(([t, l]) => [t, new Set(l)]));
@@ -345,7 +352,7 @@
           for (let k = 0; k < N; k++) { const cd = C(row[k]); const d = Math.floor(k / Pn), p = k % Pn;
             if (!cd) { if (P.emptyLast !== false && p < Pn - 1) { for (let q = k + 1; q < (d + 1) * Pn; q++) if (row[q] >= 0) { c += 0.4; break; } } continue; }
             const t = tch(gi, cd.sid), r = room(cd.sid);
-            if (t) { const key = k + '|' + t; const prev = tslot.get(key); if (prev !== undefined && !(cd.j && prev === cd.j)) c += 10; tslot.set(key, cd.j || 'x' + gi); if (blk[t] && blk[t].has(d + '-' + p)) c += 8; }
+            if (t) { const key = k + '|' + t; const prev = tslot.get(key); if (prev !== undefined && !(cd.j && prev === cd.j)) c += 10; tslot.set(key, cd.j || 'x' + gi); if (blk[t] && blk[t].has(d + '-' + p)) c += 8; if (EXT[t] && EXT[t].has(d + '-' + p)) c += 10; }
             if (r) { const key = k + '|' + r; const prev = rslot.get(key); if (prev !== undefined && !(cd.j && prev === cd.j)) c += 8; rslot.set(key, cd.j || 'x' + gi); }
             if (AL[cd.sid] && !AL[cd.sid].has(p)) c += 5;
             if (coff[gi].has(d + '-' + p)) c += 10;
@@ -389,7 +396,7 @@
     const out = [], { D, Pn, N, cls } = g, tmap = {}, rmap = {};
     g.grid.forEach((row, gi) => row.forEach((s, k) => { if (!s) return; const d = Math.floor(k / Pn), p = k % Pn, t = g.tch(gi, s), r = (P.subj[s] || {}).room, cd = g.cards[g.cid[gi][k]];
       const key = cd && cd.j ? cd.j : 'x' + gi;
-      if (t) { const kk = k + '|' + t; (tmap[kk] = tmap[kk] || new Set()).add(key); if ((P.blocks[t] || []).includes(d + '-' + p)) out.push(`${A.personName(t)} غير متاح ${A.DAYS[d]} الحصة ${p + 1} (${cls[gi].name})`); }
+      if (t) { const kk = k + '|' + t; (tmap[kk] = tmap[kk] || new Set()).add(key); if ((P.blocks[t] || []).includes(d + '-' + p)) out.push(`${A.personName(t)} غير متاح ${A.DAYS[d]} الحصة ${p + 1} (${cls[gi].name})`); if (EXT[t] && EXT[t].has(d + '-' + p)) out.push(`${A.personName(t)} لديه حصة في ${EXT[t].get(d + '-' + p)} ${A.DAYS[d]} الحصة ${p + 1} (${cls[gi].name})`); }
       if (r) { const kk = k + '|' + r; (rmap[kk] = rmap[kk] || new Set()).add(key); }
       const al = (P.subj[s] || {}).periods; if (al && al.length && !al.includes(p)) out.push(`${sName(s)} في حصة غير مسموحة: ${A.DAYS[d]} ${p + 1} (${cls[gi].name})`);
       if ((P.classOff[cls[gi].id] || []).includes(d + '-' + p)) out.push(`${cls[gi].name}: حصة في وقت مغلق ${A.DAYS[d]} ${p + 1}`); }));
@@ -404,13 +411,13 @@
     const heavy = Object.entries(ld).filter(([, n]) => n > cap()); ens();
     const nl = Object.values(P.locks).reduce((a, m) => a + Object.keys(m).length, 0);
     box.innerHTML = `<div class="sec-box" style="margin-top:12px"><div class="row" style="justify-content:space-between;gap:10px"><div><b>توليد جدول ${AR(cls.length)} فصلاً من التوزيع</b>
-        <p class="small muted" style="margin:4px 0 0">يراعي: عدد الحصص، الحصص المزدوجة، الحصص المشتركة، تعارض المعلم والقاعة، أوقات عدم الإتاحة للمعلم والفصل، الحصص المسموح بها لكل مادة، أقصى ${AR(P.maxDay || 2)} حصص للمادة يومياً، حدود المعلم اليومية والفراغات${nl ? `، و${AR(nl)} حصة مثبّتة` : ''}.${miss.length ? ` <b style="color:#b54708">${AR(miss.length)} خلية بلا معلم.</b>` : ''}</p></div>
+        <p class="small muted" style="margin:4px 0 0">يراعي: عدد الحصص، الحصص المزدوجة، الحصص المشتركة، تعارض المعلم والقاعة، أوقات عدم الإتاحة للمعلم والفصل، انشغال المعلم المشترك في الأقسام الأخرى، الحصص المسموح بها لكل مادة، أقصى ${AR(P.maxDay || 2)} حصص للمادة يومياً، حدود المعلم اليومية والفراغات${nl ? `، و${AR(nl)} حصة مثبّتة` : ''}.${miss.length ? ` <b style="color:#b54708">${AR(miss.length)} خلية بلا معلم.</b>` : ''}</p></div>
         <button class="btn sky" id="gGo">توليد</button></div>${heavy.length ? `<div class="notice bad" style="margin-top:10px">لا يمكن جدولة معلم بأكثر من ${AR(cap())} حصة أسبوعياً: ${heavy.map(([t, n]) => `${esc(A.personName(t))} (${AR(n)})`).join('، ')}</div>` : ''}<div id="gOut"></div></div>`;
     if (lastGen) showGen($('#gOut', box), root);
     $('#gGo', box).onclick = e => A.run(e.currentTarget, async () => {
       if (dirty) await save(true);
       $('#gOut', box).innerHTML = '<div class="spinner"></div>'; await new Promise(r => setTimeout(r, 30));
-      lastGen = solve({ restarts: 3, iters: 7000 }); showGen($('#gOut', box), root);
+      await loadExt(); lastGen = solve({ restarts: 3, iters: 7000 }); showGen($('#gOut', box), root);
     });
   }
   let pick = null;
@@ -440,7 +447,7 @@
       [g.grid[gi][a], g.grid[gi][b]] = [g.grid[gi][b], g.grid[gi][a]]; [g.cid[gi][a], g.cid[gi][b]] = [g.cid[gi][b], g.cid[gi][a]];
       g.issues = issuesOf(g); showGen(out, root);
     });
-    $('#gRe', out).onclick = e => A.run(e.currentTarget, async () => { if (dirty) await save(true); lastGen = solve({ restarts: 3, iters: 7000 }); showGen(out, root); });
+    $('#gRe', out).onclick = e => A.run(e.currentTarget, async () => { if (dirty) await save(true); await loadExt(); lastGen = solve({ restarts: 3, iters: 7000 }); showGen(out, root); });
     $('#gSave', out).onclick = e => A.run(e.currentTarget, async () => {
       const v = await api.createDraft({ section_id: S.sectionId, label: 'من توزيع الحصص — ' + new Date().toLocaleDateString('ar-SA-u-nu-latn'), source: 'توزيع الحصص', created_by: S.me.id });
       const vs = await api.ttVersions(S.sectionId), ap = vs.find(x => x.status === 'approved'), ids = new Set(g.cls.map(x => x.id));

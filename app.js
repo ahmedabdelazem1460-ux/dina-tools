@@ -236,6 +236,7 @@
     ['timetable', 'الجدول الدراسي', () => anyPerm('timetable_edit', 'timetable_approve', 'structure')],
     ['weeks', 'الأسابيع', () => perm('structure')],
     ['nisab', 'احتساب النصاب', () => perm('nisab')],
+    ['plan', 'توزيع الحصص', () => !!(APP.canPlan && APP.canPlan())],
     ['builder', 'الجدول الآلي', () => perm('tt_builder')],
     ['admin', 'الإدارة', () => S.me.is_owner || anyPerm('users', 'structure')],
     ['reports', 'التقارير', () => S.me.is_owner || anyPerm('review', 'export', 'users')],
@@ -291,7 +292,7 @@
     $('#nav').innerHTML = items.map(([k, l]) => `<a href="#/${k}" class="${S.view === k ? 'on' : ''}" ${S.view === k ? 'aria-current="page"' : ''}>${I[k]}<span>${l}</span>${k === 'my' && myCount ? `<span class="cnt">${AR(myCount)}</span>` : ''}</a>`).join('');
     const bn = $('#bnav'); if (bn) {
       const prim = items.length > 5 ? items.slice(0, 4) : items, rest = items.length > 5 ? items.slice(4) : [];
-      const SHORT = { records: 'السجل', assess: 'التقويم', attendance: 'الحضور', supervision: 'الإشراف', myreports: 'تقاريري', resources: 'المصادر', analysis: 'التحليل', roles: 'الصلاحيات', dash: 'المتابعة', classes: 'الفصول', timetable: 'الجدول', builder: 'الجدول الآلي', nisab: 'النصاب', dev: 'المطوّر', posts: 'الإعلانات' };
+      const SHORT = { plan: 'التوزيع', records: 'السجل', assess: 'التقويم', attendance: 'الحضور', supervision: 'الإشراف', myreports: 'تقاريري', resources: 'المصادر', analysis: 'التحليل', roles: 'الصلاحيات', dash: 'المتابعة', classes: 'الفصول', timetable: 'الجدول', builder: 'الجدول الآلي', nisab: 'النصاب', dev: 'المطوّر', posts: 'الإعلانات' };
       bn.innerHTML = prim.map(([k, l]) => `<a href="#/${k}" class="${S.view === k ? 'on' : ''}">${I[k]}<span>${SHORT[k] || l}</span></a>`).join('') +
         (rest.length ? `<button type="button" id="moreBtn" class="${rest.some(r => r[0] === S.view) ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg><span>المزيد</span></button>` : '');
       const mb = $('#moreBtn'); if (mb) mb.onclick = () => moreSheet(rest);

@@ -303,6 +303,15 @@ button,a,select,[role=button],.click{cursor:pointer}
 .chip-filter button{border:1px solid var(--border);background:#fff;border-radius:20px;padding:6px 12px;font-weight:700;color:var(--muted)}
 .drv-link{display:block;margin-top:4px;border:0;background:none;padding:2px 0;font:inherit;font-size:12px;font-weight:700;color:var(--sky,#0e7fc0);cursor:pointer}.drv-link.on{color:var(--ok,#1f8a4c)}.drv-link:focus-visible{outline:2px solid var(--sky);outline-offset:2px;border-radius:4px}
 .rec-card{padding-bottom:10px}.rec-frame{display:block;width:100%;height:calc(100vh - 230px);min-height:560px;border:1px solid var(--border);border-radius:14px;background:#fff}.rec-st{font-size:12.5px;font-weight:700;color:var(--muted)}.rec-st.ok{color:var(--ok,#1f8a4c)}.rec-st.bad{color:var(--bad,#b42318)}@media(max-width:700px){.rec-frame{height:calc(100vh - 260px);min-height:480px}}
+.pl-bar{gap:8px;margin:4px 0 10px;flex-wrap:wrap}.pl-wrap{max-height:calc(100vh - 330px);overflow:auto;border:1px solid var(--border);border-radius:12px}
+.pl-t{border-collapse:separate;border-spacing:0;font-size:13px}.pl-t th,.pl-t td{padding:4px 6px;text-align:center;white-space:nowrap}.pl-t thead th{position:sticky;top:0;background:var(--navy);color:#fff;z-index:2}.pl-t thead tr.pl-g th{background:#0b2a55}.pl-t thead tr:nth-child(2) th{top:34px}
+.pl-t th.pl-c{position:sticky;inset-inline-start:0;background:var(--card,#fff);z-index:1;text-align:start;min-width:120px}.pl-t thead th.pl-c{background:var(--navy);z-index:3}
+.pl-gb,.pl-sb{background:none;border:0;color:inherit;font:inherit;font-weight:800;cursor:pointer;padding:2px 4px;border-radius:6px}.pl-gb:hover,.pl-sb:hover,.pl-gb:focus-visible,.pl-sb:focus-visible{background:rgba(255,255,255,.16);outline:2px solid #fff3}
+.pl-in{width:42px;text-align:center;border:1px solid var(--border);border-radius:8px;padding:5px 2px;font:inherit;font-weight:700;background:#fff}.pl-in:focus{outline:2px solid var(--sky);border-color:var(--sky)}
+.pl-tot{font-weight:800}.pl-tot.ok{color:var(--ok,#1f8a4c)}.pl-tot.warn{color:#b54708}.pl-tot.bad{color:var(--bad,#b42318);background:#fde8e8}.pl-sum td,.pl-sum th{font-weight:800;background:#f3f6fb}
+.pl-sel{max-width:130px;font:inherit;font-size:12px;border:1px solid var(--border);border-radius:8px;padding:4px}.pl-sel.empty{border-color:#f5b971;background:#fff8ec}.pl-h{display:inline-block;margin-inline-start:4px;font-size:11px;color:var(--muted)}
+.pl-blk td{padding:2px}.pl-bk{width:34px;height:30px;border:1px solid var(--border);border-radius:8px;background:#fff;font-weight:800;color:var(--bad,#b42318);cursor:pointer}.pl-bk.on{background:#fde8e8;border-color:#f3a5a5}
+.pl-grid td{min-width:92px;text-align:center;vertical-align:top}
 .feat-tbl{display:grid;gap:8px}.feat-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;border-top:1px dashed var(--border)}.feat-row:first-child{border-top:0}.feat-l{min-width:190px;font-weight:700}.feat-row .chip-filter{margin:0}
 .chip-filter button.on{background:var(--navy);border-color:var(--navy);color:#fff}
 /* بطاقات الصفحات الإضافية والقوالب */
@@ -363,30 +372,31 @@ td.ldn b{font-size:22px;color:var(--navy)}
 <div id="app"><div class="spinner"></div></div>
 <div id="toasts"></div>
 <script>window.DINA_RECOVERY=/type=recovery/.test(location.hash)||/type=recovery/.test(location.search);</script>
-<script src="config.js?v=1793435562"></script>
+<script src="config.js?v=1793436089"></script>
 <script src="vendor/supabase.js"></script>
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/html2canvas.min.js"></script>
 <script src="vendor/jspdf.umd.min.js"></script>
 <script src="vendor/jszip.min.js"></script>
-<script src="tpl_consts.js?v=1793435562"></script>
-<script src="export.js?v=1793435562"></script>
-<script src="api.js?v=1793435562"></script>
-<script src="demo.js?v=1793435562"></script>
-<script src="app.js?v=1793435562"></script>
-<script src="app2.js?v=1793435562"></script>
-<script src="app3.js?v=1793435562"></script>
-<script src="app4.js?v=1793435562"></script>
-<script src="lang.js?v=1793435562"></script>
-<script src="app5.js?v=1793435562"></script>
-<script src="app6.js?v=1793435562"></script>
-<script src="app7.js?v=1793435562"></script>
-<script src="app8.js?v=1793435562"></script>
-<script src="app9.js?v=1793435562"></script>
-<script src="app10.js?v=1793435562"></script>
-<script src="app11.js?v=1793435562"></script>
-<script src="app12.js?v=1793435562"></script>
-<script src="app13.js?v=1793435562"></script>
-<script src="app14.js?v=1793435562"></script>
+<script src="tpl_consts.js?v=1793436089"></script>
+<script src="export.js?v=1793436089"></script>
+<script src="api.js?v=1793436089"></script>
+<script src="demo.js?v=1793436089"></script>
+<script src="app.js?v=1793436089"></script>
+<script src="app2.js?v=1793436089"></script>
+<script src="app3.js?v=1793436089"></script>
+<script src="app4.js?v=1793436089"></script>
+<script src="lang.js?v=1793436089"></script>
+<script src="app5.js?v=1793436089"></script>
+<script src="app6.js?v=1793436089"></script>
+<script src="app7.js?v=1793436089"></script>
+<script src="app8.js?v=1793436089"></script>
+<script src="app9.js?v=1793436089"></script>
+<script src="app10.js?v=1793436089"></script>
+<script src="app11.js?v=1793436089"></script>
+<script src="app12.js?v=1793436089"></script>
+<script src="app13.js?v=1793436089"></script>
+<script src="app14.js?v=1793436089"></script>
+<script src="app15.js?v=1793436089"></script>
 </body>
 </html>

@@ -261,8 +261,7 @@
     ['admin', 'الإدارة', () => S.me.is_owner || anyPerm('users', 'structure')],
     ['reports', 'التقارير', () => S.me.is_owner || anyPerm('review', 'export', 'users') || viewOK('reports')],
     ['posts', 'إعلانات أولياء الأمور', () => S.me.is_owner || anyPerm('users', 'structure')],
-    ['assess', 'التقويم والاختبارات', () => !!(APP.canAssess && APP.canAssess())],
-    ['paper', 'الاختبارات الورقية', () => !!(APP.canAssess && APP.canAssess())],
+    ['assess', 'الاختبارات', () => !!(APP.canAssess && APP.canAssess())],
     ['records', 'سجل المتابعة', () => !coordOnly()],
     ['resources', 'المصادر', () => !coordOnly()],
     ['analysis', 'تحليل النتائج', () => !!(APP.hasModule && APP.hasModule('analysis'))],
@@ -316,7 +315,7 @@
     $('#nav').innerHTML = items.map(([k, l]) => `<a href="#/${k}" class="${S.view === k ? 'on' : ''}" ${S.view === k ? 'aria-current="page"' : ''}>${I[k]}<span>${l}</span>${k === 'my' && myCount ? `<span class="cnt">${AR(myCount)}</span>` : ''}</a>`).join('');
     const bn = $('#bnav'); if (bn) {
       const prim = items.length > 5 ? items.slice(0, 4) : items, rest = items.length > 5 ? items.slice(4) : [];
-      const SHORT = { home: 'الرئيسية', studio: 'الجداول', activity: 'النشاط', paper: 'الورقية', plan: 'التوزيع', records: 'السجل', assess: 'التقويم', attendance: 'الحضور', supervision: 'الإشراف', myreports: 'تقاريري', resources: 'المصادر', analysis: 'التحليل', roles: 'الصلاحيات', dash: 'المتابعة', classes: 'الفصول', timetable: 'الجدول', builder: 'الجدول الآلي', nisab: 'النصاب', dev: 'المطوّر', posts: 'الإعلانات' };
+      const SHORT = { home: 'الرئيسية', studio: 'الجداول', activity: 'النشاط', paper: 'الورقية', plan: 'التوزيع', records: 'السجل', assess: 'الاختبارات', attendance: 'الحضور', supervision: 'الإشراف', myreports: 'تقاريري', resources: 'المصادر', analysis: 'التحليل', roles: 'الصلاحيات', dash: 'المتابعة', classes: 'الفصول', timetable: 'الجدول', builder: 'الجدول الآلي', nisab: 'النصاب', dev: 'المطوّر', posts: 'الإعلانات' };
       bn.innerHTML = prim.map(([k, l]) => `<a href="#/${k}" class="${S.view === k ? 'on' : ''}">${I[k]}<span>${SHORT[k] || l}</span></a>`).join('') +
         (rest.length ? `<button type="button" id="moreBtn" class="${rest.some(r => r[0] === S.view) ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg><span>المزيد</span></button>` : '');
       const mb = $('#moreBtn'); if (mb) mb.onclick = () => moreSheet(rest);
@@ -348,6 +347,7 @@
   function route() {
     let k = (location.hash.match(/^#\/(\w+)/) || [])[1];
     if (S.me.is_owner && ['timetable', 'nisab', 'plan', 'builder'].includes(k)) { LS.set('studio_t', k); k = 'studio'; }
+    if (k === 'paper') { LS.set('as_t', 'paper'); k = 'assess'; }
     const allowed = NAV.filter(navOK).map(n => n[0]);
     let v = allowed.includes(k) ? k : (LS.get('view') && allowed.includes(LS.get('view')) ? LS.get('view') : (anyPerm('review', 'export', 'structure', 'users') && !S.entries.some(e => e.teacher_id === S.me.id) ? 'dash' : (allowed.includes('my') ? 'my' : allowed[0])));
     S.view = v; LS.set('view', v);

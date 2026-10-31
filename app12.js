@@ -30,15 +30,16 @@
     const subs = mySubjects(), grades = [...new Set(myClasses().map(gk))];
     ctx.subj = A.LS.get('as_s') || ctx.subj || (subs[0] || {}).id; if (!subs.some(s => s.id === ctx.subj)) ctx.subj = (subs[0] || {}).id;
     ctx.grade = A.LS.get('as_g') || ctx.grade || grades[0]; if (!grades.includes(ctx.grade)) ctx.grade = grades[0];
-    const tabs = [['quizzes', 'الاختبارات وأوراق العمل'], ['bank', 'بنك الأسئلة'], ['spec', 'جدول المواصفات'], ['curriculum', 'المنهج والدروس'], ['results', 'النتائج والتحليل'], ['cumul', 'التقرير التراكمي'], ['remedial', 'الخطط العلاجية والإثرائية']];
+    const tabs = [['paper', 'الاختبارات الورقية والتصحيح الآلي'], ['quizzes', 'الاختبارات الإلكترونية وأوراق العمل'], ['bank', 'بنك الأسئلة'], ['spec', 'جدول المواصفات'], ['curriculum', 'المنهج والدروس'], ['results', 'النتائج والتحليل'], ['cumul', 'التقرير التراكمي'], ['remedial', 'الخطط العلاجية والإثرائية']];
     let tab = A.LS.get('as_t') || 'quizzes';
-    root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>التقويم والاختبارات</h2><p class="sub" style="margin:2px 0 0">بنك أسئلة مرتبط بالدروس ومستويات التفكير، جدول مواصفات آلي، اختبارات وأوراق عمل إلكترونية برابط للطالب، وتحليل يبني خططاً علاجية.</p></div></div>
+    root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>الاختبارات</h2><p class="sub" style="margin:2px 0 0">اختبارات ورقية بأوراق تظليل وتصحيح آلي، واختبارات إلكترونية برابط للطالب، بنك أسئلة وجدول مواصفات، تحليل شامل ولجان وخطط علاجية — في مكان واحد.</p></div></div>
       <div class="row" style="margin-bottom:10px;gap:8px"><label class="small">المادة <select class="in" id="asS" style="max-width:220px">${subs.map(s => `<option value="${s.id}" ${s.id === ctx.subj ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
         <label class="small">الصف <select class="in" id="asG" style="max-width:220px">${grades.map(g => `<option value="${esc(g)}" ${g === ctx.grade ? 'selected' : ''}>${esc(gLabel(g))}</option>`).join('')}</select></label></div>
       <div class="tabs">${tabs.map(([k, l]) => `<button data-t="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div><div id="asb"><div class="spinner"></div></div></div>`;
     $('#asS', root).onchange = e => { A.LS.set('as_s', e.target.value); V.assess(root); };
     $('#asG', root).onchange = e => { A.LS.set('as_g', e.target.value); V.assess(root); };
     $$('.tabs button', root).forEach(b => b.onclick = () => { A.LS.set('as_t', b.dataset.t); V.assess(root); });
+    if (tab === 'paper' && V.paper) { $$('#asS,#asG', root).forEach(x => x.closest('label').style.display = 'none'); return V.paper($('#asb', root)); }
     if (!ctx.subj || !ctx.grade) { $('#asb', root).innerHTML = A.emptyBox('لا توجد مواد أو فصول مسندة لك'); return; }
     try { await loadCtx(); } catch (e) { $('#asb', root).innerHTML = A.emptyBox('تعذّر التحميل', e.message); return; }
     ({ curriculum: tCur, bank: tBank, spec: tSpec, quizzes: tQuiz, results: tRes, cumul: tCum, remedial: tRem })[tab]($('#asb', root), root);

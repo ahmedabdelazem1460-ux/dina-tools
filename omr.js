@@ -7,31 +7,44 @@
   const ID_BITS = 15, ID_Y = 52, ID_X0 = 42, ID_STEP = 8.5, ID_S = 5; // 12 بت للرقم + 2 للنموذج + 1 تحقق
   const ROW_H = 7.4, TOP = 78, PER_COL = 25, R = 2.4, OPT_DX = 7.2, NUM_W = 9;
   const LET = ['أ', 'ب', 'ج', 'د', 'هـ'];
-  function layout(nq, no) {
-    const cols = Math.ceil(nq / PER_COL), colW = NUM_W + no * OPT_DX + 4, total = cols * colW, x0 = (W - total) / 2;
-    // الأعمدة من اليمين إلى اليسار (عربي)
-    const pos = (q, o) => { const c = Math.floor(q / PER_COL), r = q % PER_COL; const right = W - x0 - c * colW; return [right - NUM_W - (o + 0.5) * OPT_DX, TOP + r * ROW_H + ROW_H / 2]; };
-    const num = q => { const c = Math.floor(q / PER_COL), r = q % PER_COL; return [W - x0 - c * colW - NUM_W / 2, TOP + r * ROW_H + ROW_H / 2]; };
-    return { cols, colW, x0, pos, num };
+  // تسميات البدائل لكل نوع سؤال بالعربية والإنجليزية (المزاوجة بترتيب أبجد هوز حطي كلمن)
+  const LABELS = { ar: { mcq: ['أ', 'ب', 'ج', 'د', 'هـ'], tf: ['ص', 'خ'], match: ['أ', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح', 'ط', 'ي', 'ك', 'ل', 'م', 'ن'] },
+    en: { mcq: ['A', 'B', 'C', 'D', 'E'], tf: ['T', 'F'], match: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'] } };
+  // spec: { lang, parts:[{type, count, options}] } ← قائمة الأسئلة [{n, lab, type, part}]
+  function expand(spec) { const lang = spec.lang === 'en' ? 'en' : 'ar', qs = []; (spec.parts || []).forEach((p, pi) => { const t = p.type || 'mcq', n = t === 'tf' ? 2 : Math.max(2, Math.min(t === 'match' ? 14 : 5, +p.options || 4)); for (let i = 0; i < (+p.count || 0); i++) qs.push({ n, lab: LABELS[lang][t].slice(0, n), type: t, part: pi }); }); return { lang, dir: lang === 'en' ? 'ltr' : 'rtl', qs }; }
+  const norm = (a, b) => typeof a === 'number' ? { dir: 'rtl', qs: Array.from({ length: a }, () => ({ n: b, lab: LET.slice(0, b) })) } : (a.qs ? a : expand(a));
+  const AV = 186, MAXR = 26;
+  function layout(a, b) {
+    const sp = norm(a, b), qs = sp.qs, nq = qs.length, rtl = sp.dir !== 'ltr', maxO = Math.max(2, ...qs.map(q => q.n));
+    let dx = OPT_DX; const cw = () => NUM_W + maxO * dx + 4;
+    let cols = Math.max(1, Math.ceil(nq / PER_COL));
+    while (cols * cw() > AV && dx > 5.3) dx = +(dx - 0.1).toFixed(2);
+    if (cols * cw() > AV) cols = Math.max(1, Math.floor(AV / cw()));
+    const per = Math.ceil(nq / cols), colW = cw(), total = cols * colW, x0 = (W - total) / 2;
+    const cr = q => [Math.floor(q / per), q % per];
+    const pos = (q, o) => { const [c, r] = cr(q), y = TOP + r * ROW_H + ROW_H / 2; return rtl ? [W - x0 - c * colW - NUM_W - (o + 0.5) * dx, y] : [x0 + c * colW + NUM_W + (o + 0.5) * dx, y]; };
+    const num = q => { const [c, r] = cr(q), y = TOP + r * ROW_H + ROW_H / 2; return [rtl ? W - x0 - c * colW - NUM_W / 2 : x0 + c * colW + NUM_W / 2, y]; };
+    return { cols, per, colW, dx, x0, pos, num, qs, rtl, overflow: per > MAXR || total > AV + 0.5 };
   }
+  const capacity = spec => !layout(spec).overflow;
   const idPos = b => [ID_X0 + b * ID_STEP + ID_S / 2, ID_Y + ID_S / 2];
   function encode(idx, model) { const bits = []; for (let i = 0; i < 12; i++) bits.push((idx >> i) & 1); bits.push(model & 1, (model >> 1) & 1); bits.push(bits.reduce((a, b) => a ^ b, 0)); return bits; }
   function decode(bits) { if (!bits.slice(0, 12).some(Boolean)) return null; const par = bits.slice(0, 14).reduce((a, b) => a ^ b, 0); if (par !== bits[14]) return null; let idx = 0; for (let i = 0; i < 12; i++) idx |= bits[i] << i; return { idx, model: bits[12] | (bits[13] << 1) }; }
 
   // صفحة ورقة واحدة (HTML بإحداثيات مطلقة بالمليمتر)
   function sheetHTML(o) {
-    const L = layout(o.nq, o.no), bits = encode(o.idx || 0, o.model || 0);
-    const mm = v => v.toFixed(2) + 'mm';
-    let h = `<div class="omr-page">`;
+    const sp = o.spec ? norm(o.spec) : norm(o.nq, o.no), L = layout(sp), bits = encode(o.idx || 0, o.model || 0), en = sp.dir === 'ltr';
+    const T = en ? { name: 'Name', cls: 'Class', model: 'Model', ins: 'Fill one bubble per question completely with a dark pen or pencil. Do not write in the boxes above.' } : { name: 'الاسم', cls: 'الفصل', model: 'نموذج', ins: 'ظلّل دائرة واحدة لكل سؤال تظليلاً كاملاً بقلم رصاص أو أزرق داكن. لا تكتب في المربعات أعلاه.' };
+    const mm = v => v.toFixed(2) + 'mm', dir = en ? 'ltr' : 'rtl';
+    let h = `<div class="omr-page" dir="${dir}" style="${en ? "font-family:'Myriad Pro',Arial,'GE SS Two',sans-serif" : ''}">`;
     MARKS.forEach(([x, y]) => { h += `<div style="position:absolute;left:${mm(x)};top:${mm(y)};width:${mm(MK)};height:${mm(MK)};background:#000"></div>`; });
-    h += `<div style="position:absolute;right:22mm;left:22mm;top:12mm;display:flex;align-items:center;justify-content:space-between;direction:rtl"><div><div style="font-size:16pt;font-weight:800">${o.title}</div><div style="font-size:10pt;color:#005499">${o.sub || ''}</div></div><img src="assets/logo.svg" style="height:16mm"></div>`;
-    h += `<div style="position:absolute;right:22mm;left:22mm;top:31mm;display:flex;gap:6mm;direction:rtl;font-size:11pt"><div style="flex:2;border:0.4mm solid #082B5A;border-radius:2mm;padding:1.5mm 3mm">الاسم: <b>${o.name || ''}</b></div><div style="flex:1;border:0.4mm solid #082B5A;border-radius:2mm;padding:1.5mm 3mm">الفصل: <b>${o.cls || ''}</b></div><div style="width:24mm;border:0.4mm solid #082B5A;border-radius:2mm;padding:1.5mm 3mm;text-align:center">نموذج <b>${o.modelName || 'A'}</b></div></div>`;
+    h += `<div style="position:absolute;right:22mm;left:22mm;top:12mm;display:flex;align-items:center;justify-content:space-between;direction:${dir}"><div><div style="font-size:16pt;font-weight:800">${o.title}</div><div style="font-size:10pt;color:#005499">${o.sub || ''}</div></div><img src="assets/logo.svg" style="height:16mm"></div>`;
+    h += `<div style="position:absolute;right:22mm;left:22mm;top:31mm;display:flex;gap:6mm;direction:${dir};font-size:11pt"><div style="flex:2;border:0.4mm solid #082B5A;border-radius:2mm;padding:1.5mm 3mm">${T.name}: <b>${o.name || ''}</b></div><div style="flex:1;border:0.4mm solid #082B5A;border-radius:2mm;padding:1.5mm 3mm">${T.cls}: <b>${o.cls || ''}</b></div><div style="width:24mm;border:0.4mm solid #082B5A;border-radius:2mm;padding:1.5mm 3mm;text-align:center">${T.model} <b>${o.modelName || 'A'}</b></div></div>`;
     bits.forEach((b, i) => { const [x, y] = [ID_X0 + i * ID_STEP, ID_Y]; h += `<div style="position:absolute;left:${mm(x)};top:${mm(y)};width:${mm(ID_S)};height:${mm(ID_S)};box-sizing:border-box;border:0.3mm solid #000;${b ? 'background:#000' : ''}"></div>`; });
-    h += `<div style="position:absolute;right:22mm;top:${mm(ID_Y + 7.5)};font-size:8pt;color:#555;direction:rtl">ظلّل دائرة واحدة لكل سؤال بقلم رصاص أو أزرق داكن. لا تكتب في المربعات أعلاه.</div>`;
-    for (let c = 0; c < L.cols; c++) { for (let k = 0; k < o.no; k++) { const [x] = L.pos(c * PER_COL, k); h += `<div style="position:absolute;left:${mm(x - 3)};top:${mm(TOP - 6)};width:6mm;text-align:center;font-size:9pt;font-weight:800">${LET[k]}</div>`; } }
-    for (let q = 0; q < o.nq; q++) {
-      const [nx, ny] = L.num(q); h += `<div style="position:absolute;left:${mm(nx - 4.5)};top:${mm(ny - 2.6)};width:9mm;text-align:center;font-size:9pt;font-weight:800">${q + 1}</div>`;
-      for (let k = 0; k < o.no; k++) { const [x, y] = L.pos(q, k); h += `<div style="position:absolute;left:${mm(x - R)};top:${mm(y - R)};width:${mm(2 * R)};height:${mm(2 * R)};box-sizing:border-box;border:0.3mm solid #333;border-radius:50%;${o.fill && o.fill[q] === k ? 'background:#111' : ''}"></div>`; }
+    h += `<div style="position:absolute;right:22mm;left:22mm;top:${mm(ID_Y + 7.2)};font-size:8pt;color:#555;direction:${dir};line-height:1.45;text-align:${en ? 'left' : 'right'}">${T.ins}${o.legend ? `<br><b style="color:#082B5A">${o.legend}</b>` : ''}</div>`;
+    for (let q = 0; q < sp.qs.length; q++) {
+      const Q = sp.qs[q], [nx, ny] = L.num(q); h += `<div style="position:absolute;left:${mm(nx - 4.5)};top:${mm(ny - 2.6)};width:9mm;text-align:center;font-size:9pt;font-weight:800">${q + 1}</div>`;
+      for (let k = 0; k < Q.n; k++) { const [x, y] = L.pos(q, k), f = o.fill && o.fill[q] === k; h += `<div style="position:absolute;left:${mm(x - R)};top:${mm(y - R)};width:${mm(2 * R)};height:${mm(2 * R)};box-sizing:border-box;border:0.3mm solid #333;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:5.4pt;font-weight:700;line-height:1;color:#c4c4c4;${f ? 'background:#111' : ''}">${f ? '' : (Q.lab[k] || '')}</div>`; }
     }
     h += `<div style="position:absolute;bottom:12mm;left:22mm;right:22mm;text-align:center;font-size:8pt;color:#777">${o.foot || ''}</div></div>`;
     return h;
@@ -70,7 +83,7 @@
       const H2 = homography(MC, order.map(i => pts[i])); if (!H2) continue;
       const bits = Array.from({ length: ID_BITS }, (_, b) => sample(H2, ...idPos(b), ID_S * 0.32) > 0.5 ? 1 : 0);
       const id = decode(bits); if (!id) continue;
-      return { ok: true, H: H2, id, read: (nq, no) => { const L = layout(nq, no), ans = [], conf = []; for (let q = 0; q < nq; q++) { const f = []; for (let k = 0; k < no; k++) f.push(sample(H2, ...L.pos(q, k), R * 0.62)); const s = f.map((v, k) => [v, k]).sort((a, b) => b[0] - a[0]); const [m1, m2] = [s[0], s[1] || [0, -1]];
+      return { ok: true, H: H2, id, read: (a, b) => { const L = layout(a, b), nq = L.qs.length, ans = [], conf = []; for (let q = 0; q < nq; q++) { const f = []; for (let k = 0; k < L.qs[q].n; k++) f.push(sample(H2, ...L.pos(q, k), R * 0.62)); const s = f.map((v, k) => [v, k]).sort((a, b) => b[0] - a[0]); const [m1, m2] = [s[0], s[1] || [0, -1]];
           if (m1[0] < 0.33) ans.push(-1); else if (m2[0] > 0.33 && m2[0] > m1[0] * 0.72) ans.push(-2); else ans.push(m1[1]); conf.push(+m1[0].toFixed(2)); } return { ans, conf }; } };
     }
     return { ok: false, error: 'تعذّرت قراءة شريط التعريف — قد تكون الورقة ليست من هذا الاختبار أو المسح غير واضح' };
@@ -86,5 +99,5 @@
     const bmp = await createImageBitmap(file), c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height; c.getContext('2d').drawImage(bmp, 0, 0); return [{ cv: c, label: file.name }];
   }
   const thumb = (cv, wd = 620) => { const s = wd / cv.width, c = document.createElement('canvas'); c.width = wd; c.height = Math.round(cv.height * s); const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(cv, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.6); };
-  window.DinaOMR = { sheetHTML, PAGE_CSS, readCanvas, fileToCanvases, thumb, LET, encode, decode, layout };
+  window.DinaOMR = { sheetHTML, PAGE_CSS, readCanvas, fileToCanvases, thumb, LET, LABELS, expand, capacity, encode, decode, layout };
 })();

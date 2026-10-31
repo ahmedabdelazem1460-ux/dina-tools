@@ -132,6 +132,31 @@
         if (t && !D.memberships.some(m => m.staff_id === t && m.section_id === cl.section_id)) D.memberships.push({ id: uid(), staff_id: t, section_id: cl.section_id, role: 'teacher' });
         return wait({ slots: a, entries: b });
       },
+      async editSlot(c, d, p, s, t) {
+        const cl = find('classes', c); const v = D.timetable_versions.find(x => x.section_id === cl.section_id && x.status === 'approved');
+        let x = D.timetable_slots.find(y => y.version_id === v.id && y.class_id === c && y.day === d && y.period === p);
+        if (!x) { x = { id: uid(), version_id: v.id, class_id: c, day: d, period: p }; D.timetable_slots.push(x); }
+        x.subject_id = s || null; x.teacher_id = t || null; let a = 0, b = 0, k = 0;
+        D.plan_entries.forEach(e => { const w = find('weeks', e.week_id); if (!w || w.section_id !== cl.section_id || e.class_id !== c || e.day !== d || e.period !== p) return;
+          if (e.subject_id === x.subject_id) { if (e.teacher_id !== x.teacher_id) { e.teacher_id = x.teacher_id; a++; } }
+          else if (!e.topic && !e.homework && !e.note) { e.subject_id = x.subject_id; e.teacher_id = x.teacher_id; b++; } else k++; });
+        return wait({ teacher_fixed: a, subject_changed: b, conflicts: k });
+      },
+      async slotConflicts(sec) {
+        const v = D.timetable_versions.find(x => x.section_id === sec && x.status === 'approved'); if (!v) return wait([]);
+        const out = []; D.weeks.filter(w => w.section_id === sec).forEach(w => D.plan_entries.filter(e => e.week_id === w.id).forEach(e => { const s = D.timetable_slots.find(x => x.version_id === v.id && x.class_id === e.class_id && x.day === e.day && x.period === e.period) || {}; if ((s.subject_id || null) !== (e.subject_id || null)) out.push({ entry_id: e.id, week_number: w.number, class_id: e.class_id, day: e.day, period: e.period, entry_subject: e.subject_id, slot_subject: s.subject_id || null, slot_teacher: s.teacher_id || null, topic: e.topic, status: e.status }); }));
+        return wait(out);
+      },
+      async slotConflictApply(id) { const e = find('plan_entries', id); const w = find('weeks', e.week_id); const v = D.timetable_versions.find(x => x.section_id === w.section_id && x.status === 'approved'); const s = D.timetable_slots.find(x => x.version_id === v.id && x.class_id === e.class_id && x.day === e.day && x.period === e.period) || {}; e.subject_id = s.subject_id || null; e.teacher_id = s.teacher_id || null; return wait(null); },
+      async bulkReview(wid, classes, action) {
+        const w = find('weeks', wid); let n = 0;
+        D.plan_entries.forEach(e => { if (e.week_id !== wid || (classes && classes.length && !classes.includes(e.class_id))) return;
+          if (action === 'approve' && ['submitted', 'draft'].includes(e.status) && (e.topic || e.homework || e.note)) { e.status = 'approved'; n++; }
+          if (action === 'unapprove' && e.status === 'approved') { e.status = 'submitted'; n++; } });
+        const un = action === 'unapprove' && w.status === 'published'; if (un) w.status = 'open';
+        return wait({ count: n, unpublished: un });
+      },
+      async resetPassword() { return wait(true); },
       addStaff: r => wait(ins('staff', { school_id: D.schools[0].id, active: true, is_owner: false, user_id: null, ...r, email: r.email || null })),
       updateStaff: (id, p) => wait(upd('staff', id, p)),
       async setLogin(id, email) { if (D.staff.some(s => s.email === email && s.id !== id)) throw new Error('البريد مستخدم لحساب آخر'); upd('staff', id, { email, user_id: find('staff', id).user_id || uid() }); return wait(null); },

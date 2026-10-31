@@ -4,7 +4,7 @@
   const { api, S, $, $$, esc, AR, DAYS, PER, ROLES, I } = A;
 
   // ---------- أدوات مشتركة ----------
-  const xlsx = (name, sheets) => { const wb = XLSX.utils.book_new(); sheets.forEach(([n, rows]) => { const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{}]); ws['!views'] = [{ RTL: true }]; XLSX.utils.book_append_sheet(wb, ws, n.slice(0, 31)); }); wb.Workbook = { Views: [{ RTL: true }] }; XLSX.writeFile(wb, name + '.xlsx'); };
+  const xlsx = (name, sheets) => { const wb = XLSX.utils.book_new(); sheets.forEach(([n, rows]) => { const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{}]); ws['!views'] = [{ RTL: true }]; Object.keys(ws).forEach(k => { const c = ws[k]; if (k[0] !== '!' && c && typeof c.v === 'string') { const u = c.v.match(/https?:\/\/[^\s،]+/); if (u) c.l = { Target: u[0], Tooltip: 'فتح الرابط' }; } }); XLSX.utils.book_append_sheet(wb, ws, n.slice(0, 31)); }); wb.Workbook = { Views: [{ RTL: true }] }; XLSX.writeFile(wb, name + '.xlsx'); };
   function printDoc(title, sub, bodyHtml, land) {
     const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;left:-9999px;width:1100px;height:800px;border:0'; document.body.appendChild(f);
     const base = location.href.replace(/[^/]*$/, '').split('#')[0];
@@ -29,6 +29,7 @@
   //  التقارير
   // =====================================================================
   const REPORTS = [
+    ['completion', 'نسب إنجاز المعلمين', 'أسبوعي أو لعدة أسابيع أو للفصل كاملاً: الإنجاز والإرسال والاعتماد والتنفيذ لكل معلم، مع مصفوفة المعلمين × الأسابيع.'],
     ['teachers', 'التزام المعلمين', 'لكل معلم: الإنجاز، الإرسال في الوقت، التأخر، الأخطاء اللغوية، التنفيذ.'],
     ['teacher', 'تقرير معلم', 'تفصيل معلم واحد أسبوعاً بأسبوع، قابل للطباعة والإرسال له.'],
     ['subject', 'خطة مادة لفصل', 'خطة مادة لفصل واحد عبر عدة أسابيع أو الفصل الدراسي كاملاً.'],
@@ -46,7 +47,7 @@
     const [, title] = REPORTS.find(r => r[0] === cur);
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>${title} — ${esc(A.section().name)}</h2></div><button class="btn ghost sm" id="rBack">كل التقارير</button></div><div id="rForm"></div><div id="rOut"></div></div>`;
     $('#rBack', root).onclick = () => { A.LS.set('rep', ''); V.reports(root); };
-    ({ teachers: repTeachers, teacher: repTeacher, subject: repSubject, edits: repEdits, exec: repExec, daily: repDaily })[cur]($('#rForm', root), $('#rOut', root));
+    ({ completion: repCompletion, teachers: repTeachers, teacher: repTeacher, subject: repSubject, edits: repEdits, exec: repExec, daily: repDaily })[cur]($('#rForm', root), $('#rOut', root));
   };
   async function load(weeks) { const es = await api.entriesForWeeks(weeks.map(w => w.id)); return es; }
   function teacherStats(es, weeks, li) {
@@ -62,6 +63,34 @@
     });
     (li || []).forEach(x => { if (out[x.teacher_id]) out[x.teacher_id].lang++; });
     return out;
+  }
+  // نسب إنجاز المعلمين: نطاق أسبوع / عدة أسابيع / الفصل كاملاً
+  function repCompletion(F, O) {
+    const all = S.weeks.slice().sort((a, b) => a.number - b.number);
+    const today = new Date().toISOString().slice(0, 10);
+    const cur = all.filter(w => w.start_date <= today).slice(-1)[0] || all[0];
+    F.innerHTML = `<div class="chip-filter" id="rcR" style="margin-bottom:10px"><button data-r="week" class="on">الأسبوع الحالي</button><button data-r="multi">عدة أسابيع</button><button data-r="term">الفصل الدراسي كاملاً</button></div><div id="rcW" class="hidden">${weeksPicker('rw', 4)}</div><button class="btn" id="rGo">عرض التقرير</button>`;
+    let mode = 'week';
+    $$('#rcR button', F).forEach(b => b.onclick = () => { mode = b.dataset.r; $$('#rcR button', F).forEach(x => x.classList.toggle('on', x === b)); $('#rcW', F).classList.toggle('hidden', mode !== 'multi'); });
+    $('#rGo', F).onclick = e => A.run(e.currentTarget, async () => {
+      const weeks = mode === 'week' ? [cur].filter(Boolean) : mode === 'term' ? (all.filter(w => w.start_date <= today).length ? all.filter(w => w.start_date <= today) : all) : pickedWeeks(F, 'rw');
+      if (!weeks.length) throw new Error('اختر أسبوعاً');
+      const es = (await load(weeks)).filter(e => e.teacher_id && A.required(e));
+      const T = {}; es.forEach(e => { const t = T[e.teacher_id] = T[e.teacher_id] || { req: 0, filled: 0, sent: 0, appr: 0, exec: 0, w: {} }; const x = t.w[e.week_id] = t.w[e.week_id] || { req: 0, filled: 0 };
+        t.req++; x.req++; if (A.filled(e)) { t.filled++; x.filled++; } if (['submitted', 'approved'].includes(e.status) || (e.status === 'draft' && A.filled(e))) t.sent++; if (e.status === 'approved') t.appr++; if (e.exec_status && e.exec_status !== 'pending') t.exec++; });
+      const rows = Object.entries(T).map(([id, t]) => ({ id, name: A.personName(id), ...t, pf: A.pct(t.filled, t.req), pa: A.pct(t.appr, t.req), pe: A.pct(t.exec, t.req) })).sort((a, b) => b.pf - a.pf);
+      const tot = rows.reduce((a, r) => ({ req: a.req + r.req, filled: a.filled + r.filled, appr: a.appr + r.appr, exec: a.exec + r.exec }), { req: 0, filled: 0, appr: 0, exec: 0 });
+      const lvl = v => v >= 90 ? 'st-approved' : v >= 60 ? 'st-submitted' : 'st-returned';
+      const scope = mode === 'week' ? 'الأسبوع ' + weeks[0].word : mode === 'term' ? `الفصل الدراسي (${AR(weeks.length)} أسابيع)` : weeks.map(w => 'الأسبوع ' + w.word).join('، ');
+      const kpis = `<div class="grid g4" style="margin:14px 0">${[['متوسط الإنجاز', A.pct(tot.filled, tot.req)], ['نسبة الاعتماد', A.pct(tot.appr, tot.req)], ['نسبة التنفيذ المؤكَّد', A.pct(tot.exec, tot.req)], ['معلمون مكتملون', null]].map(([k, v]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${v == null ? AR(rows.filter(r => r.pf >= 100).length) + `<small> / ${AR(rows.length)}</small>` : AR(v) + '<small>٪</small>'}</div></div>`).join('')}</div>`;
+      const matrix = weeks.length > 1 ? `<h3 style="margin-top:18px">المعلمون × الأسابيع (نسبة الإنجاز)</h3><div class="scroll"><table class="tbl"><thead><tr><th>المعلم</th>${weeks.map(w => `<th>${esc(w.word)}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr><td><b>${esc(r.name)}</b></td>${weeks.map(w => { const x = r.w[w.id]; if (!x) return '<td class="faint">—</td>'; const v = A.pct(x.filled, x.req); return `<td><span class="pill ${lvl(v)}">${AR(v)}٪</span></td>`; }).join('')}</tr>`).join('')}</tbody></table></div>` : '';
+      const table = `<div class="scroll"><table class="tbl"><thead><tr><th>المعلم</th><th>الحصص المطلوبة</th><th>الإنجاز</th><th>مُرسلة</th><th>معتمدة</th><th>تنفيذ مؤكَّد</th></tr></thead><tbody>${rows.map(r => `<tr><td><b>${esc(r.name)}</b></td><td>${AR(r.req)}</td><td><div class="row" style="flex-wrap:nowrap">${A.bar(r.filled, r.req)}<span class="pill ${lvl(r.pf)}">${AR(r.pf)}٪</span></div></td><td>${AR(r.sent)}</td><td>${AR(r.appr)} <span class="small muted">(${AR(r.pa)}٪)</span></td><td>${AR(r.exec)} <span class="small muted">(${AR(r.pe)}٪)</span></td></tr>`).join('') || '<tr><td colspan="6" class="muted">لا توجد بيانات</td></tr>'}</tbody></table></div>`;
+      O.innerHTML = `<div class="row" style="margin-top:14px"><button class="btn ghost sm" id="rX">${I.down} Excel</button><button class="btn ghost sm" id="rP">${I.print} طباعة</button></div><p class="sub" style="margin:8px 0 0">${esc(scope)}</p>` + kpis + table + matrix;
+      const flat = rows.map(r => ({ المعلم: r.name, 'الحصص المطلوبة': r.req, المكتمل: r.filled, 'نسبة الإنجاز %': r.pf, مُرسلة: r.sent, معتمدة: r.appr, 'نسبة الاعتماد %': r.pa, 'تنفيذ مؤكَّد': r.exec, 'نسبة التنفيذ %': r.pe }));
+      const mflat = rows.map(r => Object.assign({ المعلم: r.name }, ...weeks.map(w => ({ ['الأسبوع ' + w.word]: r.w[w.id] ? A.pct(r.w[w.id].filled, r.w[w.id].req) : '' }))));
+      $('#rX', O).onclick = () => xlsx(`نسب إنجاز المعلمين - ${A.section().name}`, [['الإنجاز', flat]].concat(weeks.length > 1 ? [['حسب الأسبوع', mflat]] : []));
+      $('#rP', O).onclick = () => printDoc('نسب إنجاز المعلمين', `${A.section().name} · ${scope}`, (kpis + table + matrix), weeks.length > 4);
+    });
   }
   function repTeachers(F, O) {
     F.innerHTML = weeksPicker('rw') + `<button class="btn" id="rGo">عرض التقرير</button>`;

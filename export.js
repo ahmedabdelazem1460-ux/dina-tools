@@ -50,6 +50,7 @@
   const BASE = FONTS + TPL.CSS2.replace("font-family:'Tajawal'", "font-family:'GE SS Two','Myriad Pro','Tajawal'").replace(/'Source Sans 3'/g, "'Myriad Pro','Source Sans 3'") + `
 @media screen{body{background:#cfd8e6;padding:12px 0}.page{margin:0 auto 18px;box-shadow:0 6px 24px rgba(8,43,90,.18)}}
 table.plan td.c{overflow-wrap:anywhere}
+a.lnk{color:#005499;text-decoration:underline;text-underline-offset:2px;font-family:'Myriad Pro','Source Sans 3',sans-serif;unicode-bidi:isolate;word-break:break-all}
 .notes ul{list-style:none;padding:8px 18px 10px 16px}.notes li .bl{color:#3AB1DB;font-size:9px;vertical-align:middle;margin-inline-end:4px}
 /* ---- عرضي ---- */
 .page.land{width:1123px;height:794px}
@@ -105,13 +106,18 @@ body.ink .cards td,body.ink table.honor td,body.ink .xn,body.ink .notes .nh{back
 body.ink .topbar{background:#fff;border-bottom:3px solid #3AB1DB}
 `;
 
+  // الروابط: تبقى أرقامها لاتينية وتصبح قابلة للنقر في المعاينة والطباعة وملف PDF
+  const URL_RE = /(https?:\/\/[^\s<>"'،]+|www\.[^\s<>"'،]+)/gi;
+  const short = u => { const t = u.replace(/^https?:\/\//i, '').replace(/^www\./i, ''); return t.length > 38 ? t.slice(0, 36) + '…' : t; };
+  const link = u => { const href = /^www\./i.test(u) ? 'https://' + u : u; return `<a class="lnk" href="${esc(href)}" target="_blank" rel="noopener" dir="ltr">${esc(short(u))}</a>`; };
+  const withLinks = (s, f) => { URL_RE.lastIndex = 0; if (!URL_RE.test(s)) return f(s); URL_RE.lastIndex = 0; let out = '', i = 0, m; while ((m = URL_RE.exec(s))) { out += f(s.slice(i, m.index)) + link(m[0].replace(/[.,؛)]+$/, '')); i = m.index + m[0].replace(/[.,؛)]+$/, '').length; URL_RE.lastIndex = i; } return out + f(s.slice(i)); };
   const cell = (s, cls = '', st = '') => {
     s = clean(s);
     if (!s) return `<td class="dash ${cls}" ${st}>–</td>`;
-    if (hasAr(s)) return `<td class="${cls}" ${st}>${ar(s)}</td>`;
-    return `<td class="en ${cls}" dir="ltr" ${st}>${esc(s)}</td>`;
+    if (hasAr(s)) return `<td class="${cls}" ${st}>${withLinks(s, x => esc(AR(x)))}</td>`;
+    return `<td class="en ${cls}" dir="ltr" ${st}>${withLinks(s, esc)}</td>`;
   };
-  const txt = s => { s = clean(s); return !s ? '' : hasAr(s) ? ar(s) : `<span class="en" dir="ltr">${esc(s)}</span>`; };
+  const txt = s => { s = clean(s); return !s ? '' : hasAr(s) ? withLinks(s, x => esc(AR(x))) : `<span class="en" dir="ltr">${withLinks(s, esc)}</span>`; };
   const footer = t => `<div class="footline"></div><div class="foot"><div class="r">${t}</div>` +
     `<div class="l"><span style="letter-spacing:3px">Dinaaedu</span>&#160;&#160;&#160;&#160;${TPL.PHONE} <span style="letter-spacing:1px">920035881</span></div></div>`;
   const header = (week, info, land) => `<div class="topbar"></div><div class="hd1">الخطة الأسبوعية</div>` +
@@ -329,6 +335,9 @@ body.ink .topbar{background:#fff;border-bottom:3px solid #3AB1DB}
         const c = await html2canvas(pages[i], { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false, windowWidth: 1160 });
         if (i) pdf.addPage([W, H], land ? 'landscape' : 'portrait');
         pdf.addImage(c.toDataURL('image/jpeg', 0.9), 'JPEG', 0, 0, W, H, undefined, 'FAST');
+        // مناطق نقر فوق الروابط حتى تعمل داخل ملف PDF
+        const pr = pages[i].getBoundingClientRect(), kx = W / pr.width, ky = H / pr.height;
+        pages[i].querySelectorAll('a[href^="http"]').forEach(a => { const r = a.getBoundingClientRect(); if (r.width && r.height) pdf.link((r.left - pr.left) * kx, (r.top - pr.top) * ky, r.width * kx, r.height * ky, { url: a.href }); });
       }
       pdf.setProperties({ title });
       return pdf.output('blob');

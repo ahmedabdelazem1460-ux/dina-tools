@@ -116,6 +116,27 @@
   function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); }
 
   // ---------- الدخول ----------
+  // استعادة كلمة المرور بالبريد: رابط يصل للبريد المسجَّل، يفتح المنصة لتعيين كلمة جديدة
+  function forgotDialog(email0) {
+    const m = modal(`<h3>استعادة كلمة المرور</h3><p class="sub">اكتب بريدك المسجّل في المنصة، وسيصلك رابط لتعيين كلمة مرور جديدة. تحقّق من البريد غير الهام إن لم يصل خلال دقائق.</p>
+      <div class="field"><label for="fpe">البريد الإلكتروني</label><input class="in" id="fpe" type="email" dir="ltr" autocomplete="username" value="${esc(email0 || '')}"></div>
+      <div class="acts"><button class="btn" id="fpg">إرسال الرابط</button></div>`);
+    m.el.querySelector('#fpg').onclick = e => run(e.currentTarget, async () => {
+      const em = m.el.querySelector('#fpe').value.trim(); if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) throw new Error('اكتب بريداً صحيحاً');
+      await api.resetPassword(em); m.close(); toast('إن كان البريد مسجّلاً فسيصلك رابط الاستعادة خلال دقائق', 'ok');
+    });
+  }
+  function newPasswordDialog() {
+    const m = modal(`<h3>تعيين كلمة مرور جديدة</h3><p class="sub">اختر كلمة مرور جديدة لحسابك (٨ أحرف على الأقل).</p>
+      <div class="field"><label for="np1">كلمة المرور الجديدة</label><input class="in" id="np1" type="password" dir="ltr" autocomplete="new-password"></div>
+      <div class="field"><label for="np2">تأكيدها</label><input class="in" id="np2" type="password" dir="ltr" autocomplete="new-password"></div>
+      <div class="acts"><button class="btn" id="npg">حفظ</button></div>`);
+    m.el.querySelector('#npg').onclick = e => run(e.currentTarget, async () => {
+      const a = m.el.querySelector('#np1').value, b = m.el.querySelector('#np2').value;
+      if (a.length < 8) throw new Error('كلمة المرور يجب ألا تقل عن ٨ أحرف'); if (a !== b) throw new Error('كلمتا المرور غير متطابقتين');
+      await api.changePassword(a); m.close(); toast('تم تعيين كلمة المرور الجديدة', 'ok');
+    });
+  }
   function loginScreen(err = '') {
     $('#app').innerHTML = `
     ${DEMO ? '<div class="demo-banner">وضع التجربة — بيانات تجريبية في المتصفح فقط ولا تُحفظ</div>' : ''}
@@ -132,13 +153,14 @@
         <div class="field"><label for="lp">كلمة المرور</label><input class="in" id="lp" type="password" dir="ltr" autocomplete="current-password" ${DEMO ? '' : 'required'}></div>
         <div class="err-line" id="lerr">${esc(err)}</div>
         <button class="btn" style="width:100%;padding:13px" id="lb">دخول</button>
-        ${DEMO ? `<div class="notice info" style="margin-top:16px;display:block"><b>حسابات تجريبية:</b><div class="row" style="margin-top:8px">${api.accounts.map(([l, e]) => `<button type="button" class="btn ghost sm" data-demo="${e}">${l}</button>`).join('')}</div></div>` : '<p class="small muted" style="margin-top:16px">نسيت كلمة المرور؟ تواصل مع إدارة القسم لإعادة تعيينها.</p>'}
+        ${DEMO ? `<div class="notice info" style="margin-top:16px;display:block"><b>حسابات تجريبية:</b><div class="row" style="margin-top:8px">${api.accounts.map(([l, e]) => `<button type="button" class="btn ghost sm" data-demo="${e}">${l}</button>`).join('')}</div></div>` : '<p class="small muted" style="margin-top:16px">نسيت كلمة المرور؟ <a href="#" id="fpw">أرسل رابط الاستعادة إلى بريدي</a> أو تواصل مع إدارة القسم.</p>'}
       </form></div>
     </div>`;
     $('#lf').onsubmit = async e => {
       e.preventDefault(); $('#lerr').textContent = '';
       await run($('#lb'), async () => { await api.signIn($('#le').value, $('#lp').value); await start(); });
     };
+    const fp = $('#fpw'); if (fp) fp.onclick = e => { e.preventDefault(); forgotDialog($('#le').value); };
     $$('[data-demo]').forEach(b => b.onclick = () => { $('#le').value = b.dataset.demo; $('#lp').value = 'demo'; $('#lf').requestSubmit(); });
   }
 
@@ -445,7 +467,8 @@
         pending.delete(e.id);
         const patch = {}; $$('[data-k]', el).forEach(i => patch[i.dataset.k] = i.value.trim());
         if (patch.topic === e.topic && patch.homework === e.homework && patch.note === e.note) return;
-        if (e.status === 'returned') patch.status = 'draft';
+        // الإرسال التلقائي للمراجعة: أي حصة فيها محتوى تظهر للمراجع مباشرة ولو لم يكتمل الأسبوع
+        patch.status = (patch.topic || patch.homework || patch.note) ? 'submitted' : 'draft';
         const ss = $('#saveState'); ss && (ss.textContent = 'جارٍ الحفظ…');
         try {
           const r = await api.saveEntry(e.id, patch);
@@ -487,7 +510,7 @@
   // =====================================================================
   function stats(list) {
     const req = list.filter(required);
-    return { total: req.length, filled: req.filter(filled).length, submitted: list.filter(e => e.status === 'submitted').length, approved: list.filter(e => e.status === 'approved').length, returned: list.filter(e => e.status === 'returned').length, last: list.reduce((m, e) => (e.updated_at && e.updated_at > m ? e.updated_at : m), '') };
+    return { total: req.length, filled: req.filter(filled).length, submitted: list.filter(e => e.status === 'submitted' || (e.status === 'draft' && filled(e))).length, approved: list.filter(e => e.status === 'approved').length, returned: list.filter(e => e.status === 'returned').length, last: list.reduce((m, e) => (e.updated_at && e.updated_at > m ? e.updated_at : m), '') };
   }
   VIEWS.dash = function (root) {
     const w = week();
@@ -514,14 +537,15 @@
       ${unassigned.length ? `<div class="notice warn" style="margin-top:16px">${cnt(unassigned.length, 'حصة', 'حصص')} بلا معلم مُسند — لن تظهر لأي معلم. <button class="btn ghost sm" data-drill="unassigned">عرض الحصص</button> ${anyPerm('timetable_edit') ? '<a href="#/timetable" data-tab="assign">إسناد المعلمين</a>' : ''}</div>` : ''}
       <div class="grid g2" style="margin-top:16px;align-items:start">
         <div class="card"><h3>الفصول</h3><div class="scroll"><table class="tbl"><thead><tr><th>الفصل</th><th style="width:34%">الإنجاز</th><th>مُرسلة</th><th>معتمدة</th><th>مُعادة</th></tr></thead><tbody>
-          ${S.classes.filter(c => c.active).map(c => { const s = stats(S.entries.filter(e => e.class_id === c.id)); return `<tr class="click" data-c="${c.id}"><td><b>${esc(c.name)}</b></td><td><div class="row" style="flex-wrap:nowrap">${bar(s.filled, s.total)}<span class="small muted">${AR(pct(s.filled, s.total))}٪</span></div></td><td>${AR(s.submitted)}</td><td>${AR(s.approved)}</td><td>${s.returned ? `<span class="pill st-returned">${AR(s.returned)}</span>` : '—'}</td></tr>`; }).join('')}
+          ${S.classes.filter(c => c.active).map(c => { const s = stats(S.entries.filter(e => e.class_id === c.id)); const rd = S.entries.filter(e => e.class_id === c.id && (e.status === 'submitted' || (e.status === 'draft' && filled(e)))).length; const nb = (k, v, st) => `<button class="cellbtn" data-cd="${c.id}|${k}" aria-label="تفاصيل">${v ? (st ? `<span class="pill ${st}">${AR(v)}</span>` : AR(v)) : '—'}</button>`; return `<tr class="click" data-c="${c.id}"><td><b>${esc(c.name)}</b></td><td><button class="cellbtn wide" data-cd="${c.id}|todo"><div class="row" style="flex-wrap:nowrap">${bar(s.filled, s.total)}<span class="small muted">${AR(pct(s.filled, s.total))}٪</span></div></button></td><td>${nb('submitted', rd)}</td><td>${nb('approved', s.approved)}</td><td>${nb('returned', s.returned, 'st-returned')}</td></tr>`; }).join('')}
         </tbody></table></div></div>
         <div class="card"><div class="head" style="margin-bottom:6px"><div class="grow"><h3 style="margin:0">المعلمون</h3><p class="sub" style="margin:2px 0 0">الأقل إنجازاً أولاً</p></div>${lateT.length ? `<button class="btn ghost sm" id="remindAll">${I.mail} تذكير غير المكتملين</button>` : ''}</div>
           <div class="scroll"><table class="tbl"><thead><tr><th>المعلم</th><th style="width:30%">الإنجاز</th><th>آخر تحديث</th><th></th></tr></thead><tbody>
           ${teachers.length ? teachers.map(t => `<tr class="click" data-t="${t.id}" tabindex="0"><td><b>${esc(t.p ? t.p.full_name : '—')}</b><div class="small faint">${cnt(t.classes, 'فصل', 'فصول')} · ${cnt(t.s.total, 'حصة', 'حصص')}</div></td><td><div class="row" style="flex-wrap:nowrap">${bar(t.s.filled, t.s.total)}<span class="small muted">${AR(t.s.filled)}/${AR(t.s.total)}</span></div></td><td class="small muted">${t.s.last ? fmtDT(t.s.last) : 'لم يبدأ'}</td><td>${t.s.filled < t.s.total && t.p && t.p.email ? `<a class="btn ghost sm" href="${remindLink([t.p])}" title="تذكير بالبريد" aria-label="تذكير ${esc(t.p.full_name)} بالبريد">${I.mail}</a>` : (t.s.filled >= t.s.total ? `<span class="pill st-approved">${I.check.replace('<svg', '<svg style="width:14px;height:14px"')} مكتمل</span>` : '')}</td></tr>`).join('') : `<tr><td colspan="4">${emptyBox('لا يوجد معلمون مُسندون بعد')}</td></tr>`}
           </tbody></table></div></div>
       </div>`;
-    $$('tr[data-c]', root).forEach(r => r.onclick = () => { LS.set('cls', r.dataset.c); location.hash = '#/classes'; });
+    $$('tr[data-c]', root).forEach(r => r.onclick = ev => { if (ev.target.closest('[data-cd]')) return; LS.set('cls', r.dataset.c); location.hash = '#/classes'; });
+    $$('[data-cd]', root).forEach(b => b.onclick = ev => { ev.stopPropagation(); const [c, k] = b.dataset.cd.split('|'); drill('class', c, k); });
     $$('[data-drill]', root).forEach(b => b.onclick = () => drill(b.dataset.drill));
     const dl2 = $('#dLang', root); if (dl2) dl2.onclick = () => VIEWS._lang(null);
     const de2 = $('#dExec', root); if (de2) de2.onclick = () => VIEWS._exec(root, { all: true });
@@ -531,11 +555,27 @@
     const at = $('[data-tab=assign]', root); if (at) at.onclick = () => LS.set('tttab', 'assign');
   };
   // ---------- تفاصيل عند النقر ----------
-  function drill(kind, arg) {
+  function drill(kind, arg, sub) {
     const w = week();
-    const F = { todo: ['غير المكتمل', e => required(e) && !filled(e)], submitted: ['بانتظار المراجعة', e => e.status === 'submitted'], approved: ['المعتمد', e => e.status === 'approved'], returned: ['المُعاد للتعديل', e => e.status === 'returned'], unassigned: ['بلا معلم', e => required(e) && !e.teacher_id], all: ['الكل', e => !!e.subject_id] };
+    let classMode = null;
+    if (kind === 'class') { classMode = arg; arg = null; kind = sub || 'todo'; }
+    const F = { todo: ['غير المكتمل', e => required(e) && !filled(e)], submitted: ['بانتظار المراجعة', e => e.status === 'submitted' || (e.status === 'draft' && filled(e))], approved: ['المعتمد', e => e.status === 'approved'], returned: ['المُعاد للتعديل', e => e.status === 'returned'], unassigned: ['بلا معلم', e => required(e) && !e.teacher_id], all: ['الكل', e => !!e.subject_id] };
     let base = S.entries, title;
-    if (kind === 'teacher') { base = S.entries.filter(e => e.teacher_id === arg); title = 'خطة ' + personName(arg); kind = 'todo'; }
+    let head = '';
+    if (kind === 'teacher') {
+      base = S.entries.filter(e => e.teacher_id === arg && e.subject_id); title = 'خطة ' + personName(arg) + ' — الأسبوع ' + w.word;
+      const s = stats(base), ready = base.filter(F.submitted[1]).length, p = person(arg) || {};
+      const pairs = {}; base.forEach(e => { const k = e.class_id + '|' + e.subject_id; (pairs[k] = pairs[k] || { c: e.class_id, s: e.subject_id, n: 0, f: 0 }).n++; if (filled(e)) pairs[k].f++; });
+      const ex = base.filter(e => e.exec_status && e.exec_status !== 'pending').length;
+      head = `<div class="grid g4 dk" style="margin:8px 0 12px">
+        <div class="kpi navy"><div class="k">الإنجاز</div><div class="v">${AR(pct(s.filled, s.total))}<small>٪</small></div><div class="d">${AR(s.filled)} من ${cnt(s.total, 'حصة', 'حصص')}</div></div>
+        <div class="kpi"><div class="k">بانتظار المراجعة</div><div class="v">${AR(ready)}</div><div class="d">معتمدة ${AR(s.approved)} · مُعادة ${AR(s.returned)}</div></div>
+        <div class="kpi"><div class="k">التنفيذ اليومي</div><div class="v">${AR(ex)}</div><div class="d">حصة مؤكَّدة من ${AR(s.total)}</div></div>
+        <div class="kpi"><div class="k">آخر تحديث</div><div class="v" style="font-size:16px">${s.last ? fmtDT(s.last) : 'لم يبدأ'}</div><div class="d">${esc(p.specialty || '')}${p.email ? ' · ' + esc(p.email) : ''}</div></div></div>
+        <div class="row" style="gap:6px;margin-bottom:10px">${Object.values(pairs).sort((a, b) => (cls(a.c)?.sort ?? 0) - (cls(b.c)?.sort ?? 0)).map(x => `<span class="ldc">${esc(subjName(x.s))} — ${esc((cls(x.c) || {}).name || '')} <b>${AR(x.f)}/${AR(x.n)}</b></span>`).join('')}</div>
+        ${perm('review') && ready ? `<div class="row" style="margin-bottom:10px"><button class="btn ok sm" id="dApT">${I.check} اعتماد كل الجاهز لهذا المعلم (${AR(ready)})</button></div>` : ''}`;
+      kind = ready ? 'submitted' : 'todo';
+    }
     else if (kind === 'late') {
       const lt = {}; S.entries.filter(e => required(e) && e.teacher_id && !filled(e)).forEach(e => lt[e.teacher_id] = (lt[e.teacher_id] || 0) + 1);
       const list = Object.entries(lt).sort((a, b) => b[1] - a[1]);
@@ -543,8 +583,9 @@
         <div class="scroll drill"><table class="tbl"><thead><tr><th>المعلم</th><th>حصص ناقصة</th><th></th></tr></thead><tbody>${list.map(([id, n]) => `<tr class="click" data-t="${id}"><td><b>${esc(personName(id))}</b></td><td>${cnt(n, 'حصة', 'حصص')}</td><td>${(person(id) || {}).email ? `<a class="btn ghost sm" href="${remindLink([person(id)])}" aria-label="تذكير بالبريد">${I.mail}</a>` : ''}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">الجميع أكمل خطته</td></tr>'}</tbody></table></div>`, { cls: 'wide' });
       $$('tr[data-t]', m.el).forEach(r => r.onclick = e => { if (e.target.closest('a')) return; m.close(); drill('teacher', r.dataset.t); });
       return;
-    } else title = F[kind][0] + ' — الأسبوع ' + w.word;
-    const m = modal(`<h3>${esc(title)}</h3><div class="chip-filter" id="dfl">${Object.entries(F).filter(([k]) => k !== 'unassigned' || !arg).map(([k, [l]]) => `<button data-f="${k}" class="${k === kind ? 'on' : ''}">${l} <span class="small">(${AR(base.filter(F[k][1]).length)})</span></button>`).join('')}</div><div class="scroll drill" style="max-height:60vh"><table class="tbl"><thead><tr><th>الفصل</th><th>اليوم</th><th>الحصة</th><th>المادة</th>${arg ? '' : '<th>المعلم</th>'}<th>الموضوع</th><th>الحالة</th></tr></thead><tbody id="dtb"></tbody></table></div>`, { cls: 'wide' });
+    } else if (classMode) { base = S.entries.filter(e => e.class_id === classMode && e.subject_id); title = ((cls(classMode) || {}).name || '') + ' — الأسبوع ' + w.word; }
+    else title = F[kind][0] + ' — الأسبوع ' + w.word;
+    const m = modal(`<h3>${esc(title)}</h3>${head}<div class="chip-filter" id="dfl">${Object.entries(F).filter(([k]) => k !== 'unassigned' || !arg).map(([k, [l]]) => `<button data-f="${k}" class="${k === kind ? 'on' : ''}">${l} <span class="small">(${AR(base.filter(F[k][1]).length)})</span></button>`).join('')}</div><div class="scroll drill" style="max-height:60vh"><table class="tbl"><thead><tr><th>الفصل</th><th>اليوم</th><th>الحصة</th><th>المادة</th>${arg ? '' : '<th>المعلم</th>'}<th>الموضوع</th><th>الحالة</th></tr></thead><tbody id="dtb"></tbody></table></div>`, { cls: 'wide' });
     const draw = k => {
       $$('#dfl button', m.el).forEach(b => b.classList.toggle('on', b.dataset.f === k));
       const list = base.filter(F[k][1]).sort((a, b) => (cls(a.class_id)?.sort ?? 0) - (cls(b.class_id)?.sort ?? 0) || a.day - b.day || a.period - b.period);
@@ -552,6 +593,11 @@
       $$('tr[data-c]', m.el).forEach(r => r.onclick = () => { m.close(); LS.set('cls', r.dataset.c); location.hash = '#/classes'; if (S.view === 'classes') route(); });
     };
     $$('#dfl button', m.el).forEach(b => b.onclick = () => draw(b.dataset.f)); draw(kind);
+    const apT = m.el.querySelector('#dApT');
+    if (apT) apT.onclick = ev => run(ev.currentTarget, async () => {
+      const ids = base.filter(F.submitted[1]).map(e => e.id); const n = await api.review(ids, 'approved');
+      await loadWeek(); m.close(); route(); toast(`اعتُمدت ${cnt(n, 'حصة', 'حصص')}`, 'ok');
+    });
   }
   window.APP_DRILL = drill;
   function remindLink(people) {
@@ -569,7 +615,7 @@
     if (!w) { root.innerHTML = `<div class="card">${emptyBox('لا توجد أسابيع بعد')}</div>`; return; }
     const act = S.classes.filter(c => c.active);
     let cid = LS.get('cls'); if (!act.some(c => c.id === cid)) cid = (act[0] || {}).id;
-    const reviewer = perm('review');
+    const reviewer = perm('review'); const ttEd = perm('timetable_edit') && !!(window.APP && APP.slotDialog);
     root.innerHTML = `<div class="split"><div class="card" style="padding:14px"><h3>الفصول</h3><div class="cls-list" id="cl"></div></div><div id="cv"></div></div>`;
     const cl = $('#cl', root);
     act.forEach(c => { const s = stats(S.entries.filter(e => e.class_id === c.id)); const b = document.createElement('button'); b.className = c.id === cid ? 'on' : ''; b.innerHTML = `<span>${esc(c.name)}</span>${bar(s.filled, s.total)}`; b.onclick = () => { LS.set('cls', c.id); VIEWS.classes(root); }; cl.appendChild(b); });
@@ -581,7 +627,7 @@
     cv.innerHTML = `<div class="card">
       <div class="head"><div class="grow"><h2>${esc(c.name)}</h2><p class="sub" style="margin:2px 0 0">الأسبوع ${esc(w.word)} · الإنجاز ${AR(s.filled)}/${AR(s.total)} · معتمدة ${AR(s.approved)} · مُرسلة ${AR(s.submitted)}</p></div>
         <div class="row">
-          ${reviewer ? `<button class="btn ok sm" id="apAll">${I.check} اعتماد كل المُرسل</button><button class="btn ghost sm" id="apSel">اعتماد المحدد</button><button class="btn ghost sm" id="retSel">${I.undo} إرجاع المحدد</button>` : ''}
+          ${reviewer ? `<button class="btn ok sm" id="apAll">${I.check} اعتماد كل الجاهز</button><button class="btn ghost sm" id="apSel">اعتماد المحدد</button><button class="btn ghost sm" id="retSel">${I.undo} إرجاع المحدد</button><button class="btn ghost sm" id="unSel">إلغاء اعتماد المحدد</button><button class="btn sm" id="bulkR">اعتماد / إلغاء لعدة فصول</button>` : ''}
           ${reviewer ? `<button class="btn ghost sm" id="langB">التدقيق اللغوي</button>` : ''}<button class="btn sky sm" id="prev">${I.eye} معاينة الملف</button>
         </div></div>
       <div class="scroll"><table class="cgrid"><thead><tr>${reviewer ? '<th style="width:34px"><input type="checkbox" id="selAll" aria-label="تحديد الكل"></th>' : ''}<th>اليوم</th><th>الحصة</th><th style="width:15%">المادة / المعلم</th><th style="width:30%">الموضوع</th><th style="width:22%">الواجب</th><th style="width:14%">ملاحظة</th><th>الحالة</th></tr></thead><tbody id="cgb"></tbody></table></div>
@@ -598,13 +644,14 @@
         const ed = canEdit(e);
         tr.innerHTML = `${reviewer ? `<td><input type="checkbox" data-sel="${e.id}"></td>` : ''}${k === 0 ? `<td class="dayc" rowspan="${rows.length}">${DAYS[d]}<div class="small muted">${AR(dates[d])}</div></td>` : ''}
           <td class="per">${AR(e.period + 1)}</td>
-          <td><b>${esc(subjName(e.subject_id) || '—')}</b><div class="small ${e.teacher_id ? 'muted' : ''}" style="${e.teacher_id ? '' : 'color:var(--bad)'}">${e.subject_id ? (e.teacher_id ? esc(personName(e.teacher_id)) : `<a href="#" class="assignlink" data-assign-c="${e.class_id}" data-assign-s="${e.subject_id}">بلا معلم — إسناد</a>`) : ''}</div></td>
+          <td><b>${esc(subjName(e.subject_id) || '—')}</b>${ttEd ? ` <button class="ldx" data-es="${e.id}" title="تعديل هذه الحصة في الجدول المعتمد" aria-label="تعديل الحصة في الجدول">✎</button>` : ''}<div class="small ${e.teacher_id ? 'muted' : ''}" style="${e.teacher_id ? '' : 'color:var(--bad)'}">${e.subject_id ? (e.teacher_id ? esc(personName(e.teacher_id)) : `<a href="#" class="assignlink" data-assign-c="${e.class_id}" data-assign-s="${e.subject_id}">بلا معلم — إسناد</a>`) : ''}</div></td>
           ${['topic', 'homework', 'note'].map(k2 => `<td>${ed ? `<textarea data-k="${k2}" rows="1">${esc(e[k2])}</textarea>` : `<div style="padding:6px">${esc(e[k2]) || '<span class="faint">–</span>'}</div>`}</td>`).join('')}
           <td>${pill(e.status)}${e.subject_id && APP.exPill ? `<div style="margin-top:4px">${APP.exPill(e.exec_status)}</div>` : ''}${e.review_note ? `<div class="small" style="color:var(--warn);margin-top:4px">${esc(e.review_note)}</div>` : ''}</td>`;
         if (ed) {
           const save = async () => {
             const patch = {}; $$('[data-k]', tr).forEach(i => patch[i.dataset.k] = i.value.trim());
             if (patch.topic === e.topic && patch.homework === e.homework && patch.note === e.note) return;
+            if (!reviewer && e.status !== 'approved') patch.status = (patch.topic || patch.homework || patch.note) ? 'submitted' : 'draft';
             try { const r = await api.saveEntry(e.id, patch); Object.assign(e, r); tr.lastElementChild.innerHTML = pill(e.status); } catch (err) { toast(apiMsg(err), 'err'); }
           };
           $$('textarea', tr).forEach(t => t.addEventListener('change', save));
@@ -617,8 +664,14 @@
     if (reviewer) {
       const sel = () => $$('[data-sel]:checked', cv).map(i => i.dataset.sel);
       $('#selAll', cv).onchange = e => $$('[data-sel]', cv).forEach(i => i.checked = e.target.checked);
-      const doReview = async (ids, st, note) => { if (!ids.length) return toast('حدّد حصصاً أولاً'); const n = await api.review(ids, st, note); await loadWeek(); VIEWS.classes(root); toast(`${st === 'approved' ? 'اعتُمدت' : 'أُعيدت'} ${cnt(n, 'حصة', 'حصص')}`, 'ok'); };
-      $('#apAll', cv).onclick = e => run(e.currentTarget, () => doReview(list.filter(x => x.status === 'submitted').map(x => x.id), 'approved'));
+      const doReview = async (ids, st, note) => { if (!ids.length) return toast('حدّد حصصاً أولاً'); const n = await api.review(ids, st, note); await loadWeek(); VIEWS.classes(root); toast(`${st === 'approved' ? 'اعتُمدت' : st === 'submitted' ? 'أُلغي اعتماد' : 'أُعيدت'} ${cnt(n, 'حصة', 'حصص')}`, 'ok'); };
+      $('#apAll', cv).onclick = e => run(e.currentTarget, () => doReview(list.filter(x => x.status === 'submitted' || (x.status === 'draft' && filled(x))).map(x => x.id), 'approved'));
+      $('#unSel', cv).onclick = e => run(e.currentTarget, async () => {
+        const ids = sel().filter(id => (list.find(x => x.id === id) || {}).status === 'approved'); if (!ids.length) return toast('حدّد حصصاً معتمدة أولاً');
+        if (!(await confirmBox(`إلغاء اعتماد ${cnt(ids.length, 'حصة', 'حصص')}؟<br><span class="small muted">تعود «مُرسلة» وتختفي من بوابة أولياء الأمور حتى يُعاد اعتمادها. النصوص لا تتغير.</span>`, 'إلغاء الاعتماد', true))) return;
+        await doReview(ids, 'submitted');
+      });
+      $('#bulkR', cv).onclick = () => bulkReviewDialog(root);
       $('#apSel', cv).onclick = e => run(e.currentTarget, () => doReview(sel(), 'approved'));
       $('#retSel', cv).onclick = () => {
         const ids = sel(); if (!ids.length) return toast('حدّد حصصاً أولاً');
@@ -626,9 +679,34 @@
         m.el.querySelector('#rb').onclick = ev => run(ev.currentTarget, async () => { await doReview(ids, 'returned', m.el.querySelector('#rn').value.trim()); m.close(); });
       };
     }
+    $$('[data-es]', cv).forEach(b => b.onclick = () => { const e = list.find(x => x.id === b.dataset.es); if (e) APP.slotDialog(e.class_id, e.day, e.period, async () => { await loadWeek(); VIEWS.classes(root); }); });
     renderNotes($('#notesCard', cv), c, () => VIEWS.classes(root));
     if (VIEWS._xp) VIEWS._xp($('#xpCard', cv), c, () => VIEWS.classes(root));
   };
+
+  // اعتماد جماعي أو إلغاء اعتماد لكل الفصول أو فصول محددة (يغيّر الحالة فقط، لا النصوص)
+  function bulkReviewDialog(root) {
+    const w = week(); const act = S.classes.filter(c => c.active);
+    const rd = c => S.entries.filter(e => e.class_id === c.id && (e.status === 'submitted' || (e.status === 'draft' && filled(e)))).length;
+    const ap = c => S.entries.filter(e => e.class_id === c.id && e.status === 'approved').length;
+    const m = modal(`<h3>اعتماد أو إلغاء اعتماد — الأسبوع ${esc(w.word)}</h3>
+      <p class="sub">اختر الفصول ثم الإجراء. لا تتغير أي نصوص أدخلها المعلمون؛ الحالة فقط.</p>
+      <div class="row" style="margin-bottom:8px"><label class="chk"><input type="checkbox" id="brAll" checked> كل الفصول</label></div>
+      <div class="perm-grid" id="brC">${act.map(c => `<label class="chk"><input type="checkbox" value="${c.id}" checked> ${esc(c.name)} <span class="small muted">· جاهز ${AR(rd(c))} · معتمد ${AR(ap(c))}</span></label>`).join('')}</div>
+      <div class="acts"><button class="btn ok" id="brA">${I.check} اعتماد كل الجاهز في المحدد</button><button class="btn ghost" id="brU">إلغاء الاعتماد في المحدد</button></div>`, { cls: 'wide' });
+    const boxes = () => $$('#brC input', m.el);
+    m.el.querySelector('#brAll').onchange = e => boxes().forEach(i => i.checked = e.target.checked);
+    const go = (action) => async ev => run(ev.currentTarget, async () => {
+      const ids = boxes().filter(i => i.checked).map(i => i.value); if (!ids.length) throw new Error('اختر فصلاً على الأقل');
+      const all = ids.length === act.length;
+      if (action === 'unapprove' && !(await confirmBox(`إلغاء اعتماد ${all ? 'كل الفصول' : cnt(ids.length, 'فصل', 'فصول')}؟<br><span class="small muted">تعود الحصص «مُرسلة»، وإن كان الأسبوع منشوراً يُلغى نشره ويختفي من بوابة أولياء الأمور حتى يُعاد الاعتماد.</span>`, 'إلغاء الاعتماد', true))) return;
+      const r = await api.bulkReview(w.id, all ? null : ids, action);
+      m.close(); await loadWeek(); renderNav(); if (root && root.isConnected) route();
+      toast(action === 'approve' ? `اعتُمدت ${cnt(r.count, 'حصة', 'حصص')}` : `أُلغي اعتماد ${cnt(r.count, 'حصة', 'حصص')}${r.unpublished ? ' وأُلغي نشر الأسبوع' : ''}`, 'ok');
+    });
+    m.el.querySelector('#brA').onclick = go('approve'); m.el.querySelector('#brU').onclick = go('unapprove');
+  }
+  window.APP_BULK_REVIEW = bulkReviewDialog;
 
   function renderNotes(card, c, refresh) {
     const w = week(); const canN = perm('review') || perm('structure');
@@ -663,7 +741,8 @@
   // ---------- تشغيل ----------
   window.addEventListener('DOMContentLoaded', async () => {
     const jc = new URLSearchParams(location.search).get('join');
-    try { if (jc) { await api.signOut().catch(() => { }); return joinScreen(jc); } const s = await api.session(); if (s) await start(); else loginScreen(); } catch (e) { loginScreen(apiMsg(e)); }
+    const rec = window.DINA_RECOVERY;
+    try { if (jc) { await api.signOut().catch(() => { }); return joinScreen(jc); } let s = await api.session(); if (!s && rec) { await new Promise(r => setTimeout(r, 900)); s = await api.session(); } if (s) { await start(); if (rec) { history.replaceState(null, '', location.pathname + location.search); newPasswordDialog(); } } else loginScreen(rec ? 'انتهت صلاحية رابط الاستعادة — اطلب رابطاً جديداً' : ''); } catch (e) { loginScreen(apiMsg(e)); }
   });
   window.addEventListener('beforeunload', e => { if (pending.size) { flushSaves(); e.preventDefault(); e.returnValue = ''; } });
 })();

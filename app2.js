@@ -126,29 +126,92 @@
     S.classes.filter(c => c.active).forEach(c => { const b = document.createElement('button'); b.className = 'btn sm ' + (c.id === cur ? '' : 'ghost'); b.textContent = c.name; b.onclick = () => onPick(c.id); d.appendChild(b); });
     box.appendChild(d);
   }
-  function grid(slots, c, editable, base) {
-    const sec = A.section();
-    let h = `<div class="scroll"><table class="tt"><thead><tr><th style="width:90px"></th>${Array.from({ length: sec.periods }, (_, p) => `<th>الحصة ${PER[p]}</th>`).join('')}</tr></thead><tbody>`;
+  // تعارض المعلم: نفس المعلم في أكثر من فصل في نفس اليوم والحصة
+  function clashes(slots) {
+    const m = new Map();
+    slots.forEach(s => { if (!s.teacher_id || !s.subject_id) return; const k = s.teacher_id + '|' + s.day + '|' + s.period; (m.get(k) || m.set(k, []).get(k)).push(s); });
+    for (const [k, l] of m) if (l.length < 2) m.delete(k);
+    return m;
+  }
+  const clashOf = (cm, s) => (s && s.teacher_id) ? (cm.get(s.teacher_id + '|' + s.day + '|' + s.period) || []).filter(x => x.class_id !== s.class_id) : [];
+  function grid(slots, c, editable, base, opt = {}) {
+    const sec = A.section(); const cm = opt.clash || null;
+    let h = `<div class="scroll"><table class="tt tt-days"><thead><tr><th style="width:90px"></th>${Array.from({ length: sec.periods }, (_, p) => `<th>الحصة ${PER[p]}</th>`).join('')}</tr></thead><tbody>`;
     for (let d = 0; d < sec.days; d++) {
-      h += `<tr><td class="dayh">${DAYS[d]}</td>`;
+      h += `<tr class="dayrow d${d % 2}"><td class="dayh">${DAYS[d]}</td>`;
       for (let p = 0; p < sec.periods; p++) {
         const s = slots.find(x => x.class_id === c && x.day === d && x.period === p) || {};
         const b = base ? (base.find(x => x.class_id === c && x.day === d && x.period === p) || {}) : null;
         const chg = b && ((b.subject_id || null) !== (s.subject_id || null) || (b.teacher_id || null) !== (s.teacher_id || null));
+        const cl = cm ? clashOf(cm, s) : [];
         h += editable
           ? `<td class="${chg ? 'chg' : ''}"><select data-d="${d}" data-p="${p}" data-f="subject_id">${subjOpts(s.subject_id)}</select><select data-d="${d}" data-p="${p}" data-f="teacher_id" style="margin-top:4px">${teachersOpts(s.teacher_id)}</select></td>`
-          : `<td class="${s.subject_id && !s.teacher_id ? 'noteach' : ''}"><div class="s">${esc(A.subjName(s.subject_id)) || '<span class="faint">—</span>'}</div><div class="t">${s.subject_id ? (s.teacher_id ? esc(A.personName(s.teacher_id)) : `<a href="#" class="assignlink" data-assign-c="${c}" data-assign-s="${s.subject_id}">بلا معلم — إسناد</a>`) : ''}</div></td>`;
+          : `<td class="${s.subject_id && !s.teacher_id ? 'noteach' : ''} ${cl.length ? 'clash' : ''}">${opt.edit ? `<button class="slot-ed" data-sd="${d}" data-sp="${p}" title="تعديل هذه الحصة" aria-label="تعديل حصة ${DAYS[d]} الحصة ${PER[p]}">✎</button>` : ''}<div class="s">${esc(A.subjName(s.subject_id)) || '<span class="faint">—</span>'}</div><div class="t">${s.subject_id ? (s.teacher_id ? esc(A.personName(s.teacher_id)) : `<a href="#" class="assignlink" data-assign-c="${c}" data-assign-s="${s.subject_id}">بلا معلم — إسناد</a>`) : ''}</div>${cl.length ? `<div class="clash-n" title="المعلم نفسه في هذه الحصة لدى فصل آخر">تعارض: ${cl.map(x => esc((A.cls(x.class_id) || {}).name || '')).join('، ')}</div>` : ''}</td>`;
       }
       h += '</tr>';
     }
     return h + '</tbody></table></div>';
   }
+  // ملخص الفصل: المادة وعدد حصصها الأسبوعية ومعلمها
+  function classSummary(slots, c) {
+    const by = {}; slots.filter(s => s.class_id === c && s.subject_id).forEach(s => { const o = by[s.subject_id] = by[s.subject_id] || { n: 0, t: {} }; o.n++; o.t[s.teacher_id || ''] = (o.t[s.teacher_id || ''] || 0) + 1; });
+    const rows = Object.entries(by).sort((a, b) => b[1].n - a[1].n || A.subjName(a[0]).localeCompare(A.subjName(b[0]), 'ar'));
+    const tot = rows.reduce((a, [, o]) => a + o.n, 0);
+    return `<div class="sec-box" style="margin-top:14px"><div class="row" style="justify-content:space-between"><b>ملخص ${esc((A.cls(c) || {}).name || '')}</b><span class="small muted">${A.cnt(rows.length, 'مادة', 'مواد')} · ${A.cnt(tot, 'حصة', 'حصص')} أسبوعياً</span></div>
+      <div class="scroll" style="margin-top:8px"><table class="tbl"><thead><tr><th>المادة</th><th>الحصص الأسبوعية</th><th>المعلم</th></tr></thead><tbody>
+      ${rows.map(([sid, o]) => `<tr><td><b>${esc(A.subjName(sid))}</b></td><td>${AR(o.n)}</td><td>${Object.entries(o.t).map(([t, n]) => t ? `${esc(A.personName(t))}${Object.keys(o.t).length > 1 ? ` <span class="small muted">(${AR(n)})</span>` : ''}` : `<a href="#" class="assignlink" data-assign-c="${c}" data-assign-s="${sid}">بلا معلم — إسناد</a>`).join('، ')}</td></tr>`).join('') || `<tr><td colspan="3" class="muted">لا توجد حصص</td></tr>`}
+      </tbody></table></div></div>`;
+  }
+  // تعديل حصة واحدة في الجدول المعتمد — يسري فوراً على الأسابيع الجارية والقادمة دون مسّ ما أدخله المعلمون
+  async function slotDialog(c, d, p, onDone) {
+    if (!T.versions.length || !approved()) await loadVersions();
+    const v = approved(); if (!v) return A.toast('لا يوجد جدول معتمد', 'err');
+    const sl = await slotsOf(v.id); const s = sl.find(x => x.class_id === c && x.day === d && x.period === p) || {};
+    const busy = tid => sl.filter(x => x.teacher_id === tid && x.day === d && x.period === p && x.class_id !== c);
+    const m = A.modal(`<h3>تعديل حصة — ${esc((A.cls(c) || {}).name || '')} · ${DAYS[d]} · الحصة ${PER[p]}</h3>
+      <p class="sub">يُطبَّق على الجدول المعتمد، ثم على الأسبوع الحالي والأسابيع القادمة فوراً. الخلية التي فيها محتوى من المعلم لا تُغيَّر مادتها تلقائياً؛ تظهر لك في «تعارضات تحتاج قرارك».</p>
+      <div class="grid g2"><div class="field"><label for="sdS">المادة</label><select class="in" id="sdS">${subjOpts(s.subject_id)}</select></div>
+      <div class="field"><label for="sdT">المعلم</label><select class="in" id="sdT">${teachersOpts(s.teacher_id)}</select></div></div>
+      <div id="sdW" class="small" style="min-height:20px"></div>
+      <div class="acts"><button class="btn" id="sdGo">حفظ التعديل</button></div>`);
+    const warn = () => { const t = m.el.querySelector('#sdT').value; const b = t ? busy(t) : []; m.el.querySelector('#sdW').innerHTML = b.length ? `<div class="notice warn" style="display:block">تعارض: ${esc(A.personName(t))} لديه حصة في نفس الوقت في ${b.map(x => esc((A.cls(x.class_id) || {}).name || '')).join('، ')}. يمكنك الحفظ مؤقتاً وسيظهر التعارض بوضوح في الجدول.</div>` : ''; };
+    m.el.querySelector('#sdT').onchange = warn; warn();
+    m.el.querySelector('#sdGo').onclick = e => A.run(e.currentTarget, async () => {
+      const sid = m.el.querySelector('#sdS').value || null, tid = m.el.querySelector('#sdT').value || null;
+      const r = await api.editSlot(c, d, p, sid, tid);
+      T.slots[v.id] = null; m.close();
+      const parts = []; if (r.teacher_fixed) parts.push(`حُدِّث المعلم في ${A.cnt(r.teacher_fixed, 'خلية', 'خلايا')}`); if (r.subject_changed) parts.push(`تغيّرت المادة في ${A.cnt(r.subject_changed, 'خلية فارغة', 'خلايا فارغة')}`); if (r.conflicts) parts.push(`${A.cnt(r.conflicts, 'خلية فيها محتوى', 'خلايا فيها محتوى')} بانتظار قرارك`);
+      A.toast('حُفظت الحصة' + (parts.length ? ' — ' + parts.join(' · ') : ''), 'ok');
+      await A.loadWeek(); if (onDone) await onDone();
+    });
+  }
+  A.slotDialog = slotDialog;
+  // خلايا فيها محتوى مادتها تخالف الجدول بعد التعديل — قرار صريح فقط
+  async function conflictsPanel(el, refresh) {
+    if (!A.perm('timetable_edit') || !api.slotConflicts) { el.innerHTML = ''; return; }
+    let list = []; try { list = await api.slotConflicts(S.sectionId); } catch (_) { }
+    const withContent = list.filter(x => (x.topic || '').trim());
+    if (!withContent.length) { el.innerHTML = ''; return; }
+    el.innerHTML = `<details class="sec-box" style="margin-top:14px;border-color:var(--warn)"><summary><b>تعارضات تحتاج قرارك (${AR(withContent.length)})</b> <span class="small muted">خلايا كتب فيها المعلم محتوى، ومادتها في الخطة تختلف عن الجدول الحالي — لم تُغيَّر تلقائياً</span></summary>
+      <div class="scroll" style="margin-top:8px"><table class="tbl"><thead><tr><th>الأسبوع</th><th>الفصل</th><th>اليوم/الحصة</th><th>في الخطة</th><th>في الجدول</th><th>المحتوى</th><th></th></tr></thead><tbody>
+      ${withContent.map(x => `<tr><td>${AR(x.week_number)}</td><td><b>${esc((A.cls(x.class_id) || {}).name || '')}</b></td><td>${DAYS[x.day]} · ${AR(x.period + 1)}</td><td>${esc(A.subjName(x.entry_subject) || '—')}</td><td>${esc(A.subjName(x.slot_subject) || '—')}${x.slot_teacher ? `<div class="small muted">${esc(A.personName(x.slot_teacher))}</div>` : ''}</td><td class="small">${esc(x.topic)}</td><td><button class="btn ghost sm" data-cfa="${x.entry_id}" title="تُنقل الخلية لمادة الجدول ويبقى النص كما هو">اعتماد مادة الجدول</button></td></tr>`).join('')}
+      </tbody></table></div><p class="small muted">«اعتماد مادة الجدول» يغيّر مادة الخلية ومعلمها فقط، ويبقى النص المكتوب كما هو. اتركها إن كان الصحيح ما في الخطة، ثم صحّح الجدول بدلاً من ذلك.</p></details>`;
+    $$('[data-cfa]', el).forEach(b => b.onclick = () => A.run(b, async () => { await api.slotConflictApply(b.dataset.cfa); await A.loadWeek(); A.toast('طُبِّقت مادة الجدول على الخلية', 'ok'); refresh(); }));
+  }
   async function ttView(box) {
     const v = approved(); if (!v) { box.innerHTML = A.emptyBox('لا يوجد جدول معتمد', 'أنشئ مسودة من تبويب «تعديل واستيراد الجدول» ثم اعتمدها.'); return; }
-    const sl = await slotsOf(v.id);
+    const sl = await slotsOf(v.id); const cm = clashes(sl); const canE = A.perm('timetable_edit');
     T.cls = T.cls && A.cls(T.cls) ? T.cls : (S.classes[0] || {}).id;
+    const open = A.LS.get('ttfold') !== '0';
     box.innerHTML = ''; classChips(box, id => { T.cls = id; ttView(box); }, T.cls);
-    box.insertAdjacentHTML('beforeend', grid(sl, T.cls, false));
+    const allClash = [...cm.values()];
+    box.insertAdjacentHTML('beforeend', `${allClash.length ? `<details class="notice warn" style="display:block;margin-bottom:10px"><summary><b>${A.cnt(allClash.length, 'تعارض', 'تعارضات')} في القسم</b> — معلم في أكثر من فصل في نفس الحصة (مسموح مؤقتاً ويظهر بلون مميز). اضغط لعرضها.</summary><div style="margin-top:6px">${allClash.map(l => `<button class="ldc ldbtn" data-gc="${l[0].class_id}">${esc(A.personName(l[0].teacher_id))} · ${DAYS[l[0].day]} الحصة ${PER[l[0].period]}: ${l.map(x => esc((A.cls(x.class_id) || {}).name || '')).join(' + ')}</button>`).join('')}</div></details>` : ''}
+      <details class="ttfold" ${open ? 'open' : ''}><summary><b>جدول ${esc((A.cls(T.cls) || {}).name || '')}</b> <span class="small muted">${canE ? 'اضغط ✎ على أي حصة لتصحيحها — يسري فوراً على الخطط والأسابيع القادمة' : 'اضغط للطي أو الفتح'}</span></summary>${grid(sl, T.cls, false, null, { clash: cm, edit: canE })}</details>
+      ${classSummary(sl, T.cls)}<div id="cfp"></div>`);
+    const fold = $('.ttfold', box); fold.ontoggle = () => A.LS.set('ttfold', fold.open ? '1' : '0');
+    $$('[data-gc]', box).forEach(b => b.onclick = () => { T.cls = b.dataset.gc; ttView(box); });
+    $$('[data-sd]', box).forEach(b => b.onclick = () => slotDialog(T.cls, +b.dataset.sd, +b.dataset.sp, () => ttView(box)));
+    conflictsPanel($('#cfp', box), () => ttView(box));
   }
   async function ttAssign(box) {
     const v = approved(); if (!v) { box.innerHTML = A.emptyBox('لا يوجد جدول معتمد'); return; }
@@ -220,8 +283,9 @@
       list.sort((a, b) => sort === 'name' ? a.p.full_name.localeCompare(b.p.full_name, 'ar') : b.o.n - a.o.n);
       const un = by[''] || { pairs: {}, n: 0 }; const assigned = sl.filter(s => s.subject_id && s.teacher_id).length;
       $('#lsum', box).innerHTML = `<div class="kpi"><div class="k">معلمون في القسم</div><div class="v">${AR(people().length)}</div></div><div class="kpi"><div class="k">حصص مُسندة</div><div class="v">${AR(assigned)}</div><div class="d">من ${AR(assigned + un.n)} حصة في الجدول</div></div><div class="kpi"><div class="k">حصص بلا معلم</div><div class="v" style="${un.n ? 'color:var(--warn)' : ''}">${AR(un.n)}</div><div class="d">${A.cnt(Object.keys(un.pairs).length, 'مادة', 'مواد')} في الفصول</div></div>`;
-      $('#lb', box).innerHTML = list.map(({ p, o }) => { const pairs = Object.values(o.pairs).sort((a, b) => (A.cls(a.c)?.sort ?? 0) - (A.cls(b.c)?.sort ?? 0)); const nCls = new Set(pairs.map(x => x.c)).size, nSub = new Set(pairs.map(x => x.s)).size;
-        return `<tr><td><b>${esc(p.full_name)}</b><div class="small muted">${esc(p.specialty || '')}${p.user_id ? '' : ' · بلا حساب دخول'}</div></td>
+      const cm = clashes(sl); const tClash = {}; for (const l of cm.values()) (tClash[l[0].teacher_id] = tClash[l[0].teacher_id] || []).push(l);
+      $('#lb', box).innerHTML = list.map(({ p, o }) => { const pairs = Object.values(o.pairs).sort((a, b) => (A.cls(a.c)?.sort ?? 0) - (A.cls(b.c)?.sort ?? 0)); const nCls = new Set(pairs.map(x => x.c)).size, nSub = new Set(pairs.map(x => x.s)).size; const tc = tClash[p.id] || [];
+        return `<tr><td><b>${esc(p.full_name)}</b><div class="small muted">${esc(p.specialty || '')}${p.user_id ? '' : ' · بلا حساب دخول'}</div>${tc.length ? `<div class="clash-n" title="${tc.map(l => `${DAYS[l[0].day]} الحصة ${PER[l[0].period]}: ${l.map(x => (A.cls(x.class_id) || {}).name || '').join(' + ')}`).join(' | ')}">${A.cnt(tc.length, 'تعارض', 'تعارضات')} في الجدول</div>` : ''}</td>
           <td class="ldn"><b>${AR(o.n)}</b><div class="small muted">حصة/أسبوع</div>${o.n !== o.nAct ? `<div class="small faint">منها ${AR(o.n - o.nAct)} نشاط</div>` : ''}</td>
           <td class="small">${AR(nSub)} مادة · ${AR(nCls)} فصل</td>
           <td>${pairs.map(pr => chip(pr, p.id)).join('') || '<span class="faint small">لا يوجد إسناد</span>'}${can ? `<button class="btn ghost sm" data-add="${p.id}" style="margin:4px 0">+ إسناد</button>${o.n ? ` <button class="btn ghost sm" data-dlg="${p.id}" style="margin:4px 0">تكليف مؤقت للإدخال</button>` : ''}` : ''}${dl.some(d => d.from_teacher === p.id) ? `<div class="small" style="color:var(--warn);margin-top:4px">يُدخل عنه حالياً: ${dl.filter(d => d.from_teacher === p.id).map(d => esc(A.personName(d.to_teacher))).join('، ')}</div>` : ''}</td></tr>`; }).join('') || `<tr><td colspan="4">${A.emptyBox('لا يوجد معلمون في هذا القسم بعد', 'أضفهم من الإدارة أو برابط الانضمام.')}</td></tr>`;
@@ -278,11 +342,15 @@
         <div class="row small" style="margin-bottom:8px;gap:14px"><span><span class="lg lg-free"></span> بلا معلم</span><span><span class="lg lg-oth"></span> مسندة لمعلم آخر</span><span><span class="lg lg-mine"></span> مسندة له</span><button type="button" class="btn ghost sm" id="adA">تحديد كل المتاح</button></div>
         <div class="claim-grid" id="adl"></div><div class="acts"><span class="small muted" id="adn"></span><button class="btn" id="adg">إسناد</button></div>`, { cls: 'wide' });
       const sel = new Set();
+      // تعارض الوقت: حصص هذه المادة في الفصل التي يكون فيها المعلم مشغولاً بفصل آخر (يشمل ما حدّدته الآن)
+      const conflictsFor = (k) => { const [c, s2] = k.split('|'); const busy = new Set(sl.filter(x => x.teacher_id === tid && !(x.class_id === c && x.subject_id === s2)).map(x => x.day + '|' + x.period));
+        [...sel].filter(k2 => k2 !== k).forEach(k2 => { const [c2, s3] = k2.split('|'); sl.filter(x => x.class_id === c2 && x.subject_id === s3).forEach(x => busy.add(x.day + '|' + x.period)); });
+        return sl.filter(x => x.class_id === c && x.subject_id === s2 && busy.has(x.day + '|' + x.period)); };
       const dr = () => {
         const sid = m.el.querySelector('#ads').value; const list = Object.values(pairs).filter(p => p.s === sid).sort((x, y) => (A.cls(x.c)?.sort ?? 0) - (A.cls(y.c)?.sort ?? 0));
-        m.el.querySelector('#adl').innerHTML = list.map(p => { const k = p.c + '|' + p.s; const st = p.t === tid ? 'mine' : p.t ? 'oth' : 'free';
-          return `<label class="claim as-${st} ${sel.has(k) ? 'on' : ''}" ${st === 'mine' ? 'aria-disabled="true"' : ''}><input type="checkbox" value="${k}" ${st === 'mine' ? 'checked disabled' : sel.has(k) ? 'checked' : ''} style="width:20px;height:20px;accent-color:var(--blue)"><span class="c">${esc((A.cls(p.c) || {}).name || '')}<small>${A.cnt(p.n, 'حصة', 'حصص')}${st === 'oth' ? ` · <span class="oth-n">${esc(A.personName(p.t))}</span>` : st === 'mine' ? ' · مسندة له' : ' · بلا معلم'}</small></span></label>`; }).join('');
-        $$('#adl input', m.el).forEach(i => i.onchange = () => { i.checked ? sel.add(i.value) : sel.delete(i.value); i.closest('.claim').classList.toggle('on', i.checked); cnt(); }); cnt();
+        m.el.querySelector('#adl').innerHTML = list.map(p => { const k = p.c + '|' + p.s; const st = p.t === tid ? 'mine' : p.t ? 'oth' : 'free'; const cf = st === 'mine' ? [] : conflictsFor(k);
+          return `<label class="claim as-${st} ${sel.has(k) ? 'on' : ''}" ${st === 'mine' ? 'aria-disabled="true"' : ''}><input type="checkbox" value="${k}" ${st === 'mine' ? 'checked disabled' : sel.has(k) ? 'checked' : ''} style="width:20px;height:20px;accent-color:var(--blue)"><span class="c">${esc((A.cls(p.c) || {}).name || '')}<small>${A.cnt(p.n, 'حصة', 'حصص')}${st === 'oth' ? ` · <span class="oth-n">${esc(A.personName(p.t))}</span>` : st === 'mine' ? ' · مسندة له' : ' · بلا معلم'}</small>${cf.length ? `<small class="clash-n" title="${cf.map(x => DAYS[x.day] + ' الحصة ' + PER[x.period]).join('، ')}">تعارض وقت في ${A.cnt(cf.length, 'حصة', 'حصص')}</small>` : ''}</span></label>`; }).join('');
+        $$('#adl input', m.el).forEach(i => i.onchange = () => { i.checked ? sel.add(i.value) : sel.delete(i.value); dr(); }); cnt();
       };
       const cnt = () => { const n = [...sel].reduce((a2, k) => a2 + (pairs[k] || { n: 0 }).n, 0), mv = [...sel].filter(k => pairs[k] && pairs[k].t && pairs[k].t !== tid).length;
         m.el.querySelector('#adn').textContent = sel.size ? `${A.cnt(sel.size, 'فصل', 'فصول')} · ${A.cnt(n, 'حصة', 'حصص')}${mv ? ` · منها ${AR(mv)} نقل من معلم آخر` : ''}` : ''; };
@@ -293,6 +361,8 @@
         if (!sel.size) throw new Error('اختر فصلاً واحداً على الأقل');
         const moves = [...sel].filter(k => pairs[k] && pairs[k].t && pairs[k].t !== tid);
         if (moves.length && !(await A.confirmBox(`سيُنقل ${A.cnt(moves.length, 'فصل', 'فصول')} من معلمين آخرين إلى ${esc(t.full_name || '')}:<br><span class="small muted">${moves.map(k => `${esc(A.subjName(pairs[k].s))} — ${esc((A.cls(pairs[k].c) || {}).name || '')} (من ${esc(A.personName(pairs[k].t))})`).join('<br>')}</span>`, 'نقل وإسناد'))) return;
+        const cfl = [...sel].map(k => [k, conflictsFor(k)]).filter(([, l]) => l.length);
+        if (cfl.length && !(await A.confirmBox(`تنبيه تعارض وقت: ${esc(t.full_name || '')} سيكون في أكثر من فصل في نفس الحصة:<br><span class="small muted">${cfl.map(([k, l]) => `${esc((A.cls(k.split('|')[0]) || {}).name || '')}: ${l.map(x => DAYS[x.day] + ' الحصة ' + PER[x.period]).join('، ')}`).join('<br>')}</span><br>يمكنك الإسناد مؤقتاً، وسيظهر التعارض بلون مميز في الجدول والنصاب حتى يُعالَج.`, 'إسناد مع التعارض مؤقتاً'))) return;
         for (const k of sel) { const [c, s2] = k.split('|'); await api.assignTeacher(c, s2, tid); }
         m.close(); await after(`أُسند ${A.cnt(sel.size, 'فصل', 'فصول')} إلى ${t.full_name}`);
       });
@@ -389,7 +459,7 @@
       const val = (a2, b2) => { const v = m.el.querySelector(a2).value; return v === 'custom' ? m.el.querySelector(b2).value : v; };
       sync();
       m.el.querySelector('#apgo').onclick = e => A.run(e.currentTarget, async () => {
-        if (mode === 'now') { const r = await api.approveTT(d.id, m.el.querySelector('#apw').checked); m.close(); await A.loadWeek(); A.toast(`اعتُمد الجدول${r && r.updated_entries ? ` وحُدِّثت ${A.cnt(r.updated_entries, 'حصة', 'حصص')} في الأسابيع المفتوحة` : ''}`, 'ok'); A.LS.set('tttab', 'view'); V.timetable(root); return; }
+        if (mode === 'now') { const r = await api.approveTT(d.id, m.el.querySelector('#apw').checked); m.close(); await A.loadWeek(); A.toast(`اعتُمد الجدول${r && r.updated_entries ? ` وحُدِّثت ${A.cnt(r.updated_entries, 'حصة', 'حصص')} في الأسابيع الجارية والقادمة` : ''}${r && r.conflicts ? ` · ${A.cnt(r.conflicts, 'خلية فيها محتوى', 'خلايا فيها محتوى')} تنتظر قرارك في «الجدول المعتمد»` : ''}`, 'ok'); A.LS.set('tttab', 'view'); V.timetable(root); return; }
         const from = val('#apF', '#apFd'); if (!from) throw new Error('حدد تاريخ البداية');
         const to = mode === 'temp' ? val('#apT', '#apTd') : null; if (mode === 'temp' && !to) throw new Error('حدد تاريخ النهاية'); if (to && to < from) throw new Error('تاريخ النهاية قبل البداية');
         const r = await api.scheduleTT(d.id, from, to);

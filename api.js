@@ -69,6 +69,11 @@
       approveTT: (id, apply) => sb.rpc('approve_timetable', { p_version: id, p_apply_open_weeks: apply }).then(ok),
       deleteVersion: id => T('timetable_versions').delete().eq('id', id).then(ok),
       assignTeacher: (c, s, t) => sb.rpc('assign_teacher', { p_class: c, p_subject: s, p_teacher: t }).then(ok),
+      editSlot: (c, d, p, s, t) => sb.rpc('edit_slot', { p_class: c, p_day: d, p_period: p, p_subject: s || null, p_teacher: t || null }).then(ok),
+      slotConflicts: s => sb.rpc('slot_conflicts', { p_section: s }).then(ok),
+      slotConflictApply: id => sb.rpc('slot_conflict_apply', { p_entry: id }).then(ok),
+      bulkReview: (w, classes, action) => sb.rpc('bulk_review', { p_week: w, p_classes: classes && classes.length ? classes : null, p_action: action }).then(ok),
+      async resetPassword(email) { return ok(await sb.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo: location.origin + location.pathname })); },
 
       addStaff: r => T('staff').insert(r).select().single().then(ok),
       updateStaff: (id, p) => T('staff').update(p).eq('id', id).select().single().then(ok),

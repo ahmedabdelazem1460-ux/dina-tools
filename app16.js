@@ -49,6 +49,10 @@
   // ترقيم الأسئلة داخل كل سؤال (قسم): «٣ (ق١)» = الفقرة ٣ من السؤال الأول
   const qNum = (e, q) => { const ps = specOf(e).parts; if (ps.length < 2) return String(q + 1); let a = 0; for (let i = 0; i < ps.length; i++) { const n = +ps[i].count || 0; if (q < a + n) return (q - a + 1) + ' (ق' + (i + 1) + ')'; a += n; } return String(q + 1); };
   const qN = (e, q) => AR(qNum(e, q));
+  const nidOf = st => String(st.national_id || st.student_no || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\D/g, '');
+  const nz = x => String(x || '').replace(/^0+/, '');
+  // ربط الورقة بالطالب: رقم الهوية المظلل أولاً، ثم ترتيب الطالب في شريط التعريف، ثم الباركود
+  const matchStudent = (R, r, bc) => { const d = r.gid && !r.gid.bad && r.gid.digits.length >= 4 ? r.gid.digits : bc ? String(bc).replace(/\D/g, '') : ''; const byId = d ? R.find(x => nidOf(x) && nz(nidOf(x)) === nz(d)) : null; const byIdx = r.id.idx >= 1 && r.id.idx <= R.length ? R[r.id.idx - 1] : null; return { stu: byId || byIdx, how: byId ? 'رقم الهوية' : byIdx ? 'ترتيب الورقة' : '', conflict: !!(byId && byIdx && byId.id !== byIdx.id), digits: d }; };
   const ansText = (e, ans) => QS(e).map((Q, q) => ans[q] >= 0 ? Q.lab[ans[q]] : '-').join(' ');
 
   // ===================== القائمة =====================
@@ -196,32 +200,35 @@
 
   // ---------- طباعة أوراق التظليل ----------
   async function tSheets(box, e, root) {
+    let comms = []; try { comms = (await api.list('exam_committees', { school_id: S.school.id }, { order: 'created_at', desc: true })).filter(c => c.class_ids.some(x => e.class_ids.includes(x))); } catch (_) {}
     const R = await roster(e), by = Object.fromEntries(e.class_ids.map(c => [c, R.filter(s => s.class_id === c).length])), empty = e.class_ids.filter(c => !by[c]);
     box.innerHTML = `<div class="sec-box" style="margin-top:12px"><b>ورقة تظليل لكل طالب باسمه من قاعدة البيانات</b><p class="small muted" style="margin:4px 0 8px">كل ورقة تحمل رقم الطالب ونموذجه في شريط التعريف فيتعرّف عليها التصحيح الآلي مباشرة. ${AR(R.length)} طالباً: ${e.class_ids.map(c => `${esc(clsName(c))} (${AR(by[c] || 0)})`).join('، ')}.</p>
       <div class="small" style="margin-bottom:8px;color:#082B5A">${esc(legend(e))}</div>
       <div class="row" style="gap:10px;flex-wrap:wrap"><label class="small">توزيع النماذج <select class="in" id="shM" style="max-width:200px">${e.models.map((m, i) => `<option value="${i}">نموذج ${m.name} للجميع</option>`).join('')}${e.models.length > 1 ? '<option value="alt">بالتناوب بين النماذج</option>' : ''}</select></label>
         <label class="small">الفصل <select class="in" id="shC" style="max-width:200px"><option value="">كل الفصول</option>${e.class_ids.map(c => `<option value="${c}">${esc(clsName(c))}</option>`).join('')}</select></label>
+        ${comms.length ? `<label class="small">رقم الجلوس من <select class="in" id="shCm" style="max-width:220px"><option value="">— بلا رقم جلوس —</option>${comms.map(c => `<option value="${c.id}" ${c.exam_id === e.id ? 'selected' : ''}>${esc(c.title)}</option>`).join('')}</select></label>` : ''}
         <label class="small">أوراق احتياطية بلا اسم <input class="in" type="number" min="0" max="80" id="shX" value="${R.length ? 0 : 30}" style="width:80px"></label>
         <button class="btn" id="shGo">${I.print} طباعة الأوراق</button><button class="btn ghost" id="shOne">ورقة نموذجية فارغة</button></div>
       ${empty.length ? `<div class="notice warn" style="margin-top:8px;display:block">فصول بلا طلاب في قاعدة البيانات: <b>${esc(empty.map(clsName).join('، '))}</b>. ${realMe().is_owner ? 'أضف أسماءهم الآن لتُطبع الأوراق بأسمائهم:' : 'اطلب من الإدارة إضافة الطلاب، أو اطبع أوراقاً احتياطية بلا اسم واربطها بالطالب عند التصحيح.'} ${realMe().is_owner ? `<button class="btn sm" id="shAdd">إضافة طلاب</button>` : ''}</div>` : ''}
-      <p class="small muted" style="margin-top:8px">الورقة الاحتياطية بلا اسم تُصحَّح آلياً أيضاً، ويُختار اسم الطالب لها من قائمة الفصل في شاشة المراجعة قبل الحفظ.</p></div>`;
+      <p class="small muted" style="margin-top:8px">${R.filter(x => nidOf(x)).length < R.length ? `<b style="color:var(--warn)">${AR(R.length - R.filter(x => nidOf(x)).length)} طالباً بلا رقم هوية في قاعدة البيانات</b> — تُطبع أوراقهم بلا باركود وتُربط بترتيب الورقة. أضف أرقام الهوية من «الحضور والسلوك ← الطلاب». ` : 'كل الطلاب لهم رقم هوية: تُطبع الأوراق بالباركود وبشبكة الهوية مظللة. '}الورقة الاحتياطية بلا اسم تُصحَّح آلياً أيضاً، ويُختار اسم الطالب لها من قائمة الفصل في شاشة المراجعة قبل الحفظ.</p></div>`;
     const print = (pages) => { const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;left:-9999px;width:900px;height:1200px;border:0'; document.body.appendChild(f); const base = location.href.replace(/[^/]*$/, '').split('#')[0];
       f.contentDocument.write(`<!doctype html><html lang="${isEn(e) ? 'en' : 'ar'}" dir="${isEn(e) ? 'ltr' : 'rtl'}"><head><meta charset="utf-8"><base href="${base}"><style>@font-face{font-family:'GE SS Two';font-weight:400 500;src:url(fonts/gess-two-medium.woff2)}@font-face{font-family:'GE SS Two';font-weight:600 900;src:url(fonts/gess-two-bold.woff2)}${DinaOMR.PAGE_CSS}</style></head><body>${pages.join('')}</body></html>`); f.contentDocument.close();
       setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 4000); }, 900); };
     const common = { spec: specOf(e), legend: specOf(e).parts.length > 1 ? '' : legend(e), title: e.title, sub: `${A.subjName(e.subject_id) || ''} · ${isEn(e) ? ({ diagnostic: 'Diagnostic', periodic: 'Periodic', final: 'Final', quiz: 'Quiz' }[e.kind] || '') : (KINDS[e.kind] || '')}${e.exam_date ? ' · ' + e.exam_date : ''}`, foot: S.school.name + (isEn(e) ? ' — Dina Study Planning Platform' : ' — منصة دينا للتخطيط الدراسي') };
+    const seatOf = s => { const cm = comms.find(c => c.id === ($('#shCm', box) || {}).value); if (!cm) return ''; const x = cm.seating.find(z => z.student_id === s.id); return x ? `${x.label || x.seat} · ${cm.rooms[x.room] ? cm.rooms[x.room].name : ''}` : ''; };
     $('#shGo', box).onclick = () => { const mm = $('#shM', box).value, fc = $('#shC', box).value, extra = Math.max(0, Math.min(80, +$('#shX', box).value || 0)); const L = R.map((s, i) => [s, i]).filter(([s]) => !fc || s.class_id === fc); if (!L.length && !extra) return A.toast('لا توجد أوراق للطباعة', 'warn');
-      const pages = L.map(([s, i], j) => { const mi = mm === 'alt' ? j % e.models.length : +mm; return DinaOMR.sheetHTML({ ...common, idx: i + 1, model: mi, modelName: e.models[mi].name, name: s.full_name, cls: clsName(s.class_id) }); });
+      const pages = L.map(([s, i], j) => { const mi = mm === 'alt' ? j % e.models.length : +mm; return DinaOMR.sheetHTML({ ...common, idx: i + 1, model: mi, modelName: e.models[mi].name, name: s.full_name, cls: clsName(s.class_id), nid: nidOf(s), seat: seatOf(s) }); });
       for (let k = 0; k < extra; k++) { const mi = mm === 'alt' ? k % e.models.length : +mm; pages.push(DinaOMR.sheetHTML({ ...common, idx: 4095, model: mi, modelName: e.models[mi].name, cls: fc ? clsName(fc) : '' })); }
       print(pages); };
     $('#shOne', box).onclick = () => print([DinaOMR.sheetHTML({ ...common, idx: 4095, model: 0, modelName: e.models[0].name })]);
     const add = $('#shAdd', box); if (add) add.onclick = () => addStudents(e, empty, () => tSheets(box, e, root));
   }
   function addStudents(e, cids, done) {
-    const m = A.modal(`<h3>إضافة طلاب إلى قاعدة البيانات</h3><p class="sub">سطر لكل طالب (الاسم، ويمكن إضافة رقم الطالب بعد فاصلة). يمكن اللصق مباشرة من Excel. يُضافون إلى الفصل المختار ويظهرون في كل المنصة.</p>
+    const m = A.modal(`<h3>إضافة طلاب إلى قاعدة البيانات</h3><p class="sub">سطر لكل طالب: الاسم، ثم رقم الهوية (للربط الآلي والباركود)، ثم رقم الطالب اختيارياً — مفصولة بفاصلة أو ملصوقة من Excel. يُضافون إلى الفصل المختار ويظهرون في كل المنصة.</p>
       <div class="field"><label for="asC">الفصل</label><select class="in" id="asC">${cids.map(c => `<option value="${c}">${esc(clsName(c))}</option>`).join('')}</select></div>
-      <textarea class="in" id="asT" rows="10" placeholder="نورة محمد القحطاني، 1001&#10;سارة أحمد الغامدي"></textarea><div class="acts"><button class="btn" id="asGo">إضافة</button></div>`, { cls: 'wide' });
+      <textarea class="in" id="asT" rows="10" placeholder="نورة محمد القحطاني، 1100000001، 1001&#10;سارة أحمد الغامدي، 1100000002"></textarea><div class="acts"><button class="btn" id="asGo">إضافة</button></div>`, { cls: 'wide' });
     m.el.querySelector('#asGo').onclick = ev => A.run(ev.currentTarget, async () => {
-      const cid = m.el.querySelector('#asC').value, c = A.cls(cid) || {}; const rows = m.el.querySelector('#asT').value.split(/\n/).map(l => l.split(/[\t,،]/).map(x => x.trim())).filter(r => r[0] && r[0].length > 2).map(r => ({ school_id: S.school.id, section_id: c.section_id || S.sectionId, class_id: cid, full_name: r[0].replace(/\s+/g, ' '), student_no: r[1] || null, active: true }));
+      const cid = m.el.querySelector('#asC').value, c = A.cls(cid) || {}; const rows = m.el.querySelector('#asT').value.split(/\n/).map(l => l.split(/[\t,،]/).map(x => x.trim())).filter(r => r[0] && r[0].length > 2).map(r => ({ school_id: S.school.id, section_id: c.section_id || S.sectionId, class_id: cid, full_name: r[0].replace(/\s+/g, ' '), national_id: (r[1] || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\D/g, '') || null, student_no: r[2] || null, active: true }));
       if (!rows.length) throw new Error('اكتب اسماً واحداً على الأقل'); await api.ins('students', rows); m.close(); A.toast(`أُضيف ${AR(rows.length)} طالباً`, 'ok'); done();
     });
   }
@@ -245,14 +252,15 @@
       for (const f of files) { if (!/pdf|image/i.test(f.type) && !/\.(pdf|jpe?g|png)$/i.test(f.name)) continue; let pages = []; try { pages = await DinaOMR.fileToCanvases(f); } catch (err) { pending.push({ label: f.name, error: err.message }); continue; }
         for (const pg of pages) { n++; out.innerHTML = `<div class="small muted">يقرأ الورقة ${AR(n)}…</div>`; await new Promise(r => setTimeout(r, 10)); const r = DinaOMR.readCanvas(pg.cv);
           if (!r.ok) { pending.push({ label: pg.label, error: r.error, img: DinaOMR.thumb(pg.cv, 360) }); continue; }
-          const { ans } = r.read(specOf(e)), stu = r.id.idx >= 1 && r.id.idx <= R.length ? R[r.id.idx - 1] : null, model = (e.models[r.id.model] || e.models[0]).name;
-          pending.push({ label: pg.label, stu, model, ans, img: DinaOMR.thumb(pg.cv), blank: ans.filter(x => x === -1).length, multi: ans.filter(x => x === -2).length }); } }
+          let bc = null; if ((!r.gid || !r.gid.digits) && window.BarcodeDetector) { try { const det = new BarcodeDetector({ formats: ['code_39'] }); const f = await det.detect(pg.cv); bc = (f[0] || {}).rawValue || null; } catch (_) {} }
+          const { ans } = r.read(specOf(e)), M = matchStudent(R, r, bc), model = (e.models[r.id.model] || e.models[0]).name;
+          pending.push({ label: pg.label, stu: M.stu, how: M.how, conflict: M.conflict, digits: M.digits, model, ans, img: DinaOMR.thumb(pg.cv), blank: ans.filter(x => x === -1).length, multi: ans.filter(x => x === -2).length }); } }
       drawPending();
     };
     const drawPending = () => {
       const ok = pending.filter(p => p.ans), opts = s => `<option value="">— اختر الطالب —</option>` + R.map(x => `<option value="${x.id}" ${s && s.id === x.id ? 'selected' : ''}>${esc(x.full_name)} — ${esc(clsName(x.class_id))}</option>`).join('');
       out.innerHTML = `<div class="small" style="margin-bottom:6px">${AR(ok.length)} ورقة مقروءة${pending.length - ok.length ? ` · <b style="color:var(--bad)">${AR(pending.length - ok.length)} تعذّرت</b>` : ''}</div>
-        <div class="scroll" style="max-height:420px"><table class="tbl"><thead><tr><th>الورقة</th><th>الطالب</th><th>نموذج</th><th>الدرجة</th><th>تنبيه</th></tr></thead><tbody>${pending.map((p, i) => p.ans ? `<tr><td class="small"><button class="link" data-v="${i}">${esc(p.label)}</button></td><td><select class="in" data-ps="${i}" style="max-width:200px">${opts(p.stu)}</select></td><td>${p.model}</td><td>${(() => { const [s, mx] = scoreOf(e, p.model, p.ans); return AR(s) + ' / ' + AR(mx); })()}</td><td class="small">${p.blank ? `${AR(p.blank)} فارغ ` : ''}${p.multi ? `<b style="color:var(--bad)">${AR(p.multi)} مزدوج</b>` : ''}${bySk[(p.stu || {}).id] ? ' · يستبدل نتيجة سابقة' : ''}</td></tr>` : `<tr><td class="small">${esc(p.label)}</td><td colspan="4" class="small" style="color:var(--bad)">${esc(p.error)}</td></tr>`).join('')}</tbody></table></div>
+        <div class="scroll" style="max-height:420px"><table class="tbl"><thead><tr><th>الورقة</th><th>الطالب</th><th>نموذج</th><th>الدرجة</th><th>تنبيه</th></tr></thead><tbody>${pending.map((p, i) => p.ans ? `<tr><td class="small"><button class="link" data-v="${i}">${esc(p.label)}</button></td><td><select class="in" data-ps="${i}" style="max-width:200px">${opts(p.stu)}</select></td><td>${p.model}</td><td>${(() => { const [s, mx] = scoreOf(e, p.model, p.ans); return AR(s) + ' / ' + AR(mx); })()}</td><td class="small">${p.how ? `<span class="faint">رُبط بـ${p.how}</span> ` : p.digits ? `<b style="color:var(--warn)">هوية ${esc(p.digits)} غير موجودة في القاعدة</b> ` : '<b style="color:var(--warn)">اختر الطالب</b> '}${p.conflict ? '<b style="color:var(--bad)">تعارض بين الهوية وترتيب الورقة — تحقق</b> ' : ''}${p.blank ? `${AR(p.blank)} فارغ ` : ''}${p.multi ? `<b style="color:var(--bad)">${AR(p.multi)} مزدوج</b>` : ''}${bySk[(p.stu || {}).id] ? ' · يستبدل نتيجة سابقة' : ''}</td></tr>` : `<tr><td class="small">${esc(p.label)}</td><td colspan="4" class="small" style="color:var(--bad)">${esc(p.error)}</td></tr>`).join('')}</tbody></table></div>
         ${ok.length ? '<button class="btn ok" id="gSave" style="margin-top:8px">حفظ النتائج</button>' : ''}`;
       $$('[data-ps]', out).forEach(s => s.onchange = () => { pending[+s.dataset.ps].stu = R.find(x => x.id === s.value) || null; });
       $$('[data-v]', out).forEach(b => b.onclick = () => { const p = pending[+b.dataset.v]; A.modal(`<h3>${esc(p.label)}</h3><img src="${p.img}" style="width:100%;border:1px solid var(--border);border-radius:8px" alt="صورة الورقة"><p class="small">الإجابات المقروءة: ${p.ans.map((x, q) => `${qN(e, q)}:${lab(e, q, x)}`).join(' ')}</p>`, { cls: 'wide' }); });
@@ -461,13 +469,15 @@
     $$('[data-e]', box).forEach(b => b.onclick = () => editSeating(list.find(c => c.id === b.dataset.e), root));
     $$('[data-d]', box).forEach(b => b.onclick = async () => { if (!(await A.confirmBox('حذف هذا التوزيع؟', 'حذف', true))) return; await api.del('exam_committees', b.dataset.d); V.paper(root); });
   }
-  function newCommittee(root) {
+  async function newCommittee(root) {
+    let exams = []; try { exams = (await api.list('paper_exams', { school_id: S.school.id }, { order: 'created_at', desc: true })).filter(x => (!x.section_id || x.section_id === S.sectionId) && canSee(x)); } catch (_) {}
     const cls = S.classes.filter(c => c.active), staff = S.staff.filter(p => p.active).sort((a, b) => a.full_name.localeCompare(b.full_name, 'ar'));
     let rooms = [{ name: 'لجنة ١', capacity: 20 }, { name: 'لجنة ٢', capacity: 20 }];
     const m = A.modal(`<h3>توزيع لجان جديد</h3><div class="grid g2"><div class="field"><label for="cT">العنوان</label><input class="in" id="cT" placeholder="مثال: اختبارات الفترة الأولى"></div>
         <div class="field"><label for="cMode">طريقة التوزيع</label><select class="in" id="cMode">${MODES.map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select></div>
         <div class="field"><label for="cNum">ترقيم الجلوس</label><select class="in" id="cNum"><option value="cont">متسلسل لكل اللجان</option><option value="room">يبدأ من ١ في كل لجنة</option></select></div>
-        <div class="field"><label for="cPre">بادئة رقم الجلوس (اختياري)</label><input class="in" id="cPre" placeholder="مثال: 4 أو ب-" dir="ltr"></div></div>
+        <div class="field"><label for="cPre">بادئة رقم الجلوس (اختياري)</label><input class="in" id="cPre" placeholder="مثال: 4 أو ب-" dir="ltr"></div>
+        <div class="field"><label for="cEx">ربط باختبار ورقي (يُطبع رقم الجلوس على أوراقه)</label><select class="in" id="cEx"><option value="">— بلا ربط —</option>${exams.map(x => `<option value="${x.id}">${esc(x.title)}</option>`).join('')}</select></div></div>
       <div class="field"><label>الفصول</label><div class="perm-grid" id="cC">${cls.map(c => `<label class="chk small"><input type="checkbox" value="${c.id}"> ${esc(c.name)}</label>`).join('')}</div></div>
       <div class="sec-box"><div class="row" style="justify-content:space-between"><b>اللجان</b><span class="small muted" id="cCap"></span></div><div id="cR" style="margin-top:8px"></div>
         <div class="row" style="gap:6px;margin-top:6px"><button class="btn ghost sm" type="button" id="cRA">${I.plus} لجنة</button><button class="btn ghost sm" type="button" id="cRN">إنشاء عدد لجان بسعة واحدة</button></div>
@@ -495,7 +505,7 @@
       if (R.reduce((a, r) => a + r.capacity, 0) < stu.length) throw new Error(`سعة اللجان ${R.reduce((a, r) => a + r.capacity, 0)} أقل من عدد الطلاب ${stu.length}`);
       const order = orderStudents(stu, ids, mode), seating = place(order, R, m.el.querySelector('#cNum').value, m.el.querySelector('#cPre').value.trim());
       if (seating.left.length) throw new Error(`${seating.left.length} طالباً لم يجدوا مقعداً بسبب قصر بعض اللجان على فصول معينة — زِد سعة اللجان العامة`);
-      await api.ins('exam_committees', { school_id: S.school.id, section_id: S.sectionId, title, class_ids: ids, rooms: R, seating: seating.list, settings: { mode, num: m.el.querySelector('#cNum').value, prefix: m.el.querySelector('#cPre').value.trim() }, created_by: S.me.id });
+      await api.ins('exam_committees', { school_id: S.school.id, section_id: S.sectionId, title, class_ids: ids, rooms: R, seating: seating.list, settings: { mode, num: m.el.querySelector('#cNum').value, prefix: m.el.querySelector('#cPre').value.trim() }, exam_id: m.el.querySelector('#cEx').value || null, created_by: S.me.id });
       m.close(); A.toast(`وُزّع ${AR(seating.list.length)} طالباً على ${AR(new Set(seating.list.map(x => x.room)).size)} لجنة`, 'ok'); V.paper(root);
     });
   }

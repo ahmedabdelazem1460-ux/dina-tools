@@ -4,7 +4,13 @@
   const W = 210, H = 297, MK = 8; // A4 بالمليمتر، ضلع علامة الزاوية
   const MARKS = [[10, 10], [W - 10 - MK, 10], [10, H - 10 - MK], [W - 10 - MK, H - 10 - MK]]; // أعلى يسار، أعلى يمين، أسفل يسار، أسفل يمين
   const MC = MARKS.map(([x, y]) => [x + MK / 2, y + MK / 2]);
-  const ID_BITS = 15, ID_Y = 52, ID_X0 = 42, ID_STEP = 8.5, ID_S = 5; // 12 بت للرقم + 2 للنموذج + 1 تحقق
+  const ID_BITS = 15, ID_Y = 43, ID_X0 = 76, ID_STEP = 7.2, ID_S = 4.6; // 12 بت لترتيب الطالب + 2 للنموذج + 1 تحقق
+  // شبكة رقم الهوية: ١٠ خانات × الأرقام ٠–٩ (تُظلَّل آلياً للورقة المسماة، ويظللها الطالب في الورقة الاحتياطية)
+  const GID_N = 10, GID_X0 = 22, GID_DX = 4.5, GID_Y0 = 52.4, GID_DY = 3.9, GID_R = 1.55;
+  const gidPos = (c, d) => [GID_X0 + c * GID_DX + GID_DX / 2, GID_Y0 + d * GID_DY];
+  // باركود Code 39 لرقم الهوية (للقارئ اليدوي والتحقق البصري)
+  const C39 = { '0': '000110100', '1': '100100001', '2': '001100001', '3': '101100000', '4': '000110001', '5': '100110000', '6': '001110000', '7': '000100101', '8': '100100100', '9': '001100100', '*': '010010100' };
+  function barcodeSVG(txt, hmm) { const t = '*' + String(txt).replace(/\D/g, '') + '*', n = 0.3, w = n * 2.6; let x = 0, r = ''; for (const ch of t) { const p = C39[ch]; if (!p) continue; for (let i = 0; i < 9; i++) { const ww = p[i] === '1' ? w : n; if (i % 2 === 0) r += `<rect x="${x.toFixed(2)}" y="0" width="${ww.toFixed(2)}" height="${hmm}"/>`; x += ww; } x += n; } return `<svg xmlns="http://www.w3.org/2000/svg" width="${x.toFixed(2)}mm" height="${hmm}mm" viewBox="0 0 ${x.toFixed(2)} ${hmm}" fill="#000">${r}</svg>`; }
   const ROW_H = 7.4, TOP = 78, PER_COL = 25, R = 2.4, OPT_DX = 7.2, NUM_W = 9;
   const LET = ['أ', 'ب', 'ج', 'د', 'هـ'];
   // تسميات البدائل لكل نوع سؤال بالعربية والإنجليزية (المزاوجة بترتيب أبجد هوز حطي كلمن)
@@ -19,7 +25,7 @@
       const n = t === 'tf' ? 2 : Math.max(2, Math.min(t === 'match' ? 14 : 5, +p.options || 4)); for (let i = 0; i < (+p.count || 0); i++) qs.push({ n, lab: LABELS[lang][t].slice(0, n), type: t, part: pi }); });
     return { lang, dir: lang === 'en' ? 'ltr' : 'rtl', qs }; }
   const norm = (a, b) => typeof a === 'number' ? { dir: 'rtl', qs: Array.from({ length: a }, () => ({ n: b, lab: LET.slice(0, b) })) } : (a.qs ? a : expand(a));
-  const AV = 178, Y0 = 73, YMAX = 276, HEAD = 5.2, GAP = 2.6;
+  const AV = 178, Y0 = 94, YMAX = 276, HEAD = 5.2, GAP = 2.6;
   // كل قسم (نوع أسئلة) في كتلة مستقلة بعنوانه وترقيمه الخاص، والكتل متتالية من أعلى إلى أسفل
   function layout(a, b) {
     const sp = norm(a, b), qs = sp.qs, rtl = sp.dir !== 'ltr';
@@ -48,15 +54,20 @@
 
   // صفحة ورقة واحدة (HTML بإحداثيات مطلقة بالمليمتر)
   function sheetHTML(o) {
-    const sp = o.spec ? norm(o.spec) : norm(o.nq, o.no), L = layout(sp), bits = encode(o.idx || 0, o.model || 0), en = sp.dir === 'ltr';
-    const T = en ? { name: 'Name', cls: 'Class', model: 'Model', ins: 'Fill one bubble per question completely with a dark pen or pencil. Do not write in the boxes above.' + (sp.qs.some(q => q.teacher) ? ' Grey rows are for the teacher only (essay marks).' : '') } : { name: 'الاسم', cls: 'الفصل', model: 'نموذج', ins: 'ظلّل دائرة واحدة لكل سؤال تظليلاً كاملاً بقلم رصاص أو أزرق داكن. لا تكتب في المربعات أعلاه.' + (sp.qs.some(q => q.teacher) ? ' الصفوف الرمادية خاصة بالمعلم لرصد درجات الأسئلة المقالية — لا يظللها الطالب.' : '') };
+    const sp = o.spec ? norm(o.spec) : norm(o.nq, o.no), L = layout(sp), bits = encode(o.idx || 0, o.model || 0), en = sp.dir === 'ltr', nid = String(o.nid || '').replace(/\D/g, '').slice(0, GID_N);
+    const T = en ? { name: 'Name', cls: 'Class', model: 'Model', gid: 'ID number', gidh: 'Write your ID and shade it if not printed', ins: 'Fill one bubble per question completely with a dark pen or pencil. Do not write in the black-box strip.' + (sp.qs.some(q => q.teacher) ? ' Grey rows are for the teacher only (essay marks).' : '') } : { name: 'الاسم', cls: 'الفصل', model: 'نموذج', gid: 'رقم الهوية', gidh: 'إن لم يكن مظللاً: اكتب رقمك وظلّله', ins: 'ظلّل دائرة واحدة لكل سؤال تظليلاً كاملاً بقلم رصاص أو أزرق داكن. لا تكتب على شريط المربعات.' + (sp.qs.some(q => q.teacher) ? ' الصفوف الرمادية خاصة بالمعلم لرصد درجات الأسئلة المقالية — لا يظللها الطالب.' : '') };
     const mm = v => v.toFixed(2) + 'mm', dir = en ? 'ltr' : 'rtl';
     let h = `<div class="omr-page" dir="${dir}" style="${en ? "font-family:'Myriad Pro',Arial,'GE SS Two',sans-serif" : ''}">`;
     MARKS.forEach(([x, y]) => { h += `<div style="position:absolute;left:${mm(x)};top:${mm(y)};width:${mm(MK)};height:${mm(MK)};background:#000"></div>`; });
     h += `<div style="position:absolute;right:22mm;left:22mm;top:12mm;display:flex;align-items:center;justify-content:space-between;direction:${dir}"><div><div style="font-size:16pt;font-weight:800">${o.title}</div><div style="font-size:10pt;color:#005499">${o.sub || ''}</div></div><img src="assets/logo.svg" style="height:16mm"></div>`;
-    h += `<div style="position:absolute;right:22mm;left:22mm;top:31mm;display:flex;gap:6mm;direction:${dir};font-size:11pt"><div style="flex:2;border:0.4mm solid #082B5A;border-radius:2mm;padding:1.5mm 3mm">${T.name}: <b>${o.name || ''}</b></div><div style="flex:1;border:0.4mm solid #082B5A;border-radius:2mm;padding:1.5mm 3mm">${T.cls}: <b>${o.cls || ''}</b></div><div style="width:24mm;border:0.4mm solid #082B5A;border-radius:2mm;padding:1.5mm 3mm;text-align:center">${T.model} <b>${o.modelName || 'A'}</b></div></div>`;
+    h += `<div style="position:absolute;right:22mm;left:22mm;top:31mm;display:flex;gap:6mm;direction:${dir};font-size:11pt"><div style="flex:2;border:0.4mm solid #082B5A;border-radius:2mm;padding:1.5mm 3mm">${T.name}: <b>${o.name || ''}</b></div><div style="flex:1;border:0.4mm solid #082B5A;border-radius:2mm;padding:1.5mm 3mm">${T.cls}: <b>${o.cls || ''}</b></div>${o.seat ? `<div style="flex:1;border:0.4mm solid #082B5A;border-radius:2mm;padding:1.5mm 3mm;white-space:nowrap;overflow:hidden">${en ? 'Seat' : 'الجلوس'}: <b>${o.seat}</b></div>` : ''}<div style="width:24mm;border:0.4mm solid #082B5A;border-radius:2mm;padding:1.5mm 3mm;text-align:center">${T.model} <b>${o.modelName || 'A'}</b></div></div>`;
     bits.forEach((b, i) => { const [x, y] = [ID_X0 + i * ID_STEP, ID_Y]; h += `<div style="position:absolute;left:${mm(x)};top:${mm(y)};width:${mm(ID_S)};height:${mm(ID_S)};box-sizing:border-box;border:0.3mm solid #000;${b ? 'background:#000' : ''}"></div>`; });
-    h += `<div style="position:absolute;right:22mm;left:22mm;top:${mm(ID_Y + 7.2)};font-size:8pt;color:#555;direction:${dir};line-height:1.45;text-align:${en ? 'left' : 'right'}">${T.ins}${o.legend ? `<br><b style="color:#082B5A">${o.legend}</b>` : ''}</div>`;
+    // شبكة رقم الهوية
+    h += `<div style="position:absolute;left:${mm(GID_X0 - 1.5)};top:41.2mm;width:${mm(GID_N * GID_DX + 3)};height:${mm(GID_Y0 + 9 * GID_DY + 2.6 - 41.2)};box-sizing:border-box;border:0.3mm solid #b9c9de;border-radius:2mm;background:#fbfdff"></div><div style="position:absolute;left:${mm(GID_X0)};top:42mm;width:${mm(GID_N * GID_DX)};text-align:center;font-size:7pt;font-weight:800;color:#082B5A;direction:${dir}">${T.gid}</div>`;
+    for (let c = 0; c < GID_N; c++) { const dg = nid[c]; h += `<div style="position:absolute;left:${mm(GID_X0 + c * GID_DX + 0.4)};top:45.4mm;width:${mm(GID_DX - 0.8)};height:4.2mm;box-sizing:border-box;border:0.25mm solid #082B5A;border-radius:0.6mm;text-align:center;font-size:8pt;font-weight:800;line-height:4mm;font-family:Arial,sans-serif">${dg ?? ''}</div>`;
+      for (let d = 0; d < 10; d++) { const [x, y] = gidPos(c, d), f = dg !== undefined && +dg === d; h += `<div style="position:absolute;left:${mm(x - GID_R)};top:${mm(y - GID_R)};width:${mm(2 * GID_R)};height:${mm(2 * GID_R)};box-sizing:border-box;border:0.25mm solid #333;border-radius:50%;font:700 4.6pt/1 Arial,sans-serif;color:#c4c4c4;display:flex;align-items:center;justify-content:center;${f ? 'background:#111' : ''}">${f ? '' : d}</div>`; } }
+    h += `<div style="position:absolute;left:${mm(ID_X0)};right:22mm;top:${mm(ID_Y + ID_S + 2.2)};font-size:8pt;color:#555;direction:${dir};line-height:1.45;text-align:${en ? 'left' : 'right'}">${T.ins}${nid ? '' : `<br><b style="color:#082B5A">${T.gidh}</b>`}${o.legend ? `<br><b style="color:#082B5A">${o.legend}</b>` : ''}</div>`;
+    if (nid) h += `<div style="position:absolute;right:22mm;top:69mm;text-align:center;direction:ltr">${barcodeSVG(nid, 10)}<div style="font:700 8pt/1.2 Arial,sans-serif;letter-spacing:1.5pt;margin-top:0.6mm">${nid}</div></div>`;
     const ORD = ['الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر'];
     const TN = en ? { mcq: 'Multiple choice — shade the correct letter', tf: 'True / False — T = True, F = False', match: 'Matching — shade the letter of the matching item', essay: 'Essay — TEACHER ONLY: shade the mark awarded' } : { mcq: 'اختيار من متعدد — ظلّل حرف الإجابة الصحيحة', tf: 'صح وخطأ — ص = صح، خ = خطأ', match: 'مزاوجة — ظلّل حرف العبارة المناسبة', essay: 'مقالي — خاص بالمعلم: يظلل الدرجة المستحقة' };
     if (L.groups > 1 || L.heads.some(x => x.teacher)) L.heads.forEach(hd => { h += `<div style="position:absolute;left:${mm(hd.x0 - 2.5)};top:${mm(hd.y - 0.8)};width:${mm(hd.w + 5)};height:${mm(hd.h + 1)};box-sizing:border-box;border:0.3mm solid ${hd.teacher ? '#8a97a8' : '#b9c9de'};${hd.teacher ? 'border-style:dashed;' : ''}border-radius:2mm;background:${hd.teacher ? '#f6f7f9' : '#fbfdff'}"></div>`; h += `<div style="position:absolute;left:${mm(hd.x0)};top:${mm(hd.y)};width:${mm(hd.w)};height:4.4mm;box-sizing:border-box;border-bottom:0.35mm solid ${hd.teacher ? '#8a97a8' : '#005499'};direction:${dir};text-align:${en ? 'left' : 'right'};font-size:8pt;font-weight:800;color:${hd.teacher ? '#5b6b82' : '#082B5A'};line-height:4mm;white-space:nowrap;overflow:hidden">${en ? 'Question ' + (hd.idx + 1) : 'السؤال ' + (ORD[hd.idx] || hd.idx + 1)}: <span style="font-weight:600">${TN[hd.type || 'mcq']}</span> <span style="color:#6b7aa3;font-weight:600">(${hd.n})</span></div>`; });
@@ -104,7 +115,8 @@
       const H2 = homography(MC, order.map(i => pts[i])); if (!H2) continue;
       const bits = Array.from({ length: ID_BITS }, (_, b) => sample(H2, ...idPos(b), ID_S * 0.32) > 0.5 ? 1 : 0);
       const id = decode(bits); if (!id) continue;
-      return { ok: true, H: H2, id, read: (a, b) => { const L = layout(a, b), nq = L.qs.length, ans = [], conf = []; for (let q = 0; q < nq; q++) { const f = []; for (let k = 0; k < L.qs[q].n; k++) f.push(sample(H2, ...L.pos(q, k), R * 0.62)); const s = f.map((v, k) => [v, k]).sort((a, b) => b[0] - a[0]); const [m1, m2] = [s[0], s[1] || [0, -1]];
+      const gid = () => { let out = '', bad = false; for (let c = 0; c < GID_N; c++) { const f = []; for (let d = 0; d < 10; d++) f.push(sample(H2, ...gidPos(c, d), GID_R * 0.6)); const s2 = f.map((v, d) => [v, d]).sort((x, y) => y[0] - x[0]); if (s2[0][0] < 0.33) continue; if (s2[1][0] > 0.33 && s2[1][0] > s2[0][0] * 0.72) { bad = true; continue; } out += s2[0][1]; } return { digits: out, bad }; };
+      return { ok: true, H: H2, id, gid: gid(), read: (a, b) => { const L = layout(a, b), nq = L.qs.length, ans = [], conf = []; for (let q = 0; q < nq; q++) { const f = []; for (let k = 0; k < L.qs[q].n; k++) f.push(sample(H2, ...L.pos(q, k), R * 0.62)); const s = f.map((v, k) => [v, k]).sort((a, b) => b[0] - a[0]); const [m1, m2] = [s[0], s[1] || [0, -1]];
           if (m1[0] < 0.33) ans.push(-1); else if (m2[0] > 0.33 && m2[0] > m1[0] * 0.72) ans.push(-2); else ans.push(m1[1]); conf.push(+m1[0].toFixed(2)); } return { ans, conf }; } };
     }
     return { ok: false, error: 'تعذّرت قراءة شريط التعريف — قد تكون الورقة ليست من هذا الاختبار أو المسح غير واضح' };
@@ -120,5 +132,5 @@
     const bmp = await createImageBitmap(file), c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height; c.getContext('2d').drawImage(bmp, 0, 0); return [{ cv: c, label: file.name }];
   }
   const thumb = (cv, wd = 620) => { const s = wd / cv.width, c = document.createElement('canvas'); c.width = wd; c.height = Math.round(cv.height * s); const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(cv, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.6); };
-  window.DinaOMR = { sheetHTML, PAGE_CSS, readCanvas, fileToCanvases, thumb, LET, LABELS, expand, capacity, encode, decode, layout };
+  window.DinaOMR = { barcodeSVG, sheetHTML, PAGE_CSS, readCanvas, fileToCanvases, thumb, LET, LABELS, expand, capacity, encode, decode, layout };
 })();

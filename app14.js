@@ -34,7 +34,7 @@
         <div class="row" style="gap:8px"><span class="rec-st" id="recSt" role="status" aria-live="polite">${pendingUpload ? 'يرفع نسختك المحلية…' : row ? 'محفوظ في السحابة · ' + A.fmtDT(row.updated_at) : 'جاهز'}</span>
         ${leads ? '<button class="btn ghost sm" id="recView">سجلات المعلمين</button>' : ''}
         <a class="btn ghost sm" id="recFull" href="tools/records.html?embed=1&k=-${me}" target="_blank" rel="noopener">صفحة كاملة</a></div></div>
-      <iframe id="recF" class="rec-frame" title="سجل المتابعة" src="tools/records.html?embed=1&k=-${me}&${ver.split('?')[1] || ''}"></iframe></div>`;
+      <iframe id="recF" class="rec-frame" title="سجل المتابعة" src="tools/records.html?embed=1&k=-${me}&lang=${window.DINA_LANG === 'en' ? 'en' : 'ar'}&${ver.split('?')[1] || ''}"></iframe></div>`;
     const st = $('#recSt', root), fr = $('#recF', root);
     let tm = null, busy = false, again = false;
     const upload = async () => {

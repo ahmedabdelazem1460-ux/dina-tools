@@ -303,10 +303,11 @@
     const m = document.createElement('div'); m.className = 'menu';
     const roles = S.me.is_owner ? 'مالك النظام' : (myMem() ? ROLES[myMem().role] : '');
     m.innerHTML = `<div class="who"><b>${esc(S.me.full_name)}</b><span dir="ltr">${esc(S.me.email || '')}</span><br><span>${roles} · ${esc(section().name)}</span></div>
-      <button data-a="drive">مجلدي في Google Drive</button><button data-a="pw">تغيير كلمة المرور</button><button data-a="out">تسجيل الخروج</button>`;
+      <button data-a="lang" class="noi18n">${window.DINA_LANG === 'en' ? 'العربية' : 'English'}</button><button data-a="drive">مجلدي في Google Drive</button><button data-a="pw">تغيير كلمة المرور</button><button data-a="out">تسجيل الخروج</button>`;
     document.body.appendChild(m);
     const off = () => { m.remove(); document.removeEventListener('click', off); };
     setTimeout(() => document.addEventListener('click', off), 0);
+    m.querySelector('[data-a=lang]').onclick = () => window.setDinaLang && setDinaLang(window.DINA_LANG === 'en' ? 'ar' : 'en');
     m.querySelector('[data-a=drive]').onclick = () => APP.driveDialog && APP.driveDialog(S.me);
     m.querySelector('[data-a=out]').onclick = async () => { await api.signOut(); loginScreen(); };
     m.querySelector('[data-a=pw]').onclick = () => {

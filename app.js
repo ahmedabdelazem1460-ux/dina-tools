@@ -594,7 +594,7 @@
     const leftTxt = left == null ? '—' : left < 0 ? 'انتهى' : left > 864e5 ? `${cnt(Math.floor(left / 864e5), 'يوم', 'أيام')}` : `${cnt(Math.floor(left / 36e5), 'ساعة', 'ساعات')}`;
     const byTeacher = {};
     S.entries.filter(e => required(e) && e.teacher_id).forEach(e => (byTeacher[e.teacher_id] = byTeacher[e.teacher_id] || []).push(e));
-    const teachers = Object.entries(byTeacher).map(([id, l]) => ({ id, p: person(id), s: stats(l), classes: new Set(l.map(e => e.class_id)).size })).sort((a, b) => pct(a.s.filled, a.s.total) - pct(b.s.filled, b.s.total));
+    const teachers = Object.entries(byTeacher).map(([id, l]) => ({ id, p: person(id), s: stats(l), classes: new Set(l.map(e => e.class_id)).size, hw: l.filter(e => filled(e) && (e.homework || '').trim()).length, pf: l.filter(e => e.perf_task && e.perf_task.text).length })).sort((a, b) => pct(a.s.filled, a.s.total) - pct(b.s.filled, b.s.total));
     const lateT = teachers.filter(t => t.s.filled < t.s.total);
     root.innerHTML = `
       <div class="head"><div class="grow"><h2 style="margin:0;font-size:24px;font-weight:800">لوحة المتابعة — الأسبوع ${esc(w.word)}</h2>
@@ -613,7 +613,7 @@
         </tbody></table></div></div>
         <div class="card"><div class="head" style="margin-bottom:6px"><div class="grow"><h3 style="margin:0">المعلمون</h3><p class="sub" style="margin:2px 0 0">الأقل إنجازاً أولاً</p></div>${lateT.length ? `<button class="btn ghost sm" id="remindAll">${I.mail} تذكير غير المكتملين</button>` : ''}</div>
           <div class="scroll"><table class="tbl"><thead><tr><th>المعلم</th><th style="width:30%">الإنجاز</th><th>آخر تحديث</th><th></th></tr></thead><tbody>
-          ${teachers.length ? teachers.map(t => `<tr class="click" data-t="${t.id}" tabindex="0"><td><b>${esc(t.p ? t.p.full_name : '—')}</b><div class="small faint">${cnt(t.classes, 'فصل', 'فصول')} · ${cnt(t.s.total, 'حصة', 'حصص')}</div></td><td><div class="row" style="flex-wrap:nowrap">${bar(t.s.filled, t.s.total)}<span class="small muted">${AR(t.s.filled)}/${AR(t.s.total)}</span></div></td><td class="small muted">${t.s.last ? fmtDT(t.s.last) : 'لم يبدأ'}</td><td>${t.s.filled < t.s.total && t.p && t.p.email ? `<a class="btn ghost sm" href="${remindLink([t.p])}" title="تذكير بالبريد" aria-label="تذكير ${esc(t.p.full_name)} بالبريد">${I.mail}</a>` : (t.s.filled >= t.s.total ? `<span class="pill st-approved">${I.check.replace('<svg', '<svg style="width:14px;height:14px"')} مكتمل</span>` : '')}</td></tr>`).join('') : `<tr><td colspan="4">${emptyBox('لا يوجد معلمون مُسندون بعد')}</td></tr>`}
+          ${teachers.length ? teachers.map(t => `<tr class="click" data-t="${t.id}" tabindex="0"><td><b>${esc(t.p ? t.p.full_name : '—')}</b><div class="small faint">${cnt(t.classes, 'فصل', 'فصول')} · ${cnt(t.s.total, 'حصة', 'حصص')} · واجب ${AR(pct(t.hw, t.s.filled))}٪${t.pf ? ` · مهام أدائية ${AR(t.pf)}` : ''}</div></td><td><div class="row" style="flex-wrap:nowrap">${bar(t.s.filled, t.s.total)}<span class="small muted">${AR(t.s.filled)}/${AR(t.s.total)}</span></div></td><td class="small muted">${t.s.last ? fmtDT(t.s.last) : 'لم يبدأ'}</td><td>${t.s.filled < t.s.total && t.p && t.p.email ? `<a class="btn ghost sm" href="${remindLink([t.p])}" title="تذكير بالبريد" aria-label="تذكير ${esc(t.p.full_name)} بالبريد">${I.mail}</a>` : (t.s.filled >= t.s.total ? `<span class="pill st-approved">${I.check.replace('<svg', '<svg style="width:14px;height:14px"')} مكتمل</span>` : '')}</td></tr>`).join('') : `<tr><td colspan="4">${emptyBox('لا يوجد معلمون مُسندون بعد')}</td></tr>`}
           </tbody></table></div></div>
       </div>`;
     $$('tr[data-c]', root).forEach(r => r.onclick = ev => { if (ev.target.closest('[data-cd]')) return; LS.set('cls', r.dataset.c); location.hash = '#/classes'; });
@@ -637,14 +637,16 @@
     if (kind === 'teacher') {
       base = S.entries.filter(e => e.teacher_id === arg && e.subject_id); title = 'خطة ' + personName(arg) + ' — الأسبوع ' + w.word;
       const s = stats(base), ready = base.filter(F.submitted[1]).length, p = person(arg) || {};
-      const pairs = {}; base.forEach(e => { const k = e.class_id + '|' + e.subject_id; (pairs[k] = pairs[k] || { c: e.class_id, s: e.subject_id, n: 0, f: 0 }).n++; if (filled(e)) pairs[k].f++; });
+      const pairs = {}; base.forEach(e => { const k = e.class_id + '|' + e.subject_id; (pairs[k] = pairs[k] || { c: e.class_id, s: e.subject_id, n: 0, f: 0, h: 0 }).n++; if (filled(e)) pairs[k].f++; if (filled(e) && (e.homework || '').trim()) pairs[k].h++; });
       const ex = base.filter(e => e.exec_status && e.exec_status !== 'pending').length;
+      const wrN = base.filter(filled).length, hwN = base.filter(e => filled(e) && (e.homework || '').trim()).length, pfN = base.filter(e => e.perf_task && e.perf_task.text).length, ntN = base.filter(e => (e.note || '').trim()).length;
       head = `<div class="grid g4 dk" style="margin:8px 0 12px">
         <div class="kpi navy"><div class="k">الإنجاز</div><div class="v">${AR(pct(s.filled, s.total))}<small>٪</small></div><div class="d">${AR(s.filled)} من ${cnt(s.total, 'حصة', 'حصص')}</div></div>
         <div class="kpi"><div class="k">بانتظار المراجعة</div><div class="v">${AR(ready)}</div><div class="d">معتمدة ${AR(s.approved)} · مُعادة ${AR(s.returned)}</div></div>
         <div class="kpi"><div class="k">التنفيذ اليومي</div><div class="v">${AR(ex)}</div><div class="d">حصة مؤكَّدة من ${AR(s.total)}</div></div>
-        <div class="kpi"><div class="k">آخر تحديث</div><div class="v" style="font-size:16px">${s.last ? fmtDT(s.last) : 'لم يبدأ'}</div><div class="d">${esc(p.specialty || '')}${p.email ? ' · ' + esc(p.email) : ''}</div></div></div>
-        <div class="row" style="gap:6px;margin-bottom:10px">${Object.values(pairs).sort((a, b) => (cls(a.c)?.sort ?? 0) - (cls(b.c)?.sort ?? 0)).map(x => `<span class="ldc">${esc(subjName(x.s))} — ${esc((cls(x.c) || {}).name || '')} <b>${AR(x.f)}/${AR(x.n)}</b></span>`).join('')}</div>
+        <div class="kpi"><div class="k">الحصص التي فيها واجب</div><div class="v">${AR(pct(hwN, wrN))}<small>٪</small></div><div class="d">${AR(hwN)} من ${cnt(wrN, 'حصة مكتوبة', 'حصص مكتوبة')}</div></div></div>
+        <p class="small muted" style="margin:-4px 0 10px"><b>مهام أدائية: ${AR(pfN)}</b> · <b>ملاحظات: ${AR(ntN)}</b> · آخر تحديث: ${s.last ? fmtDT(s.last) : 'لم يبدأ'}${p.specialty ? ' · ' + esc(p.specialty) : ''}${p.email ? ' · ' + esc(p.email) : ''}</p>
+        <div class="row" style="gap:6px;margin-bottom:10px">${Object.values(pairs).sort((a, b) => (cls(a.c)?.sort ?? 0) - (cls(b.c)?.sort ?? 0)).map(x => `<span class="ldc">${esc(subjName(x.s))} — ${esc((cls(x.c) || {}).name || '')} <b>${AR(x.f)}/${AR(x.n)}</b> <span class="small" title="حصص فيها واجب">· واجب ${AR(x.h)}</span></span>`).join('')}</div>
         ${perm('review') && ready ? `<div class="row" style="margin-bottom:10px"><button class="btn ok sm" id="dApT">${I.check} اعتماد كل الجاهز لهذا المعلم (${AR(ready)})</button></div>` : ''}`;
       kind = ready ? 'submitted' : 'todo';
     }
@@ -657,13 +659,21 @@
       return;
     } else if (classMode) { base = S.entries.filter(e => e.class_id === classMode && e.subject_id); title = ((cls(classMode) || {}).name || '') + ' — الأسبوع ' + w.word; }
     else title = F[kind][0] + ' — الأسبوع ' + w.word;
-    const m = modal(`<h3>${esc(title)}</h3>${head}<div class="chip-filter" id="dfl">${Object.entries(F).filter(([k]) => k !== 'unassigned' || !arg).map(([k, [l]]) => `<button data-f="${k}" class="${k === kind ? 'on' : ''}">${l} <span class="small">(${AR(base.filter(F[k][1]).length)})</span></button>`).join('')}</div><div class="scroll drill" style="max-height:60vh"><table class="tbl"><thead><tr><th>الفصل</th><th>اليوم</th><th>الحصة</th><th>المادة</th>${arg ? '' : '<th>المعلم</th>'}<th>الموضوع</th><th>الحالة</th></tr></thead><tbody id="dtb"></tbody></table></div>`, { cls: 'wide' });
+    const m = modal(`<h3>${esc(title)}</h3>${head}<div class="chip-filter" id="dfl">${Object.entries(F).filter(([k]) => k !== 'unassigned' || !arg).map(([k, [l]]) => `<button data-f="${k}" class="${k === kind ? 'on' : ''}">${l} <span class="small">(${AR(base.filter(F[k][1]).length)})</span></button>`).join('')}</div><div class="scroll drill" style="max-height:60vh"><table class="tbl"><thead><tr><th>الفصل</th><th>اليوم</th><th>الحصة</th><th>المادة</th>${arg ? '' : '<th>المعلم</th>'}<th>الموضوع والملاحظة</th><th>الواجب</th><th>المهمة الأدائية</th><th>الحالة</th>${arg && perm('review') ? '<th>المراجعة</th>' : ''}</tr></thead><tbody id="dtb"></tbody></table></div>`, { cls: 'wide' });
     const draw = k => {
-      $$('#dfl button', m.el).forEach(b => b.classList.toggle('on', b.dataset.f === k));
+      $$('#dfl button', m.el).forEach(b => { b.classList.toggle('on', b.dataset.f === k); const c = b.querySelector('.small'); if (c) c.textContent = `(${AR(base.filter(F[b.dataset.f][1]).length)})`; });
       const list = base.filter(F[k][1]).sort((a, b) => (cls(a.class_id)?.sort ?? 0) - (cls(b.class_id)?.sort ?? 0) || a.day - b.day || a.period - b.period);
-      $('#dtb', m.el).innerHTML = list.slice(0, 400).map(e => `<tr class="click" data-c="${e.class_id}"><td><b>${esc((cls(e.class_id) || {}).name || '')}</b></td><td>${DAYS[e.day]}</td><td>${AR(e.period + 1)}</td><td>${esc(subjName(e.subject_id))}</td>${arg ? '' : `<td class="small">${e.teacher_id ? esc(personName(e.teacher_id)) : `<a href="#" class="assignlink" data-assign-c="${e.class_id}" data-assign-s="${e.subject_id}">إسناد</a>`}</td>`}<td class="small">${esc(e.topic) || '<span class="faint">—</span>'}</td><td>${pill(e.status)}</td></tr>`).join('') || `<tr><td colspan="7">${emptyBox('لا توجد حصص في هذا التصنيف')}</td></tr>`;
-      $$('tr[data-c]', m.el).forEach(r => r.onclick = () => { m.close(); LS.set('cls', r.dataset.c); location.hash = '#/classes'; if (S.view === 'classes') route(); });
+      $('#dtb', m.el).innerHTML = list.slice(0, 400).map(e => `<tr class="click" data-c="${e.class_id}"><td><b>${esc((cls(e.class_id) || {}).name || '')}</b></td><td>${DAYS[e.day]}</td><td>${AR(e.period + 1)}</td><td>${esc(subjName(e.subject_id))}</td>${arg ? '' : `<td class="small">${e.teacher_id ? esc(personName(e.teacher_id)) : `<a href="#" class="assignlink" data-assign-c="${e.class_id}" data-assign-s="${e.subject_id}">إسناد</a>`}</td>`}<td class="small">${esc(e.topic) || '<span class="faint">—</span>'}${e.note ? `<div class="faint">ملاحظة: ${esc(e.note)}</div>` : ''}</td><td class="small">${(e.homework || '').trim() ? esc(e.homework) : (filled(e) ? '<span class="pill st-empty">بلا واجب</span>' : '<span class="faint">—</span>')}</td><td class="small">${e.perf_task && e.perf_task.text ? `<span class="pill st-submitted">${esc(perfName(e.perf_task.type) || 'مهمة')}</span> ${esc(e.perf_task.text)}${e.perf_task.due ? `<div class="faint">التسليم: ${esc(e.perf_task.due)}</div>` : ''}` : '<span class="faint">—</span>'}</td><td data-ps>${pill(e.status)}</td>${arg && perm('review') ? `<td class="row" style="gap:4px;flex-wrap:nowrap">${filled(e) && e.status !== 'approved' ? `<button class="btn ok sm" data-rv="approved" data-id="${e.id}" title="اعتماد هذه الحصة">${I.check}</button>` : ''}${filled(e) && e.status !== 'returned' ? `<button class="btn ghost sm" data-rv="returned" data-id="${e.id}" title="إرجاع للمعلم مع ملاحظة">إرجاع</button>` : ''}</td>` : ''}</tr>`).join('') || `<tr><td colspan="10">${emptyBox('لا توجد حصص في هذا التصنيف')}</td></tr>`;
+      $$('tr[data-c]', m.el).forEach(r => r.onclick = ev => { if (ev.target.closest('[data-rv]')) return; m.close(); LS.set('cls', r.dataset.c); location.hash = '#/classes'; if (S.view === 'classes') route(); });
+      $$('[data-rv]', m.el).forEach(b => b.onclick = ev => { ev.stopPropagation(); run(b, async () => {
+        const st = b.dataset.rv; let note = '';
+        if (st === 'returned') { note = (prompt('ملاحظة للمعلم (سبب الإرجاع)') || '').trim(); if (!note) return; }
+        await api.review([b.dataset.id], st, note); const e = S.entries.find(x => x.id === b.dataset.id); if (e) { e.status = st; if (note) e.review_note = note; }
+        draw(cur); toast(st === 'approved' ? 'اعتُمدت الحصة' : 'أُعيدت الحصة للمعلم', 'ok'); renderNav();
+      }); });
+      cur = k;
     };
+    let cur = kind;
     $$('#dfl button', m.el).forEach(b => b.onclick = () => draw(b.dataset.f)); draw(kind);
     const apT = m.el.querySelector('#dApT');
     if (apT) apT.onclick = ev => run(ev.currentTarget, async () => {

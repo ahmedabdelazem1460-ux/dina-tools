@@ -50,22 +50,83 @@
       return `<td>${t}</td>`;
     };
     const who = c.kind === 'class' ? cName(target) : ((A.person(target) || {}).full_name || '');
+    // ملخص وإحصائية (اختياري)
+    const si = c.si || {}, sl = slots.filter(x => x.subject_id && days.includes(x.day) && x.period < P), tot = sl.length;
+    const bySub = {}; sl.forEach(x => { bySub[x.subject_id] = (bySub[x.subject_id] || 0) + 1; });
+    const other = new Set(sl.map(x => c.kind === 'class' ? x.teacher_id : x.class_id).filter(Boolean)).size;
+    const cap = days.reduce((a, d) => a + (s ? B.schedP(s, sec, d) : P), 0);
+    const stat = c.sum ? [si.total !== false ? [c.kind === 'class' ? 'عدد الحصص' : 'النصاب', AR(tot)] : null, si.subs !== false ? ['المواد', AR(Object.keys(bySub).length)] : null, si.other !== false ? [c.kind === 'class' ? 'المعلمون' : 'الفصول', AR(other)] : null, si.free ? [c.kind === 'class' ? 'حصص فارغة' : 'حصص الفراغ', AR(Math.max(0, cap - tot))] : null].filter(Boolean) : [];
+    const perSub = c.sum && si.perSub !== false ? Object.entries(bySub).sort((a, b) => b[1] - a[1]).map(([id, n]) => `<span>${esc(subShort(c, id))} <b>${AR(n)}</b></span>`).join('') : '';
+    const perDay = c.sum && si.perDay ? days.map(d => `<span>${DAYS[d]} <b>${AR(sl.filter(x => x.day === d).length)}</b></span>`).join('') : '';
+    const compact = !!(stat.length || perSub || perDay);
     const link = (c.links[target] || c.link0 || '').trim(), qr = link ? qrSvg(link, T.a) : '';
     const dec = svgUrl(IC.flower, T.l);
-    return `<div class="dz" dir="rtl" style="--a:${T.a};--b:${T.b};--p:${T.p};--l:${T.l}">
+    return `<div class="dz ${compact ? 'dz-c' : ''}" dir="rtl" style="--a:${T.a};--b:${T.b};--p:${T.p};--l:${T.l}">
       <span class="dz-fl" style="background-image:${dec};top:18px;left:300px;width:46px;height:46px"></span><span class="dz-fl" style="background-image:${dec};top:520px;left:-14px;width:70px;height:70px;opacity:.5"></span><span class="dz-fl" style="background-image:${dec};top:-10px;left:-10px;width:90px;height:90px;opacity:.45"></span>
       <div class="dz-top"><div class="dz-logo"><img src="assets/logo.svg" alt="مدارس دينا العالمية"></div>
         <div class="dz-mid"><div class="dz-title"><span class="dz-ic" style="background-image:${svgUrl(IC.cal, '#fff')}"></span><h1>${esc(c.title || 'جدول الحصص الدراسي')}</h1></div>
           ${c.tag ? `<div class="dz-tag"><span>${esc(c.tag)}</span><span class="dz-ic sm" style="background-image:${svgUrl(IC.wifi, T.a)}"></span></div>` : ''}</div>
         <div class="dz-art"><span class="dz-lap"></span></div></div>
-      <div class="dz-who"><span>${esc(c.label || (c.kind === 'class' ? 'الصف:' : 'المعلم:'))}</span><b>${esc(who)}</b></div>
+      <div class="dz-who"><span>${esc(c.label || (c.kind === 'class' ? 'الصف:' : 'المعلم:'))}</span><b>${esc(who)}</b>${stat.length ? `<em class="dz-st">${stat.map(([k, v]) => `<span>${k} <b>${v}</b></span>`).join('')}</em>` : ''}</div>
       <table class="dz-t"><colgroup><col style="width:${dayW}px">${cols.map(x => `<col style="width:${x.k === 'b' ? bW : pW}px">`).join('')}</colgroup>
         <tbody><tr class="dz-h"><th class="dz-dh">اليوم</th>${cols.map(x => x.k === 'b' ? `<th class="dz-b" rowspan="${days.length + 1}"><div class="dz-bi"><span class="dz-ic sm" style="background-image:${svgUrl(IC.cup, T.a)}"></span><div class="dz-bv" style="height:${Math.max(200, days.length * 58 + 30)}px"><span><b>${esc(x.b.label || 'استراحة')}</b>${c.times ? `<i>${range(x.b)}</i>` : ''}</span></div></div></th>` : `<th class="dz-ph">${c.nums ? `<span class="dz-n">${AR(x.p + 1)}</span>` : ''}<span class="dz-pn">الحصة ${PER[x.p] || AR(x.p + 1)}</span>${pt(x.p) ? `<span class="dz-tm"><span class="dz-ic xs" style="background-image:${svgUrl(IC.clock, T.a)}"></span><span>${range(pt(x.p))}</span></span>` : ''}</th>`).join('')}</tr>
         ${days.map(d => `<tr><th class="dz-d">${DAYS[d]}</th>${cols.filter(x => x.k === 'p').map(x => cell(d, x.p)).join('')}</tr>`).join('')}</tbody></table>
+      ${perSub || perDay ? `<div class="dz-sum">${perSub ? `<div><i>توزيع الحصص على المواد:</i>${perSub}</div>` : ''}${perDay ? `<div><i>الحصص اليومية:</i>${perDay}</div>` : ''}</div>` : ''}
       <div class="dz-foot"><svg viewBox="0 0 1123 140" preserveAspectRatio="none" aria-hidden="true"><path d="M0 70 C 200 20 380 110 600 60 C 800 20 960 70 1123 40 L1123 140 L0 140Z" fill="${T.b}" opacity=".35"/><path d="M0 95 C 220 50 420 130 640 85 C 840 50 980 95 1123 70 L1123 140 L0 140Z" fill="${T.a}"/></svg>
         ${qr ? `<div class="dz-qr"><div class="dz-ql"><span class="dz-ic" style="background-image:${svgUrl(IC.link, T.a)}"></span><div><b>${esc(c.qrT)}</b><i>${esc(c.qrS)}</i></div></div><div class="dz-qc"><img alt="QR" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(qr)}"></div></div>` : c.foot ? `<p class="dz-ft">${esc(c.foot)}</p>` : ''}</div>
     </div>`;
   }
+  // ---------- التقارير العامة: الجدول العام للفصول/للمعلمين وملخص الأنصبة ----------
+  const clsAbbr = (ids) => { const base = id => { const t = cName(id).split(/\s+/); const sec = t.filter(x => /^[أ-ي]$/.test(x)).pop() || ''; return (t[0] || '') + (sec ? ' ' + sec : ''); }; const m = {}; ids.forEach(id => { m[id] = base(id); }); const dup = new Set(Object.values(m).filter((v, i, a) => a.indexOf(v) !== i)); ids.forEach(id => { if (dup.has(m[id])) { const n = cName(id); const st = /متوسط/.test(n) ? 'م' : /ثانوي/.test(n) ? 'ث' : /ابتدائ/.test(n) ? 'ب' : ''; m[id] = m[id].replace(' ', ' ' + st + ' ').replace(/\s+$/, '') || n; if (!/ /.test(m[id])) m[id] += ' ' + st; } }); return m; };
+  function entities(c, D) {
+    if (c.kind === 'mteacher' || (c.kind === 'load' && c.loadBy !== 'class')) return [...new Set(D.slots.filter(s => s.teacher_id && s.subject_id).map(s => s.teacher_id))].map(id => [id, (A.person(id) || {}).full_name || '—']).sort((a, b) => a[1].localeCompare(b[1], 'ar'));
+    return (S.allClasses && S.allClasses.length ? S.allClasses : S.classes).filter(x => D.slots.some(s => s.class_id === x.id && s.subject_id)).map(x => [x.id, x.name]);
+  }
+  function masterPages(c, D) {
+    const sec = A.section(), T = THEMES[c.theme] || THEMES.navy, B = A.bell, s = D.sched;
+    const allDays = s ? B.actDays(s, sec) : Array.from({ length: sec.days || 5 }, (_, i) => i);
+    const P = s ? B.maxP(s, sec) : (sec.periods || 7);
+    const ents = entities(c, D), isT = c.kind === 'mteacher' || (c.kind === 'load' && c.loadBy !== 'class');
+    const abbr = clsAbbr([...new Set(D.slots.map(x => x.class_id))]);
+    const style = `--a:${T.a};--b:${T.b};--p:${T.p};--l:${T.l}`;
+    const today = new Date().toLocaleDateString('ar-SA-u-ca-gregory', { year: 'numeric', month: 'long', day: 'numeric' });
+    const head = (title, sub) => `<div class="dz-mh"><img src="assets/logo.svg" alt="مدارس دينا العالمية"><div class="dz-title"><span class="dz-ic" style="width:28px;height:28px;background-image:${svgUrl(IC.cal, '#fff')}"></span><h1>${esc(title)}</h1></div><div class="dz-meta"><b>${esc(sec.name)}</b>${c.tag ? esc(c.tag) + '<br>' : ''}${esc(sub || '')}</div></div>`;
+    const foot = (i, n) => `<div class="dz-mf"><span>${esc(S.school.name || 'مدارس دينا العالمية')} · ${esc(D.vlabel || '')}</span><span>${today}</span><span>صفحة ${AR(i)} من ${AR(n)}</span></div>`;
+    const chunk = (arr, k) => { const o = []; for (let i = 0; i < arr.length; i += k) o.push(arr.slice(i, i + k)); return o.length ? o : [[]]; };
+    const slotAt = (id, d, p) => D.slots.filter(x => (isT ? x.teacher_id === id : x.class_id === id) && x.day === d && x.period === p && x.subject_id);
+    if (c.kind === 'load') {
+      const L = c.lc || {}, rows = ents.map(([id, nm]) => { const sl = D.slots.filter(x => (isT ? x.teacher_id === id : x.class_id === id) && x.subject_id && allDays.includes(x.day) && x.period < P); const bs = {}; sl.forEach(x => { bs[x.subject_id] = (bs[x.subject_id] || 0) + 1; }); const oth = [...new Set(sl.map(x => isT ? x.class_id : x.teacher_id).filter(Boolean))]; return { id, nm, sl, bs, oth, per: allDays.map(d => sl.filter(x => x.day === d).length) }; });
+      const cols = [['#', 34], [isT ? 'المعلم' : 'الفصل', 190], L.total !== false ? [isT ? 'النصاب' : 'الحصص', 64] : null, L.subs !== false ? ['المواد', 56] : null, L.subList !== false ? ['تفصيل المواد', 0] : null, L.oth !== false ? [isT ? 'الفصول' : 'المعلمون', 60] : null, L.othList ? [isT ? 'أسماء الفصول' : 'أسماء المعلمين', 0] : null].filter(Boolean).concat(L.days !== false ? allDays.map(d => [DAYS[d], 60]) : []);
+      const row = (r, i) => `<tr><td>${AR(i + 1)}</td><th>${esc(r.nm)}</th>${L.total !== false ? `<td><b style="font-size:16px">${AR(r.sl.length)}</b></td>` : ''}${L.subs !== false ? `<td>${AR(Object.keys(r.bs).length)}</td>` : ''}${L.subList !== false ? `<td class="chips" style="text-align:start">${Object.entries(r.bs).sort((a, b) => b[1] - a[1]).map(([sid, n]) => `<span>${esc(subShort(c, sid))} ${AR(n)}</span>`).join('')}</td>` : ''}${L.oth !== false ? `<td>${AR(r.oth.length)}</td>` : ''}${L.othList ? `<td class="chips" style="text-align:start">${r.oth.map(o => `<span>${esc(isT ? abbr[o] || cName(o) : tShort(o))}</span>`).join('')}</td>` : ''}${L.days !== false ? r.per.map(n => `<td>${n ? AR(n) : '—'}</td>`).join('') : ''}</tr>`;
+      const sumAll = rows.reduce((a, r) => a + r.sl.length, 0);
+      const per = 17, pages = chunk(rows, per);
+      return pages.map((pg, pi) => `<div class="dz-m" dir="rtl" style="${style}">${head(c.title2 || (isT ? 'ملخص أنصبة المعلمين' : 'ملخص حصص الفصول'), `${AR(rows.length)} ${isT ? 'معلماً' : 'فصلاً'} · مجموع الحصص ${AR(sumAll)}`)}
+        <table class="dz-mt" style="font-size:13px"><colgroup>${cols.map(([, w]) => `<col ${w ? `style="width:${w}px"` : ''}>`).join('')}</colgroup><thead><tr>${cols.map(([t]) => `<th style="padding:6px 2px">${t}</th>`).join('')}</tr></thead>
+        <tbody>${pg.map((r, i) => row(r, pi * per + i)).join('').replace(/<tr>/g, '<tr style="height:30px">')}</tbody>
+        ${pi === pages.length - 1 ? `<tfoot><tr><td></td><th style="background:var(--a);color:#fff">المجموع</th>${L.total !== false ? `<td>${AR(sumAll)}</td>` : ''}${L.subs !== false ? '<td></td>' : ''}${L.subList !== false ? '<td></td>' : ''}${L.oth !== false ? '<td></td>' : ''}${L.othList ? '<td></td>' : ''}${L.days !== false ? allDays.map((d, k) => `<td>${AR(rows.reduce((a, r) => a + r.per[k], 0))}</td>`).join('') : ''}</tr></tfoot>` : ''}</table>${foot(pi + 1, pages.length)}</div>`);
+    }
+    const perDay = c.split === 'day';
+    const dayGroups = perDay ? allDays.map(d => [d]) : [allDays];
+    const out = [];
+    dayGroups.forEach(dl => {
+      const nCols = dl.length * P, nameW = isT ? 150 : 120, cellW = (1071 - nameW) / nCols;
+      const rowH = perDay ? (c.who ? 40 : 30) : (c.who && cellW > 40 ? 34 : 24);
+      const per = Math.max(6, Math.floor((794 - 18 - 72 - 40 - (perDay ? 54 : 44)) / rowH));
+      const fs = perDay ? 14 : Math.max(8, Math.min(12, cellW / 4.6));
+      const tl = s && c.times && perDay ? B.timeline(s, P, null) : null;
+      const pt = p => tl ? tl.items.find(x => x.k === 'p' && x.i === p) : null;
+      const fm = m => { const h = Math.floor(m / 60) % 24, mm = String(m % 60).padStart(2, '0'); return (s && s.h24 ? String(h).padStart(2, '0') : String(h % 12 || 12)) + ':' + mm; };
+      const pages = chunk(ents, per);
+      pages.forEach(pg => out.push({ dl, pg, html: (pi, pn) => `<div class="dz-m" dir="rtl" style="${style}">${head(c.title2 || (isT ? 'الجدول العام للمعلمين' : 'الجدول العام للفصول'), perDay ? 'يوم ' + DAYS[dl[0]] : `${AR(ents.length)} ${isT ? 'معلماً' : 'فصلاً'}`)}
+        <table class="dz-mt" style="font-size:${fs}px"><colgroup><col style="width:${nameW}px">${dl.map(() => Array.from({ length: P }, () => `<col>`).join('')).join('')}</colgroup>
+        <thead><tr><th rowspan="2" style="font-size:14px">${isT ? 'المعلم' : 'الفصل'}</th>${dl.map((d, k) => `<th colspan="${P}" class="${k ? 'dz-dsep' : ''}" style="font-size:${perDay ? 16 : 13}px;padding:4px 0">${DAYS[d]}</th>`).join('')}</tr>
+          <tr>${dl.map((d, k) => Array.from({ length: P }, (_, p) => `<th class="${k && !p ? 'dz-dsep' : ''}">${perDay ? `الحصة ${PER[p] || AR(p + 1)}${pt(p) ? `<div style="font-family:'Myriad Pro',Arial;direction:ltr;font-size:11px">${fm(pt(p).from)} – ${fm(pt(p).to)}</div>` : ''}` : AR(p + 1)}</th>`).join('')).join('')}</tr></thead>
+        <tbody>${pg.map(([id, nm]) => `<tr style="height:${rowH}px"><th style="font-size:${Math.min(14, fs + 2)}px">${esc(isT ? (perDay ? nm : tShort(id)) : nm)}</th>${dl.map((d, k) => Array.from({ length: P }, (_, p) => { const off = s && p >= B.schedP(s, sec, d); const l = off ? [] : slotAt(id, d, p); const cl = (k && !p ? 'dz-dsep ' : '') + (off ? 'dz-x' : ''); return `<td class="${cl}">${l.map(x => isT ? `<b>${esc(abbr[x.class_id] || cName(x.class_id))}</b>${c.who ? `<i>${esc(subShort(c, x.subject_id))}</i>` : ''}` : `<b>${esc(subShort(c, x.subject_id))}</b>${c.who ? `<i>${esc(tShort(x.teacher_id))}</i>` : ''}`).join('')}</td>`; }).join('')).join('')}</tr>`).join('')}</tbody></table>${foot(pi, pn)}</div>` }));
+    });
+    return out.map((o, i) => o.html(i + 1, out.length));
+  }
+  const MASTER = { mclass: 1, mteacher: 1, load: 1 };
+
   const CSS = `.dz{width:1123px;height:794px;box-sizing:border-box;position:relative;overflow:hidden;background:#fff;color:var(--a);font-family:'GE SS Two','Tajawal',sans-serif;padding:22px 32px 0;background-image:radial-gradient(circle at 98% 2%,var(--p) 0 110px,transparent 111px),radial-gradient(circle at 0 100%,var(--p) 0 140px,transparent 141px)}
     .dz-fl{position:absolute;background-size:contain;background-repeat:no-repeat}
     .dz-top{display:grid;grid-template-columns:230px 1fr 230px;align-items:center;gap:10px;position:relative}.dz-logo img{height:96px;display:block}
@@ -84,7 +145,17 @@
     .dz-foot{position:absolute;left:0;right:0;bottom:0;height:140px}.dz-foot svg{position:absolute;inset:0;width:100%;height:100%}
     .dz-qr{position:absolute;bottom:12px;left:0;right:0;display:flex;justify-content:center;align-items:flex-end;gap:22px}.dz-ql{display:flex;align-items:center;gap:12px;background:var(--a);color:#fff;border:3px solid var(--l);border-radius:999px;padding:10px 26px}.dz-ql .dz-ic{background-color:#fff;border-radius:50%;width:42px;height:42px;background-size:26px}.dz-ql b{display:block;font-size:21px}.dz-ql i{display:block;font-style:normal;font-size:13px;opacity:.85}
     .dz-qc{background:#fff;border-radius:14px;padding:6px;border:3px solid var(--b);margin-bottom:6px}.dz-qc img{width:104px;height:104px;display:block}
-    .dz-ft{position:absolute;left:0;right:0;bottom:16px;margin:0;text-align:center;color:#fff;font-size:24px;font-weight:800}`;
+    .dz-ft{position:absolute;left:0;right:0;bottom:16px;margin:0;text-align:center;color:#fff;font-size:24px;font-weight:800}
+    .dz-st{display:flex;gap:6px;font-style:normal}.dz-st span{background:var(--a);color:#fff;border-radius:999px;padding:3px 12px;font-size:14px;white-space:nowrap}.dz-st b{font-size:16px;color:#fff;border:0;padding:0}
+    .dz-sum{width:1060px;margin:8px auto 0;display:flex;flex-direction:column;gap:5px;position:relative;z-index:1}.dz-sum div{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.dz-sum i{font-style:normal;font-weight:800;font-size:14px;margin-left:4px}.dz-sum span{background:var(--p);border:1px solid var(--l);border-radius:999px;padding:2px 10px;font-size:13px}.dz-sum b{font-weight:800}
+    .dz-c .dz-logo img{height:74px}.dz-c .dz-title{padding:8px 34px}.dz-c .dz-title h1{font-size:30px}.dz-c .dz-tag{padding:3px 22px;font-size:17px}.dz-c .dz-art{height:74px}.dz-c .dz-who{margin:6px auto 8px;padding:4px 20px}.dz-c .dz-who b{font-size:21px}.dz-c .dz-t td{height:48px}.dz-c .dz-foot{height:110px}.dz-c .dz-qc img{width:84px;height:84px}
+    .dz-m{width:1123px;height:794px;box-sizing:border-box;position:relative;overflow:hidden;background:#fff;color:var(--a);font-family:'GE SS Two','Tajawal',sans-serif;padding:18px 26px 0}
+    .dz-mh{display:grid;grid-template-columns:180px 1fr 180px;align-items:center;gap:10px;margin-bottom:10px}.dz-mh img{height:62px}.dz-mh .dz-title{padding:7px 30px;justify-self:center}.dz-mh .dz-title h1{font-size:26px}.dz-mh .dz-meta{justify-self:end;text-align:left;font-size:13px;line-height:1.6}.dz-mh .dz-meta b{display:block;font-size:15px}
+    .dz-mt{width:100%;border-collapse:collapse;table-layout:fixed;border:2px solid var(--l)}.dz-mt th,.dz-mt td{border:1px solid var(--l);text-align:center;vertical-align:middle;padding:1px 2px;line-height:1.15;overflow:hidden}
+    .dz-mt thead th{background:var(--a);color:#fff;font-weight:700}.dz-mt thead tr:nth-child(2) th{background:var(--p);color:var(--a);font-size:12px}.dz-mt .dz-dsep{border-right:3px solid var(--a)!important}
+    .dz-mt tbody th{background:var(--p);font-weight:800;text-align:start;padding:2px 6px;white-space:nowrap;text-overflow:ellipsis}.dz-mt tbody tr:nth-child(even) td{background:#fafcff}.dz-mt td b{display:block;font-weight:700;color:#0b1f3a}.dz-mt td i{display:block;font-style:normal;opacity:.75;font-size:.82em}
+    .dz-mt .chips span{display:inline-block;background:var(--p);border-radius:999px;padding:0 7px;margin:1px;font-size:11px}.dz-mt tfoot td,.dz-mt tfoot th{background:var(--a);color:#fff;font-weight:800}
+    .dz-mf{position:absolute;left:26px;right:26px;bottom:10px;display:flex;justify-content:space-between;font-size:12px;border-top:2px solid var(--a);padding-top:5px}`;
   if (!document.getElementById('dzCss')) { const st = document.createElement('style'); st.id = 'dzCss'; st.textContent = CSS; document.head.appendChild(st); }
   const FONT = `@font-face{font-family:'Myriad Pro';src:url(fonts/myriad-pro-regular.woff2)}@font-face{font-family:'GE SS Two';font-weight:400 500;src:url(fonts/gess-two-medium.woff2)}@font-face{font-family:'GE SS Two';font-weight:600 900;src:url(fonts/gess-two-bold.woff2)}`;
 
@@ -116,50 +187,63 @@
     pickSched();
     const targets = () => c.kind === 'class' ? (S.allClasses && S.allClasses.length ? S.allClasses : S.classes).filter(x => D.slots.some(s => s.class_id === x.id && s.subject_id)).map(x => [x.id, x.name]) : [...new Set(D.slots.filter(s => s.teacher_id && s.subject_id).map(s => s.teacher_id))].map(id => [id, (A.person(id) || {}).full_name || '—']).sort((a, b) => a[1].localeCompare(b[1], 'ar'));
     let tg = targets(); let cur = tg.some(t => t[0] === c.cur) ? c.cur : (tg[0] || [])[0];
+    const M = !!MASTER[c.kind];
     const vLbl = v => `${v.label}${v.status === 'approved' ? ' (المعتمد)' : v.scheduled ? ' (مجدول)' : ' (مسودة)'}`;
     root.innerHTML = `<div class="dzw"><aside class="card dz-side" aria-label="إعدادات التصميم">
         <h2 style="margin:0 0 4px">تصميم الجداول وتصديرها</h2><p class="small muted" style="margin:0 0 10px">كل تعديل يظهر مباشرة في المعاينة، ويُحفظ للمرة القادمة.</p>
-        <div class="kpick" id="zK"><button type="button" data-k="class" class="${c.kind === 'class' ? 'on' : ''}">جدول فصل</button><button type="button" data-k="teacher" class="${c.kind === 'teacher' ? 'on' : ''}">جدول معلم</button></div>
-        <div class="field"><label for="zT">${c.kind === 'class' ? 'الفصل' : 'المعلم'}</label><select class="in" id="zT"></select></div>
+        <div class="kpick dz-kinds" id="zK">${[['class', 'جدول فصل'], ['teacher', 'جدول معلم'], ['mclass', 'الجدول العام للفصول'], ['mteacher', 'الجدول العام للمعلمين'], ['load', 'ملخص الأنصبة']].map(([k, l]) => `<button type="button" data-k="${k}" class="${c.kind === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+        <div class="field"><label for="zT">${M ? 'معاينة الصفحة' : c.kind === 'class' ? 'الفصل' : 'المعلم'}</label><select class="in" id="zT"></select></div>
+        ${c.kind === 'mclass' || c.kind === 'mteacher' ? `<div class="field"><label>التقسيم</label><div class="kpick" id="zSp"><button type="button" data-sp="all" class="${c.split !== 'day' ? 'on' : ''}">كل الأيام في صفحة</button><button type="button" data-sp="day" class="${c.split === 'day' ? 'on' : ''}">صفحة لكل يوم (أوضح)</button></div></div>` : ''}
+        ${c.kind === 'load' ? `<div class="field"><label>الملخص حسب</label><div class="kpick" id="zLb"><button type="button" data-lb="teacher" class="${c.loadBy !== 'class' ? 'on' : ''}">المعلمين</button><button type="button" data-lb="class" class="${c.loadBy === 'class' ? 'on' : ''}">الفصول</button></div></div>
+          <fieldset class="dz-fs"><legend>أعمدة الملخص</legend>${[['total', c.loadBy === 'class' ? 'عدد الحصص' : 'مجموع النصاب', true], ['subs', 'عدد المواد', true], ['subList', 'تفصيل المواد وحصص كل مادة', true], ['oth', c.loadBy === 'class' ? 'عدد المعلمين' : 'عدد الفصول', true], ['othList', c.loadBy === 'class' ? 'أسماء المعلمين' : 'أسماء الفصول', false], ['days', 'الحصص في كل يوم', true]].map(([k, l, d]) => `<label class="chk"><input type="checkbox" data-lc="${k}" ${(c.lc || {})[k] ?? d ? 'checked' : ''}> ${l}</label>`).join('')}</fieldset>` : ''}
+        ${!M ? `<fieldset class="dz-fs"><legend><label class="chk" style="margin:0"><input type="checkbox" data-b="sum" ${c.sum ? 'checked' : ''}> <b>ملخص وإحصائية على الجدول</b></label></legend>${[['total', c.kind === 'class' ? 'عدد الحصص' : 'مجموع النصاب', true], ['subs', 'عدد المواد', true], ['other', c.kind === 'class' ? 'عدد المعلمين' : 'عدد الفصول', true], ['free', c.kind === 'class' ? 'الحصص الفارغة' : 'حصص الفراغ', false], ['perSub', 'توزيع الحصص على المواد', true], ['perDay', 'الحصص في كل يوم', false]].map(([k, l, d]) => `<label class="chk"><input type="checkbox" data-si="${k}" ${(c.si || {})[k] ?? d ? 'checked' : ''} ${c.sum ? '' : 'disabled'}> ${l}</label>`).join('')}</fieldset>` : ''}
         <div class="field"><label for="zV">الجدول</label><select class="in" id="zV">${vers.map(v => `<option value="${v.id}" ${v.id === c.version ? 'selected' : ''}>${esc(vLbl(v))}</option>`).join('')}</select></div>
         <div class="field"><label for="zS">التوقيت (من «اليوم الدراسي والجدول الزمني»)</label><select class="in" id="zS"><option value="">الساري اليوم</option>${bell.schedules.map(s => `<option value="${s.id}" ${c.sched === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}<option value="none" ${c.sched === 'none' ? 'selected' : ''}>بدون توقيت</option></select></div>
-        <div class="field"><label for="zTi">العنوان</label><input class="in" id="zTi" data-c="title" value="${esc(c.title)}"></div>
+        <div class="field"><label for="zTi">العنوان</label><input class="in" id="zTi" data-c="${M ? 'title2' : 'title'}" value="${esc(M ? (c.title2 || '') : c.title)}" placeholder="${M ? 'يُختار تلقائياً حسب نوع التقرير' : ''}"></div>
         <div class="field"><label for="zTg">الشارة (اختياري)</label><input class="in" id="zTg" data-c="tag" value="${esc(c.tag)}" list="zTgL" placeholder="مثال: للتعليم عن بعد"><datalist id="zTgL"><option>للتعليم عن بعد</option><option>للتعليم الحضوري</option><option>دوام شهر رمضان</option><option>الفصل الدراسي الثاني</option></datalist></div>
         <fieldset class="dz-fs"><legend>إظهار</legend>
           <label class="chk"><input type="checkbox" data-b="times" ${c.times ? 'checked' : ''}> أوقات الحصص</label><label class="chk"><input type="checkbox" data-b="brk" ${c.brk ? 'checked' : ''}> عمود الاستراحة</label>
-          <label class="chk"><input type="checkbox" data-b="who" ${c.who ? 'checked' : ''}> ${c.kind === 'class' ? 'اسم المعلم' : 'اسم الفصل'} تحت المادة</label><label class="chk"><input type="checkbox" data-b="nums" ${c.nums ? 'checked' : ''}> أرقام الحصص</label>
+          ${c.kind === 'load' ? '' : `<label class="chk"><input type="checkbox" data-b="who" ${c.who ? 'checked' : ''}> ${c.kind === 'class' || c.kind === 'mclass' ? 'اسم المعلم تحت المادة' : 'المادة تحت الفصل'}</label>`}<label class="chk"><input type="checkbox" data-b="nums" ${c.nums ? 'checked' : ''}> أرقام الحصص</label>
           <label class="chk"><input type="checkbox" data-b="shortN" ${c.shortN ? 'checked' : ''}> أسماء مواد مختصرة</label></fieldset>
         <div class="field"><label>اللون</label><div class="dz-th">${Object.entries(THEMES).map(([k, t]) => `<button type="button" data-th="${k}" class="${c.theme === k ? 'on' : ''}" style="background:linear-gradient(135deg,${t.a} 55%,${t.b} 55%)" aria-label="لون ${({ navy: "كحلي", sky: "أزرق", green: "أخضر", purple: "بنفسجي" })[k]}" title="${({ navy: "كحلي", sky: "أزرق", green: "أخضر", purple: "بنفسجي" })[k]}"></button>`).join('')}</div></div>
-        <details class="dz-det"><summary>رابط القاعة الافتراضية (QR)</summary>
+        ${M ? '' : `<details class="dz-det"><summary>رابط القاعة الافتراضية (QR)</summary>
           <div class="field"><label for="zL">رابط ${c.kind === 'class' ? 'هذا الفصل' : 'هذا المعلم'}</label><input class="in" id="zL" dir="ltr" placeholder="https://…"></div>
           <div class="field"><label for="zL0">رابط عام لكل الجداول (إن لم يُحدد رابط خاص)</label><input class="in" id="zL0" dir="ltr" data-c="link0" value="${esc(c.link0)}" placeholder="https://…"></div>
           <div class="grid g2"><div class="field"><label for="zQ1">عنوان الزر</label><input class="in" id="zQ1" data-c="qrT" value="${esc(c.qrT)}"></div><div class="field"><label for="zQ2">النص الفرعي</label><input class="in" id="zQ2" data-c="qrS" value="${esc(c.qrS)}"></div></div>
-          <div class="field"><label for="zF">عبارة التذييل (عند عدم وجود رابط)</label><input class="in" id="zF" data-c="foot" value="${esc(c.foot)}"></div></details>
+          <div class="field"><label for="zF">عبارة التذييل (عند عدم وجود رابط)</label><input class="in" id="zF" data-c="foot" value="${esc(c.foot)}"></div></details>`}
         <details class="dz-det"><summary>تخصيص أسماء المواد</summary><div id="zSh" class="dz-sh"></div></details>
         <div class="dz-ex"><button class="btn" id="zP">${I.print || ''} طباعة / PDF</button><button class="btn ghost" id="zPng">${I.down || ''} صورة PNG</button>
-          <button class="btn sky" id="zPA">طباعة الكل (${'<span id="zN"></span>'})</button><button class="btn ghost" id="zZip">صور الكل (ZIP)</button></div>
+          <button class="btn sky" id="zPA">طباعة الكل (<span id="zN"></span>)</button><button class="btn ghost" id="zZip">صور الكل (ZIP)</button></div>
       </aside>
       <section class="card dz-pv"><div class="dz-stage" id="zStage"><div class="dz-scale" id="zPv"></div></div><p class="small muted" id="zInfo" style="margin:8px 0 0"></p></section></div>`;
-    const drawT = () => { tg = targets(); if (!tg.some(t => t[0] === cur)) cur = (tg[0] || [])[0]; $('#zT', root).innerHTML = tg.map(([id, n]) => `<option value="${id}" ${id === cur ? 'selected' : ''}>${esc(n)}</option>`).join('') || '<option>لا يوجد</option>'; $('#zN', root).textContent = AR(tg.length); };
+    let mp = [], mi = 0; const vl = () => { const v = vers.find(x => x.id === c.version); D.vlabel = v ? vLbl(v) : ''; };
+    const drawT = () => { vl(); if (M) { mp = masterPages(c, D); if (mi >= mp.length) mi = 0; $('#zT', root).innerHTML = mp.map((_, i) => `<option value="${i}" ${i === mi ? 'selected' : ''}>صفحة ${AR(i + 1)} من ${AR(mp.length)}</option>`).join(''); $('#zN', root).textContent = AR(mp.length); return; } tg = targets(); if (!tg.some(t => t[0] === cur)) cur = (tg[0] || [])[0]; $('#zT', root).innerHTML = tg.map(([id, n]) => `<option value="${id}" ${id === cur ? 'selected' : ''}>${esc(n)}</option>`).join('') || '<option>لا يوجد</option>'; $('#zN', root).textContent = AR(tg.length); };
+    const curHTML = () => M ? mp[mi] || '' : posterHTML(c, D, cur);
+    const allHTML = () => M ? masterPages(c, D) : tg.map(([id]) => posterHTML(c, D, id));
+    const allNames = () => M ? mp.map((_, i) => `صفحة ${i + 1}`) : tg.map(t => t[1]);
     const drawSh = () => { const ids = [...new Set(D.slots.filter(s => s.subject_id).map(s => s.subject_id))].sort((a, b) => (A.subjName(a) || '').localeCompare(A.subjName(b) || '', 'ar')); $('#zSh', root).innerHTML = ids.map(id => `<label><span>${esc(A.subjName(id))}</span><input class="in" data-sh="${id}" value="${esc(c.short[id] || '')}" placeholder="${esc(subShort(Object.assign({}, c, { short: {} }), id))}"></label>`).join(''); $$('[data-sh]', root).forEach(i => i.oninput = () => { if (i.value.trim()) c.short[i.dataset.sh] = i.value.trim(); else delete c.short[i.dataset.sh]; changed(); }); };
     const fit = () => { const st = $('#zStage', root), sc = $('#zPv', root); if (!st) return; const k = Math.min(1, (st.clientWidth - 4) / 1123); sc.style.transform = `scale(${k})`; st.style.height = Math.ceil(794 * k) + 'px'; };
-    const draw = () => { if (!cur) { $('#zPv', root).innerHTML = A.emptyBox('لا توجد حصص في هذا الجدول'); return; } $('#zPv', root).innerHTML = posterHTML(c, D, cur); $('#zL', root).value = c.links[cur] || ''; fit();
+    const draw = () => { if (M) { mp = masterPages(c, D); const zt = $('#zT', root); if (zt.options.length !== mp.length) drawT(); } if (!M && !cur) { $('#zPv', root).innerHTML = A.emptyBox('لا توجد حصص في هذا الجدول'); return; } $('#zPv', root).innerHTML = curHTML(); const zl = $('#zL', root); if (zl) zl.value = c.links[cur] || ''; fit();
       const s = D.sched; $('#zInfo', root).textContent = s ? `التوقيت: ${s.name} · ${AR(A.bell.maxP(s, sec))} حصص · الأيام: ${A.bell.actDays(s, sec).map(d => DAYS[d]).join('، ')}` : 'بدون توقيت — يظهر الجدول بعدد حصص القسم.'; };
     let sv = null; const changed = () => { draw(); clearTimeout(sv); sv = setTimeout(() => saveCfg(Object.assign({}, c, { cur })), 900); };
     new ResizeObserver(fit).observe($('#zStage', root));
     $$('#zK button', root).forEach(b => b.onclick = () => { c.kind = b.dataset.k; saveCfg(c); A.ttDesign(root, opts); });
-    $('#zT', root).onchange = e => { cur = e.target.value; changed(); };
+    $('#zT', root).onchange = e => { if (M) mi = +e.target.value; else cur = e.target.value; changed(); };
+    $$('[data-sp]', root).forEach(b => b.onclick = () => { c.split = b.dataset.sp; $$('[data-sp]', root).forEach(x => x.classList.toggle('on', x === b)); mi = 0; drawT(); changed(); });
+    $$('[data-lb]', root).forEach(b => b.onclick = () => { c.loadBy = b.dataset.lb; saveCfg(c); A.ttDesign(root, opts); });
+    $$('[data-lc]', root).forEach(i => i.onchange = () => { c.lc = Object.assign({}, c.lc, { [i.dataset.lc]: i.checked }); changed(); });
+    $$('[data-si]', root).forEach(i => i.onchange = () => { c.si = Object.assign({}, c.si, { [i.dataset.si]: i.checked }); changed(); });
     $('#zV', root).onchange = async e => { c.version = e.target.value; D.slots = await slotsOf(c.version); drawT(); drawSh(); changed(); };
     $('#zS', root).onchange = e => { c.sched = e.target.value; pickSched(); changed(); };
     $$('[data-c]', root).forEach(i => i.oninput = () => { c[i.dataset.c] = i.value; changed(); });
-    $$('[data-b]', root).forEach(i => i.onchange = () => { c[i.dataset.b] = i.checked; if (i.dataset.b === 'shortN') drawSh(); changed(); });
+    $$('[data-b]', root).forEach(i => i.onchange = () => { c[i.dataset.b] = i.checked; if (i.dataset.b === 'shortN') drawSh(); if (i.dataset.b === 'sum') $$('[data-si]', root).forEach(x => x.disabled = !i.checked); changed(); });
     $$('[data-th]', root).forEach(b => b.onclick = () => { c.theme = b.dataset.th; $$('[data-th]', root).forEach(x => x.classList.toggle('on', x === b)); changed(); });
-    $('#zL', root).oninput = e => { if (e.target.value.trim()) c.links[cur] = e.target.value.trim(); else delete c.links[cur]; changed(); };
+    const zL = $('#zL', root); if (zL) zL.oninput = e => { if (e.target.value.trim()) c.links[cur] = e.target.value.trim(); else delete c.links[cur]; changed(); };
     const nameOf = id => (tg.find(t => t[0] === id) || [, ''])[1];
-    $('#zP', root).onclick = () => { A.toast('يجهّز الجدول للطباعة…'); printMany([posterHTML(c, D, cur)], `${c.title} — ${nameOf(cur)}`); };
-    $('#zPA', root).onclick = () => { A.toast(`يجهّز ${AR(tg.length)} جدولاً للطباعة…`); printMany(tg.map(([id]) => posterHTML(c, D, id)), `${c.title} — ${sec.name}`); };
-    $('#zPng', root).onclick = ev => A.run(ev.currentTarget, async () => { const cv = await toCanvas(posterHTML(c, D, cur)); A.download(await blobOf(cv), `${c.title} — ${nameOf(cur)}.png`); });
-    $('#zZip', root).onclick = ev => { const btn = ev.currentTarget; A.run(btn, async () => { if (!window.JSZip) throw new Error('أداة الضغط غير محمّلة'); const z = new JSZip(); let n = 0; try { for (const [id, nm] of tg) { btn.textContent = `يجهّز ${AR(++n)} من ${AR(tg.length)}…`; z.file(`${nm.replace(/[\\/:*?"<>|]/g, '-')}.png`, await blobOf(await toCanvas(posterHTML(c, D, id)))); } A.download(await z.generateAsync({ type: 'blob' }), `${c.title} — ${sec.name}.zip`); } finally { btn.textContent = 'صور الكل (ZIP)'; } }); };
+    $('#zP', root).onclick = () => { A.toast('يجهّز للطباعة…'); printMany([curHTML()], M ? (c.title2 || 'تقرير الجداول') + ' — ' + sec.name : `${c.title} — ${nameOf(cur)}`); };
+    $('#zPA', root).onclick = () => { const all = allHTML(); A.toast(`يجهّز ${AR(all.length)} صفحة للطباعة…`); printMany(all, `${M ? c.title2 || 'تقرير الجداول' : c.title} — ${sec.name}`); };
+    $('#zPng', root).onclick = ev => A.run(ev.currentTarget, async () => { const cv = await toCanvas(curHTML()); A.download(await blobOf(cv), `${M ? 'تقرير' : c.title} — ${M ? 'صفحة ' + (mi + 1) : nameOf(cur)}.png`); });
+    $('#zZip', root).onclick = ev => { const btn = ev.currentTarget; A.run(btn, async () => { if (!window.JSZip) throw new Error('أداة الضغط غير محمّلة'); const z = new JSZip(); let n = 0; try { const all = allHTML(), nms = allNames(); for (let k = 0; k < all.length; k++) { btn.textContent = `يجهّز ${AR(++n)} من ${AR(all.length)}…`; z.file(`${String(nms[k]).replace(/[\\/:*?"<>|]/g, '-')}.png`, await blobOf(await toCanvas(all[k]))); } A.download(await z.generateAsync({ type: 'blob' }), `${c.title} — ${sec.name}.zip`); } finally { btn.textContent = 'صور الكل (ZIP)'; } }); };
     drawT(); drawSh(); draw();
   };
   V.ttdesign = root => A.ttDesign(root);

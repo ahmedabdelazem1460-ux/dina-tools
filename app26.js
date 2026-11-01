@@ -9,7 +9,10 @@
   const lsGet = () => { try { return JSON.parse(localStorage.getItem(LK()) || '{}'); } catch (_) { return {}; } };
   const lsSet = v => { try { localStorage.setItem(LK(), JSON.stringify(v)); } catch (_) {} };
   const has = e => !!((e.topic || '').trim() || (e.homework || '').trim() || (e.note || '').trim());
-  const same = (e, l) => (e.topic || '').trim() === (l.topic || '').trim() && (e.homework || '').trim() === (l.homework || '').trim() && (e.note || '').trim() === (l.note || '').trim();
+  // مقارنة تتجاهل الفروق الشكلية فقط: المسافات، التشكيل، التطويل، صور الألف والياء والتاء المربوطة، الأرقام العربية/الهندية، المسافة حول علامات الترقيم والنقطة في الآخر.
+  // أي اختلاف في الكلمات أو الأرقام نفسها (مثل ص ٤٥ ← ص ٤٦) يبقى اختلافاً حقيقياً.
+  const nrm = t => String(t || '').normalize('NFKC').replace(/[\u064B-\u0652\u0670\u0640]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[–—ـ]/g, '-').replace(/\s*([-:،,.؛;()«»"/])\s*/g, '$1').replace(/\s+/g, ' ').replace(/[.。]+$/, '').trim().toLowerCase();
+  const same = (e, l) => nrm(e.topic) === nrm(l.topic) && nrm(e.homework) === nrm(l.homework) && nrm(e.note) === nrm(l.note);
   const clsOf = id => A.cls(id) || {};
 
   // مجموعات: نفس المادة + نفس الصف لفصلين فأكثر (حصص المعلم نفسه فقط، دون النيابة)

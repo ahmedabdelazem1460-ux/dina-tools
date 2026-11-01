@@ -145,7 +145,7 @@
   const clashOf = (cm, s) => (s && s.teacher_id) ? (cm.get(s.teacher_id + '|' + s.day + '|' + s.period) || []).filter(x => x.class_id !== s.class_id) : [];
   function grid(slots, c, editable, base, opt = {}) {
     const sec = A.section(); const cm = opt.clash || null;
-    let h = `<div class="scroll"><table class="tt tt-days"><thead><tr><th style="width:90px"></th>${Array.from({ length: sec.periods }, (_, p) => `<th>الحصة ${PER[p]}</th>`).join('')}</tr></thead><tbody>`;
+    let h = `<div class="scroll"><table class="tt tt-days"><thead><tr><th style="width:90px"></th>${Array.from({ length: sec.periods }, (_, p) => `<th>الحصة ${PER[p]}${A.ptime ? A.ptime(p, c) : ''}</th>`).join('')}</tr></thead><tbody>`;
     for (let d = 0; d < sec.days; d++) {
       h += `<tr class="dayrow d${d % 2}"><td class="dayh">${DAYS[d]}</td>`;
       for (let p = 0; p < sec.periods; p++) {

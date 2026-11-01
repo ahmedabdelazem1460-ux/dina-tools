@@ -506,7 +506,7 @@
     };
     const n = mine.length, f = mine.filter(e => required(e) && filled(e)).length, rq = mine.filter(required).length;
     return `<details class="card tgrid" ${LS.get('mygrid') === '0' ? '' : 'open'} ontoggle="APP.LS.set('mygrid', this.open ? '1' : '0')"><summary><b>جدولي الأسبوعي</b> <span class="small muted">${cnt(n, 'حصة', 'حصص')} · مكتملة ${AR(f)} من ${AR(rq)} · اضغط على أي حصة لفتحها</span></summary>
-      <div class="scroll"><table class="tbl tg"><thead><tr><th>اليوم</th>${Array.from({ length: P }, (_, p) => `<th>${PER[p] || AR(p + 1)}</th>`).join('')}</tr></thead>
+      <div class="scroll"><table class="tbl tg"><thead><tr><th>اليوم</th>${Array.from({ length: P }, (_, p) => `<th>${PER[p] || AR(p + 1)}${window.APP && APP.ptime ? APP.ptime(p) : ''}</th>`).join('')}</tr></thead>
       <tbody>${dates.map((dt, d) => `<tr><th><b>${DAYS[d]}</b><div class="small faint">${AR(dt)}</div></th>${Array.from({ length: P }, (_, p) => cell(d, p)).join('')}</tr>`).join('')}</tbody></table></div>
       <div class="row small muted" style="margin-top:8px"><span class="tg-c ok tg-key"></span> مكتملة <span class="tg-c todo tg-key"></span> بانتظار الإدخال</div></details>`;
   }

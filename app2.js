@@ -515,46 +515,7 @@
     });
     return { items: out.filter(x => x.day >= 0 && x.period >= 0 && x.period < A.section().periods && x.day < A.section().days), badSheets: [...err] };
   }
-  function importDialog(draft, sl, done) {
-    const m = A.modal(`<h3>استيراد جدول جاهز إلى المسودة</h3>
-      <p class="sub">يقبل النظام ملف Excel أو CSV بإحدى الصيغ: <b>(١)</b> جدول بأعمدة الفصل | اليوم | الحصة | المادة | المعلم (نزّل القالب)، <b>(٢)</b> ورقة لكل فصل باسم الفصل بنفس صيغة شيت الخطة (اليوم | رقم الحصة | المادة)، <b>(٣)</b> ورقة لكل فصل: الصفوف أيام والأعمدة حصص.</p>
-      <label class="drop" id="dz"><input type="file" id="ff" accept=".xlsx,.xls,.csv" hidden><div style="font-weight:800">${I.up.replace('<svg', '<svg style="width:28px;height:28px"')}<br>اختر الملف أو اسحبه هنا</div></label>
-      <div id="ires" style="margin-top:14px"></div>`, { cls: 'wide' });
-    const handle = async file => {
-      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
-      const { items, badSheets } = parseWorkbook(wb);
-      const unkClass = new Set(), unkSub = new Set(), unkT = new Set(); const res = [];
-      items.forEach(it => {
-        const c = matchClass(it.cls); if (!c) { unkClass.add(it.cls); return; }
-        let sid = null; if (it.subject) { const s = S.subjects.find(x => A.normKey(x.name) === A.normKey(it.subject)); if (s) sid = s.id; else unkSub.add(it.subject); }
-        let tid = null; if (it.teacher) { const t = S.staff.find(x => A.normKey(x.full_name) === A.normKey(it.teacher) || A.normKey(x.full_name).includes(A.normKey(it.teacher))); if (t) tid = t.id; else unkT.add(it.teacher); }
-        res.push({ class_id: c.id, day: it.day, period: it.period, subject_id: sid, teacher_id: tid, _sub: it.subject });
-      });
-      const classesN = new Set(res.map(r => r.class_id)).size;
-      const box = m.el.querySelector('#ires');
-      box.innerHTML = `<div class="notice ${res.length ? 'ok' : 'bad'}">قُرئت <b>${AR(res.length)}</b> حصة لـ <b>${AR(classesN)}</b> فصل.</div>
-        ${unkClass.size || badSheets.length ? `<div class="notice warn">فصول غير معروفة (ستُتجاهل): ${[...unkClass, ...badSheets].map(esc).join('، ')}</div>` : ''}
-        ${unkSub.size ? `<div class="notice warn">مواد جديدة غير موجودة: ${[...unkSub].map(esc).join('، ')}<br><label class="chk" style="margin-top:6px"><input type="checkbox" id="mkSub" checked> إضافتها إلى قائمة المواد</label></div>` : ''}
-        ${unkT.size ? `<div class="notice warn">معلمون غير موجودين (ستبقى حصصهم بلا معلم): ${[...unkT].map(esc).join('، ')}</div>` : ''}
-        <label class="chk"><input type="checkbox" id="keepT" checked> إبقاء المعلمين الحاليين للحصص التي لا يحدد الملف معلمها</label>
-        <div class="acts"><button class="btn" id="igo" ${res.length ? '' : 'disabled'}>تطبيق على المسودة</button></div>`;
-      box.querySelector('#igo').onclick = e => A.run(e.currentTarget, async () => {
-        if (unkSub.size && box.querySelector('#mkSub') && box.querySelector('#mkSub').checked) {
-          for (const n of unkSub) { try { await api.addSubject({ school_id: S.school.id, name: n }); } catch (er) { } }
-          S.subjects = await api.reloadSubjects();
-          res.forEach(r => { if (!r.subject_id && r._sub) { const s = S.subjects.find(x => A.normKey(x.name) === A.normKey(r._sub)); if (s) r.subject_id = s.id; } });
-        }
-        const keep = box.querySelector('#keepT').checked;
-        const rows = res.map(r => { const old = sl.find(x => x.class_id === r.class_id && x.day === r.day && x.period === r.period) || {}; return { class_id: r.class_id, day: r.day, period: r.period, subject_id: r.subject_id, teacher_id: r.teacher_id || (keep && old.subject_id === r.subject_id ? old.teacher_id || null : null) }; });
-        for (let i = 0; i < rows.length; i += 400) await api.upsertSlots(draft.id, rows.slice(i, i + 400));
-        await api.updateDraft(draft.id, { source: 'استيراد ملف: ' + file.name });
-        m.close(); A.toast(`طُبِّقت ${A.cnt(rows.length, 'حصة', 'حصص')} على المسودة — راجعها ثم اعتمدها`, 'ok'); done();
-      });
-    };
-    const ff = m.el.querySelector('#ff'); ff.onchange = () => ff.files[0] && A.run(null, () => handle(ff.files[0]));
-    const dz = m.el.querySelector('#dz');
-    dz.addEventListener('dragover', e => { e.preventDefault(); }); dz.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer.files[0]; f && A.run(null, () => handle(f)); });
-  }
+  function importDialog(draft, sl, done) { return A.ttImport(draft, sl, done); }
   window.TT_parse = parseWorkbook;
 
   // =====================================================================

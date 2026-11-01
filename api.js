@@ -73,6 +73,7 @@
       assignTeacher: (c, s, t) => sb.rpc('assign_teacher', { p_class: c, p_subject: s, p_teacher: t }).then(ok),
       editSlot: (c, d, p, s, t) => sb.rpc('edit_slot', { p_class: c, p_day: d, p_period: p, p_subject: s || null, p_teacher: t || null }).then(ok),
       slotConflicts: s => sb.rpc('slot_conflicts', { p_section: s }).then(ok),
+      slotConflictReset: id => sb.rpc('slot_conflict_reset', { p_entry: id }).then(ok),
       slotConflictApply: id => sb.rpc('slot_conflict_apply', { p_entry: id }).then(ok),
       bulkReview: (w, classes, action) => sb.rpc('bulk_review', { p_week: w, p_classes: classes && classes.length ? classes : null, p_action: action }).then(ok),
       // واجهة عامة للوحدات الجديدة (الطلاب، الحضور، السلوك، الإشراف) — تخضع لصلاحيات الصفوف في قاعدة البيانات

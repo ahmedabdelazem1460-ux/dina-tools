@@ -154,6 +154,7 @@
         return wait(out);
       },
       async slotConflictApply(id) { const e = find('plan_entries', id); const w = find('weeks', e.week_id); const v = D.timetable_versions.find(x => x.section_id === w.section_id && x.status === 'approved'); const s = D.timetable_slots.find(x => x.version_id === v.id && x.class_id === e.class_id && x.day === e.day && x.period === e.period) || {}; e.subject_id = s.subject_id || null; e.teacher_id = s.teacher_id || null; return wait(null); },
+      async slotConflictReset(id) { const e = find('plan_entries', id); const w = find('weeks', e.week_id); const v = D.timetable_versions.find(x => x.section_id === w.section_id && x.status === 'approved'); const s = D.timetable_slots.find(x => x.version_id === v.id && x.class_id === e.class_id && x.day === e.day && x.period === e.period) || {}; const r = { old_teacher: e.teacher_id, old_subject: e.subject_id, topic: e.topic }; Object.assign(e, { subject_id: s.subject_id || null, teacher_id: s.teacher_id || null, topic: '', homework: '', note: '', status: 'empty' }); return wait(r); },
       async bulkReview(wid, classes, action) {
         const w = find('weeks', wid); let n = 0;
         D.plan_entries.forEach(e => { if (e.week_id !== wid || (classes && classes.length && !classes.includes(e.class_id))) return;

@@ -202,9 +202,11 @@
     const withContent = list.filter(x => (x.topic || '').trim());
     if (!withContent.length) { el.innerHTML = ''; return; }
     el.innerHTML = `<details class="sec-box" style="margin-top:14px;border-color:var(--warn)"><summary><b>تعارضات تحتاج قرارك (${AR(withContent.length)})</b> <span class="small muted">خلايا كتب فيها المعلم محتوى، ومادتها في الخطة تختلف عن الجدول الحالي — لم تُغيَّر تلقائياً</span></summary>
+      <div style="margin-top:8px"><button class="btn sm" data-cfd>مراجعة واتخاذ القرار (تطبيق الجدول مع حفظ المحتوى)</button></div>
       <div class="scroll" style="margin-top:8px"><table class="tbl"><thead><tr><th>الأسبوع</th><th>الفصل</th><th>اليوم/الحصة</th><th>في الخطة</th><th>في الجدول</th><th>المحتوى</th><th></th></tr></thead><tbody>
       ${withContent.map(x => `<tr><td>${AR(x.week_number)}</td><td><b>${esc((A.cls(x.class_id) || {}).name || '')}</b></td><td>${DAYS[x.day]} · ${AR(x.period + 1)}</td><td>${esc(A.subjName(x.entry_subject) || '—')}</td><td>${esc(A.subjName(x.slot_subject) || '—')}${x.slot_teacher ? `<div class="small muted">${esc(A.personName(x.slot_teacher))}</div>` : ''}</td><td class="small">${esc(x.topic)}</td><td><button class="btn ghost sm" data-cfa="${x.entry_id}" title="تُنقل الخلية لمادة الجدول ويبقى النص كما هو">اعتماد مادة الجدول</button></td></tr>`).join('')}
       </tbody></table></div><p class="small muted">«اعتماد مادة الجدول» يغيّر مادة الخلية ومعلمها فقط، ويبقى النص المكتوب كما هو. اتركها إن كان الصحيح ما في الخطة، ثم صحّح الجدول بدلاً من ذلك.</p></details>`;
+    $$('[data-cfd]', el).forEach(b => b.onclick = () => A.conflictsDialog(refresh));
     $$('[data-cfa]', el).forEach(b => b.onclick = () => A.run(b, async () => { await api.slotConflictApply(b.dataset.cfa); await A.loadWeek(); A.toast('طُبِّقت مادة الجدول على الخلية', 'ok'); refresh(); }));
   }
   async function ttView(box) {

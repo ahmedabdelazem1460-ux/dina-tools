@@ -449,32 +449,7 @@
     const imp = $('#imp', de); if (imp) imp.onclick = () => importDialog(d, sl, () => { T.slots[d.id] = null; V.timetable(root); });
     $$('[data-unsch]', de).forEach(b => b.onclick = () => A.run(b, async () => { if (!(await A.confirmBox('إلغاء جدولة هذا الجدول؟ يعود مسودة قابلة للتعديل، وتعود الأسابيع التي طُبّق عليها إلى الجدول الساري.', 'إلغاء الجدولة'))) return; await api.unscheduleTT(b.dataset.unsch); await A.loadWeek(); A.toast('أُلغيت الجدولة', 'ok'); V.timetable(root); }));
     const dd = $('#dd', de); if (dd) dd.onclick = async () => { if (!(await confirmBox2('حذف المسودة نهائياً؟'))) return; await A.run(null, async () => { await api.deleteVersion(d.id); T.draft = null; V.timetable(root); }); };
-    const ap = $('#ap', de); if (ap) ap.onclick = () => {
-      const ws = S.weeks.filter(w => !w.archived).slice().sort((x, y) => x.start_date.localeCompare(y.start_date));
-      const wOpt = (sel, end) => ws.map(w => { const v = end ? A.isoDate(new Date(A.parseDate(w.start_date).getTime() + 4 * 864e5)) : w.start_date; return `<option value="${v}" ${w.id === sel ? 'selected' : ''}>الأسبوع ${esc(w.word)} — ${AR(A.weekDates(w)[end ? 4 : 0])}</option>`; }).join('') + '<option value="custom">تاريخ آخر…</option>';
-      const cur = S.weekId; const nxt = (ws.find(w => w.start_date > ((ws.find(x => x.id === cur) || {}).start_date || '')) || {}).id || cur;
-      const m = A.modal(`<h3>اعتماد «${esc(d.label)}»</h3><p class="sub">عدد التغييرات عن الجدول الحالي: <b>${AR(changes)}</b>. اختر متى يسري هذا الجدول:</p>
-        <div class="kpick" id="apm" style="margin-bottom:12px"><button type="button" data-m="now" class="on">الآن</button><button type="button" data-m="from">من أسبوع / تاريخ</button><button type="button" data-m="temp">مؤقت لفترة ثم يعود الحالي</button></div>
-        <div id="apNow"><p class="small muted" style="margin-top:0">يصبح الجدول المعتمد فوراً ويُؤرشف السابق.</p><label class="chk"><input type="checkbox" id="apw" checked> تطبيق التغييرات على الأسابيع المفتوحة (الحصص غير المعتمدة فقط)</label></div>
-        <div id="apFrom" class="hidden"><div class="grid g2"><div class="field"><label for="apF">يسري ابتداءً من</label><select class="in" id="apF">${wOpt(nxt)}</select><input class="in hidden" type="date" id="apFd" style="margin-top:6px"></div>
-          <div class="field" id="apToBox"><label for="apT">وينتهي في (للمؤقت)</label><select class="in" id="apT">${wOpt(nxt, true)}</select><input class="in hidden" type="date" id="apTd" style="margin-top:6px"></div></div>
-          <p class="small muted" id="apHint" style="margin:0"></p></div>
-        <div class="acts"><button class="btn ok" id="apgo">${I.check} تأكيد</button></div>`, { cls: 'wide' });
-      let mode = 'now';
-      const sync = () => { m.el.querySelector('#apNow').classList.toggle('hidden', mode !== 'now'); m.el.querySelector('#apFrom').classList.toggle('hidden', mode === 'now'); m.el.querySelector('#apToBox').classList.toggle('hidden', mode !== 'temp');
-        m.el.querySelector('#apHint').textContent = mode === 'from' ? 'يُطبَّق على الأسابيع المفتوحة من هذا التاريخ وما بعدها فوراً، وعلى الأسابيع التي تُنشأ لاحقاً، ويصبح الجدول المعتمد تلقائياً عند حلول التاريخ.' : mode === 'temp' ? 'يُطبَّق فقط على أسابيع هذه الفترة (مثل رمضان أو الاختبارات)، ثم تعود الأسابيع بعدها للجدول المعتمد الحالي تلقائياً.' : ''; };
-      $$('#apm button', m.el).forEach(b => b.onclick = () => { mode = b.dataset.m; $$('#apm button', m.el).forEach(x => x.classList.toggle('on', x === b)); sync(); });
-      [['#apF', '#apFd'], ['#apT', '#apTd']].forEach(([a2, b2]) => { m.el.querySelector(a2).onchange = e => m.el.querySelector(b2).classList.toggle('hidden', e.target.value !== 'custom'); });
-      const val = (a2, b2) => { const v = m.el.querySelector(a2).value; return v === 'custom' ? m.el.querySelector(b2).value : v; };
-      sync();
-      m.el.querySelector('#apgo').onclick = e => A.run(e.currentTarget, async () => {
-        if (mode === 'now') { const r = await api.approveTT(d.id, m.el.querySelector('#apw').checked); m.close(); await A.loadWeek(); A.toast(`اعتُمد الجدول${r && r.updated_entries ? ` وحُدِّثت ${A.cnt(r.updated_entries, 'حصة', 'حصص')} في الأسابيع الجارية والقادمة` : ''}${r && r.conflicts ? ` · ${A.cnt(r.conflicts, 'خلية فيها محتوى', 'خلايا فيها محتوى')} تنتظر قرارك في «الجدول المعتمد»` : ''}`, 'ok'); A.LS.set('tttab', 'view'); V.timetable(root); return; }
-        const from = val('#apF', '#apFd'); if (!from) throw new Error('حدد تاريخ البداية');
-        const to = mode === 'temp' ? val('#apT', '#apTd') : null; if (mode === 'temp' && !to) throw new Error('حدد تاريخ النهاية'); if (to && to < from) throw new Error('تاريخ النهاية قبل البداية');
-        const r = await api.scheduleTT(d.id, from, to);
-        m.close(); T.versions = null; await A.loadWeek(); A.toast(`جُدول الجدول ${to ? 'مؤقتاً' : ''} — طُبّق على ${A.cnt((r && r.weeks) || 0, 'أسبوع مفتوح', 'أسابيع مفتوحة')}`, 'ok'); V.timetable(root);
-      });
-    };
+    const ap = $('#ap', de); if (ap) ap.onclick = () => A.ttApprove(d, changes, () => { T.versions = null; V.timetable(root); }, () => { A.LS.set('tttab', 'view'); V.timetable(root); });
   }
   const winTxt = v => v.effective_to ? `من ${AR(A.dmy(A.parseDate(v.effective_from)))} إلى ${AR(A.dmy(A.parseDate(v.effective_to)))} ثم يعود الجدول المعتمد` : `يسري من ${AR(A.dmy(A.parseDate(v.effective_from)))}`;
   const confirmBox2 = t => A.confirmBox(t, 'حذف', true);

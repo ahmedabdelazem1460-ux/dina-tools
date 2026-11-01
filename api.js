@@ -64,6 +64,8 @@
       },
       upsertSlots: (v, slots) => T('timetable_slots').upsert(slots.map(s => ({ ...s, version_id: v })), { onConflict: 'version_id,class_id,day,period' }).then(ok),
       scheduleTT: (id, from, to) => sb.rpc('schedule_timetable', { p_version: id, p_from: from, p_to: to || null }).then(ok),
+      scheduleTT2: (id, from, to, weeks) => sb.rpc('schedule_timetable_v2', { p_version: id, p_from: from, p_to: to || null, p_weeks: weeks || null }).then(ok),
+      previewSchedule: (id, from, to) => sb.rpc('preview_schedule', { p_version: id, p_from: from, p_to: to || null }).then(ok),
       unscheduleTT: id => sb.rpc('unschedule_timetable', { p_version: id }).then(ok),
       promoteTT: () => sb.rpc('timetable_promote').then(ok),
       approveTT: (id, apply) => sb.rpc('approve_timetable', { p_version: id, p_apply_open_weeks: apply }).then(ok),

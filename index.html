@@ -442,47 +442,60 @@ html.lang-en .hm-go{transform:scaleX(-1)}
 .tt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:8px;margin-top:8px}.tt-grid label{display:grid;grid-template-columns:minmax(90px,40%) 1fr;gap:8px;align-items:center;padding:4px 6px;border-radius:8px}.tt-grid label.need{background:var(--warnbg);outline:1px solid #F0DFA6}.tt-src{font-weight:700;overflow-wrap:anywhere}
 .tx-warn{color:var(--warn);font-weight:700}.tt-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px}.tt-kpis div{background:var(--pale);border-radius:var(--r-sm);padding:8px;text-align:center}.tt-kpis div.w{background:var(--warnbg);color:var(--warn)}.tt-kpis b{display:block;font-size:20px}.tt-kpis span{font-size:12px}
 @media (max-width:600px){.tt-grid{grid-template-columns:1fr}.tt-kpis{grid-template-columns:repeat(3,1fr)}}
+.modal.xl{width:min(1500px,100%)}
+.ap-pv{margin:10px 0}.ap-t tr.off td{opacity:.55}.ap-st{margin:6px 0 0;padding-inline-start:18px;font-size:13px;line-height:1.7}
+.bl-dg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px}.bl-d{border:1px solid var(--border);border-radius:var(--r-sm);padding:8px;display:flex;flex-direction:column;gap:6px;opacity:.6}.bl-d.on{opacity:1;border-color:var(--line);background:var(--pale)}
+.dzw{display:grid;grid-template-columns:340px minmax(0,1fr);gap:14px;align-items:start}.dz-side{position:sticky;top:10px;max-height:calc(100vh - 20px);overflow:auto}.dz-side .field{margin-bottom:10px}
+.dz-fs{border:1px solid var(--border);border-radius:var(--r-sm);padding:6px 10px;margin:0 0 10px;display:grid;gap:2px}.dz-th{display:flex;gap:8px}.dz-th button{width:40px;height:40px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px var(--border);cursor:pointer}.dz-th button.on{box-shadow:0 0 0 3px var(--sky)}
+.dz-det{border:1px solid var(--border);border-radius:var(--r-sm);padding:6px 10px;margin-bottom:10px}.dz-det summary{cursor:pointer;font-weight:700;min-height:32px;display:flex;align-items:center}
+.dz-sh{display:grid;gap:6px;margin-top:6px}.dz-sh label{display:grid;grid-template-columns:1fr 120px;gap:6px;align-items:center;font-size:13px}
+.dz-ex{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
+.dz-stage{overflow:hidden;min-width:0;background:var(--bg);border-radius:var(--r-sm);display:flex;justify-content:center}.dz-scale{transform-origin:top center;width:1123px;flex:none;box-shadow:var(--sh2)}
+@media (max-width:1000px){.dzw{grid-template-columns:minmax(0,1fr)}.dz-side{position:static;max-height:none}}
 </style>
-<script src="i18n_en.js?v=1793504548"></script>
-<script src="i18n.js?v=1793504548"></script>
+<script src="i18n_en.js?v=1793506022"></script>
+<script src="i18n.js?v=1793506022"></script>
 </head>
 <body>
 <div id="app"><div class="spinner"></div></div>
 <div id="toasts"></div>
 <script>window.DINA_RECOVERY=/type=recovery/.test(location.hash)||/type=recovery/.test(location.search);</script>
-<script src="config.js?v=1793504548"></script>
+<script src="config.js?v=1793506022"></script>
 <script src="vendor/supabase.js"></script>
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/html2canvas.min.js"></script>
 <script src="vendor/jspdf.umd.min.js"></script>
 <script src="vendor/jszip.min.js"></script>
-<script src="tpl_consts.js?v=1793504548"></script>
-<script src="export.js?v=1793504548"></script>
-<script src="api.js?v=1793504548"></script>
-<script src="demo.js?v=1793504548"></script>
-<script src="app.js?v=1793504548"></script>
-<script src="app2.js?v=1793504548"></script>
-<script src="app3.js?v=1793504548"></script>
-<script src="app4.js?v=1793504548"></script>
-<script src="lang.js?v=1793504548"></script>
-<script src="app5.js?v=1793504548"></script>
-<script src="app6.js?v=1793504548"></script>
-<script src="app7.js?v=1793504548"></script>
-<script src="app8.js?v=1793504548"></script>
-<script src="app9.js?v=1793504548"></script>
-<script src="app10.js?v=1793504548"></script>
-<script src="app11.js?v=1793504548"></script>
-<script src="app12.js?v=1793504548"></script>
-<script src="app13.js?v=1793504548"></script>
-<script src="app14.js?v=1793504548"></script>
-<script src="app15.js?v=1793504548"></script>
-<script src="omr.js?v=1793504548"></script>
-<script src="app16.js?v=1793504548"></script>
-<script src="app17.js?v=1793504548"></script>
-<script src="app18.js?v=1793504548"></script>
-<script src="app19.js?v=1793504548"></script>
-<script src="app20.js?v=1793504548"></script>
-<script src="app21.js?v=1793504548"></script>
-<script src="app22.js?v=1793504548"></script>
+<script src="tpl_consts.js?v=1793506022"></script>
+<script src="export.js?v=1793506022"></script>
+<script src="api.js?v=1793506022"></script>
+<script src="demo.js?v=1793506022"></script>
+<script src="app.js?v=1793506022"></script>
+<script src="app2.js?v=1793506022"></script>
+<script src="app3.js?v=1793506022"></script>
+<script src="app4.js?v=1793506022"></script>
+<script src="lang.js?v=1793506022"></script>
+<script src="app5.js?v=1793506022"></script>
+<script src="app6.js?v=1793506022"></script>
+<script src="app7.js?v=1793506022"></script>
+<script src="app8.js?v=1793506022"></script>
+<script src="app9.js?v=1793506022"></script>
+<script src="app10.js?v=1793506022"></script>
+<script src="app11.js?v=1793506022"></script>
+<script src="app12.js?v=1793506022"></script>
+<script src="app13.js?v=1793506022"></script>
+<script src="app14.js?v=1793506022"></script>
+<script src="app15.js?v=1793506022"></script>
+<script src="omr.js?v=1793506022"></script>
+<script src="app16.js?v=1793506022"></script>
+<script src="app17.js?v=1793506022"></script>
+<script src="app18.js?v=1793506022"></script>
+<script src="app19.js?v=1793506022"></script>
+<script src="app20.js?v=1793506022"></script>
+<script src="app21.js?v=1793506022"></script>
+<script src="app22.js?v=1793506022"></script>
+<script src="app23.js?v=1793506022"></script>
+<script src="app24.js?v=1793506022"></script>
+<script src="vendor/qrcode.js?v=1793506022"></script>
 </body>
 </html>

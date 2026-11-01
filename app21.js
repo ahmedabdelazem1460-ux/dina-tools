@@ -37,9 +37,13 @@
     }
     return { items: out, start: toMin(s.start), end: t };
   }
-  A.bell = { norm, bellOf, activeSched, timeline, fmt };
+  // أيام هذا الجدول وعدد حصص كل يوم (منفصلة عن إعداد القسم، ولا تتجاوزه)
+  const actDays = (s, sec) => { const n = (sec || A.section()).days || 5, all = Array.from({ length: n }, (_, i) => i); return Array.isArray(s.days) && s.days.length ? all.filter(d => s.days.includes(d)) : all; };
+  const schedP = (s, sec, d) => { const P = (sec || A.section()).periods || 7, base = Math.min(P, +s.np || P); return d == null ? base : Math.min(P, +(s.perDay || {})[d] || base); };
+  const maxP = (s, sec) => Math.max(1, ...actDays(s, sec).map(d => schedP(s, sec, d)));
+  A.bell = { norm, bellOf, activeSched, timeline, fmt, actDays, schedP, maxP, posterHTML: (...a) => posterHTML(...a), printPoster: (...a) => printPoster(...a), pngPoster: (...a) => pngPoster(...a) };
   // وقت الحصة في رؤوس الجداول (إن كان الإظهار مفعّلاً في الجدول الساري اليوم)
-  A.ptime = (p, cid) => { try { const sec = A.section(); if (!sec || !sec.bell || !sec.bell.schedules) return ''; const b = bellOf(sec), s = activeSched(b); if (!s.show) return ''; const it = timeline(s, sec.periods || 7, cid).items.find(x => x.k === 'p' && x.i === p); return it ? `<small class="ptm" dir="rtl">${fmt(it.from, s)} – ${fmt(it.to, s)}</small>` : ''; } catch (_) { return ''; } };
+  A.ptime = (p, cid) => { try { const sec = A.section(); if (!sec || !sec.bell || !sec.bell.schedules) return ''; const b = bellOf(sec), s = activeSched(b); if (!s.show) return ''; const it = timeline(s, maxP(s, sec), cid).items.find(x => x.k === 'p' && x.i === p); return it ? `<small class="ptm" dir="rtl">${fmt(it.from, s)} – ${fmt(it.to, s)}</small>` : ''; } catch (_) { return ''; } };
 
   // ---------- الملصق ----------
   const CLOCK = '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
@@ -51,7 +55,7 @@
   };
   const ic = svg => `background:#E4EBF5 url(&quot;data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" '))}&quot;) center/26px 26px no-repeat`;
   function posterHTML(sec, s, cid) {
-    const P = sec.periods || 7, tl = timeline(s, P, cid), durs = tl.items.filter(x => x.k === 'p').map(x => x.dur), same = durs.every(d => d === durs[0]);
+    const P = maxP(s, sec), dd = actDays(s, sec), tl = timeline(s, P, cid), durs = tl.items.filter(x => x.k === 'p').map(x => x.dur), same = durs.every(d => d === durs[0]);
     const cls = cid ? (allCls().find(c => c.id === cid) || {}).name : '';
     const row = it => {
       if (it.k === 't') return `<div class="bp-row bp-pass"><span class="bp-tm">${fmt(it.from, s)}</span><span class="bp-dot"></span><span class="bp-lb">انتقال · ${AR(it.dur)} د</span></div>`;
@@ -63,7 +67,7 @@
     return `<div class="bposter${dense}" dir="rtl">
       <div class="bp-top"><img src="assets/logo.svg" alt="مدارس دينا العالمية">${s.tag ? `<span class="bp-tag">${esc(s.tag)}</span>` : ''}</div>
       <div class="bp-title"><span class="bp-clock">${CLOCK}</span><h1>${esc(s.title || DEF_TITLE)}</h1></div>
-      <p class="bp-sub">${esc(sec.name)}${cls ? ' · ' + esc(cls) : ''}${s.name && s.name !== 'الجدول الأساسي' ? ' · ' + esc(s.name) : ''}</p>
+      <p class="bp-sub">${esc(sec.name)}${cls ? ' · ' + esc(cls) : ''}${s.name && s.name !== 'الجدول الأساسي' ? ' · ' + esc(s.name) : ''}<br><span class="bp-days">أيام الدراسة: ${dd.length === (sec.days || 5) ? `${DAYS[dd[0]]} – ${DAYS[dd[dd.length - 1]]}` : dd.map(d => DAYS[d]).join('، ')}${dd.some(d => schedP(s, sec, d) !== P) ? ' · ' + dd.filter(d => schedP(s, sec, d) !== P).map(d => `${DAYS[d]} ${AR(schedP(s, sec, d))} حصص`).join('، ') : ''}</span></p>
       <div class="bp-stats">
         <div><span style="${ic(ICO.sun)}"></span><i>بداية اليوم</i><b>${fmt(tl.start, s)}</b></div>
         <div><span style="${ic(ICO.flag)}"></span><i>نهاية اليوم</i><b>${fmt(tl.end, s)}</b></div>
@@ -77,7 +81,7 @@
   const POSTER_CSS = `.bposter{width:794px;min-height:1123px;box-sizing:border-box;background:#fff;color:#082B5A;font-family:'GE SS Two','Tajawal',sans-serif;position:relative;overflow:hidden;padding:34px 46px 150px;background-image:radial-gradient(circle at 92% 6%,#E4EBF5 0 120px,transparent 121px),radial-gradient(circle at 4% 40%,#EEF3FA 0 90px,transparent 91px)}
     .bp-top{display:flex;align-items:center;justify-content:space-between;gap:12px}.bp-top img{height:76px}.bp-tag{background:#3AB1DB;color:#fff;border-radius:999px;padding:8px 22px;font-weight:800;font-size:18px}
     .bp-title{margin:26px auto 4px;display:flex;align-items:center;gap:14px;justify-content:center;background:#082B5A;color:#fff;border-radius:999px;padding:12px 30px;width:fit-content;box-shadow:0 10px 24px -10px rgba(8,43,90,.6)}.bp-title h1{margin:0;font-size:30px;font-weight:800}.bp-clock{color:#3AB1DB;display:flex}
-    .bp-sub{text-align:center;color:#005499;margin:8px 0 18px;font-size:16px}
+    .bp-sub{text-align:center;color:#005499;margin:8px 0 18px;font-size:16px;line-height:1.7}.bp-days{font-size:14px;color:#4D6A8F}
     .bp-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px}.bp-stats div{border:2px solid #84B7E3;border-radius:18px;padding:12px 8px;text-align:center;background:#fff}.bp-stats span{display:inline-flex;width:46px;height:46px;border-radius:50%;background:#E4EBF5;color:#005499;align-items:center;justify-content:center}.bp-stats i{display:block;font-style:normal;color:#4D6A8F;font-size:14px;margin-top:6px}.bp-stats b{display:block;font-size:21px;margin-top:2px}
     .bp-line{position:relative;padding:0 6px}.bp-line:before{content:'';position:absolute;top:18px;bottom:18px;right:50%;margin-right:-1.5px;width:3px;background:linear-gradient(#3AB1DB,#082B5A);border-radius:3px}
     .bp-row{display:grid;grid-template-columns:1fr 54px 1fr;align-items:center;gap:14px;margin:7px 0;position:relative}
@@ -154,7 +158,7 @@
 
     // ---- محرر الجدول الزمني ----
     const drawEd = () => {
-      const s = S0(), P = sec.periods || 7, ed = $('#blEd', root), tl = timeline(s, P, pvCls);
+      const s = S0(), SP = sec.periods || 7, P = maxP(s, sec), ed = $('#blEd', root), tl = timeline(s, P, pvCls), dd = actDays(s, sec);
       ed.innerHTML = `<div class="grid g3">
           <div class="field"><label for="eN">اسم الجدول</label><input class="in" id="eN" value="${esc(s.name)}"></div>
           <div class="field"><label for="eTag">شارة أعلى الملصق (اختياري)</label><input class="in" id="eTag" value="${esc(s.tag || '')}" placeholder="مثال: للتعليم عن بعد" list="eTagL"><datalist id="eTagL"><option>للتعليم الحضوري</option><option>للتعليم عن بعد</option><option>دوام شهر رمضان</option><option>أيام الاختبارات</option><option>الدوام الشتوي</option></datalist></div>
@@ -165,6 +169,9 @@
           <div class="field"><label for="eFo">عبارة التذييل</label><input class="in" id="eFo" value="${esc(s.foot || '')}"></div>
           <div class="field"><label class="chk" style="margin-top:26px"><input type="checkbox" id="eSh" ${s.show ? 'checked' : ''}> إظهار أوقات الحصص في الجداول</label></div>
           <div class="field"><label class="chk" style="margin-top:26px"><input type="checkbox" id="e24" ${s.h24 ? 'checked' : ''}> نظام ٢٤ ساعة</label></div></div>
+        <div class="bl-days"><h4 style="margin:12px 0 6px">أيام هذا الجدول وحصصه <span class="small muted">— مستقلة لكل جدول (مثل التعليم عن بعد بست حصص)</span></h4>
+          <div class="row" style="gap:10px;flex-wrap:wrap;align-items:flex-end"><div class="field" style="margin:0"><label for="eNp">عدد الحصص في هذا الجدول</label><select class="in" id="eNp">${Array.from({ length: SP }, (_, i) => `<option value="${i + 1}" ${schedP(s, sec) === i + 1 ? 'selected' : ''}>${AR(i + 1)} حصص</option>`).join('')}</select></div><span class="small muted">الحد الأعلى ${AR(SP)} حسب إعداد القسم أعلاه.</span></div>
+          <div class="bl-dg">${Array.from({ length: sec.days || 5 }, (_, d) => `<div class="bl-d ${dd.includes(d) ? 'on' : ''}"><label class="chk"><input type="checkbox" data-dy="${d}" ${dd.includes(d) ? 'checked' : ''}> ${DAYS[d]}</label><select class="in" data-dp="${d}" aria-label="حصص ${DAYS[d]}" ${dd.includes(d) ? '' : 'disabled'}>${Array.from({ length: schedP(s, sec) }, (_, i) => `<option value="${i + 1}" ${schedP(s, sec, d) === i + 1 ? 'selected' : ''}>${AR(i + 1)} حصص</option>`).join('')}</select></div>`).join('')}</div></div>
         <details class="bl-det"><summary>مدة مختلفة لحصة معينة <span class="small muted">(اتركها فارغة لتأخذ المدة العامة)</span></summary><div class="bl-pd">${Array.from({ length: P }, (_, p) => `<label><span>${PER[p] || AR(p + 1)}</span><input class="in" type="number" min="10" max="120" data-pd="${p}" value="${s.perDur[p] || ''}" placeholder="${+s.dur || 45}"></label>`).join('')}</div></details>
         <h4 style="margin:14px 0 6px">الفسحات والصلاة <span class="small muted">— يمكن أن تختلف حسب الصفوف</span></h4>
         <div class="bl-brs">${s.breaks.map(br => `<div class="bl-br" data-br="${br.id}">
@@ -177,6 +184,9 @@
           ${s.id !== b.def ? '<button class="btn ok sm" id="eDef">اجعله الأساسي</button><button class="btn bad sm" id="eDel">حذف الجدول</button>' : ''}</div>
         <div class="bl-sum small">اليوم: من <b>${fmt(tl.start, s)}</b> إلى <b>${fmt(tl.end, s)}</b> · ${AR(Math.round((tl.end - tl.start) / 6) / 10)} ساعة${pvCls ? ` · محسوب لـ ${esc((allCls().find(c => c.id === pvCls) || {}).name || '')}` : ''}</div>`;
       const bind = (id, k, num) => { const i = $('#' + id, ed); i.oninput = () => { s[k] = i.type === 'checkbox' ? i.checked : num ? +i.value : i.value; if (k === 'name') { const ch = $(`[data-sc="${s.id}"]`, root); if (ch) ch.firstChild.textContent = i.value; } later(); drawPv(); if (num || k === 'start') sumOnly(); }; };
+      $('#eNp', ed).onchange = e => { s.np = +e.target.value; Object.keys(s.perDay || {}).forEach(k => { if (s.perDay[k] >= s.np) delete s.perDay[k]; }); later(); drawEd(); drawPv(); };
+      $$('[data-dy]', ed).forEach(c => c.onchange = () => { const on = $$('[data-dy]', ed).filter(x => x.checked).map(x => +x.dataset.dy); if (!on.length) { c.checked = true; A.toast('اختر يوماً واحداً على الأقل', 'err'); return; } s.days = on.length === (sec.days || 5) ? null : on; later(); drawEd(); drawPv(); });
+      $$('[data-dp]', ed).forEach(c => c.onchange = () => { s.perDay = s.perDay || {}; if (+c.value >= schedP(s, sec)) delete s.perDay[c.dataset.dp]; else s.perDay[c.dataset.dp] = +c.value; later(); drawPv(); });
       bind('eN', 'name'); bind('eTag', 'tag'); bind('eTi', 'title'); bind('eSt', 'start'); bind('eDu', 'dur', true); bind('ePa', 'pass', true); bind('eFo', 'foot'); bind('eSh', 'show'); bind('e24', 'h24');
       $$('[data-pd]', ed).forEach(i => i.oninput = () => { if (i.value) s.perDur[i.dataset.pd] = +i.value; else delete s.perDur[i.dataset.pd]; later(); drawPv(); sumOnly(); });
       $$('[data-br]', ed).forEach(row => { const br = s.breaks.find(x => x.id === row.dataset.br);
@@ -187,7 +197,7 @@
       const df = $('#eDef', ed); if (df) df.onclick = () => { b.def = s.id; later(); V.bell(root); };
       const dl = $('#eDel', ed); if (dl) dl.onclick = async () => { if (!(await A.confirmBox(`حذف الجدول «${esc(s.name)}»؟ تُلغى فترات التفعيل المرتبطة به.`, 'حذف', true))) return; b.schedules = b.schedules.filter(x => x !== s); b.acts = b.acts.filter(a => a.sid !== s.id); cur = b.def; A.LS.set('bell_s_' + sec.id, cur); await save(); V.bell(root); };
     };
-    const sumOnly = () => { const s = S0(), tl = timeline(s, sec.periods || 7, pvCls), el = $('.bl-sum', root); if (el) el.innerHTML = `اليوم: من <b>${fmt(tl.start, s)}</b> إلى <b>${fmt(tl.end, s)}</b> · ${AR(Math.round((tl.end - tl.start) / 6) / 10)} ساعة`; };
+    const sumOnly = () => { const s = S0(), tl = timeline(s, maxP(s, sec), pvCls), el = $('.bl-sum', root); if (el) el.innerHTML = `اليوم: من <b>${fmt(tl.start, s)}</b> إلى <b>${fmt(tl.end, s)}</b> · ${AR(Math.round((tl.end - tl.start) / 6) / 10)} ساعة`; };
 
     function pickClasses(br, done) {
       const cs = allCls(), groups = {}; cs.forEach(c => { const g = A.stageOf ? A.stageOf(c) : 'الصفوف'; (groups[g] = groups[g] || []).push(c); });

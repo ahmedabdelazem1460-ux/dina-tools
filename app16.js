@@ -32,7 +32,11 @@
   const skey = (sid, name, cls) => sid || ('n:' + A.normKey(name || '') + '|' + (cls || ''));
   const legend = e => { const sp = specOf(e), en = sp.lang === 'en', L = DinaOMR.LABELS[en ? 'en' : 'ar']; let q = 1; return sp.parts.map(p => { const a = q, b = q + (+p.count || 0) - 1; q = b + 1; const n = p.type === 'tf' ? 2 : +p.options || 4, ls = L[p.type || 'mcq'].slice(0, n); if (p.type === 'essay') return `${a}–${b}: ${en ? 'Essay — marked by the teacher in the grey rows' : 'مقالي — يرصد المعلم الدرجة في الصفوف الرمادية'}`; return `${a}–${b}: ${(en ? QT_EN : QT)[p.type || 'mcq']}${p.type === 'tf' ? (en ? ' (T = True, F = False)' : ' (ص = صح، خ = خطأ)') : ` (${ls[0]}–${ls[ls.length - 1]})`}`; }).join(' · '); };
   let st = { view: 'list', exam: null, tab: 'key' };
-  async function roster(e) { const ids = e.class_ids || []; if (!ids.length) return []; let l = []; try { l = await api.list('students', { class_id: ids, active: true }); } catch (_) {} return l.sort((a, b) => clsName(a.class_id).localeCompare(clsName(b.class_id), 'ar') || a.full_name.localeCompare(b.full_name, 'ar')); }
+  // ذاكرة مؤقتة للتنقل الفوري بين التبويبات (تُحدَّث بعد كل حفظ)
+  const CACHE = new Map(), cget = (k, fn) => { if (!CACHE.has(k)) CACHE.set(k, fn().catch(e => { CACHE.delete(k); throw e; })); return CACHE.get(k); }, cdel = pre => [...CACHE.keys()].forEach(k => k.startsWith(pre) && CACHE.delete(k));
+  const resOf = e => cget('re:' + e.id, () => api.list('paper_results', { exam_id: e.id })).then(l => l.map(x => ({ ...x })));
+  let GEN = 0; const upsRes = async (e, rows) => { const r = await api.ups('paper_results', rows, 'exam_id,skey'); GEN++; cdel('re:' + e.id); return r; };
+  async function roster(e) { const ids = e.class_ids || []; if (!ids.length) return []; let l = []; try { l = await cget('ro:' + ids.join(','), () => api.list('students', { class_id: ids, active: true })); } catch (_) {} return l.slice().sort((a, b) => clsName(a.class_id).localeCompare(clsName(b.class_id), 'ar') || a.full_name.localeCompare(b.full_name, 'ar')); }
   // تحويل حرف/كلمة إجابة إلى رقم البديل حسب نوع السؤال (يقبل العربية والإنجليزية والأرقام)
   const TF_WORDS = { 'ص': 0, 'صح': 0, 'صواب': 0, 't': 0, 'true': 0, '√': 0, '✓': 0, 'خ': 1, 'خطأ': 1, 'خطا': 1, 'f': 1, 'false': 1, '×': 1, 'x': 1 };
   function parseAns(Q, tok) {
@@ -153,7 +157,7 @@
         const marks = markMode ? Qs.map((q, i) => { const pq = (a.per_q || {})[q.id]; if (q.qtype === 'mcq' || q.qtype === 'tf') return ans[i] >= 0 && ans[i] === key[i] ? (+q.points || 1) : 0; return pq && pq.score != null ? +pq.score : pq && pq.ok ? (+q.points || 1) : 0; }) : null;
         const s = R.find(x => A.normKey(x.full_name) === A.normKey(a.student_name) && x.class_id === a.class_id), [score, mx] = scoreOf(ex, 'A', ans, marks);
         return { exam_id: ex.id, student_id: s ? s.id : null, student_name: a.student_name, class_id: a.class_id, model: 'A', answers: ans, marks, score, max_score: mx, absent: false, skey: skey(s && s.id, a.student_name, a.class_id), updated_at: new Date().toISOString() }; });
-      await api.ups('paper_results', rows, 'exam_id,skey');
+      await upsRes(ex, rows);
       m.close(); A.toast(`نُقلت ${AR(rows.length)} نتيجة للتحليل`, 'ok'); st = { view: 'exam', exam: ex, tab: 'results' }; V.paper(root);
     });
   }
@@ -166,9 +170,11 @@
       <div class="tabs" id="peTabs">${tabs.map(([k, l]) => `<button data-t="${k}" class="${st.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div><div id="peB"><div class="spinner"></div></div></div>`;
     $('#peBack', root).onclick = () => { st = { view: 'list' }; V.paper(root); };
     const eb = $('#peEd', root); if (eb) eb.onclick = () => editExam(e, root);
-    $$('#peTabs button', root).forEach(b => b.onclick = () => { st.tab = b.dataset.t; examView(root); });
-    const box = $('#peB', root);
-    ({ key: tKey, sheets: tSheets, grade: tGrade, results: tResults, items: tItems, skills: tSkills, report: tReport, share: tShare })[st.tab](box, e, root);
+    const box = $('#peB', root), body = () => { const t = st.tab, tok = (body.n = (body.n || 0) + 1); box.innerHTML = '<div class="spinner"></div>'; const fn = ({ key: tKey, sheets: tSheets, grade: tGrade, results: tResults, items: tItems, skills: tSkills, report: tReport, share: tShare })[t]; Promise.resolve(fn(box, e, root)).catch(err => { if (tok === body.n) box.innerHTML = A.emptyBox('تعذّر التحميل', esc(err.message)); }); };
+    $$('#peTabs button', root).forEach(b => b.onclick = () => { if (st.tab === b.dataset.t) return; st.tab = b.dataset.t; $$('#peTabs button', root).forEach(x => x.classList.toggle('on', x === b)); body(); });
+    body();
+    // تحميل مسبق في الخلفية لتكون التبويبات فورية
+    roster(e).catch(() => {}); resOf(e).catch(() => {});
   }
   const saveExam = async (e, patch) => { const r = await api.upd('paper_exams', e.id, patch); Object.assign(e, r || patch); };
 
@@ -176,7 +182,7 @@
   async function tKey(box, e) {
     const ed = canEdit(e), qs = QS(e), parts = specOf(e).parts; let mi = 0;
     const gk = (() => { const c = A.cls(e.class_ids[0]) || {}; return c.stage + '|' + c.grade_word; })();
-    let lessons = []; try { lessons = await api.list('curriculum', { school_id: S.school.id, subject_id: e.subject_id, grade_key: gk }, { order: 'sort' }); } catch (_) {}
+    let lessons = []; try { lessons = await cget('le:' + e.subject_id + gk, () => api.list('curriculum', { school_id: S.school.id, subject_id: e.subject_id, grade_key: gk }, { order: 'sort' })); } catch (_) {}
     const draw = () => {
       const m = e.models[mi], tot = e.weights.reduce((a, w) => a + (+w || 0), 0), filled = m.answers.filter(x => x >= 0).length;
       let q0 = 0;
@@ -202,8 +208,8 @@
 
   // ---------- طباعة أوراق التظليل ----------
   async function tSheets(box, e, root) {
-    let comms = []; try { comms = (await api.list('exam_committees', { school_id: S.school.id }, { order: 'created_at', desc: true })).filter(c => c.class_ids.some(x => e.class_ids.includes(x))); } catch (_) {}
-    const R = await roster(e), by = Object.fromEntries(e.class_ids.map(c => [c, R.filter(s => s.class_id === c).length])), empty = e.class_ids.filter(c => !by[c]);
+    let comms = []; try { comms = (await cget('cm', () => api.list('exam_committees', { school_id: S.school.id }, { order: 'created_at', desc: true }))).filter(c => c.class_ids.some(x => e.class_ids.includes(x))); } catch (_) {}
+    const [R] = await Promise.all([roster(e)]), by = Object.fromEntries(e.class_ids.map(c => [c, R.filter(s => s.class_id === c).length])), empty = e.class_ids.filter(c => !by[c]);
     box.innerHTML = `<div class="sec-box" style="margin-top:12px"><b>ورقة تظليل لكل طالب باسمه من قاعدة البيانات</b><p class="small muted" style="margin:4px 0 8px">كل ورقة تحمل رقم الطالب ونموذجه في شريط التعريف فيتعرّف عليها التصحيح الآلي مباشرة. ${AR(R.length)} طالباً: ${e.class_ids.map(c => `${esc(clsName(c))} (${AR(by[c] || 0)})`).join('، ')}.</p>
       <div class="small" style="margin-bottom:8px;color:#082B5A">${esc(legend(e))}</div>
       <div class="row" style="gap:10px;flex-wrap:wrap"><label class="small">توزيع النماذج <select class="in" id="shM" style="max-width:200px">${e.models.map((m, i) => `<option value="${i}">نموذج ${m.name} للجميع</option>`).join('')}${e.models.length > 1 ? '<option value="alt">بالتناوب بين النماذج</option>' : ''}</select></label>
@@ -215,10 +221,11 @@
       <p class="small muted" style="margin-top:8px">${R.filter(x => nidOf(x)).length < R.length ? `<b style="color:var(--warn)">${AR(R.length - R.filter(x => nidOf(x)).length)} طالباً بلا رقم هوية في قاعدة البيانات</b> — تُطبع أوراقهم بلا باركود وتُربط بترتيب الورقة. أضف أرقام الهوية من «الحضور والسلوك ← الطلاب». ` : 'كل الطلاب لهم رقم هوية: يُطبع باركود الهوية تحت الاسم ويُقرأ آلياً للربط. '}الورقة الاحتياطية بلا اسم تُصحَّح آلياً أيضاً، ويُختار اسم الطالب لها من قائمة الفصل في شاشة المراجعة قبل الحفظ.</p></div>`;
     const print = (pages) => { const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;left:-9999px;width:900px;height:1200px;border:0'; document.body.appendChild(f); const base = location.href.replace(/[^/]*$/, '').split('#')[0];
       f.contentDocument.write(`<!doctype html><html lang="${isEn(e) ? 'en' : 'ar'}" dir="${isEn(e) ? 'ltr' : 'rtl'}"><head><meta charset="utf-8"><base href="${base}"><style>@font-face{font-family:'GE SS Two';font-weight:400 500;src:url(fonts/gess-two-medium.woff2)}@font-face{font-family:'GE SS Two';font-weight:600 900;src:url(fonts/gess-two-bold.woff2)}${DinaOMR.PAGE_CSS}</style></head><body>${pages.join('')}</body></html>`); f.contentDocument.close();
-      setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 4000); }, 900); };
+      const doc = f.contentDocument, ready = Promise.all([doc.fonts ? doc.fonts.ready : null, ...[...doc.images].map(im => im.complete ? null : new Promise(r => { im.onload = im.onerror = r; }))]);
+      Promise.race([ready, new Promise(r => setTimeout(r, 1500))]).then(() => { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 4000); }); };
     const common = { spec: specOf(e), legend: specOf(e).parts.length > 1 ? '' : legend(e), title: e.title, sub: `${A.subjName(e.subject_id) || ''} · ${isEn(e) ? ({ diagnostic: 'Diagnostic', periodic: 'Periodic', final: 'Final', quiz: 'Quiz' }[e.kind] || '') : (KINDS[e.kind] || '')}${e.exam_date ? ' · ' + e.exam_date : ''}`, foot: S.school.name + (isEn(e) ? ' — Dina Study Planning Platform' : ' — منصة دينا للتخطيط الدراسي') };
     const seatOf = s => { const cm = comms.find(c => c.id === ($('#shCm', box) || {}).value); if (!cm) return ''; const x = cm.seating.find(z => z.student_id === s.id); return x ? `${x.label || x.seat} · ${cm.rooms[x.room] ? cm.rooms[x.room].name : ''}` : ''; };
-    $('#shGo', box).onclick = () => { const mm = $('#shM', box).value, fc = $('#shC', box).value, extra = Math.max(0, Math.min(80, +$('#shX', box).value || 0)); const L = R.map((s, i) => [s, i]).filter(([s]) => !fc || s.class_id === fc); if (!L.length && !extra) return A.toast('لا توجد أوراق للطباعة', 'warn');
+    $('#shGo', box).onclick = () => { A.toast('يجهّز الأوراق للطباعة…'); const mm = $('#shM', box).value, fc = $('#shC', box).value, extra = Math.max(0, Math.min(80, +$('#shX', box).value || 0)); const L = R.map((s, i) => [s, i]).filter(([s]) => !fc || s.class_id === fc); if (!L.length && !extra) return A.toast('لا توجد أوراق للطباعة', 'warn');
       const pages = L.map(([s, i], j) => { const mi = mm === 'alt' ? j % e.models.length : +mm; return DinaOMR.sheetHTML({ ...common, idx: i + 1, model: mi, modelName: e.models[mi].name, name: s.full_name, cls: clsName(s.class_id), nid: nidOf(s), seat: seatOf(s) }); });
       for (let k = 0; k < extra; k++) { const mi = mm === 'alt' ? k % e.models.length : +mm; pages.push(DinaOMR.sheetHTML({ ...common, idx: 4095, model: mi, modelName: e.models[mi].name, cls: fc ? clsName(fc) : '' })); }
       print(pages); };
@@ -231,13 +238,13 @@
       <textarea class="in" id="asT" rows="10" placeholder="نورة محمد القحطاني، 1100000001، 1001&#10;سارة أحمد الغامدي، 1100000002"></textarea><div class="acts"><button class="btn" id="asGo">إضافة</button></div>`, { cls: 'wide' });
     m.el.querySelector('#asGo').onclick = ev => A.run(ev.currentTarget, async () => {
       const cid = m.el.querySelector('#asC').value, c = A.cls(cid) || {}; const rows = m.el.querySelector('#asT').value.split(/\n/).map(l => l.split(/[\t,،]/).map(x => x.trim())).filter(r => r[0] && r[0].length > 2).map(r => ({ school_id: S.school.id, section_id: c.section_id || S.sectionId, class_id: cid, full_name: r[0].replace(/\s+/g, ' '), national_id: (r[1] || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\D/g, '') || null, student_no: r[2] || null, active: true }));
-      if (!rows.length) throw new Error('اكتب اسماً واحداً على الأقل'); await api.ins('students', rows); m.close(); A.toast(`أُضيف ${AR(rows.length)} طالباً`, 'ok'); done();
+      if (!rows.length) throw new Error('اكتب اسماً واحداً على الأقل'); await api.ins('students', rows); cdel('ro:'); m.close(); A.toast(`أُضيف ${AR(rows.length)} طالباً`, 'ok'); done();
     });
   }
 
   // ---------- التصحيح: المسح، الإدخال اليدوي، استيراد Excel ----------
   async function tGrade(box, e, root) {
-    const R = await roster(e), qs = QS(e); let res = await api.list('paper_results', { exam_id: e.id });
+    const [R, res0] = await Promise.all([roster(e), resOf(e)]), qs = QS(e); let res = res0;
     const bySk = Object.fromEntries(res.map(r => [r.skey, r]));
     box.innerHTML = `<div class="grid g2" style="align-items:start;margin-top:12px"><div class="sec-box"><b>تصحيح آلي من الأوراق الممسوحة</b><p class="small muted" style="margin:4px 0 8px">ارفع ملف PDF من الماسح أو صوراً (أو مجلداً كاملاً). يُتعرَّف على الطالب ونموذجه تلقائياً، ثم تراجع قبل الحفظ.</p>
         <label class="drop" id="gDrop" tabindex="0"><input type="file" id="gF" accept="application/pdf,image/*" multiple hidden><span>اسحب الملفات هنا أو <u>اختر ملفات</u></span><small>PDF أو صور (JPG/PNG)</small></label>
@@ -268,7 +275,7 @@
       $$('[data-v]', out).forEach(b => b.onclick = () => { const p = pending[+b.dataset.v]; A.modal(`<h3>${esc(p.label)}</h3><img src="${p.img}" style="width:100%;border:1px solid var(--border);border-radius:8px" alt="صورة الورقة"><p class="small">الإجابات المقروءة: ${p.ans.map((x, q) => `${qN(e, q)}:${lab(e, q, x)}`).join(' ')}</p>`, { cls: 'wide' }); });
       const sv = $('#gSave', out); if (sv) sv.onclick = ev => A.run(ev.currentTarget, async () => {
         const rows = pending.filter(p => p.ans && p.stu).map(p => { const [score, mx] = scoreOf(e, p.model, p.ans); return { exam_id: e.id, student_id: p.stu.id, skey: p.stu.id, student_name: p.stu.full_name, class_id: p.stu.class_id, model: p.model, answers: p.ans, marks: null, score, max_score: mx, absent: false, sheet_img: p.img, updated_at: new Date().toISOString() }; });
-        if (!rows.length) throw new Error('حدّد الطالب لكل ورقة'); await api.ups('paper_results', rows, 'exam_id,skey'); A.toast(`حُفظت ${AR(rows.length)} نتيجة`, 'ok'); st.tab = 'results'; examView(root);
+        if (!rows.length) throw new Error('حدّد الطالب لكل ورقة'); await upsRes(e, rows); A.toast(`حُفظت ${AR(rows.length)} نتيجة`, 'ok'); st.tab = 'results'; examView(root);
       });
     };
     $('#gF', box).onchange = ev => handle([...ev.target.files]); $('#gD', box).onchange = ev => handle([...ev.target.files]);
@@ -278,7 +285,7 @@
       const rows = []; $$('tr[data-s]', box).forEach(tr => { const s = R.find(x => x.id === tr.dataset.s), txt = tr.querySelector('[data-a]').value.trim(), ab = tr.querySelector('[data-ab]').checked, model = tr.querySelector('[data-m]').value; if (!txt && !ab) return;
         const tk = tokens(txt), ans = qs.map((Q, q) => parseAns(Q, tk[q])); const [score, mx] = ab ? [0, scoreOf(e, model, [])[1]] : scoreOf(e, model, ans);
         rows.push({ exam_id: e.id, student_id: s.id, skey: s.id, student_name: s.full_name, class_id: s.class_id, model, answers: ab ? [] : ans, marks: null, score, max_score: mx, absent: ab, updated_at: new Date().toISOString() }); });
-      if (!rows.length) throw new Error('لا يوجد إدخال'); await api.ups('paper_results', rows, 'exam_id,skey'); A.toast(`حُفظت ${AR(rows.length)} نتيجة`, 'ok'); examView(root);
+      if (!rows.length) throw new Error('لا يوجد إدخال'); await upsRes(e, rows); A.toast(`حُفظت ${AR(rows.length)} نتيجة`, 'ok'); examView(root);
     });
     const es = $('#gEs', box); if (es) es.onclick = () => essayDialog(e, R, res, () => examView(root));
     $('#gTpl', box).onclick = () => { const head = ['الاسم', 'الفصل', ...qs.map((_, q) => 'س' + qNum(e, q))]; const keyRow = ['المفتاح', '', ...qs.map((Q, q) => { const k = e.models[0].answers[q]; return k >= 0 ? Q.lab[k] : ''; })]; const rows = [head, keyRow, ...R.map(s => [s.full_name, clsName(s.class_id)])]; const ws = XLSX.utils.aoa_to_sheet(rows); ws['!views'] = [{ RTL: !isEn(e) }]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'النتائج'); XLSX.writeFile(wb, `قالب نتائج - ${e.title}.xlsx`); };
@@ -299,7 +306,7 @@
         const absent = qCols.every(i => String(r[i]).trim() === '' || /^غ|^غائب|^abs/i.test(String(r[i]).trim())); const [score, mx] = absent ? [0, scoreOf(e, 'A', [])[1]] : scoreOf(e, 'A', ans, marks);
         return { exam_id: e.id, student_id: s ? s.id : null, skey: skey(s && s.id, name, s ? s.class_id : cid), student_name: s ? s.full_name : name, class_id: s ? s.class_id : cid, model: 'A', answers: absent ? [] : ans, marks: absent ? null : marks, score, max_score: mx, absent, updated_at: new Date().toISOString() }; });
       if (!out2.length) throw new Error('لا توجد صفوف طلاب');
-      await api.ups('paper_results', out2, 'exam_id,skey');
+      await upsRes(e, out2);
       const un = out2.filter(r => !r.student_id).length;
       $('#gXo', box).innerHTML = `<span style="color:var(--ok)">استُورد ${AR(out2.length)} طالباً ${marksMode ? '(درجات لكل سؤال)' : '(إجابات بالحروف)'}${kr ? ' · واعتُمد المفتاح من الملف' : ''}.</span>${un ? ` <b>${AR(un)}</b> غير مطابقين لأسماء قاعدة البيانات وحُفظوا بأسمائهم كما في الملف.` : ''}`;
       A.toast('اكتمل الاستيراد', 'ok'); setTimeout(() => { st.tab = 'results'; examView(root); }, 1400);
@@ -318,14 +325,14 @@
         const base = r ? JSON.parse(JSON.stringify(r)) : { exam_id: e.id, student_id: s.id, skey: s.id, student_name: s.full_name, class_id: s.class_id, model: e.models[0].name, answers: qs.map(() => -1), marks: null, absent: false };
         ins.forEach(i => { const q = +i.dataset.q, Q = qs[q], v = Math.max(0, Math.min(Q.max, +String(i.value).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(',', '.').replace('½', '.5') || 0)); if (base.marks) base.marks[q] = v; else { base.answers = qs.map((_, k) => base.answers[k] ?? -1); base.answers[q] = parseAns(Q, String(v)); } });
         const [score, mx] = scoreOf(e, base.model, base.answers, base.marks); out.push({ exam_id: e.id, student_id: base.student_id || null, skey: base.skey || skey(base.student_id, base.student_name, base.class_id), student_name: base.student_name, class_id: base.class_id, model: base.model, answers: base.answers, marks: base.marks, score, max_score: mx, absent: false, updated_at: new Date().toISOString() }); });
-      if (!out.length) throw new Error('لم تُدخل أي درجة'); await api.ups('paper_results', out, 'exam_id,skey'); m.close(); A.toast(`رُصدت درجات ${AR(out.length)} طالباً`, 'ok'); done();
+      if (!out.length) throw new Error('لم تُدخل أي درجة'); await upsRes(e, out); m.close(); A.toast(`رُصدت درجات ${AR(out.length)} طالباً`, 'ok'); done();
     });
   }
 
   // ---------- مرشحات مشتركة ----------
   const ctxF = { c: '', m: '' };
   const filterUI = e => `<div class="row" style="gap:8px;margin:12px 0;flex-wrap:wrap"><label class="small">الفصل <select class="in" id="fC" style="max-width:200px"><option value="">كل الفصول</option>${e.class_ids.map(c => `<option value="${c}" ${ctxF.c === c ? 'selected' : ''}>${esc(clsName(c))}</option>`).join('')}</select></label>${e.models.length > 1 ? `<label class="small">النموذج <select class="in" id="fM" style="max-width:120px"><option value="">الكل</option>${e.models.map(m => `<option ${ctxF.m === m.name ? 'selected' : ''}>${m.name}</option>`).join('')}</select></label>` : ''}</div>`;
-  async function loadRes(e, all) { const r = await api.list('paper_results', { exam_id: e.id }); return all ? r : r.filter(x => (!ctxF.c || x.class_id === ctxF.c) && (!ctxF.m || x.model === ctxF.m)); }
+  async function loadRes(e, all) { const r = await resOf(e); return all ? r : r.filter(x => (!ctxF.c || x.class_id === ctxF.c) && (!ctxF.m || x.model === ctxF.m)); }
   const bindF = (box, again) => { const c = $('#fC', box); if (c) c.onchange = () => { ctxF.c = c.value; again(); }; const m = $('#fM', box); if (m) m.onchange = () => { ctxF.m = m.value; again(); }; };
 
   // ---------- الحسابات المشتركة للتحليل والتقرير ----------
@@ -444,7 +451,7 @@
 
   // ---------- مشاركة النتائج مع أولياء الأمور ----------
   async function tShare(box, e) {
-    const all = (await api.list('paper_results', { exam_id: e.id })).sort((a, b) => clsName(a.class_id).localeCompare(clsName(b.class_id), 'ar') || a.student_name.localeCompare(b.student_name, 'ar'));
+    const all = (await resOf(e)).sort((a, b) => clsName(a.class_id).localeCompare(clsName(b.class_id), 'ar') || a.student_name.localeCompare(b.student_name, 'ar'));
     const sh = Object.assign({ on: false, kind: 'result', comment: '', students: [] }, e.share || {}), sel = new Set(sh.students || []);
     const link = r => location.href.split('#')[0].replace(/[^/]*$/, '') + 'student.html?pr=' + r.token;
     const visible = r => sh.on && (!sel.size || sel.has(r.student_id));
@@ -469,7 +476,7 @@
     $('#cNew', box).onclick = () => newCommittee(root);
     $$('[data-p]', box).forEach(b => b.onclick = () => printCommittee(list.find(c => c.id === b.dataset.p)));
     $$('[data-e]', box).forEach(b => b.onclick = () => editSeating(list.find(c => c.id === b.dataset.e), root));
-    $$('[data-d]', box).forEach(b => b.onclick = async () => { if (!(await A.confirmBox('حذف هذا التوزيع؟', 'حذف', true))) return; await api.del('exam_committees', b.dataset.d); V.paper(root); });
+    $$('[data-d]', box).forEach(b => b.onclick = async () => { if (!(await A.confirmBox('حذف هذا التوزيع؟', 'حذف', true))) return; cdel('cm'); await api.del('exam_committees', b.dataset.d); V.paper(root); });
   }
   async function newCommittee(root) {
     let exams = []; try { exams = (await api.list('paper_exams', { school_id: S.school.id }, { order: 'created_at', desc: true })).filter(x => (!x.section_id || x.section_id === S.sectionId) && canSee(x)); } catch (_) {}
@@ -507,7 +514,7 @@
       if (R.reduce((a, r) => a + r.capacity, 0) < stu.length) throw new Error(`سعة اللجان ${R.reduce((a, r) => a + r.capacity, 0)} أقل من عدد الطلاب ${stu.length}`);
       const order = orderStudents(stu, ids, mode), seating = place(order, R, m.el.querySelector('#cNum').value, m.el.querySelector('#cPre').value.trim());
       if (seating.left.length) throw new Error(`${seating.left.length} طالباً لم يجدوا مقعداً بسبب قصر بعض اللجان على فصول معينة — زِد سعة اللجان العامة`);
-      await api.ins('exam_committees', { school_id: S.school.id, section_id: S.sectionId, title, class_ids: ids, rooms: R, seating: seating.list, settings: { mode, num: m.el.querySelector('#cNum').value, prefix: m.el.querySelector('#cPre').value.trim() }, exam_id: m.el.querySelector('#cEx').value || null, created_by: S.me.id });
+      cdel('cm'); await api.ins('exam_committees', { school_id: S.school.id, section_id: S.sectionId, title, class_ids: ids, rooms: R, seating: seating.list, settings: { mode, num: m.el.querySelector('#cNum').value, prefix: m.el.querySelector('#cPre').value.trim() }, exam_id: m.el.querySelector('#cEx').value || null, created_by: S.me.id });
       m.close(); A.toast(`وُزّع ${AR(seating.list.length)} طالباً على ${AR(new Set(seating.list.map(x => x.room)).size)} لجنة`, 'ok'); V.paper(root);
     });
   }
@@ -535,7 +542,7 @@
     const cap = () => { m.el.querySelector('#seCap').innerHTML = c.rooms.map((r, i) => { const n = L.filter(x => x.room === i).length; return `<span class="pill ${n > r.capacity ? 'st-returned' : 'st-empty'}">${esc(r.name)}: ${AR(n)}/${AR(r.capacity)}</span>`; }).join(' '); };
     const draw = () => { const q = A.normKey(m.el.querySelector('#seQ').value || ''); m.el.querySelector('#seB').innerHTML = L.map((x, i) => [x, i]).filter(([x]) => !q || A.normKey(x.name).includes(q)).map(([x, i]) => `<tr><td><b>${esc(x.label || x.seat)}</b></td><td>${esc(x.name)}</td><td>${esc(clsName(x.class_id))}</td><td><select class="in" data-mv="${i}" style="max-width:180px">${c.rooms.map((r, ri) => `<option value="${ri}" ${x.room === ri ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></td></tr>`).join(''); $$('[data-mv]', m.el).forEach(s => s.onchange = () => { L[+s.dataset.mv].room = +s.value; cap(); }); };
     m.el.querySelector('#seQ').oninput = draw; draw(); cap();
-    m.el.querySelector('#seGo').onclick = ev => A.run(ev.currentTarget, async () => { const ord = c.rooms.flatMap((_, ri) => L.filter(x => x.room === ri)); renumber(ord, c.rooms, (c.settings || {}).num, (c.settings || {}).prefix); await api.upd('exam_committees', c.id, { seating: ord }); m.close(); A.toast('حُفظ التوزيع', 'ok'); V.paper(root); });
+    m.el.querySelector('#seGo').onclick = ev => A.run(ev.currentTarget, async () => { const ord = c.rooms.flatMap((_, ri) => L.filter(x => x.room === ri)); renumber(ord, c.rooms, (c.settings || {}).num, (c.settings || {}).prefix); cdel('cm'); await api.upd('exam_committees', c.id, { seating: ord }); m.close(); A.toast('حُفظ التوزيع', 'ok'); V.paper(root); });
   }
   function printCommittee(c) {
     const m = A.modal(`<h3>طباعة — ${esc(c.title)}</h3><div class="acts" style="justify-content:flex-start;flex-wrap:wrap"><button class="btn" data-k="lists">كشوف اللجان مع التوقيع</button><button class="btn ghost" data-k="doors">ملصقات الأبواب</button><button class="btn ghost" data-k="cards">بطاقات المقاعد</button><button class="btn ghost" data-k="summary">ملخص اللجان والملاحظين</button></div>`);

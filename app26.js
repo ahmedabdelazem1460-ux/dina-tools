@@ -78,7 +78,7 @@
     const gs = groups(); if (!gs.length) return r;
     const anchor = $('.tgrid', root); if (!anchor || $('#unCard', root)) return r;
     anchor.insertAdjacentHTML('afterend', `<div class="card un-card" id="unCard"><div class="un-h"><div><b>الإدخال الموحّد</b><p class="small muted" style="margin:2px 0 0">تدرّس المادة نفسها لأكثر من فصل — اكتب الخطة مرة واحدة وتُرحَّل لكل فصل حسب جدوله.</p></div></div>
-      <div class="un-gs">${gs.map((g, i) => { const req = g.entries.length, f = g.entries.filter(A.filled).length; return `<button class="un-g" data-g="${i}"><b>${esc(A.subjName(g.subject_id))}</b><span>${esc(g.grade)} · ${A.cnt(g.classes.length, 'فصل', 'فصول')} · ${A.cnt(req, 'حصة', 'حصص')}</span><span class="un-p"><i style="width:${A.pct(f, req)}%"></i></span><span class="small">${AR(f)} / ${AR(req)} مكتملة</span></button>`; }).join('')}</div></div>`);
+      <div class="un-gs">${gs.map((g, i) => { const req = g.entries.length, f = g.entries.filter(A.filled).length; return `<button class="un-g" data-g="${i}"><b>${esc(A.subjName(g.subject_id))}</b><span>${esc(g.grade)} · ${g.classes.length === 2 ? 'فصلان' : A.cnt(g.classes.length, 'فصل', 'فصول')} · ${A.cnt(req, 'حصة', 'حصص')}</span><span class="un-p"><i style="width:${A.pct(f, req)}%"></i></span><span class="small">${AR(f)} / ${AR(req)} مكتملة</span></button>`; }).join('')}</div></div>`);
     $$('[data-g]', root).forEach(b => b.onclick = () => A.unifiedEditor(gs[+b.dataset.g], () => V.my(root)));
     return r;
   };

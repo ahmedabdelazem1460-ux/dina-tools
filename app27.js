@@ -93,7 +93,9 @@
     const slots = [], badC = new Set(), badS = new Set();
     base.forEach(x => { const c = titleCls(x.cls); if (!c) { badC.add(x.cls); return; } const s = A.ttMatch ? A.ttMatch.autoSub(x.subject) : ''; if (!s) badS.add(x.subject); slots.push({ c, d: x.day, p: x.period, s: s || null, sn: x.subject, t: null, tn: (x.teacher || '').trim() && !codeCls(x.teacher).length ? x.teacher.trim() : '' }); });
     let placed = 0, lost = 0;
-    tch.forEach(x => { let cs = codeCls(x.b); if (!cs.length) cs = codeCls(x.a + ' ' + x.b); let cand = slots.filter(y => y.d === x.d && y.p === x.p && cs.includes(y.c));
+    const subjOK = (y, a) => { const s0 = A.ttMatch ? A.ttMatch.autoSub(a) : ''; if (s0 && y.s) return s0 === y.s; const ta = A.ttMatch ? A.ttMatch.toks(a) : [a], tb = A.ttMatch ? A.ttMatch.toks(y.sn || '') : [y.sn]; return ta.some(t => tb.includes(t)); };
+    tch.forEach(x => { let cs = codeCls(x.b); if (!cs.length) cs = codeCls(x.a + ' ' + x.b); let cand = slots.filter(y => y.d === x.d && y.p === x.p && cs.includes(y.c) && (!base.length || subjOK(y, x.a)));
+      if (!cand.length && base.length) { const l = slots.filter(y => y.d === x.d && y.p === x.p && !y.tn && subjOK(y, x.a)); if (l.length === 1) cand = l; }
       if (!cand.length && !base.length) { cs.forEach(c => { const s = A.ttMatch ? A.ttMatch.autoSub(x.a) : ''; const y = { c, d: x.d, p: x.p, s: s || null, sn: x.a, t: null, tn: '' }; slots.push(y); cand.push(y); if (!s) badS.add(x.a); }); }
       if (cand.length) { cand.forEach(y => { if (!y.tn) y.tn = x.tn; }); placed++; } else lost++; });
     const tm = teacherMap([...new Set(slots.map(x => x.tn).filter(Boolean))]);

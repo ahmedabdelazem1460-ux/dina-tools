@@ -109,14 +109,15 @@
   // جدول تفاعلي مشترك (لولي الأمر وللمعاينة وللمعلم) — نفس الكود في parents.html
   A.liveTable = (...a) => window.DinaLive ? window.DinaLive.html(...a) : '';
   A.bindLive = el => window.DinaLive && window.DinaLive.bind(el);
+  const hookJoin = () => { if (window.DinaLive && !window.DinaLive.onJoin) window.DinaLive.onJoin = (ds, c, d, p) => { try { if (api.rpc) api.rpc('log_live_click_staff', { p_ds: ds, p_class: c, p_day: d, p_period: p }).catch(() => {}); } catch (_) {} }; };
 
   // بطاقة للمعلم في «خطتي»: حصصه في الجداول الاستثنائية المنشورة السارية
   const my0 = V.my;
   if (my0) V.my = function (root) {
     const r = my0(root);
     (async () => { try { const t = today(), l = (await api.list('display_schedules', { section_id: S.sectionId })).filter(d => d.published && d.date_to >= t && d.date_from <= addD(t, 7)); if (!l.length || $('#lvMy', root)) return; const anchor = $('#myMode', root) || $('.head', root); if (!anchor) return;
-      const html = l.map(d => { const mine = (d.slots || []).filter(x => x.t === S.me.id); if (!mine.length) return ''; const L = d.links || {}; const cells = mine.map(x => ({ d: x.d, p: x.p, subject: A.subjName(x.s) + ' — ' + cName(x.c), teacher: '', link: (L.cell || {})[`${x.c}|${x.d}|${x.p}`] || (L.cls || {})[x.c] || (L.tch || {})[x.t] || '' })); return A.liveTable({ label: d.label, tag: d.tag, from: d.date_from, to: d.date_to, meta: d.meta, cells }, { today: t, now: null, teacher: true }); }).join('');
-      if (!html) return; anchor.insertAdjacentHTML('afterend', `<div id="lvMy">${html}</div>`); A.bindLive($('#lvMy', root)); } catch (_) {} })();
+      const html = l.map(d => { const mine = (d.slots || []).filter(x => x.t === S.me.id); if (!mine.length) return ''; const L = d.links || {}; const cells = mine.map(x => ({ c: x.c, d: x.d, p: x.p, subject: A.subjName(x.s) + ' — ' + cName(x.c), teacher: '', link: (L.cell || {})[`${x.c}|${x.d}|${x.p}`] || (L.cls || {})[x.c] || (L.tch || {})[x.t] || '' })); return A.liveTable({ id: d.id, label: d.label, tag: d.tag, from: d.date_from, to: d.date_to, meta: d.meta, cells }, { today: t, now: null, teacher: true }); }).join('');
+      if (!html) return; anchor.insertAdjacentHTML('afterend', `<div id="lvMy">${html}</div>`); hookJoin(); A.bindLive($('#lvMy', root)); } catch (_) {} })();
     return r;
   };
 })();

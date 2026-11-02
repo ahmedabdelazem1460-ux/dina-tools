@@ -77,15 +77,15 @@ footer{text-align:center;color:var(--faint);font-size:12px;padding:10px 16px 30p
 
 html.lang-en body,html.lang-en input,html.lang-en select,html.lang-en textarea,html.lang-en button{font-family:'Myriad Pro','GE SS Two',Tahoma,sans-serif}
 </style>
-<script src="i18n_en.js?v=1793609860"></script>
-<script src="i18n.js?v=1793609860"></script>
+<script src="i18n_en.js?v=1793610258"></script>
+<script src="i18n.js?v=1793610258"></script>
 </head>
 <body>
 <header class="top"><div class="top-in"><img src="assets/logo_white.svg" alt="مدارس دينا العالمية"><h1>خطط أبنائي<small id="schName">مدارس دينا العالمية</small></h1></div></header>
 <main id="app"><div class="spin" role="status" aria-label="جارٍ التحميل"></div></main>
 <footer>مدارس دينا العالمية · Dinaaedu · 920035881</footer>
-<script src="live.js?v=1793609860"></script>
-<script src="config.js?v=1793609860"></script>
+<script src="live.js?v=1793610258"></script>
+<script src="config.js?v=1793610258"></script>
 <script>
 (function () {
   const C = window.APP_CONFIG, $ = s => document.querySelector(s), app = $('#app');
@@ -194,7 +194,7 @@ html.lang-en body,html.lang-en input,html.lang-en select,html.lang-en textarea,h
     const resHtml = (st.res || []).length ? `<section class="card no-print" aria-label="مصادر للمراجعة"><h3 style="margin:0 0 8px">مصادر للمراجعة والتدريب <span class="small muted">(${AR(st.res.length)})</span></h3>${st.res.map(r => `<a class="resl" href="${esc(r.url)}" target="_blank" rel="noopener"><span class="rk">${esc(RK[r.kind] || 'رابط')}</span><span><b>${esc(r.title)}</b>${r.subject || r.note ? `<br><span class="small muted">${esc([r.subject, r.note].filter(Boolean).join(' · '))}</span>` : ''}</span></a>`).join('')}</section>` : '';
     const QK = { quiz: 'اختبار قصير', worksheet: 'ورقة عمل', homework: 'واجب إلكتروني', remedial: 'ورقة دعم' }, DN = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
     const quzHtml = (st.quz || []).length ? `<section class="card no-print" aria-label="الواجبات وأوراق العمل الإلكترونية"><h3 style="margin:0 0 8px">الواجبات وأوراق العمل الإلكترونية <span class="small muted">(${AR(st.quz.length)})</span></h3>${st.quz.map(z => `<a class="resl" href="student.html?q=${encodeURIComponent(z.code)}" target="_blank" rel="noopener"><span class="rk">${esc(QK[z.kind] || 'واجب')}</span><span><b>${esc(z.title)}</b><br><span class="small muted">${esc([z.subject, z.flex ? 'متاح طوال الفترة' : (z.day != null ? DN[z.day] : 'هذا الأسبوع')].filter(Boolean).join(' · '))}</span></span></a>`).join('')}</section>` : '';
-    const liveHtml = st.live && window.DinaLive ? (st.live.list || []).map(x => window.DinaLive.html(x, { today: st.live.today })).join('') : '';
+    const liveHtml = st.live && window.DinaLive ? (st.live.list || []).map(x => window.DinaLive.html(x, { today: st.live.today, cls: st.cur })).join('') : '';
     app.innerHTML = kidsBar() + postsHtml(st.posts) + `<div class="card" style="padding:12px 16px"><h2 style="margin:0">${esc(clsName(st.cur) || d.class.name)}</h2><span class="small muted">الخطة المعتمدة من المدرسة · تُحدَّث تلقائياً</span></div>` + liveHtml + body + quzHtml + resHtml;
     bindKids(); bindPosts(); if (liveHtml) window.DinaLive.bind(app);
     app.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { st.view = b.dataset.v; LS.set('view', st.view); render(); });
@@ -205,6 +205,8 @@ html.lang-en body,html.lang-en input,html.lang-en select,html.lang-en textarea,h
   }
   // تحديث تلقائي كل دقيقة عند فتح الصفحة
   setInterval(async () => { if (document.hidden || !st.cur || st.adding || !st.week) return; try { const [n, ps] = await Promise.all([rpc('parent_plan', { p_token: token, p_class: st.cur, p_week: st.week }), rpc('parent_posts_for', { p_token: token, p_class: st.cur }).catch(() => st.posts)]); if (JSON.stringify(n.entries) !== JSON.stringify(st.data.entries) || JSON.stringify(n.notes) !== JSON.stringify(st.data.notes) || JSON.stringify(ps) !== JSON.stringify(st.posts)) { st.data = n; st.posts = ps || []; render(); } } catch (_) { } }, 60000);
+  // تسجيل مجهول الهوية لضغطة «دخول الحصة» (جهاز واحد = ضغطة واحدة لكل حصة)
+  if (window.DinaLive) { let dev = LS.get('dev'); if (!dev) { dev = Math.random().toString(36).slice(2) + Date.now().toString(36); LS.set('dev', dev); } window.DinaLive.onJoin = (ds, c, d, p) => { try { fetch(`${C.supabaseUrl}/rest/v1/rpc/log_live_click`, { method: 'POST', keepalive: true, headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ p_token: token, p_ds: ds, p_class: c || st.cur, p_day: d, p_period: p, p_dev: dev }) }).catch(() => { }); } catch (_) { } }; }
   boot();
 })();
 </script>

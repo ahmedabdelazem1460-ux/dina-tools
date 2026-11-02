@@ -58,10 +58,10 @@
   A.ttParsePdf = parsePdf;
 
   // ---------- المطابقة الذكية ----------
-  const ALIAS = { 'لغتي': 'اللغة العربية', 'لغتي الجميله': 'اللغة العربية', 'عربي': 'اللغة العربية', 'e': 'اللغة الإنجليزية', 'en': 'اللغة الإنجليزية', 'eng': 'اللغة الإنجليزية', 'english': 'اللغة الإنجليزية', 'انجليزي': 'اللغة الإنجليزية', 'اسلاميه': 'الدراسات الإسلامية والقرآن', 'دين': 'الدراسات الإسلامية والقرآن', 'قران': 'الدراسات الإسلامية والقرآن', 'رقميه': 'المهارات الرقمية', 'حاسب': 'الحاسب الآلي', 'حياتيه': 'المهارات الحياتية', 'بدنيه': 'التربية البدنية', 'رياضه': 'التربية البدنية', 'فنيه': 'التربية الفنية', 'اجتماعيات': 'الاجتماعيات', 'رياضيات': 'الرياضيات', 'علوم': 'العلوم', 'تمكين و اتقان': 'تمكين وإتقان' };
+  const ALIAS = { 'لغتي': 'اللغة العربية', 'لغتي الجميله': 'اللغة العربية', 'عربي': 'اللغة العربية', 'e': 'اللغة الإنجليزية', 'en': 'اللغة الإنجليزية', 'eng': 'اللغة الإنجليزية', 'english': 'اللغة الإنجليزية', 'انجليزي': 'اللغة الإنجليزية', 'اسلاميه': 'الدراسات الإسلامية والقرآن', 'دين': 'الدراسات الإسلامية والقرآن', 'قران': 'الدراسات الإسلامية والقرآن', 'رقميه': 'المهارات الرقمية', 'حاسب': 'الحاسب الآلي', 'حياتيه': 'المهارات الحياتية', 'بدنيه': 'التربية البدنية', 'رياضه': 'التربية البدنية', 'فنيه': 'التربية الفنية', 'اجتماعيات': 'الاجتماعيات', 'رياضيات': 'الرياضيات', 'علوم': 'العلوم', 'تمكين و اتقان': 'تمكين وإتقان', 'دراسات اجتماعيه': 'الاجتماعيات', 'اجتماعيه': 'الاجتماعيات', 'علم ارض و فضاء': 'علوم الأرض والفضاء', 'قراان كريم و تفسيره': 'الدراسات الإسلامية والقرآن', 'قران كريم و تفسيره': 'الدراسات الإسلامية والقرآن', 'قران كريم': 'الدراسات الإسلامية والقرآن', 'دراسات اسلاميه': 'الدراسات الإسلامية والقرآن', 'مهارات رقميه': 'المهارات الرقمية', 'تقنيه رقميه': 'التقنية الرقمية', 'بحث و مصادر': 'البحث ومصادر المعلومات', 'تربيه حياتيه و اسريه': 'التربية الحياتية والأسرية' };
   const toks = s => K(s).split(' ').filter(t => t && t !== 'و');
   const lev1 = (x, y) => { if (Math.abs(x.length - y.length) > 1) return false; let i = 0, j = 0, e = 0; while (i < x.length && j < y.length) { if (x[i] === y[j]) { i++; j++; continue; } if (++e > 1) return false; if (x.length > y.length) i++; else if (y.length > x.length) j++; else { i++; j++; } } return e + (x.length - i) + (y.length - j) <= 1; };
-  const tokEq = (t, u) => { if (t === u || 'و' + t === u || t === 'و' + u || 'وال' + t === u || t === 'وال' + u) return true; if (t.length > 2 && u.length > 2 && (u.startsWith(t) || t.startsWith(u))) return true; return t.length >= 3 && u.length >= 3 && lev1(t, u); };
+  const tokEq = (t, u) => { if (t === u || 'و' + t === u || t === 'و' + u || 'وال' + t === u || t === 'وال' + u) return true; if (t.length > 2 && u.length > 2 && (u.startsWith(t) || t.startsWith(u))) return true; return t.length >= 4 && u.length >= 4 && lev1(t, u); };
   const score = (src, cand) => { const a = toks(src), b = toks(cand); if (!a.length || !b.length) return 0; if (a.join(' ') === b.join(' ')) return 100; const hit = a.filter(t => b.some(u => tokEq(t, u))).length; return hit === a.length ? 60 + 30 * hit / b.length : hit ? 30 * hit / a.length : 0; };
   const best = (src, list, name) => { let top = null, sc = 0, tie = false; list.forEach(x => { const v = score(src, name(x)); if (v > sc) { top = x; sc = v; tie = false; } else if (v === sc && v > 0) tie = true; }); return sc >= 60 && !tie ? top : null; };
   function autoSub(src) { const k = K(src); const al = ALIAS[k] || ALIAS[k.replace(/ /g, '')]; if (al) { const s = S.subjects.find(x => K(x.name) === K(al)); if (s) return s.id; } const s = best(src, S.subjects, x => x.name); return s ? s.id : ''; }
@@ -72,6 +72,7 @@
     const k = K(src); const ex = cs.find(c => K(c.name) === k); if (ex) return ex.id;
     const c = best(src, cs, x => x.name); return c ? c.id : '';
   }
+  A.ttMatch = { autoSub, autoT, autoC, toks, K };
   const MK = () => 'tt_map_' + S.school.id;
   const loadMap = () => { try { return JSON.parse(localStorage.getItem(MK()) || '{}'); } catch (_) { return {}; } };
   const saveMap = m => { try { localStorage.setItem(MK(), JSON.stringify(m)); } catch (_) {} };

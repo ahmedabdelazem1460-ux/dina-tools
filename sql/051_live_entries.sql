@@ -59,3 +59,4 @@ begin
 end $$;
 grant execute on function public.parent_live(text, uuid) to anon, authenticated;
 select 'ok';
+-- (لاحقاً) parent_live: اسم المعلمة/المادة من الملف (tn/sn) عند عدم الربط بقاعدة البيانات

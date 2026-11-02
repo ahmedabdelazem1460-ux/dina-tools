@@ -48,6 +48,61 @@
     const open = A.LS.get('live_open'); if (open && list.some(x => x.id === open)) editor(root, list.find(x => x.id === open));
   };
 
+  // ---------- استيراد ملفات aSc إلى الجدول الاستثنائي مباشرة ----------
+  const NZ = x => A.normKey(String(x || '').normalize('NFKC')).replace(/ئ/g, 'ي').replace(/\s+/g, ' ').trim();
+  const GN = ['', 'أول', 'ثاني', 'ثالث', 'رابع', 'خامس', 'سادس'];
+  const byName = n => allCls().find(c => NZ(c.name) === NZ(n));
+  // رموز الفصول في صفحات المعلمين: «بنين-2»، «أ بنات 1-»، «بنات 3-»، «ب 5-»، «أ-4»، «م 2»، «ث 3»
+  function codeCls(b) {
+    const n = NZ(b), out = [], re = /(بنين)\s*-\s*(\d)|([اب])\s*بنات\s*(\d)\s*-|بنات\s*(\d)\s*-|([اب])\s*(\d)\s*-|(\d)\s*-\s*([اب])|([اب])\s*-\s*(\d)|([مث])\s*-?\s*(\d)/g; let m;
+    while ((m = re.exec(n))) { let nm, alt = null; const sec = x => x === 'ا' ? 'أ' : 'ب';
+      if (m[1]) nm = `${GN[m[2]]} ابتدائي بنين`; else if (m[3]) nm = `${GN[m[4]]} ابتدائي ${sec(m[3])} بنات`; else if (m[5]) nm = `${GN[m[5]]} ابتدائي بنات`;
+      else if (m[6]) nm = `${GN[m[7]]} ابتدائي ${sec(m[6])}`; else if (m[8]) nm = `${GN[m[8]]} ابتدائي ${sec(m[9])}`; else if (m[10]) { nm = `${GN[m[11]]} ابتدائي ${sec(m[10])}`; alt = `${GN[m[11]]} ابتدائي`; } else nm = `${GN[m[13]]} ${m[12] === 'م' ? 'متوسط' : 'ثانوي'} أ`;
+      const c = byName(nm) || (alt && allCls().filter(x => NZ(x.name).startsWith(NZ(alt))).length === 1 ? allCls().find(x => NZ(x.name).startsWith(NZ(alt))) : null) || (/سادس ابتدائي/.test(nm) ? allCls().filter(x => /^سادس/.test(x.name)).length === 1 && allCls().find(x => /^سادس/.test(x.name)) : null);
+      if (c && !out.includes(c.id)) out.push(c.id); }
+    return out;
+  }
+  // عنوان صفحة فصل: «الرابع الابتدائي-أ» / «الأول الابتدائي-بنات أ» / «السادس الابتدائي»
+  function titleCls(t) {
+    const m = A.ttMatch && A.ttMatch.autoC(t, false); if (m) return m;
+    const n = NZ(t).replace(/-/g, ' '), tk = n.split(' ').map(x => x.replace(/^ال/, '')); const st = /ابتداي/.test(n) ? 'ابتداي' : /متوسط/.test(n) ? 'متوسط' : 'ثانوي', gender = /بنين/.test(n) ? 'بنين' : /بنات/.test(n) ? 'بنات' : '', sec = tk.filter(x => /^[اب]$/.test(x)).pop() || '';
+    const g = NZ(GN.find(x => x && NZ(x) === tk[0]) || tk[0]);
+    const l = allCls().filter(c => { const k = NZ(c.name); return k.startsWith(g) && k.includes(st) && (!gender || k.includes(gender)) && (!sec || k.split(' ').includes(sec)) && (gender || !/بنين|بنات/.test(k) || allCls().filter(x => NZ(x.name).startsWith(g) && NZ(x.name).includes(st)).length === 1); });
+    return l.length === 1 ? l[0].id : '';
+  }
+  const PLACE = n => /^(معلم|معلمه|معلمة|معمله|معملة|مدرس|مدرسة)\b/.test(NZ(n));
+  function teacherMap(names) {
+    const M = {}; names.forEach(n => { M[n] = PLACE(n) || !A.ttMatch ? '' : (A.ttMatch.autoT(n) || ''); });
+    const toks = n => (A.ttMatch ? A.ttMatch.toks(n) : NZ(n).split(' ')).length;
+    const by = {}; Object.entries(M).forEach(([k, v]) => { if (v) (by[v] = by[v] || []).push(k); });
+    Object.values(by).forEach(l => { if (l.length > 1) { l.sort((a, b) => toks(b) - toks(a)); l.slice(1).forEach(k => { M[k] = ''; }); } });
+    return M;
+  }
+  async function importFiles(files) {
+    const items = [];
+    for (const f of files) {
+      if (/\.pdf$/i.test(f.name) || f.type === 'application/pdf') { const r = await A.ttParsePdf(f); items.push(...r.items); }
+      else { const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' }); items.push(...window.TT_parse(wb).items.map(x => ({ ...x, src: 'class', file: f.name }))); }
+    }
+    // تصنيف كل صفحة: صفحة معلم إن كانت أغلب خاناتها رموز فصول
+    const pages = {}; items.forEach(it => { const k = it.file + '|' + (it.src === 'teacher' ? it.teacher : it.cls); (pages[k] = pages[k] || []).push(it); });
+    const base = [], tch = [];
+    Object.values(pages).forEach(l => { const isT = l[0].src === 'teacher' || l.filter(x => codeCls(x.teacher).length || codeCls(x.subject + ' ' + x.teacher).length).length >= l.length * 0.5;
+      if (isT) l.forEach(x => tch.push({ tn: x.src === 'teacher' ? x.teacher : x.cls, a: x.subject, b: x.src === 'teacher' ? x.cls : x.teacher, d: x.day, p: x.period }));
+      else l.forEach(x => base.push(x)); });
+    const slots = [], badC = new Set(), badS = new Set();
+    base.forEach(x => { const c = titleCls(x.cls); if (!c) { badC.add(x.cls); return; } const s = A.ttMatch ? A.ttMatch.autoSub(x.subject) : ''; if (!s) badS.add(x.subject); slots.push({ c, d: x.day, p: x.period, s: s || null, sn: x.subject, t: null, tn: (x.teacher || '').trim() && !codeCls(x.teacher).length ? x.teacher.trim() : '' }); });
+    let placed = 0, lost = 0;
+    tch.forEach(x => { let cs = codeCls(x.b); if (!cs.length) cs = codeCls(x.a + ' ' + x.b); let cand = slots.filter(y => y.d === x.d && y.p === x.p && cs.includes(y.c));
+      if (!cand.length && !base.length) { cs.forEach(c => { const s = A.ttMatch ? A.ttMatch.autoSub(x.a) : ''; const y = { c, d: x.d, p: x.p, s: s || null, sn: x.a, t: null, tn: '' }; slots.push(y); cand.push(y); if (!s) badS.add(x.a); }); }
+      if (cand.length) { cand.forEach(y => { if (!y.tn) y.tn = x.tn; }); placed++; } else lost++; });
+    const tm = teacherMap([...new Set(slots.map(x => x.tn).filter(Boolean))]);
+    slots.forEach(x => { x.t = x.tn ? (tm[x.tn] || null) : null; });
+    if (!slots.length) throw new Error('لم تُقرأ حصص يمكن ربطها بفصول هذا القسم' + (badC.size ? ': ' + [...badC].join('، ') : ''));
+    return { slots, report: `${slots.length} حصة${badC.size ? ' · فصول غير معروفة: ' + [...badC].join('، ') : ''}${badS.size ? ' · مواد غير معروفة: ' + [...badS].join('، ') : ''}${lost ? ` · ${lost} خانة معلم لم تُطابق` : ''}` };
+  }
+  A._liveImport = importFiles;
+
   async function createDialog(root) {
     const vers = (await api.list('timetable_versions', { section_id: S.sectionId })).filter(v => v.status !== 'archived');
     const bell = A.bell.bellOf(A.section()); const [f, t] = curWeek();
@@ -55,20 +110,23 @@
     const preS = bell.schedules.find(s => /بعد/.test(s.name + ' ' + (s.tag || ''))) || A.bell.activeSched(bell);
     const m = A.modal(`<h3>جدول استثنائي جديد</h3><p class="sub">تُؤخذ لقطة ثابتة من الجدول المختار. تعديل الجدول الأصلي لاحقاً لا يغيّرها (ويمكنك تحديثها يدوياً).</p>
       <div class="grid g2"><div class="field"><label for="lvL">الاسم</label><input class="in" id="lvL" value="جدول التعليم عن بعد"></div><div class="field"><label for="lvT">الشارة</label><input class="in" id="lvT" value="للتعليم عن بعد"></div>
-      <div class="field"><label for="lvV">من جدول</label><select class="in" id="lvV">${vers.map(v => `<option value="${v.id}" ${pre && v.id === pre.id ? 'selected' : ''}>${esc(v.label)}${v.status === 'approved' ? ' (المعتمد)' : ' (مسودة)'}</option>`).join('')}</select></div>
+      <div class="field"><label for="lvV">من جدول</label><select class="in" id="lvV"><option value="__file">استيراد من ملف PDF أو Excel (aSc)</option>${vers.map(v => `<option value="${v.id}" ${pre && v.id === pre.id ? 'selected' : ''}>${esc(v.label)}${v.status === 'approved' ? ' (المعتمد)' : ' (مسودة)'}</option>`).join('')}</select></div>
       <div class="field"><label for="lvS">التوقيت</label><select class="in" id="lvS">${bell.schedules.map(s => `<option value="${s.id}" ${s.id === preS.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>
+      <div class="field" id="lvFileBox" style="grid-column:1/-1" hidden><label for="lvFile">ملفات الجدول</label><input class="in" type="file" id="lvFile" multiple accept=".pdf,.xlsx,.xls,.csv"><span class="small muted">ارفع ملف الفصول وملف المعلمين معاً إن وُجدا: المواد من ملف الفصول، والمعلمة لكل حصة من ملف المعلمين. لا يُنشأ أي جدول آخر ولا تتأثر الخطط.</span></div>
       <div class="field"><label for="lvF">من تاريخ</label><input class="in" type="date" id="lvF" value="${f}"></div><div class="field"><label for="lvTo">إلى تاريخ</label><input class="in" type="date" id="lvTo" value="${t}"></div></div>
       <div class="acts"><button class="btn" id="lvGo">إنشاء</button></div>`);
+    const vSel = m.el.querySelector('#lvV'), fb = m.el.querySelector('#lvFileBox'); const syncSrc = () => { fb.hidden = vSel.value !== '__file'; }; vSel.onchange = syncSrc; if (!pre) vSel.value = '__file'; syncSrc();
     m.el.querySelector('#lvGo').onclick = e => A.run(e.currentTarget, async () => {
       const g = id => m.el.querySelector(id).value, from = g('#lvF'), to = g('#lvTo'); if (!from || !to || to < from) throw new Error('تحقق من التاريخين');
       await ensureBell();
-      const sl = await api.list('timetable_slots', { version_id: g('#lvV') });
-      const slots = sl.filter(x => x.subject_id).map(x => ({ c: x.class_id, d: x.day, p: x.period, s: x.subject_id, t: x.teacher_id || null }));
+      let slots, fromFile = g('#lvV') === '__file', rep = '';
+      if (fromFile) { const files = [...m.el.querySelector('#lvFile').files]; if (!files.length) throw new Error('اختر ملف الجدول'); const r = await importFiles(files); slots = r.slots; rep = r.report; }
+      else { const sl = await api.list('timetable_slots', { version_id: g('#lvV') }); slots = sl.filter(x => x.subject_id).map(x => ({ c: x.class_id, d: x.day, p: x.period, s: x.subject_id, t: x.teacher_id || null })); }
       if (!slots.length) throw new Error('الجدول المختار فارغ');
       // روابط الفصول من آخر جدول استثنائي (إن وُجد) — القاعات ثابتة غالباً
       const prev = (await api.list('display_schedules', { section_id: S.sectionId })).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))[0];
-      const r = (await api.ins('display_schedules', { school_id: S.school.id, section_id: S.sectionId, version_id: g('#lvV'), label: g('#lvL').trim() || 'جدول استثنائي', tag: g('#lvT').trim(), date_from: from, date_to: to, slots, meta: metaFrom(g('#lvS')), links: prev ? { cls: (prev.links || {}).cls || {}, tch: (prev.links || {}).tch || {}, cell: {} } : {}, created_by: S.me.id }))[0];
-      m.close(); A.LS.set('live_open', r.id); A.toast('أُنشئ الجدول — أضف الروابط ثم انشره', 'ok'); V.live(root);
+      const r = (await api.ins('display_schedules', { school_id: S.school.id, section_id: S.sectionId, version_id: fromFile ? null : g('#lvV'), label: g('#lvL').trim() || 'جدول استثنائي', tag: g('#lvT').trim(), date_from: from, date_to: to, slots, meta: metaFrom(g('#lvS')), links: prev ? { cls: (prev.links || {}).cls || {}, tch: (prev.links || {}).tch || {}, cell: {} } : {}, created_by: S.me.id }))[0];
+      m.close(); A.LS.set('live_open', r.id); if (fromFile) A.LS.set('live_tab', 'tn'); A.toast(fromFile ? 'استُورد الجدول — راجع ربط أسماء المعلمات ثم أضف الروابط وانشره' : 'أُنشئ الجدول — أضف الروابط ثم انشره', 'ok'); V.live(root);
     });
   }
 
@@ -77,7 +135,7 @@
     const box = $('#lvEd', root); const L = { cls: {}, tch: {}, cell: {}, ...(ds.links || {}) }; L.cls = { ...L.cls }; L.tch = { ...L.tch }; L.cell = { ...L.cell };
     const classes = [...new Set(ds.slots.map(x => x.c))].sort((a, b) => (allCls().find(c => c.id === a) || {}).sort - (allCls().find(c => c.id === b) || {}).sort || cName(a).localeCompare(cName(b), 'ar'));
     const teachers = [...new Set(ds.slots.map(x => x.t).filter(Boolean))].sort((a, b) => A.personName(a).localeCompare(A.personName(b), 'ar'));
-    let pv = classes[0], dirty = false, tab = 'cls';
+    let pv = classes[0], dirty = false, tab = A.LS.get('live_tab') || 'cls'; A.LS.set('live_tab', '');
     let M = ds.meta || {}, days = M.days || [0, 1, 2, 3, 4], P = M.periods || ((A.section() || {}).periods || 7);
     const setM = n => { M = n; days = M.days || [0, 1, 2, 3, 4]; P = M.periods || P; const sb = $('#lvSub', box); if (sb) sb.innerHTML = subTxt(); };
     const subTxt = () => `${dAR(ds.date_from)} — ${dAR(ds.date_to)} · التوقيت: ${esc(M.schedName || '—')}${M.linked === false ? '' : ' (مرتبط)'} · ${AR(classes.length)} فصل · ${AR(ds.slots.length)} حصة`;
@@ -85,7 +143,7 @@
     box.innerHTML = `<div class="card lv-ed"><div class="head"><div class="grow"><h2 style="margin:0">${esc(ds.label)} ${ds.tag ? `<span class="pill st-submitted">${esc(ds.tag)}</span>` : ''}</h2><p class="sub" id="lvSub" style="margin:2px 0 0">${subTxt()}</p></div>
         <span class="rec-st ok" id="lvSt" role="status" aria-live="polite">${ds.published ? 'منشور' : 'مسودة — غير ظاهر بعد'}</span>
         <div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn ${ds.published ? 'ghost' : 'ok'}" id="lvPub">${ds.published ? 'إيقاف النشر' : `${I.check} اعتماد ونشر`}</button><button class="btn ghost sm" id="lvDz">تصميم وطباعة</button><button class="btn ghost sm" id="lvRe">تحديث من الجدول</button><button class="btn ghost sm" id="lvDates">تعديل الفترة</button><button class="btn bad sm" id="lvDel">حذف</button></div></div>
-      <div class="kpick" id="lvTab"><button data-t="cls" class="on">روابط الفصول</button><button data-t="tch">روابط المعلمين</button><button data-t="cell">رابط لحصة معينة</button><button data-t="time">التوقيت ومواعيد الحصص والفسح</button></div>
+      <div class="kpick" id="lvTab"><button data-t="cls" class="on">روابط الفصول</button><button data-t="tch">روابط المعلمين</button><button data-t="cell">رابط لحصة معينة</button><button data-t="time">التوقيت ومواعيد الحصص والفسح</button><button data-t="tn">ربط أسماء المعلمات</button></div>
       <div id="lvBody" style="margin-top:10px"></div>
       <h3 style="margin:16px 0 6px">معاينة ما يراه ولي الأمر</h3><div class="row" style="gap:6px;margin-bottom:8px"><select class="in" id="lvPv" style="width:auto">${classes.map(c => `<option value="${c}">${esc(cName(c))}</option>`).join('')}</select></div><div id="lvPrev"></div></div>`;
     const save = async () => { const r = await api.upd('display_schedules', ds.id, { links: L }); Object.assign(ds, Array.isArray(r) ? r[0] : r, { links: L }); dirty = false; const s = $('#lvSt', box); if (s) { s.textContent = (ds.published ? 'منشور' : 'مسودة') + ' · حُفظت الروابط'; s.className = 'rec-st ok'; } };
@@ -123,6 +181,16 @@
         $$('[data-tbx]', B).forEach(x => x.onclick = () => { cs.breaks.splice(+x.dataset.tbx, 1); own(true); });
         const ab = $('#tmAddB', B); if (ab) ab.onclick = () => { (cs.breaks = cs.breaks || []).push({ after: Math.min(3, Math.max(1, +cs.np - 1)), dur: 20, label: cs.breaks.length ? 'الصلاة' : 'الفسحة' }); own(true); };
         $$('[data-tpd]', B).forEach(i => i.oninput = () => { cs.perDur = cs.perDur || {}; if (i.value) cs.perDur[i.dataset.tpd] = +i.value; else delete cs.perDur[i.dataset.tpd]; own(); });
+      } else if (tab === 'tn') {
+        const keyOf = x => x.tn || (x.t ? 't:' + x.t : '');
+        const groups = {}; ds.slots.forEach(x => { const k = keyOf(x); if (!k) return; (groups[k] = groups[k] || { k, name: x.tn || A.personName(x.t), n: 0, t: x.t || '' }).n++; });
+        const staff = (S.staff || []).filter(x => x.active !== false).slice().sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'ar'));
+        const gl = Object.values(groups).sort((a, b) => (a.t ? 1 : 0) - (b.t ? 1 : 0) || a.name.localeCompare(b.name, 'ar'));
+        const un = gl.filter(g => !g.t).length;
+        B.innerHTML = `<p class="small muted" style="margin:0 0 8px">الاسم كما ورد في الملف ← المعلمة في المنصة. الربط يجعل الحصص تظهر في «خطتي» للمعلمة، وباسمها الكامل لولي الأمر. غير المرتبطة تظهر لولي الأمر بالاسم الوارد في الملف.</p>
+          <div class="notice ${un ? 'warn' : 'ok'}" style="margin-bottom:8px">${un ? `${AR(un)} من ${AR(gl.length)} اسم غير مرتبط` : 'كل الأسماء مرتبطة ✓'}</div>
+          <div class="lv-grid">${gl.map(g => `<label class="${g.t ? '' : 'need'}"><span>${esc(g.name)} <span class="small muted">· ${AR(g.n)} حصة</span></span><select class="in" data-tk="${esc(g.k)}"><option value="">— غير مرتبطة —</option>${staff.map(x => `<option value="${x.id}" ${x.id === g.t ? 'selected' : ''}>${esc(x.full_name)}</option>`).join('')}</select></label>`).join('')}</div>`;
+        $$('[data-tk]', B).forEach(sel => sel.onchange = () => A.run(null, async () => { const k = sel.dataset.tk, v = sel.value || null; ds.slots.forEach(x => { if (keyOf(x) === k) { if (!x.tn && x.t) x.tn = A.personName(x.t); x.t = v; } }); await api.upd('display_schedules', ds.id, { slots: ds.slots }); const st0 = $('#lvSt', box); if (st0) { st0.textContent = 'حُفظ الربط'; st0.className = 'rec-st ok'; } drawBody(); drawPrev(); }));
       } else if (tab === 'tch') {
         B.innerHTML = `<p class="small muted" style="margin:0 0 8px">اختياري: رابط خاص بالمعلم يُستخدم فقط للفصول التي ليس لها رابط.</p><div class="lv-grid">${teachers.map(t => `<label><span>${esc(A.personName(t))}</span>${inp('lt', t, L.tch[t])}</label>`).join('')}</div>`;
         $$('[data-lt]', B).forEach(i => i.oninput = () => { const v = i.value.trim(); if (v) L.tch[i.dataset.lt] = v; else delete L.tch[i.dataset.lt]; later(); drawPrev(); });
@@ -133,7 +201,8 @@
       }
     };
     let PE = []; entriesOf([ds.id]).then(e => { PE = e; drawPrev(); });
-    const drawPrev = () => { const c = pv, cells = ds.slots.filter(x => x.c === c).map(x => A._liveEntries ? A._liveEntries.withEntry({ c: x.c, d: x.d, p: x.p, subject: A.subjName(x.s), teacher: A.personName(x.t), link: linkOf(c, x.d, x.p, x.t) }, PE, ds.id) : ({ d: x.d, p: x.p, subject: A.subjName(x.s), teacher: A.personName(x.t), link: linkOf(c, x.d, x.p, x.t) })); $('#lvPrev', box).innerHTML = A.liveTable({ label: ds.label, tag: ds.tag, from: ds.date_from, to: ds.date_to, meta: M, cells, cls_link: L.cls[c] }, { now: null, today: today(), preview: true }); A.bindLive($('#lvPrev', box)); };
+    const drawPrev = () => { const c = pv, cells = ds.slots.filter(x => x.c === c).map(x => A._liveEntries ? A._liveEntries.withEntry({ c: x.c, d: x.d, p: x.p, subject: A.subjName(x.s), teacher: x.t ? A.personName(x.t) : (x.tn || ''), link: linkOf(c, x.d, x.p, x.t) }, PE, ds.id) : ({ d: x.d, p: x.p, subject: A.subjName(x.s) || x.sn, teacher: x.t ? A.personName(x.t) : (x.tn || ''), link: linkOf(c, x.d, x.p, x.t) })); $('#lvPrev', box).innerHTML = A.liveTable({ label: ds.label, tag: ds.tag, from: ds.date_from, to: ds.date_to, meta: M, cells, cls_link: L.cls[c] }, { now: null, today: today(), preview: true }); A.bindLive($('#lvPrev', box)); };
+    $$('#lvTab button', box).forEach(x => x.classList.toggle('on', x.dataset.t === tab));
     $$('#lvTab button', box).forEach(b => b.onclick = () => { tab = b.dataset.t; $$('#lvTab button', box).forEach(x => x.classList.toggle('on', x === b)); drawBody(); });
     $('#lvPv', box).onchange = e => { pv = e.target.value; drawPrev(); if (tab === 'cell') drawBody(); };
     $('#lvPub', box).onclick = ev => A.run(ev.currentTarget, async () => {

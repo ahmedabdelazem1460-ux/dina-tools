@@ -15,11 +15,26 @@
   const curWeek = () => { const t = today(), w = (S.weeks || []).find(x => !x.archived && x.start_date <= t && addD(x.start_date, 6) >= t); const s = w ? w.start_date : weekStartOf(t); return [s, addD(s, ((A.section() || {}).days || 5) - 1)]; };
 
   // توقيت من «اليوم الدراسي والجدول الزمني»
+  // تثبيت معرّفات الجداول الزمنية (إن لم تُحفظ إعدادات القسم بعد) حتى يبقى الربط صحيحاً
+  const ensureBell = async () => { const sec = A.section(); if (sec && !(sec.bell && Array.isArray(sec.bell.schedules) && sec.bell.schedules.length)) { const b = A.bell.bellOf(sec); b.schedules.forEach(x => { x.show = false; }); const r = await api.updateSection(sec.id, { bell: b }); Object.assign(sec, r); } };
   function metaFrom(schedId) {
     const sec = A.section(), b = A.bell.bellOf(sec), s = b.schedules.find(x => x.id === schedId) || A.bell.activeSched(b);
     const P = A.bell.maxP(s, sec), tl = A.bell.timeline(s, P, null);
-    return { sched: s.id, schedName: s.name, days: A.bell.actDays(s, sec), periods: P, perDay: Object.fromEntries(A.bell.actDays(s, sec).map(d => [d, A.bell.schedP(s, sec, d)])), times: tl.items.filter(x => x.k === 'p').map(x => [hhmm(x.from), hhmm(x.to)]), breaks: tl.items.filter(x => x.k === 'b').map((x, i, a) => ({ after: tl.items.slice(0, tl.items.indexOf(x)).filter(y => y.k === 'p').length, label: x.label, from: hhmm(x.from), to: hhmm(x.to) })) };
+    return { linked: true, sched: s.id, schedName: s.name, days: A.bell.actDays(s, sec), periods: P, perDay: Object.fromEntries(A.bell.actDays(s, sec).map(d => [d, A.bell.schedP(s, sec, d)])), times: tl.items.filter(x => x.k === 'p').map(x => [hhmm(x.from), hhmm(x.to)]), breaks: tl.items.filter(x => x.k === 'b').map((x, i, a) => ({ after: tl.items.slice(0, tl.items.indexOf(x)).filter(y => y.k === 'p').length, label: x.label, from: hhmm(x.from), to: hhmm(x.to) })) };
   }
+
+  // توقيت خاص بالجدول الاستثنائي (غير مرتبط بأداة التوقيت)
+  function metaCustom(cs) {
+    const sec = A.section(), nd = Math.max(5, sec.days || 5), days = (cs.days && cs.days.length ? cs.days : Array.from({ length: sec.days || 5 }, (_, i) => i)).filter(d => d < nd).sort();
+    const P = Math.max(1, Math.min(10, +cs.np || 6));
+    const ps = { start: cs.start || '08:00', dur: +cs.dur || 40, pass: +cs.pass || 0, perDur: cs.perDur || {}, breaks: (cs.breaks || []).map(b => ({ ...b, classes: [] })) };
+    const tl = A.bell.timeline(ps, P, null);
+    return { linked: false, custom: cs, sched: null, schedName: 'توقيت خاص بهذا الجدول', days, periods: P, perDay: Object.fromEntries(days.map(d => [d, Math.min(P, +(cs.perDay || {})[d] || P)])), times: tl.items.filter(x => x.k === 'p').map(x => [hhmm(x.from), hhmm(x.to)]), breaks: tl.items.filter(x => x.k === 'b').map(x => ({ after: tl.items.slice(0, tl.items.indexOf(x)).filter(y => y.k === 'p').length, label: x.label, from: hhmm(x.from), to: hhmm(x.to) })) };
+  }
+  const toMin = t => { const [h, m] = String(t || '0:0').split(':').map(Number); return h * 60 + m; };
+  const customFrom = M => { if (M.custom) return JSON.parse(JSON.stringify(M.custom)); const t = M.times || []; const d0 = t[0] ? toMin(t[0][1]) - toMin(t[0][0]) : 40; return { start: (t[0] || ['08:00'])[0], dur: d0, pass: t[1] && !(M.breaks || []).some(b => b.after === 1) ? Math.max(0, toMin(t[1][0]) - toMin(t[0][1])) : 0, np: M.periods || 6, days: M.days || [0, 1, 2, 3, 4], perDay: M.perDay || {}, perDur: {}, breaks: (M.breaks || []).map(b => ({ after: b.after, dur: toMin(b.to) - toMin(b.from), label: b.label })) }; };
+  // عند تعديل «اليوم الدراسي والجدول الزمني»: تُحدَّث الجداول الاستثنائية المرتبطة تلقائياً
+  A._syncLiveTimes = async () => { try { const l = await api.list('display_schedules', { section_id: S.sectionId }); for (const d of l) { const M = d.meta || {}; if (M.linked === false || !M.sched) continue; const n = metaFrom(M.sched); if (n.sched !== M.sched) continue; if (JSON.stringify(n) !== JSON.stringify(M)) await api.upd('display_schedules', d.id, { meta: n }); } } catch (_) {} };
 
   V.live = async function (root) {
     if (!can()) { root.innerHTML = `<div class="card">${A.emptyBox('لصاحب صلاحية اعتماد الجدول')}</div>`; return; }
@@ -46,6 +61,7 @@
       <div class="acts"><button class="btn" id="lvGo">إنشاء</button></div>`);
     m.el.querySelector('#lvGo').onclick = e => A.run(e.currentTarget, async () => {
       const g = id => m.el.querySelector(id).value, from = g('#lvF'), to = g('#lvTo'); if (!from || !to || to < from) throw new Error('تحقق من التاريخين');
+      await ensureBell();
       const sl = await api.list('timetable_slots', { version_id: g('#lvV') });
       const slots = sl.filter(x => x.subject_id).map(x => ({ c: x.class_id, d: x.day, p: x.period, s: x.subject_id, t: x.teacher_id || null }));
       if (!slots.length) throw new Error('الجدول المختار فارغ');
@@ -62,12 +78,14 @@
     const classes = [...new Set(ds.slots.map(x => x.c))].sort((a, b) => (allCls().find(c => c.id === a) || {}).sort - (allCls().find(c => c.id === b) || {}).sort || cName(a).localeCompare(cName(b), 'ar'));
     const teachers = [...new Set(ds.slots.map(x => x.t).filter(Boolean))].sort((a, b) => A.personName(a).localeCompare(A.personName(b), 'ar'));
     let pv = classes[0], dirty = false, tab = 'cls';
-    const M = ds.meta || {}, days = M.days || [0, 1, 2, 3, 4], P = M.periods || ((A.section() || {}).periods || 7);
+    let M = ds.meta || {}, days = M.days || [0, 1, 2, 3, 4], P = M.periods || ((A.section() || {}).periods || 7);
+    const setM = n => { M = n; days = M.days || [0, 1, 2, 3, 4]; P = M.periods || P; const sb = $('#lvSub', box); if (sb) sb.innerHTML = subTxt(); };
+    const subTxt = () => `${dAR(ds.date_from)} — ${dAR(ds.date_to)} · التوقيت: ${esc(M.schedName || '—')}${M.linked === false ? '' : ' (مرتبط)'} · ${AR(classes.length)} فصل · ${AR(ds.slots.length)} حصة`;
     const linkOf = (c, d, p, t) => L.cell[`${c}|${d}|${p}`] || L.cls[c] || (t && L.tch[t]) || '';
-    box.innerHTML = `<div class="card lv-ed"><div class="head"><div class="grow"><h2 style="margin:0">${esc(ds.label)} ${ds.tag ? `<span class="pill st-submitted">${esc(ds.tag)}</span>` : ''}</h2><p class="sub" style="margin:2px 0 0">${dAR(ds.date_from)} — ${dAR(ds.date_to)} · التوقيت: ${esc(M.schedName || '—')} · ${AR(classes.length)} فصل · ${AR(ds.slots.length)} حصة</p></div>
+    box.innerHTML = `<div class="card lv-ed"><div class="head"><div class="grow"><h2 style="margin:0">${esc(ds.label)} ${ds.tag ? `<span class="pill st-submitted">${esc(ds.tag)}</span>` : ''}</h2><p class="sub" id="lvSub" style="margin:2px 0 0">${subTxt()}</p></div>
         <span class="rec-st ok" id="lvSt" role="status" aria-live="polite">${ds.published ? 'منشور' : 'مسودة — غير ظاهر بعد'}</span>
         <div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn ${ds.published ? 'ghost' : 'ok'}" id="lvPub">${ds.published ? 'إيقاف النشر' : `${I.check} اعتماد ونشر`}</button><button class="btn ghost sm" id="lvDz">تصميم وطباعة</button><button class="btn ghost sm" id="lvRe">تحديث من الجدول</button><button class="btn ghost sm" id="lvDates">تعديل الفترة</button><button class="btn bad sm" id="lvDel">حذف</button></div></div>
-      <div class="kpick" id="lvTab"><button data-t="cls" class="on">روابط الفصول</button><button data-t="tch">روابط المعلمين</button><button data-t="cell">رابط لحصة معينة</button></div>
+      <div class="kpick" id="lvTab"><button data-t="cls" class="on">روابط الفصول</button><button data-t="tch">روابط المعلمين</button><button data-t="cell">رابط لحصة معينة</button><button data-t="time">التوقيت ومواعيد الحصص والفسح</button></div>
       <div id="lvBody" style="margin-top:10px"></div>
       <h3 style="margin:16px 0 6px">معاينة ما يراه ولي الأمر</h3><div class="row" style="gap:6px;margin-bottom:8px"><select class="in" id="lvPv" style="width:auto">${classes.map(c => `<option value="${c}">${esc(cName(c))}</option>`).join('')}</select></div><div id="lvPrev"></div></div>`;
     const save = async () => { const r = await api.upd('display_schedules', ds.id, { links: L }); Object.assign(ds, Array.isArray(r) ? r[0] : r, { links: L }); dirty = false; const s = $('#lvSt', box); if (s) { s.textContent = (ds.published ? 'منشور' : 'مسودة') + ' · حُفظت الروابط'; s.className = 'rec-st ok'; } };
@@ -81,6 +99,30 @@
           <div class="lv-grid">${classes.map(c => `<label><span>${esc(cName(c))}</span>${inp('lc', c, L.cls[c])}</label>`).join('')}</div>`;
         $$('[data-lc]', B).forEach(i => i.oninput = () => { const v = i.value.trim(); if (v) L.cls[i.dataset.lc] = v; else delete L.cls[i.dataset.lc]; i.classList.toggle('bad', !!v && !urlOk(v)); later(); drawPrev(); });
         $('#lvBulkGo', B).onclick = () => { let n = 0, miss = []; $('#lvBulk', B).value.split('\n').map(x => x.trim()).filter(Boolean).forEach(line => { const m = line.match(/(https?:\/\/\S+)/i); if (!m) return; const nm = A.normKey(line.replace(m[1], '').replace(/[|,،\t:]+/g, ' ').trim()); const c = classes.find(id => A.normKey(cName(id)) === nm) || classes.find(id => A.normKey(cName(id)).includes(nm) || nm.includes(A.normKey(cName(id)))); if (c) { L.cls[c] = m[1]; n++; } else miss.push(nm); }); $('#lvBulkR', B).textContent = `طُبّق ${AR(n)}${miss.length ? ` · لم يُعرف: ${miss.join('، ')}` : ''}`; later(); drawBody(); drawPrev(); };
+      } else if (tab === 'time') {
+        const tsum = () => (M.times || []).map((t, p) => `<span><b>${AR(p + 1)}</b> <span dir="ltr">${t[0]} – ${t[1]}</span></span>${(M.breaks || []).filter(b => b.after === p + 1).map(b => `<span class="brk">☕ ${esc(b.label || 'استراحة')} <span dir="ltr">${b.from} – ${b.to}</span></span>`).join('')}`).join('');
+        const bell = A.bell.bellOf(A.section()), linked = M.linked !== false, cs = customFrom(M), nd = (A.section() || {}).days || 5;
+        B.innerHTML = `<div class="kpick" id="tmM"><button data-m="link" class="${linked ? 'on' : ''}">مرتبط بأداة التوقيت</button><button data-m="own" class="${linked ? '' : 'on'}">توقيت خاص بهذا الجدول</button></div>
+          ${linked ? `<div class="grid g2" style="margin-top:10px"><div class="field"><label for="tmS">الجدول الزمني</label><select class="in" id="tmS">${bell.schedules.map(x => `<option value="${x.id}" ${x.id === M.sched ? 'selected' : ''}>${esc(x.name)}${x.tag ? ' — ' + esc(x.tag) : ''}</option>`).join('')}</select></div><div class="field"><label>&nbsp;</label><button class="btn ghost sm" id="tmGo">فتح أداة التوقيت لتعديله</button></div></div><p class="small muted" style="margin:0">أي تعديل في هذا الجدول الزمني (بداية اليوم، مدة الحصة، الفسح، الأيام) يُطبَّق هنا تلقائياً، ويصل لأولياء الأمور.</p>`
+          : `<div class="grid g3" style="margin-top:10px"><div class="field"><label for="tmSt">بداية اليوم</label><input class="in" type="time" id="tmSt" value="${esc(cs.start)}"></div><div class="field"><label for="tmD">مدة الحصة (دقيقة)</label><input class="in" type="number" min="10" max="120" id="tmD" value="${cs.dur}"></div><div class="field"><label for="tmP">الانتقال بين الحصص (دقيقة)</label><input class="in" type="number" min="0" max="20" id="tmP" value="${cs.pass}"></div>
+            <div class="field"><label for="tmN">عدد الحصص</label><select class="in" id="tmN">${Array.from({ length: 10 }, (_, i) => `<option ${+cs.np === i + 1 ? 'selected' : ''}>${i + 1}</option>`).join('')}</select></div></div>
+            <div class="field"><label>الأيام وحصص كل يوم</label><div class="bl-dg">${Array.from({ length: nd }, (_, d) => { const on = (cs.days || []).includes(d); return `<div class="bl-d ${on ? 'on' : ''}"><label class="chk"><input type="checkbox" data-tdy="${d}" ${on ? 'checked' : ''}> ${DAYS[d]}</label><select class="in" data-tdp="${d}" ${on ? '' : 'disabled'}>${Array.from({ length: +cs.np }, (_, i) => `<option value="${i + 1}" ${(+(cs.perDay || {})[d] || +cs.np) === i + 1 ? 'selected' : ''}>${AR(i + 1)} حصص</option>`).join('')}</select></div>`; }).join('')}</div></div>
+            <div class="field"><label>الفسح والصلاة</label><div class="bl-brs">${(cs.breaks || []).map((b, i) => `<div class="bl-br"><input class="in" data-tb="${i}" data-k="label" value="${esc(b.label || '')}" placeholder="استراحة"><label>بعد الحصة <select class="in" data-tb="${i}" data-k="after">${Array.from({ length: Math.max(1, +cs.np - 1) }, (_, p) => `<option value="${p + 1}" ${+b.after === p + 1 ? 'selected' : ''}>${PER[p] || AR(p + 1)}</option>`).join('')}</select></label><label>المدة <input class="in" type="number" min="5" max="90" style="width:76px" data-tb="${i}" data-k="dur" value="${+b.dur || 15}"> د</label><button class="btn bad sm" data-tbx="${i}" aria-label="حذف">×</button></div>`).join('') || '<p class="small muted">لا توجد فسح.</p>'}</div><button class="btn ghost sm" id="tmAddB" style="margin-top:6px">+ فسحة / صلاة</button></div>
+            <details class="bl-det"><summary>مدة مختلفة لحصة معينة</summary><div class="bl-pd">${Array.from({ length: +cs.np }, (_, p) => `<label><span>${PER[p] || AR(p + 1)}</span><input class="in" type="number" min="10" max="120" data-tpd="${p}" value="${(cs.perDur || {})[p] || ''}" placeholder="${cs.dur}"></label>`).join('')}</div></details>`}
+          <div class="lv-tsum">${tsum()}</div>`;
+        const saveMeta = async n => { setM(n); const r = await api.upd('display_schedules', ds.id, { meta: n }); ds.meta = n; const st0 = $('#lvSt', box); if (st0) { st0.textContent = 'حُفظ التوقيت'; st0.className = 'rec-st ok'; } drawPrev(); };
+        let tt; const own = structural => { clearTimeout(tt); setM(metaCustom(cs)); drawPrev(); const sm = $('.lv-tsum', B); if (sm) sm.innerHTML = tsum(); if (structural) drawBody(); tt = setTimeout(() => saveMeta(metaCustom(cs)).catch(e => A.toast(e.message, 'err')), 700); };
+        $$('#tmM button', B).forEach(b => b.onclick = ev => A.run(ev.currentTarget, async () => { if ((b.dataset.m === 'link') === linked) return; if (b.dataset.m === 'link') await ensureBell(); await saveMeta(b.dataset.m === 'link' ? metaFrom(M.sched || (bell.schedules[0] || {}).id) : metaCustom(cs)); drawBody(); }));
+        const tS = $('#tmS', B); if (tS) tS.onchange = () => A.run(null, async () => { await ensureBell(); await saveMeta(metaFrom(tS.value)); drawBody(); });
+        const tG = $('#tmGo', B); if (tG) tG.onclick = () => { A.LS.set('studio_t', 'bell'); A.LS.set('bell_s_' + S.sectionId, M.sched); if (V.studio && document.querySelector('.st-steps')) V.studio(document.querySelector('.st-steps').closest('main') || document.getElementById('app')); else location.hash = '#/studio'; };
+        const num = (id, k) => { const i = $(id, B); if (i) i.oninput = i.onchange = () => { cs[k] = i.type === 'time' ? i.value : +i.value; own(); }; };
+        num('#tmSt', 'start'); num('#tmD', 'dur'); num('#tmP', 'pass'); const tN = $('#tmN', B); if (tN) tN.onchange = () => { cs.np = +tN.value; own(true); };
+        $$('[data-tdy]', B).forEach(c => c.onchange = () => { const on = $$('[data-tdy]', B).filter(x => x.checked).map(x => +x.dataset.tdy); if (!on.length) { c.checked = true; return; } cs.days = on; own(true); });
+        $$('[data-tdp]', B).forEach(c => c.onchange = () => { cs.perDay = cs.perDay || {}; cs.perDay[c.dataset.tdp] = +c.value; own(); });
+        $$('[data-tb]', B).forEach(i => i.oninput = i.onchange = () => { const b = cs.breaks[+i.dataset.tb]; b[i.dataset.k] = i.dataset.k === 'label' ? i.value : +i.value; own(); });
+        $$('[data-tbx]', B).forEach(x => x.onclick = () => { cs.breaks.splice(+x.dataset.tbx, 1); own(true); });
+        const ab = $('#tmAddB', B); if (ab) ab.onclick = () => { (cs.breaks = cs.breaks || []).push({ after: Math.min(3, Math.max(1, +cs.np - 1)), dur: 20, label: cs.breaks.length ? 'الصلاة' : 'الفسحة' }); own(true); };
+        $$('[data-tpd]', B).forEach(i => i.oninput = () => { cs.perDur = cs.perDur || {}; if (i.value) cs.perDur[i.dataset.tpd] = +i.value; else delete cs.perDur[i.dataset.tpd]; own(); });
       } else if (tab === 'tch') {
         B.innerHTML = `<p class="small muted" style="margin:0 0 8px">اختياري: رابط خاص بالمعلم يُستخدم فقط للفصول التي ليس لها رابط.</p><div class="lv-grid">${teachers.map(t => `<label><span>${esc(A.personName(t))}</span>${inp('lt', t, L.tch[t])}</label>`).join('')}</div>`;
         $$('[data-lt]', B).forEach(i => i.oninput = () => { const v = i.value.trim(); if (v) L.tch[i.dataset.lt] = v; else delete L.tch[i.dataset.lt]; later(); drawPrev(); });
@@ -105,6 +147,7 @@
     $('#lvDates', box).onclick = () => { const m = A.modal(`<h3>تعديل الفترة</h3><div class="grid g2"><div class="field"><label for="ldF">من</label><input class="in" type="date" id="ldF" value="${ds.date_from}"></div><div class="field"><label for="ldT">إلى</label><input class="in" type="date" id="ldT" value="${ds.date_to}"></div></div><div class="acts"><button class="btn" id="ldGo">حفظ</button></div>`); m.el.querySelector('#ldGo').onclick = e => A.run(e.currentTarget, async () => { const f = m.el.querySelector('#ldF').value, t = m.el.querySelector('#ldT').value; if (!f || !t || t < f) throw new Error('تحقق من التاريخين'); await api.upd('display_schedules', ds.id, { date_from: f, date_to: t }); m.close(); V.live(root); }); };
     $('#lvDz', box).onclick = () => { const mm = A.modal('<div id="dzM"></div>', { cls: 'wide xl' }); A.ttDesign(mm.el.querySelector('#dzM'), { version: ds.version_id }); };
     drawBody(); drawPrev();
+    if (M.linked !== false && M.sched) { const n = metaFrom(M.sched); if (n.sched === M.sched && JSON.stringify(n) !== JSON.stringify(M)) api.upd('display_schedules', ds.id, { meta: n }).then(() => { ds.meta = n; setM(n); drawPrev(); }).catch(() => {}); }
   }
 
   // جدول تفاعلي مشترك (لولي الأمر وللمعاينة وللمعلم) — نفس الكود في parents.html

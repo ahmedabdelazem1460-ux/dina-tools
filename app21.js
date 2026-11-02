@@ -122,7 +122,7 @@
     let pvCls = '', dirty = false, saving = null;
     const S0 = () => b.schedules.find(s => s.id === cur);
     const save = async (quiet) => {
-      const r = await api.updateSection(sec.id, { bell: b }); Object.assign(sec, r); dirty = false;
+      const r = await api.updateSection(sec.id, { bell: b }); Object.assign(sec, r); dirty = false; if (A._syncLiveTimes) A._syncLiveTimes();
       const st = $('#blSt', root); if (st) { st.textContent = 'محفوظ · ' + A.fmtDT(new Date().toISOString()); st.className = 'rec-st ok'; }
       if (!quiet) A.toast('حُفظت الإعدادات', 'ok');
     };

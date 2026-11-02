@@ -90,7 +90,8 @@
         $$('[data-lcell]', B).forEach(i => i.oninput = () => { const v = i.value.trim(); if (v) L.cell[i.dataset.lcell] = v; else delete L.cell[i.dataset.lcell]; later(); drawPrev(); });
       }
     };
-    const drawPrev = () => { const c = pv, cells = ds.slots.filter(x => x.c === c).map(x => ({ d: x.d, p: x.p, subject: A.subjName(x.s), teacher: A.personName(x.t), link: linkOf(c, x.d, x.p, x.t) })); $('#lvPrev', box).innerHTML = A.liveTable({ label: ds.label, tag: ds.tag, from: ds.date_from, to: ds.date_to, meta: M, cells, cls_link: L.cls[c] }, { now: null, today: today(), preview: true }); A.bindLive($('#lvPrev', box)); };
+    let PE = []; entriesOf([ds.id]).then(e => { PE = e; drawPrev(); });
+    const drawPrev = () => { const c = pv, cells = ds.slots.filter(x => x.c === c).map(x => A._liveEntries ? A._liveEntries.withEntry({ c: x.c, d: x.d, p: x.p, subject: A.subjName(x.s), teacher: A.personName(x.t), link: linkOf(c, x.d, x.p, x.t) }, PE, ds.id) : ({ d: x.d, p: x.p, subject: A.subjName(x.s), teacher: A.personName(x.t), link: linkOf(c, x.d, x.p, x.t) })); $('#lvPrev', box).innerHTML = A.liveTable({ label: ds.label, tag: ds.tag, from: ds.date_from, to: ds.date_to, meta: M, cells, cls_link: L.cls[c] }, { now: null, today: today(), preview: true }); A.bindLive($('#lvPrev', box)); };
     $$('#lvTab button', box).forEach(b => b.onclick = () => { tab = b.dataset.t; $$('#lvTab button', box).forEach(x => x.classList.toggle('on', x === b)); drawBody(); });
     $('#lvPv', box).onchange = e => { pv = e.target.value; drawPrev(); if (tab === 'cell') drawBody(); };
     $('#lvPub', box).onclick = ev => A.run(ev.currentTarget, async () => {
@@ -112,12 +113,43 @@
   const hookJoin = () => { if (window.DinaLive && !window.DinaLive.onJoin) window.DinaLive.onJoin = (ds, c, d, p) => { try { if (api.rpc) api.rpc('log_live_click_staff', { p_ds: ds, p_class: c, p_day: d, p_period: p }).catch(() => {}); } catch (_) {} }; };
 
   // بطاقة للمعلم في «خطتي»: حصصه في الجداول الاستثنائية المنشورة السارية
+  const ERR = { 'not your period': 'هذه الحصة ليست لك', 'link must start with https://': 'الرابط يجب أن يبدأ بـ https://', 'no such period': 'الحصة غير موجودة في هذا الجدول', 'not found': 'الجدول غير موجود' };
+  const saveEntry = async (ds, c, d, p, v) => { if (!api.rpc) return api.ups('live_entries', [{ ds_id: ds, class_id: c, day: d, period: p, topic: v.topic.trim(), homework: v.homework.trim(), note: v.note.trim(), link: v.link }], 'ds_id,class_id,day,period'); try { return await api.rpc('save_live_entry', { p_ds: ds, p_class: c, p_day: d, p_period: p, p_topic: v.topic, p_homework: v.homework, p_note: v.note, p_link: v.link }); } catch (e) { throw new Error(ERR[e.message] || e.message); } };
+  // نافذة إدخال بيانات الحصة (للمعلم) — منفصلة تماماً عن الخطة الأسبوعية
+  function entryDialog(ds, c, d, p, cur, done) {
+    const sl = (ds.slots || []).find(x => x.c === c && x.d === d && x.p === p) || {};
+    const plan = S.entries.find(e => e.class_id === c && e.day === d && e.period === p && e.teacher_id === S.me.id && (e.topic || e.homework));
+    const m = A.modal(`<h3>بيانات الحصة — ${esc(A.subjName(sl.s))} · ${esc(cName(c))}</h3><p class="sub">${DAYS[d]} · الحصة ${PER[p] || AR(p + 1)} · ${esc(ds.label)}. تظهر لولي الأمر بأيقونات ملونة، ولا تؤثر على الخطة الأسبوعية.</p>
+      ${plan ? `<button class="btn ghost sm" id="leCp" style="margin-bottom:8px">نسخ الموضوع والواجب من خطتي الأسبوعية</button>` : ''}
+      <div class="field"><label for="leT"><span class="lv-dotk" style="--c:#005499"></span> الدرس / الموضوع</label><textarea class="in" id="leT" rows="2" placeholder="مثال: الفعل الماضي ص ٤٥">${esc(cur.topic || '')}</textarea></div>
+      <div class="field"><label for="leH"><span class="lv-dotk" style="--c:#B7791F"></span> الواجب</label><input class="in" id="leH" value="${esc(cur.homework || '')}" placeholder="اختياري"></div>
+      <div class="field"><label for="leN"><span class="lv-dotk" style="--c:#6B4FA3"></span> ملاحظة لولي الأمر</label><input class="in" id="leN" value="${esc(cur.note || '')}" placeholder="اختياري — مثل: تجهيز الكتاب والدفتر"></div>
+      <div class="field"><label for="leL"><span class="lv-dotk" style="--c:#0E8A9E"></span> رابط الدرس (عرض، فيديو، ورقة عمل…)</label><input class="in" id="leL" dir="ltr" value="${esc(cur.llink || '')}" placeholder="https://…"><span class="small muted">رابط دخول الحصة نفسه تضيفه الإدارة لكل فصل.</span></div>
+      <div class="acts"><button class="btn" id="leGo">حفظ</button></div>`);
+    const el = m.el, cp = el.querySelector('#leCp'); if (cp) cp.onclick = () => { el.querySelector('#leT').value = plan.topic || ''; el.querySelector('#leH').value = plan.homework || ''; };
+    el.querySelector('#leGo').onclick = e => A.run(e.currentTarget, async () => { const v = { topic: el.querySelector('#leT').value, homework: el.querySelector('#leH').value, note: el.querySelector('#leN').value, link: el.querySelector('#leL').value.trim() }; if (v.link && !urlOk(v.link)) throw new Error('الرابط يجب أن يبدأ بـ https://'); await saveEntry(ds.id, c, d, p, v); m.close(); A.toast('حُفظت بيانات الحصة — تظهر لولي الأمر', 'ok'); done(); });
+  }
+  const entriesOf = async ids => { try { return ids.length ? await api.list('live_entries', { ds_id: ids }) : []; } catch (_) { return []; } };
+  const withEntry = (cell, E, ds) => { const e = E.find(x => x.ds_id === ds && x.class_id === cell.c && x.day === cell.d && x.period === cell.p); return e ? { ...cell, topic: e.topic, homework: e.homework, note: e.note, llink: e.link } : cell; };
+  A._liveEntries = { entriesOf, withEntry };
+
+  // بطاقة للمعلم في «خطتي»: حصصه في الجداول الاستثنائية المنشورة السارية، مع إضافة بيانات كل حصة
   const my0 = V.my;
   if (my0) V.my = function (root) {
     const r = my0(root);
-    (async () => { try { const t = today(), l = (await api.list('display_schedules', { section_id: S.sectionId })).filter(d => d.published && d.date_to >= t && d.date_from <= addD(t, 7)); if (!l.length || $('#lvMy', root)) return; const anchor = $('#myMode', root) || $('.head', root); if (!anchor) return;
-      const html = l.map(d => { const mine = (d.slots || []).filter(x => x.t === S.me.id); if (!mine.length) return ''; const L = d.links || {}; const cells = mine.map(x => ({ c: x.c, d: x.d, p: x.p, subject: A.subjName(x.s) + ' — ' + cName(x.c), teacher: '', link: (L.cell || {})[`${x.c}|${x.d}|${x.p}`] || (L.cls || {})[x.c] || (L.tch || {})[x.t] || '' })); return A.liveTable({ id: d.id, label: d.label, tag: d.tag, from: d.date_from, to: d.date_to, meta: d.meta, cells }, { today: t, now: null, teacher: true }); }).join('');
-      if (!html) return; anchor.insertAdjacentHTML('afterend', `<div id="lvMy">${html}</div>`); hookJoin(); A.bindLive($('#lvMy', root)); } catch (_) {} })();
+    const paint = async () => { try {
+      const t = today(), l = (await api.list('display_schedules', { section_id: S.sectionId })).filter(d => d.published && d.date_to >= t && d.date_from <= addD(t, 7)); const old = $('#lvMy', root);
+      if (!l.length) { if (old) old.remove(); return; } const anchor = $('#myMode', root) || $('.head', root); if (!anchor) return;
+      const E = await entriesOf(l.map(d => d.id));
+      const html = l.map(d => { const mine = (d.slots || []).filter(x => x.t === S.me.id); if (!mine.length) return ''; const L = d.links || {}; const cells = mine.map(x => withEntry({ c: x.c, d: x.d, p: x.p, subject: A.subjName(x.s) + ' — ' + cName(x.c), teacher: '', link: (L.cell || {})[`${x.c}|${x.d}|${x.p}`] || (L.cls || {})[x.c] || (L.tch || {})[x.t] || '' }, E, d.id)); return A.liveTable({ id: d.id, label: d.label, tag: d.tag, from: d.date_from, to: d.date_to, meta: d.meta, cells }, { today: t, now: null, teacher: true, edit: A.week() ? true : true }); }).join('');
+      if (!html) { if (old) old.remove(); return; }
+      const box = old || (anchor.insertAdjacentHTML('afterend', '<div id="lvMy"></div>'), $('#lvMy', root));
+      const keep = box.querySelector('.lv-days .on'), keepD = keep && keep.dataset.lvd;
+      box.innerHTML = html; hookJoin(); A.bindLive(box);
+      if (keepD) { const b = box.querySelector(`[data-lvd="${keepD}"]`); if (b) b.click(); }
+      box.querySelectorAll('[data-lved]').forEach(b => b.onclick = () => { const [ds, c, d, p] = b.dataset.lved.split('|'); const dsr = l.find(x => x.id === ds); const cur = withEntry({ c, d: +d, p: +p }, E, ds); entryDialog(dsr, c, +d, +p, cur, paint); });
+    } catch (_) {} };
+    paint();
     return r;
   };
 })();

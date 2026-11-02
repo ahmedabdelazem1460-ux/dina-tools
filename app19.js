@@ -4,7 +4,7 @@
 (function () {
   const A = window.APP, V = window.VIEWS, { S, api, $, $$, esc, AR, I, DAYS } = A;
   A.I.studio = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11M15 9v11"/><circle cx="18" cy="4" r="2.4" fill="currentColor"/></svg>';
-  const TABS = [['bell', 'اليوم الدراسي والجدول الزمني', ''], ['nisab', 'النصاب', '١'], ['plan', 'التوزيع والقيود والتوليد', '٢'], ['timetable', 'الجدول المعتمد', '٣'], ['conflicts', 'تعارضات الأقسام', '٤'], ['ttdesign', 'تصميم الجداول وتصديرها', ''], ['builder', 'الأداة الكلاسيكية', '']];
+  const TABS = [['bell', 'اليوم الدراسي والجدول الزمني', ''], ['nisab', 'النصاب', '١'], ['plan', 'التوزيع والقيود والتوليد', '٢'], ['timetable', 'الجدول المعتمد', '٣'], ['conflicts', 'تعارضات الأقسام', '٤'], ['ttdesign', 'تصميم الجداول وتصديرها', ''], ['live', 'جدول استثنائي للعرض', ''], ['builder', 'الأداة الكلاسيكية', '']];
   const GW = ['أول', 'ثاني', 'ثالث', 'رابع', 'خامس', 'سادس'];
   const gIdx = c => { const g = String(c.grade_word || c.name || ''); return GW.findIndex(w => g.includes(w)); };
   const stg = c => { const s = String(c.stage || '') + ' ' + c.name; return /ابتدائ/.test(s) ? 'p' : /متوسط/.test(s) ? 'm' : /ثانوي/.test(s) ? 's' : ''; };

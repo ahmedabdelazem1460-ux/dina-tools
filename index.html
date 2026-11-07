@@ -538,54 +538,64 @@ tr.done td{opacity:.6}
 .rs-how{border:1px solid #D5E1F0;border-radius:14px;padding:8px 12px;background:#F6F9FD;margin-top:6px}.rs-how summary{cursor:pointer;color:#005499}.rs-how ul{margin:6px 0 0;padding-inline-start:20px;font-size:13px;line-height:1.9}.rs-grp{margin-bottom:16px}.rs-grp h3{font-size:15px;color:#005499;margin:6px 0 8px;border-inline-start:5px solid #3AB1DB;padding-inline-start:8px}
 .pb-mob{display:none}.pb-day{margin-bottom:8px}.pb-day>b{color:#005499;font-size:13px}.pb-dl{display:grid;gap:4px;margin-top:4px}.pb-pi{display:grid;grid-template-columns:54px 1fr;gap:6px;align-items:start}.pb-pi>span{font-size:11.5px;color:#5b6b7d;padding-top:6px}@media(max-width:640px){.pb-mob{display:block}.pb-desk{display:none}}
 .sk-bar{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:6px}.sk-bar .btn.on{background:#082B5A;color:#fff}.sk-cols{display:inline-flex;gap:4px;margin:0 6px}.sk-cols button{width:24px;height:24px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #84B7E3;cursor:pointer}.sk-wrap{max-width:calc(60vh * 1.5625);margin:0 auto;border:1px solid #84B7E3;border-radius:12px;overflow:hidden;touch-action:none;background:#fff}.sk-wrap svg{display:block;width:100%;height:auto;cursor:crosshair;user-select:none}
+.gm-ov{position:fixed;inset:0;z-index:9999;background:linear-gradient(160deg,#082B5A,#005499 60%,#3AB1DB);color:#fff;overflow:auto;display:flex;flex-direction:column}.gm-ov .btn.ghost{background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.4)}.gm-bar{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 18px;background:rgba(0,0,0,.2)}.gm-body{flex:1;padding:18px clamp(12px,3vw,40px);display:flex;flex-direction:column;gap:14px}.gm-ov .center{text-align:center}.gm-big{font-size:20px;min-height:56px;padding:12px 32px}
+.gm-lobby{display:flex;gap:30px;align-items:center;justify-content:center;flex-wrap:wrap;text-align:center;font-size:20px}.gm-url{font-weight:800;font-size:22px;background:#fff;color:#082B5A;border-radius:12px;padding:4px 14px}.gm-pin{font-family:'Myriad Pro',monospace;font-size:clamp(48px,9vw,96px);font-weight:800;letter-spacing:8px;background:#fff;color:#082B5A;border-radius:22px;padding:4px 26px}.gm-qr{background:#fff;padding:12px;border-radius:18px;width:220px}.gm-qr svg{width:100%;height:auto;display:block}
+.gm-pl{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}.gm-pl span{background:rgba(255,255,255,.15);border-radius:999px;padding:6px 14px;font-weight:800}
+.gm-qh{display:flex;justify-content:space-between;align-items:center;font-size:18px}.gm-t{width:70px;height:70px;border-radius:50%;background:#fff;color:#082B5A;display:grid;place-items:center;font-size:30px;font-weight:800}.gm-q{text-align:center;font-size:clamp(22px,3.4vw,40px);margin:6px 0;background:#fff;color:#082B5A;border-radius:18px;padding:16px}
+.gm-ch{display:grid;grid-template-columns:1fr 1fr;gap:12px}.gm-ch div{border-radius:18px;padding:18px;font-size:clamp(17px,2.4vw,28px);font-weight:800;display:flex;gap:12px;align-items:center;min-height:90px}.gm-ch span{font-size:1.3em}
+.gm-bars{display:flex;gap:14px;justify-content:center;align-items:flex-end;flex-wrap:wrap}.gm-bars>div{display:grid;justify-items:center;gap:4px;min-width:110px;opacity:.6}.gm-bars>div.ok{opacity:1}.gm-bars i{width:80px;border-radius:10px 10px 0 0;display:block}.gm-bars b{font-size:24px}.gm-bars span{font-weight:800;text-align:center}
+.gm-lb{list-style:none;counter-reset:r;max-width:520px;margin:0 auto;width:100%;padding:0}.gm-lb li{counter-increment:r;display:flex;justify-content:space-between;background:rgba(255,255,255,.14);border-radius:12px;padding:8px 14px;margin-bottom:6px;font-size:18px}.gm-lb li span::before{content:counter(r) ". "}
+.gm-pod{display:grid;grid-template-columns:repeat(3,minmax(0,200px));gap:10px;justify-content:center;align-items:end}.gm-pod>div{background:#fff;color:#082B5A;border-radius:16px 16px 0 0;text-align:center;padding:12px;display:grid;gap:4px}.gm-pod .p1{min-height:200px}.gm-pod .p2{min-height:160px}.gm-pod .p3{min-height:130px}.gm-pod i{font-style:normal;font-size:40px}.gm-pod b{font-size:18px}
+.gm-sets{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+@media(max-width:640px){.gm-ch{grid-template-columns:1fr}}
 </style>
-<script src="i18n_en.js?v=1794032272"></script>
-<script src="i18n.js?v=1794032272"></script>
+<script src="i18n_en.js?v=1794032729"></script>
+<script src="i18n.js?v=1794032729"></script>
 </head>
 <body>
 <div id="app"><div class="spinner"></div></div>
 <div id="toasts"></div>
 <script>window.DINA_RECOVERY=/type=recovery/.test(location.hash)||/type=recovery/.test(location.search);</script>
-<script src="config.js?v=1794032272"></script>
+<script src="config.js?v=1794032729"></script>
 <script src="vendor/supabase.js"></script>
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/html2canvas.min.js"></script>
 <script src="vendor/jspdf.umd.min.js"></script>
 <script src="vendor/jszip.min.js"></script>
-<script src="tpl_consts.js?v=1794032272"></script>
-<script src="export.js?v=1794032272"></script>
-<script src="api.js?v=1794032272"></script>
-<script src="demo.js?v=1794032272"></script>
-<script src="app.js?v=1794032272"></script>
-<script src="app2.js?v=1794032272"></script>
-<script src="app3.js?v=1794032272"></script>
-<script src="app4.js?v=1794032272"></script>
-<script src="lang.js?v=1794032272"></script>
-<script src="app5.js?v=1794032272"></script>
-<script src="app6.js?v=1794032272"></script>
-<script src="app7.js?v=1794032272"></script>
-<script src="app8.js?v=1794032272"></script>
-<script src="app9.js?v=1794032272"></script>
-<script src="app10.js?v=1794032272"></script>
-<script src="app11.js?v=1794032272"></script>
-<script src="app12.js?v=1794032272"></script>
-<script src="app13.js?v=1794032272"></script>
-<script src="app14.js?v=1794032272"></script>
-<script src="app15.js?v=1794032272"></script>
-<script src="omr.js?v=1794032272"></script>
-<script src="app16.js?v=1794032272"></script>
-<script src="app17.js?v=1794032272"></script>
-<script src="app18.js?v=1794032272"></script>
-<script src="app19.js?v=1794032272"></script>
-<script src="app20.js?v=1794032272"></script>
-<script src="app21.js?v=1794032272"></script>
-<script src="app22.js?v=1794032272"></script>
-<script src="app23.js?v=1794032272"></script>
-<script src="app24.js?v=1794032272"></script>
-<script src="app25.js?v=1794032272"></script>
-<script src="app26.js?v=1794032272"></script>
-<script src="live.js?v=1794032272"></script>
-<script src="app27.js?v=1794032272"></script><script src="app28.js?v=1794032272"></script><script src="app29.js?v=1794032272"></script><script src="app30.js?v=1794032272"></script><script src="app31.js?v=1794032272"></script><script src="app32.js?v=1794032272"></script><script src="app33.js?v=1794032272"></script><script src="app34.js?v=1794032272"></script><script src="app35.js?v=1794032272"></script><script src="app36.js?v=1794032272"></script><script src="app37.js?v=1794032272"></script><script src="app38.js?v=1794032272"></script><script src="app39.js?v=1794032272"></script><script src="app40.js?v=1794032272"></script><script src="app41.js?v=1794032272"></script>
-<script src="vendor/qrcode.js?v=1794032272"></script>
+<script src="tpl_consts.js?v=1794032729"></script>
+<script src="export.js?v=1794032729"></script>
+<script src="api.js?v=1794032729"></script>
+<script src="demo.js?v=1794032729"></script>
+<script src="app.js?v=1794032729"></script>
+<script src="app2.js?v=1794032729"></script>
+<script src="app3.js?v=1794032729"></script>
+<script src="app4.js?v=1794032729"></script>
+<script src="lang.js?v=1794032729"></script>
+<script src="app5.js?v=1794032729"></script>
+<script src="app6.js?v=1794032729"></script>
+<script src="app7.js?v=1794032729"></script>
+<script src="app8.js?v=1794032729"></script>
+<script src="app9.js?v=1794032729"></script>
+<script src="app10.js?v=1794032729"></script>
+<script src="app11.js?v=1794032729"></script>
+<script src="app12.js?v=1794032729"></script>
+<script src="app13.js?v=1794032729"></script>
+<script src="app14.js?v=1794032729"></script>
+<script src="app15.js?v=1794032729"></script>
+<script src="omr.js?v=1794032729"></script>
+<script src="app16.js?v=1794032729"></script>
+<script src="app17.js?v=1794032729"></script>
+<script src="app18.js?v=1794032729"></script>
+<script src="app19.js?v=1794032729"></script>
+<script src="app20.js?v=1794032729"></script>
+<script src="app21.js?v=1794032729"></script>
+<script src="app22.js?v=1794032729"></script>
+<script src="app23.js?v=1794032729"></script>
+<script src="app24.js?v=1794032729"></script>
+<script src="app25.js?v=1794032729"></script>
+<script src="app26.js?v=1794032729"></script>
+<script src="live.js?v=1794032729"></script>
+<script src="app27.js?v=1794032729"></script><script src="app28.js?v=1794032729"></script><script src="app29.js?v=1794032729"></script><script src="app30.js?v=1794032729"></script><script src="app31.js?v=1794032729"></script><script src="app32.js?v=1794032729"></script><script src="app33.js?v=1794032729"></script><script src="app34.js?v=1794032729"></script><script src="app35.js?v=1794032729"></script><script src="app36.js?v=1794032729"></script><script src="app37.js?v=1794032729"></script><script src="app38.js?v=1794032729"></script><script src="app39.js?v=1794032729"></script><script src="app40.js?v=1794032729"></script><script src="app41.js?v=1794032729"></script><script src="app42.js?v=1794032729"></script>
+<script src="vendor/qrcode.js?v=1794032729"></script>
 </body>
 </html>

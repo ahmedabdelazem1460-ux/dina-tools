@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>الألعاب التعليمية — مدارس دينا العالمية</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+<style>
+@font-face{font-family:'GE SS Two';font-weight:400 500;src:url(fonts/gess-two-medium.woff2) format('woff2');font-display:swap}
+@font-face{font-family:'GE SS Two';font-weight:600 900;src:url(fonts/gess-two-bold.woff2) format('woff2');font-display:swap}
+@font-face{font-family:'Myriad Pro';font-weight:400;src:url(fonts/myriad-pro-regular.woff2) format('woff2');font-display:swap}
+:root{--navy:#082B5A;--blue:#005499;--sky:#3AB1DB;--pale:#E4EBF5;--line:#C9D7EC;--ok:#17814a;--okbg:#e3f5ea;--bad:#c62d22;--badbg:#fde8e6;--warn:#a85d00;--warnbg:#fff1d6;--muted:#566384}
+*{box-sizing:border-box}html,body{margin:0}
+body{font-family:'GE SS Two','Myriad Pro',Tahoma,sans-serif;color:var(--navy);background:linear-gradient(180deg,#f2f6fc,#e6edf8);min-height:100vh;font-size:16px;line-height:1.7}
+header{background:var(--navy);color:#fff;padding:14px 16px;border-bottom:4px solid var(--sky);display:flex;align-items:center;gap:12px}
+header img{height:42px}header .t{font-weight:800;font-size:18px}header .s{font-size:13px;color:#BFD7EE}
+main{max-width:760px;margin:0 auto;padding:16px}
+.card{background:#fff;border:1px solid #dbe5f3;border-radius:20px;padding:18px;box-shadow:0 2px 3px rgba(8,43,90,.08),0 12px 26px -10px rgba(8,43,90,.25);margin-bottom:14px}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:18px;margin:0 0 8px}.muted{color:var(--muted)}.small{font-size:13.5px}
+label{display:block;font-weight:700;font-size:14px;margin:10px 0 4px}
+input,select,textarea{width:100%;font:inherit;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;background:#f7f9fd;color:var(--navy)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--sky);box-shadow:0 0 0 3px rgba(58,177,219,.3)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font:inherit;font-weight:800;border:0;border-radius:14px;padding:12px 20px;background:linear-gradient(180deg,#0a72c4,#005499);color:#fff;cursor:pointer;box-shadow:0 6px 0 -1px #022a56,0 10px 16px -6px rgba(0,84,153,.5);min-height:48px}
+.btn:active{transform:translateY(2px)}.btn.ghost{background:#fff;color:var(--blue);border:1.5px solid var(--line);box-shadow:none}.btn:disabled{opacity:.6}
+.q{border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px;background:#fff}
+.q .n{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:9px;background:var(--navy);color:#fff;font-weight:800;margin-inline-end:6px}
+.q .pts{font-size:12px;color:var(--blue)}.q img{max-width:100%;max-height:260px;border-radius:12px;margin:8px 0}
+.opt{display:flex;align-items:center;gap:10px;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px;cursor:pointer;background:#f7f9fd;font-weight:700}
+.opt input{width:22px;height:22px;accent-color:var(--blue);flex:none}.opt.on{border-color:var(--blue);background:#eaf3fc}
+.opt.right{border-color:var(--ok);background:var(--okbg)}.opt.wrong{border-color:var(--bad);background:var(--badbg)}
+.bar{height:10px;background:var(--pale);border-radius:99px;overflow:hidden}.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--sky),var(--blue))}
+.top{position:sticky;top:0;z-index:5;background:rgba(242,246,252,.95);backdrop-filter:blur(6px);padding:10px 0;display:flex;gap:10px;align-items:center}
+.timer{font-weight:800;background:var(--navy);color:#fff;border-radius:10px;padding:4px 10px;font-variant-numeric:tabular-nums}
+.res{text-align:center}.res .big{font-size:52px;font-weight:800;line-height:1.1}
+.tag{display:inline-block;border-radius:99px;padding:2px 10px;font-weight:800;font-size:13px}.tag.ok{background:var(--okbg);color:var(--ok)}.tag.bad{background:var(--badbg);color:var(--bad)}.tag.warn{background:var(--warnbg);color:var(--warn)}
+.exp{font-size:14px;background:var(--pale);border-radius:10px;padding:8px 10px;margin-top:8px}
+.gap{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px dashed var(--line)}
+a{color:var(--blue)}
+footer{text-align:center;color:var(--muted);font-size:12px;padding:20px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+
+
+main{max-width:820px}
+.pin{font-family:'Myriad Pro',monospace;letter-spacing:6px;text-align:center;font-size:28px;direction:ltr}
+.ch{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.ch button{font:inherit;font-weight:800;font-size:18px;color:#fff;border:0;border-radius:18px;min-height:96px;padding:12px;cursor:pointer;box-shadow:0 6px 0 -1px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;gap:8px;text-align:center}
+.ch button:active{transform:translateY(3px)}.ch button[aria-pressed=true]{outline:5px solid #082B5A;outline-offset:2px}.ch button:disabled{opacity:.45}
+.c0{background:#E0675A}.c1{background:#005499}.c2{background:#C9A44C}.c3{background:#2F855A}.c4{background:#AE95DA}.c5{background:#3AB1DB}
+.sh{font-size:22px}
+.big{font-size:44px;font-weight:800;text-align:center;line-height:1.2}.center{text-align:center}
+.timer{display:inline-block;font-weight:800;background:var(--navy);color:#fff;border-radius:12px;padding:4px 12px;font-variant-numeric:tabular-nums}
+.res-ok{background:var(--okbg);color:var(--ok)}.res-bad{background:var(--badbg);color:var(--bad)}
+.modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.modes button{font:inherit;font-weight:800;border:1.5px solid var(--line);background:#fff;color:var(--navy);border-radius:18px;padding:16px 10px;cursor:pointer;min-height:110px;display:grid;gap:4px;place-items:center}.modes button span{font-size:30px}.modes button small{font-weight:400;color:var(--muted);font-size:12.5px}
+.flash{perspective:1000px;margin:14px auto;max-width:560px;height:260px;cursor:pointer}.flash .in{position:relative;width:100%;height:100%;transition:transform .5s;transform-style:preserve-3d}.flash.flip .in{transform:rotateY(180deg)}.flash .fc{position:absolute;inset:0;backface-visibility:hidden;border-radius:22px;display:grid;place-items:center;padding:20px;text-align:center;font-size:20px;font-weight:800;border:2px solid var(--line);background:#fff}.flash .bk{transform:rotateY(180deg);background:linear-gradient(135deg,#e3f5ea,#fff);color:var(--ok)}
+.mg{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}.mg button{font:inherit;font-weight:700;min-height:90px;border-radius:16px;border:2px solid var(--line);background:linear-gradient(135deg,#082B5A,#005499);color:transparent;cursor:pointer;padding:8px;font-size:14px}.mg button.op{background:#fff;color:var(--navy);border-color:var(--sky)}.mg button.dn{background:var(--okbg);color:var(--ok);border-color:var(--ok);cursor:default}
+.wheel{width:min(340px,80vw);height:min(340px,80vw);margin:14px auto;border-radius:50%;border:8px solid var(--navy);position:relative;transition:transform 3.2s cubic-bezier(.17,.67,.15,1);overflow:hidden}
+.wptr{width:0;height:0;border-left:16px solid transparent;border-right:16px solid transparent;border-top:28px solid #E0675A;margin:0 auto -18px;position:relative;z-index:2}
+.board{list-style:none;padding:0;margin:0}.board li{display:flex;justify-content:space-between;border-bottom:1px dashed var(--line);padding:6px 0}
+@media (prefers-reduced-motion:reduce){.flash .in,.wheel{transition:none}}
+</style>
+</head>
+<body>
+<header><img src="assets/logo_white.svg" alt="مدارس دينا العالمية"><div><div class="t" id="ht">الألعاب التعليمية</div><div class="s" id="hs">مدارس دينا العالمية</div></div></header>
+<main id="m"><div class="card">جارٍ التحميل…</div></main>
+<footer>مدارس دينا العالمية · Dinaaedu · 920035881</footer>
+<script src="config.js?v=1794032729"></script>
+<script>
+(function () {
+  const C = window.APP_CONFIG, m = document.getElementById('m');
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const AR = s => String(s).replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+  const LS = { get: k => { try { return localStorage.getItem(k); } catch (_) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (_) { } }, del: k => { try { localStorage.removeItem(k); } catch (_) { } } };
+  const ERR = { BAD_PIN: 'رمز اللعبة غير صحيح أو انتهت اللعبة', BAD_NICK: 'اكتب اسماً من حرفين على الأقل', NICK_TAKEN: 'هذا الاسم مستخدم — اختر اسماً آخر', FULL: 'اكتمل عدد اللاعبين', BAD_TOKEN: 'انتهت جلستك — انضم من جديد', CLOSED: 'انتهى وقت السؤال', DONE: 'أجبت عن هذا السؤال', BAD_CODE: 'رابط اللعبة غير صحيح أو متوقف' };
+  async function rpc(fn, body) { const r = await fetch(`${C.supabaseUrl}/rest/v1/rpc/${fn}`, { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); const j = await r.json(); if (!r.ok) throw new Error(ERR[j.message] || j.message || 'تعذّر الاتصال'); return j; }
+  const SH = ['▲', '◆', '●', '■', '★', '⬟'];
+  const P = new URLSearchParams(location.search);
+  const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+  // ================= المسابقة المباشرة =================
+  let tok = LS.get('dina_game_tok'), poll = null, last = '', pick = [];
+  function join(msg) {
+    clearInterval(poll);
+    m.innerHTML = `<div class="card center"><h1>انضم إلى المسابقة</h1><p class="muted small">اكتب رمز اللعبة الظاهر على شاشة المعلم واسمك.</p>
+      <label for="pn">رمز اللعبة</label><input id="pn" class="pin" inputmode="numeric" maxlength="6" value="${esc(P.get('pin') || '')}" autocomplete="off">
+      <label for="nk">اسمك</label><input id="nk" maxlength="24" value="${esc(JSON.parse(LS.get('dina_stu') || '{}').name ? JSON.parse(LS.get('dina_stu')).name.split(' ').slice(0, 2).join(' ') : '')}">
+      <div style="margin-top:14px"><button class="btn" id="go" style="width:100%">دخول</button></div><p class="small" id="er" role="alert" style="color:var(--bad)">${esc(msg || '')}</p></div>`;
+    const go = document.getElementById('go');
+    go.onclick = async () => { go.disabled = true; try { const r = await rpc('game_join', { p_pin: document.getElementById('pn').value.trim(), p_nick: document.getElementById('nk').value }); tok = r.token; LS.set('dina_game_tok', tok); run(); } catch (e) { document.getElementById('er').textContent = e.message; go.disabled = false; } };
+  }
+  function run() { clearInterval(poll); tick(); poll = setInterval(tick, 1200); }
+  async function tick() {
+    let s; try { s = await rpc('game_state', { p_token: tok }); } catch (e) { LS.del('dina_game_tok'); return join(e.message); }
+    const key = [s.state, s.qi, s.answered, s.state === 'question' ? '' : s.score].join('|');
+    document.getElementById('ht').textContent = s.title || 'المسابقة';
+    document.getElementById('hs').textContent = `${s.nick} · ${AR(s.score)} نقطة`;
+    if (s.state === 'question' && !s.answered && key === last) { const t = document.getElementById('tl'); if (t) t.textContent = AR(s.q.left); if (s.q.left <= 0) { const c = document.getElementById('chs'); if (c) c.querySelectorAll('button').forEach(b => b.disabled = true); } return; }
+    if (key === last) return; last = key;
+    if (s.state === 'lobby') { m.innerHTML = `<div class="card center"><div class="big">أنت في اللعبة!</div><p>بانتظار المعلم ليبدأ…</p><p class="muted small">${AR(s.players)} لاعب انضموا</p></div>`; return; }
+    if (s.state === 'end') { clearInterval(poll); LS.del('dina_game_tok'); m.innerHTML = `<div class="card center"><h1>انتهت المسابقة</h1><div class="big">${s.rank <= 3 ? ['🥇', '🥈', '🥉'][s.rank - 1] : '🎉'}</div><p>ترتيبك <b>${AR(s.rank)}</b> من ${AR(s.players)}</p><p class="big" style="font-size:32px">${AR(s.score)} نقطة</p><button class="btn ghost" id="again">مسابقة أخرى</button></div>`; document.getElementById('again').onclick = () => join(); return; }
+    const q = s.q || {};
+    if (s.state === 'question' && s.answered) { m.innerHTML = `<div class="card center"><p class="muted">السؤال ${AR(s.qi + 1)} من ${AR(s.total)}</p><div class="big">✓</div><p>استُلمت إجابتك — انتظر النتيجة</p></div>`; return; }
+    if (s.state === 'question') {
+      pick = []; const opts = q.opts || [];
+      m.innerHTML = `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><span class="muted small">السؤال ${AR(s.qi + 1)} من ${AR(s.total)}</span><span class="timer" id="tl">${AR(q.left)}</span></div><h2 style="margin-top:8px">${esc(q.body)}</h2>${q.type === 'multi' ? '<p class="small muted">اختر كل الإجابات الصحيحة ثم اضغط «إرسال»</p>' : ''}
+        <div class="ch" id="chs">${opts.map((o, i) => `<button type="button" class="c${i % 6}" data-i="${i}" aria-pressed="false"><span class="sh" aria-hidden="true">${SH[i % 6]}</span>${esc(o)}</button>`).join('')}</div>${q.type === 'multi' ? '<div style="margin-top:12px"><button class="btn" id="send" style="width:100%">إرسال</button></div>' : ''}<p class="small" id="er" role="alert" style="color:var(--bad)"></p></div>`;
+      const send = async v => { m.querySelectorAll('#chs button,#send').forEach(b => b.disabled = true); try { await rpc('game_answer', { p_token: tok, p_qi: s.qi, p_choice: v }); last = ''; tick(); } catch (e) { document.getElementById('er').textContent = e.message; } };
+      m.querySelectorAll('#chs button').forEach(b => b.onclick = () => { const i = b.dataset.i; if (q.type === 'multi') { pick = pick.includes(i) ? pick.filter(x => x !== i) : [...pick, i]; b.setAttribute('aria-pressed', pick.includes(i)); } else send(i); });
+      const sd = document.getElementById('send'); if (sd) sd.onclick = () => pick.length ? send(JSON.stringify(pick)) : null;
+      return;
+    }
+    if (s.state === 'reveal') { const cor = [].concat(q.correct || []).map(String); m.innerHTML = `<div class="card center ${s.ok ? 'res-ok' : 'res-bad'}"><div class="big">${s.answered === false ? '⏱' : s.ok ? '✓ إجابة صحيحة' : '✗ إجابة خاطئة'}</div>${s.ok ? `<p class="big" style="font-size:30px">+${AR(s.pts)}</p>` : ''}<p>الصحيح: <b>${cor.map(i => esc((q.opts || [])[+i])).join('، ')}</b></p><p>ترتيبك <b>${AR(s.rank)}</b> · مجموعك ${AR(s.score)}</p></div>`; }
+  }
+
+  // ================= الألعاب الذاتية =================
+  let G = null, RUN = 0, QT = null; const live = r => () => r === RUN;
+  const MODES = { flash: ['🃏', 'البطاقات', 'اقلب البطاقة لترى الإجابة'], match: ['🧩', 'المطابقة', 'طابق السؤال بإجابته'], quiz: ['⚡', 'التحدي السريع', 'أجب قبل انتهاء الوقت'], tf: ['✔✘', 'صح أم خطأ', 'احكم على العبارة بسرعة'], wheel: ['🎡', 'عجلة الأسئلة', 'أدر العجلة وأجب'] };
+  const ansOf = q => { const o = q.options || []; if (q.type === 'mcq') return (o.find(x => x.ok) || {}).t || ''; if (q.type === 'multi') return o.filter(x => x.ok).map(x => x.t).join('، '); if (q.type === 'tf') return q.answer; if (q.type === 'blank') return o.map(x => String(x.t || '').split('|')[0]).join('، '); if (q.type === 'match') return o.map(x => `${x.t} ← ${x.m}`).join(' · '); if (q.type === 'order') return o.map(x => x.t).join(' ← '); return String(q.answer || '').split('|')[0]; };
+  const shortQ = q => String(q.body || '').replace(/\.{3,}|…+|_{3,}/g, '……');
+  async function selfPlay(code) {
+    try { G = await rpc('game_set_public', { p_code: code }); } catch (e) { m.innerHTML = `<div class="card center"><h2>${esc(e.message)}</h2></div>`; return; }
+    document.getElementById('ht').textContent = G.title; document.getElementById('hs').textContent = [G.subject, G.school].filter(Boolean).join(' · ');
+    home();
+  }
+  function home() { RUN++; clearInterval(QT); const md = (G.modes || Object.keys(MODES)).filter(k => MODES[k]);
+    m.innerHTML = `<div class="card"><h1>${esc(G.title)}</h1><p class="muted small">${AR(G.questions.length)} سؤالاً — اختر طريقة اللعب</p><div class="modes">${md.map(k => `<button type="button" data-md="${k}"><span aria-hidden="true">${MODES[k][0]}</span>${MODES[k][1]}<small>${MODES[k][2]}</small></button>`).join('')}</div></div>`;
+    m.querySelectorAll('[data-md]').forEach(b => b.onclick = () => ({ flash, match, quiz, tf, wheel })[b.dataset.md]()); }
+  const back = '<button class="btn ghost" id="bk" style="min-height:40px;padding:6px 14px">رجوع</button>';
+  const bindBack = () => { const b = document.getElementById('bk'); if (b) b.onclick = home; };
+  function flash() { const Q = shuffle(G.questions); let i = 0; const dr = () => { const q = Q[i]; m.innerHTML = `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><b>البطاقات ${AR(i + 1)} / ${AR(Q.length)}</b>${back}</div><div class="flash" id="fl" tabindex="0" role="button" aria-label="اقلب البطاقة"><div class="in"><div class="fc">${esc(shortQ(q))}</div><div class="fc bk">${esc(ansOf(q))}</div></div></div><div style="display:flex;gap:8px;justify-content:center"><button class="btn ghost" id="pv" ${i ? '' : 'disabled'}>السابقة</button><button class="btn" id="nx">${i + 1 < Q.length ? 'التالية' : 'من البداية'}</button></div></div>`; bindBack(); const f = document.getElementById('fl'); f.onclick = f.onkeydown = e => { if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return; f.classList.toggle('flip'); }; document.getElementById('pv').onclick = () => { i--; dr(); }; document.getElementById('nx').onclick = () => { i = (i + 1) % Q.length; dr(); }; }; dr(); }
+  function match() { const Q = shuffle(G.questions.filter(q => ansOf(q))).slice(0, 6); const cards = shuffle(Q.flatMap((q, k) => [{ k, t: shortQ(q) }, { k, t: ansOf(q) }])); let open = [], done = new Set(), moves = 0, t0 = Date.now();
+    const dr = () => { m.innerHTML = `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><b>المطابقة — ${AR(done.size)} / ${AR(Q.length)}</b><span class="small muted">${AR(moves)} محاولة</span>${back}</div><div class="mg" style="margin-top:10px">${cards.map((c, i) => `<button type="button" data-c="${i}" class="${done.has(c.k) ? 'dn' : open.includes(i) ? 'op' : ''}" aria-label="${done.has(c.k) || open.includes(i) ? esc(c.t) : 'بطاقة مغلقة'}">${esc(c.t)}</button>`).join('')}</div></div>`; bindBack();
+      m.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { const i = +b.dataset.c; if (done.has(cards[i].k) || open.includes(i) || open.length === 2) return; open.push(i); dr(); if (open.length === 2) { moves++; const ok2 = live(RUN); setTimeout(() => { if (!ok2()) return; const [a, c] = open; if (cards[a].k === cards[c].k) done.add(cards[a].k); open = []; if (done.size === Q.length) { m.innerHTML = `<div class="card center"><div class="big">🎉 أحسنت!</div><p>${AR(moves)} محاولة في ${AR(Math.round((Date.now() - t0) / 1000))} ثانية</p><button class="btn" id="ag">مرة أخرى</button> ${back}</div>`; bindBack(); document.getElementById('ag').onclick = match; } else dr(); }, 750); } }); }; dr(); }
+  function quiz() { const Q = shuffle(G.questions.filter(q => ['mcq', 'tf', 'multi'].includes(q.type))); if (!Q.length) { alertBox('لا توجد أسئلة اختيار أو صواب وخطأ في هذه المجموعة'); return; } let i = 0, sc = 0, tm = null, left = 15;
+    const dr = () => { clearInterval(tm); if (i >= Q.length) { m.innerHTML = `<div class="card center"><div class="big">${sc >= Q.length * 700 ? '🏆' : '👏'}</div><p class="big" style="font-size:32px">${AR(sc)} نقطة</p><button class="btn" id="ag">مرة أخرى</button> ${back}</div>`; bindBack(); document.getElementById('ag').onclick = quiz; return; }
+      const q = Q[i], opts = q.type === 'tf' ? ['صواب', 'خطأ'] : (q.options || []).map(o => o.t); left = 15;
+      m.innerHTML = `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><span class="small muted">${AR(i + 1)} / ${AR(Q.length)} · ${AR(sc)} نقطة</span><span class="timer" id="tl">${AR(left)}</span>${back}</div><h2 style="margin-top:8px">${esc(shortQ(q))}</h2><div class="ch">${opts.map((o, k) => `<button type="button" class="c${k % 6}" data-k="${k}"><span class="sh" aria-hidden="true">${SH[k % 6]}</span>${esc(o)}</button>`).join('')}</div><p id="fb" class="center" role="status"></p></div>`; bindBack();
+      const ok = k => q.type === 'tf' ? opts[k] === q.answer : !!(q.options[k] || {}).ok;
+      const fin = k => { clearInterval(tm); m.querySelectorAll('.ch button').forEach((b, j) => { b.disabled = true; if (ok(j)) b.style.outline = '5px solid #17814a'; }); const g = k != null && ok(k); if (g) sc += 500 + left * 40; document.getElementById('fb').innerHTML = g ? '<b style="color:var(--ok)">✓ صحيح</b>' : `<b style="color:var(--bad)">✗ ${k == null ? 'انتهى الوقت' : 'خطأ'}</b> — الصحيح: ${esc(ansOf(q))}`; const ok3 = live(RUN); setTimeout(() => { if (ok3()) { i++; dr(); } }, 1500); };
+      m.querySelectorAll('.ch button').forEach(b => b.onclick = () => fin(+b.dataset.k));
+      QT = tm = setInterval(() => { left--; const t = document.getElementById('tl'); if (!t) return clearInterval(tm); t.textContent = AR(Math.max(0, left)); if (left <= 0) fin(null); }, 1000); }; dr(); }
+  function tf() { const pool = G.questions.filter(q => ansOf(q)); const Q = shuffle(pool).slice(0, 15).map(q => { const right = Math.random() < .5 || pool.length < 2; const other = shuffle(pool.filter(x => x !== q))[0]; return { s: shortQ(q), a: right ? ansOf(q) : ansOf(other), right }; }); let i = 0, sc = 0;
+    const dr = () => { if (i >= Q.length) { m.innerHTML = `<div class="card center"><div class="big">${AR(sc)} / ${AR(Q.length)}</div><button class="btn" id="ag">مرة أخرى</button> ${back}</div>`; bindBack(); document.getElementById('ag').onclick = tf; return; } const x = Q[i];
+      m.innerHTML = `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><span class="small muted">${AR(i + 1)} / ${AR(Q.length)} · ${AR(sc)} صحيحة</span>${back}</div><p class="muted small" style="margin-top:8px">هل الإجابة صحيحة؟</p><h2>${esc(x.s)}</h2><div class="card" style="background:var(--pale);font-size:20px;font-weight:800;text-align:center">${esc(x.a)}</div><div class="ch"><button type="button" class="c3" data-v="1">✔ صح</button><button type="button" class="c0" data-v="0">✘ خطأ</button></div><p id="fb" class="center" role="status"></p></div>`; bindBack();
+      m.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { const g = (b.dataset.v === '1') === x.right; if (g) sc++; m.querySelectorAll('[data-v]').forEach(z => z.disabled = true); document.getElementById('fb').innerHTML = g ? '<b style="color:var(--ok)">✓ أحسنت</b>' : '<b style="color:var(--bad)">✗ ليس تماماً</b>'; const ok4 = live(RUN); setTimeout(() => { if (ok4()) { i++; dr(); } }, 1000); }); }; dr(); }
+  function wheel() { const Q = G.questions.slice(); let rot = 0; const N = Math.min(Q.length, 12), cols = ['#E0675A', '#005499', '#C9A44C', '#2F855A', '#AE95DA', '#3AB1DB'];
+    const grad = Array.from({ length: N }, (_, k) => `${cols[k % 6]} ${k * 360 / N}deg ${(k + 1) * 360 / N}deg`).join(',');
+    m.innerHTML = `<div class="card center"><div style="display:flex;justify-content:space-between;align-items:center"><b>عجلة الأسئلة</b>${back}</div><div class="wptr"></div><div class="wheel" id="wh" style="background:conic-gradient(${grad})"></div><button class="btn" id="sp">أدر العجلة</button><div id="wq" style="margin-top:12px"></div></div>`; bindBack();
+    document.getElementById('sp').onclick = () => { const k = Math.floor(Math.random() * N), q = Q[Math.floor(Math.random() * Q.length)]; rot += 1440 + (360 - (k * 360 / N + 180 / N)); document.getElementById('wh').style.transform = `rotate(${rot}deg)`; document.getElementById('wq').innerHTML = '';
+      const ok5 = live(RUN); setTimeout(() => { if (!ok5()) return; document.getElementById('wq').innerHTML = `<div class="card" style="text-align:start"><h2>${esc(shortQ(q))}</h2>${(q.type === 'mcq' || q.type === 'multi') ? `<ol type="أ">${q.options.map(o => `<li>${esc(o.t)}</li>`).join('')}</ol>` : ''}<details><summary>الإجابة</summary><p><b>${esc(ansOf(q))}</b></p></details></div>`; }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 3300); }; }
+  function alertBox(t) { m.innerHTML = `<div class="card center"><p>${esc(t)}</p>${back}</div>`; bindBack(); }
+
+  if (P.get('s')) selfPlay(P.get('s')); else if (tok && !P.get('pin')) run(); else join();
+})();
+</script>
+</body>
+</html>

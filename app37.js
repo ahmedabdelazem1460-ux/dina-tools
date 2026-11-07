@@ -211,7 +211,7 @@
 
         <details class="dz-det" style="margin-top:10px"><summary><b>كروكي المدرسة</b> <span class="small muted">— صورة توضح مواقع الإشراف (اختياري)</span></summary>
           <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap;align-items:flex-start">${cfg.map && cfg.map.url ? `<img src="${esc(cfg.map.url)}" alt="${esc(cfg.map.name || 'كروكي المدرسة')}" style="max-width:260px;max-height:200px;border:1px solid #D5E1F0;border-radius:10px">` : '<span class="small muted">لم تُرفع صورة بعد.</span>'}
-            <div class="field" style="margin:0;min-width:220px"><label for="duMN">مسمى الكروكي</label><input class="in" id="duMN" value="${esc((cfg.map || {}).name || 'كروكي مواقع الإشراف والمناوبة')}"><label class="btn ghost sm" style="margin-top:6px">رفع صورة<input type="file" id="duMF" accept="image/*" hidden></label>${cfg.map && cfg.map.url ? ' <button class="btn ghost sm" id="duMX">إزالة</button>' : ''}</div></div></details>
+            <div class="field" style="margin:0;min-width:220px"><label for="duMN">مسمى الكروكي</label><input class="in" id="duMN" value="${esc((cfg.map || {}).name || 'كروكي مواقع الإشراف والمناوبة')}"><button class="btn sm" id="duMD" type="button" style="margin-top:6px">${cfg.map && cfg.map.shapes ? 'تعديل الرسم' : 'رسم الكروكي'}</button> <label class="btn ghost sm" style="margin-top:6px">رفع صورة<input type="file" id="duMF" accept="image/*" hidden></label>${cfg.map && cfg.map.url ? ' <button class="btn ghost sm" id="duMX">إزالة</button>' : ''}</div></div></details>
 
         <div class="row" style="gap:6px;margin-top:12px"><button class="btn ok" id="duSv2">حفظ الإعدادات</button><button class="btn ghost" id="duGo2">حفظ وإعادة التوزيع الذكي</button></div>`;
       const P = t => (cfg.people[t] = Object.assign(pOf(cfg, t), cfg.people[t] || {}));
@@ -231,6 +231,7 @@
       $$('[data-nr]', B).forEach(b => b.onclick = () => { cfg.notes[b.dataset.nr] = NOTES_DEF[b.dataset.nr]; draw(); });
       $('#duMN', B).oninput = e => { cfg.map = Object.assign({}, cfg.map || {}, { name: e.target.value }); };
       $('#duMF', B).onchange = e => A.run(null, async () => { const f = e.target.files[0]; if (!f) return; if (f.size > 6e6) throw new Error('الصورة أكبر من ٦ ميجابايت'); const url = await api.uploadAsset(f); cfg.map = Object.assign({}, cfg.map || {}, { url, name: $('#duMN', B).value }); draw(); A.toast('رُفعت الصورة — اضغط «حفظ الإعدادات»', 'ok'); });
+      const md = $('#duMD', B); if (md) md.onclick = () => A.sketchEditor && A.sketchEditor((cfg.map || {}).shapes, placesAll(cfg), async (file, shapes) => { const url = await api.uploadAsset(file); cfg.map = Object.assign({}, cfg.map || {}, { url, shapes, name: $('#duMN', B).value }); await saveCfg(sec, cfg); draw(); A.toast('حُفظ الكروكي', 'ok'); });
       const mx = $('#duMX', B); if (mx) mx.onclick = () => { cfg.map = Object.assign({}, cfg.map, { url: '' }); draw(); };
       const read = () => { cfg.perDay = Math.max(1, +$('#duPD', B).value || 1); cfg.maxWeek = Math.max(0, +$('#duMW', B).value || 0); sm.heavy = Math.max(3, +$('#duHv', B).value || 6); cfg.places = cfg.places.filter(x => (x.n || x || '').trim()); };
       $('#duSv2', B).onclick = e => A.run(e.currentTarget, async () => { read(); await saveCfg(sec, cfg); A.toast('حُفظت الإعدادات', 'ok'); });

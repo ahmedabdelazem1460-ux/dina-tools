@@ -43,14 +43,14 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:20px}
 html.lang-en body,html.lang-en input,html.lang-en select,html.lang-en textarea,html.lang-en button{font-family:'Myriad Pro','GE SS Two',Tahoma,sans-serif}
 .blk{line-height:2.4;margin-top:8px}.bl{display:inline-block;width:auto;min-width:110px;max-width:220px;margin:0 4px;padding:4px 8px;border:0;border-bottom:2px dashed #3AB1DB;border-radius:6px;background:#F5F9FD}.bank{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}.bank button{border:1px solid #84B7E3;background:#fff;border-radius:999px;padding:4px 12px;font:inherit;cursor:pointer;color:#082B5A}.mt{display:grid;gap:6px;margin-top:8px}.mr{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;border:1px solid #D5E1F0;border-radius:12px;padding:6px 10px}.or{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:6px}.or li{display:flex;align-items:center;gap:8px;border:1px solid #D5E1F0;border-radius:12px;padding:6px 10px;background:#fff}.or li span{width:26px;height:26px;border-radius:50%;background:#E4EBF5;display:grid;place-items:center;font-weight:800;font-size:13px}.or li b{flex:1}.or li button{border:1px solid #D5E1F0;background:#fff;border-radius:8px;width:36px;height:36px;cursor:pointer}.or li button:disabled{opacity:.3}
 </style>
-<script src="i18n_en.js?v=1794031934"></script>
-<script src="i18n.js?v=1794031934"></script>
+<script src="i18n_en.js?v=1794032272"></script>
+<script src="i18n.js?v=1794032272"></script>
 </head>
 <body>
 <header><img src="assets/logo_white.svg" alt="مدارس دينا العالمية"><div><div class="t" id="ht">بوابة الطالب</div><div class="s" id="hs">مدارس دينا العالمية</div></div></header>
 <main id="m"><div class="card">جارٍ التحميل…</div></main>
 <footer>مدارس دينا العالمية · Dinaaedu · 920035881</footer>
-<script src="config.js?v=1794031934"></script>
+<script src="config.js?v=1794032272"></script>
 <script>
 (function () {
   const C = window.APP_CONFIG, m = document.getElementById('m');
@@ -119,7 +119,7 @@ html.lang-en body,html.lang-en input,html.lang-en select,html.lang-en textarea,h
   function result(Q, qs, ans, r) {
     const p = r.max ? Math.round(r.score / r.max * 100) : 0; const [l, c] = p >= 80 ? ['ممتاز — متمكن', 'ok'] : p >= 50 ? ['جيد — واصل التدريب', 'warn'] : ['تحتاج إلى مراجعة', 'bad'];
     const R = Object.fromEntries((r.review || []).map(x => [x.id, x]));
-    m.innerHTML = `<div class="card res"><p class="muted">تم تسليم إجاباتك يا ${esc(JSON.parse(LS.get('dina_stu') || '{}').name || '')}</p><div class="big">${AR(r.score)} / ${AR(r.max)}</div><p><span class="tag ${c}">${l}</span> ${AR(p)}٪</p>${r.pending ? '<p class="small muted">الأسئلة المقالية سيصححها معلمك.</p>' : ''}${r.left > 0 ? `<p class="small muted">بقي لك ${AR(r.left)} محاولة</p>` : ''}</div>` +
+    m.innerHTML = `<div class="card res"><p class="muted">تم تسليم إجاباتك يا ${esc(JSON.parse(LS.get('dina_stu') || '{}').name || '')}</p><div class="big">${AR(r.score)} / ${AR(r.max)}</div><p><span class="tag ${c}">${l}</span> ${AR(p)}٪</p>${r.pending ? '<p class="small muted">الأسئلة المقالية سيصححها معلمك.</p>' : ''}${r.left > 0 ? `<p class="small muted">بقي لك ${AR(r.left)} محاولة</p>` : ''}${LS.get('dina_me') ? '<p><a class="btn ghost" href="me.html">العودة إلى حسابي</a></p>' : ''}</div>` +
       (r.review ? qs.map((q, i) => { const x = R[q.id] || {}; const mine = ans[q.id];
         const fmt = v => { try { const a = JSON.parse(v); return Array.isArray(a) ? a.filter(Boolean).join(' · ') : v; } catch (_) { return v; } };
         const body = ['blank', 'match', 'order'].includes(q.type) ? `<div class="small">إجابتك: <b>${esc(fmt(mine) || '—')}</b><br>الصحيح: <b>${esc(x.answer || '')}</b>${x.pts != null ? ` · درجتك ${AR(x.pts)} من ${AR(q.points)}` : ''}</div>` : q.type === 'multi' ? (() => { const R2 = String(x.answer || '').split(',').filter(Boolean), M = (() => { try { return JSON.parse(mine || '[]'); } catch (_) { return []; } })(); return q.options.map((o, k) => `<div class="opt ${R2.includes(String(k)) ? 'right' : M.includes(String(k)) ? 'wrong' : ''}">${esc(o)}${R2.includes(String(k)) ? ' ✓' : ''}${M.includes(String(k)) ? ' <small>(اخترتها)</small>' : ''}</div>`).join('') + (x.pts != null ? `<div class="small">درجتك ${AR(x.pts)} من ${AR(q.points)}</div>` : ''); })() : q.type === 'mcq' ? q.options.map((o, k) => `<div class="opt ${String(k) === String(x.answer) ? 'right' : String(k) === String(mine) ? 'wrong' : ''}">${esc(o)}${String(k) === String(x.answer) ? ' ✓' : ''}</div>`).join('') : `<div class="small">إجابتك: <b>${esc(mine || '—')}</b>${q.type !== 'essay' ? ` · الصحيح: <b>${esc(String(x.answer || '').split('|')[0])}</b>` : ''}</div>`;

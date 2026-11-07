@@ -37,7 +37,7 @@
       const base = { title: w.title, kind: guess(w.url, w.file_type), file_type: w.file_type, subject_id: x.subject_id || null, grade_key: x.grade_key || null, lesson_id: x.lesson_id || null, note: x.lesson || '', origin: lib ? 'library' : 'prep', ...(lib ? { share_status: 'shared', share_scope: 'all' } : {}) };
       const h = have.find(r => r.url === w.url);
       if (h) { await api.updateResource(h.id, { ...base, class_ids: lib ? (h.class_ids || []) : cls }).catch(() => { }); }
-      else await api.addResource({ ...base, url: w.url, prep_id: x.id, class_ids: lib ? [] : cls, section_id: sec, school_id: S.school.id, visible_to_parents: false, week_id: null }).catch(() => { });
+      else await api.addResource({ ...base, created_by: x.created_by || S.me.id, url: w.url, prep_id: x.id, class_ids: lib ? [] : cls, section_id: sec, school_id: S.school.id, visible_to_parents: false, week_id: null }).catch(() => { });
     }
     S._resAt = 0;
   };

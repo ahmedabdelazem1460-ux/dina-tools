@@ -127,7 +127,7 @@
         D.links = x ? [...((D.links || []).filter(l => !ES.some(e => e.id === l.e))), ...links] : links;
         const title = F.lesson.trim() || `تحضير ${A.subjName(e0.subject_id)} — ${DAYS[e0.day]} الحصة ${e0.period + 1}`;
         const row = { subject_id: e0.subject_id, grade_key: gk(c0), lesson_id: F.lesson_id, unit: F.unit || '', lesson: title, data: D, updated_at: new Date().toISOString() };
-        let saved; if (x) saved = await api.upd('lesson_preps', x.id, row); else saved = (await api.ins('lesson_preps', { ...row, school_id: S.school.id, kind: 'mine' }))[0];
+        let saved; if (x) saved = await api.upd('lesson_preps', x.id, row); else saved = (await api.ins('lesson_preps', { ...row, school_id: S.school.id, kind: 'mine', created_by: S.me.id }))[0];
         if (A.syncPrepRes) await A.syncPrepRes(saved && saved.id ? saved : { ...x, ...row });
         let n = 0;
         if (q('#qpPl').checked) { const ov = q('#qpOv').checked, ql = q('#qpQL').checked; const qz = (P.quizzes || []).filter(z => D.quiz_ids.includes(z.id) && z.status === 'published');

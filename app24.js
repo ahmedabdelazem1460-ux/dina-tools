@@ -14,21 +14,23 @@
   };
   const THEMES = { navy: { a: '#082B5A', b: '#3AB1DB', p: '#E4EBF5', l: '#84B7E3' }, sky: { a: '#005499', b: '#3AB1DB', p: '#E6F5FB', l: '#9ED6EC' }, green: { a: '#1F5E3A', b: '#7CBF5A', p: '#EAF5E3', l: '#B5DC9C' }, purple: { a: '#3F2A73', b: '#AE95DA', p: '#EFEAF8', l: '#CBBCEA' } };
   const SHORT = { 'اللغة العربية': 'لغتي', 'اللغة الإنجليزية': 'E', 'الدراسات الإسلامية والقرآن': 'إسلامية', 'المهارات الرقمية': 'رقمية', 'المهارات الحياتية': 'حياتية', 'الرياضيات': 'رياضيات', 'العلوم': 'علوم', 'الاجتماعيات': 'اجتماعيات', 'تمكين وإتقان': 'تمكين', 'التربية البدنية': 'بدنية', 'التربية الفنية': 'فنية', 'التقنية الرقمية': 'تقنية رقمية', 'الكفايات اللغوية': 'كفايات لغوية', 'التفكير الناقد': 'تفكير ناقد', 'البحث ومصادر المعلومات': 'بحث ومصادر', 'علوم الأرض والفضاء': 'علوم الأرض', 'التربية الصحية والبدنية': 'صحية وبدنية', 'التربية الحياتية والأسرية': 'حياتية وأسرية' };
-  const DKEY = () => 'tt_design_' + S.sectionId;
-  const loadCfg = () => { const sec = A.section(), b = (sec.bell && sec.bell.design) || {}; let l = {}; try { l = JSON.parse(localStorage.getItem(DKEY()) || '{}'); } catch (_) {} return Object.assign({ kind: 'class', title: 'جدول الحصص الدراسي', tag: '', label: '', theme: 'navy', times: true, brk: true, who: true, nums: true, shortN: true, short: {}, links: {}, link0: '', qrT: 'رابط القاعة الافتراضية', qrS: 'امسح الكود للدخول إلى القاعة', foot: 'رحلتهم الكبرى... تبدأ من هنا', sched: '' }, b, l); };
-  const saveCfg = async c => { try { localStorage.setItem(DKEY(), JSON.stringify(c)); } catch (_) {} if (S.me.is_owner) { const sec = A.section(), bell = Object.assign({}, sec.bell || {}, { design: c }); try { const r = await api.updateSection(sec.id, { bell }); Object.assign(sec, r); } catch (_) {} } };
+  let DSM = null; // وضع «جدول استثنائي / تعليم عن بعد»
+  const DKEY = () => 'tt_design_' + (DSM ? 'ds_' : '') + S.sectionId;
+  const loadCfg = () => { const sec = A.section(), b = (sec.bell && sec.bell[DSM ? 'design_ds' : 'design']) || {}; let l = {}; try { l = JSON.parse(localStorage.getItem(DKEY()) || '{}'); } catch (_) {} return Object.assign({ kind: 'class', title: 'جدول الحصص الدراسي', tag: '', label: '', theme: 'navy', times: true, brk: true, who: true, nums: true, shortN: true, short: {}, links: {}, link0: '', qrT: 'رابط القاعة الافتراضية', qrS: 'امسح الكود للدخول إلى القاعة', foot: 'رحلتهم الكبرى... تبدأ من هنا', sched: '' }, DSM ? { title: 'جدول التعليم عن بعد', tag: 'للتعليم عن بعد', qrT: 'رابط دخول الحصص', qrS: 'امسح الكود للدخول إلى قاعة الفصل' } : {}, b, l); };
+  const saveCfg = async c => { try { localStorage.setItem(DKEY(), JSON.stringify(c)); } catch (_) {} if (S.me.is_owner) { const sec = A.section(), bell = Object.assign({}, sec.bell || {}, { [DSM ? "design_ds" : "design"]: c }); try { const r = await api.updateSection(sec.id, { bell }); Object.assign(sec, r); } catch (_) {} } };
+  const pName = id => id && String(id).startsWith('tn:') ? String(id).slice(3) : ((A.person(id) || {}).full_name || '');
   function subShort(c, sid) {
-    if (!sid) return ''; if (c.short[sid]) return c.short[sid]; const full = A.subjName(sid) || ''; if (!c.shortN) return full;
+    if (!sid) return ''; if (String(sid).startsWith('sn:')) return c.short[sid] || String(sid).slice(3); if (c.short[sid]) return c.short[sid]; const full = A.subjName(sid) || ''; if (!c.shortN) return full;
     try { const mp = (JSON.parse(localStorage.getItem('tt_map_' + S.school.id) || '{}').s) || {}; const ks = Object.keys(mp).filter(k => mp[k] === sid).sort((a, b) => a.length - b.length); if (ks[0]) return ks[0]; } catch (_) {}
     return SHORT[full] || full.replace(/^ال/, '');
   }
-  const tShort = id => { const n = ((A.person(id) || {}).full_name || '').replace(/^(أ\.|أ\/|م\.|د\.)\s*/, '').trim().split(/\s+/); return n.length > 2 ? n[0] + ' ' + n[n.length - 1] : n.join(' '); };
+  const tShort = id => { const n = pName(id).replace(/^(أ\.|أ\/|م\.|د\.)\s*/, '').trim().split(/\s+/); return n.length > 2 ? n[0] + ' ' + n[n.length - 1] : n.join(' '); };
   const cName = id => (A.cls(id) || (S.allClasses || []).find(c => c.id === id) || {}).name || '';
   const qrSvg = (txt, color) => { if (!window.qrcode || !txt) return ''; try { const q = qrcode(0, 'M'); q.addData(txt); q.make(); const n = q.getModuleCount(); let r = ''; for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (q.isDark(y, x)) r += `M${x},${y}h1v1h-1z`; return `<svg xmlns="http://www.w3.org/2000/svg" width="${(n + 4) * 6}" height="${(n + 4) * 6}" viewBox="-2 -2 ${n + 4} ${n + 4}" shape-rendering="crispEdges"><rect x="-2" y="-2" width="${n + 4}" height="${n + 4}" fill="#fff"/><path d="${r}" fill="${color}"/></svg>`; } catch (_) { return ''; } };
 
   // ---------- الرسم ----------
   function posterHTML(c, D, target) {
-    const sec = A.section(), T = THEMES[c.theme] || THEMES.navy, B = A.bell, s = D.sched;
+    const sec = A.section(), T = THEMES[c.theme] || THEMES.navy, B = D.bell || A.bell, s = D.sched;
     const days = s ? B.actDays(s, sec) : Array.from({ length: sec.days || 5 }, (_, i) => i);
     const P = s ? B.maxP(s, sec) : (sec.periods || 7);
     const cid = c.kind === 'class' ? target : null;
@@ -49,7 +51,7 @@
       const t = l.map(x => { const n = subShort(c, x.subject_id), sub = c.who ? (c.kind === 'class' ? tShort(x.teacher_id) : cName(x.class_id)) : ''; const fs = n.length > 12 ? big - 8 : n.length > 8 ? big - 4 : big; return `<b style="font-size:${l.length > 1 ? fs - 6 : fs}px">${esc(n)}</b>${sub ? `<i>${esc(sub)}</i>` : ''}`; }).join('<hr>');
       return `<td>${t}</td>`;
     };
-    const who = c.kind === 'class' ? cName(target) : ((A.person(target) || {}).full_name || '');
+    const who = c.kind === 'class' ? cName(target) : pName(target);
     // ملخص وإحصائية (اختياري)
     const si = c.si || {}, sl = slots.filter(x => x.subject_id && days.includes(x.day) && x.period < P), tot = sl.length;
     const bySub = {}; sl.forEach(x => { bySub[x.subject_id] = (bySub[x.subject_id] || 0) + 1; });
@@ -59,7 +61,7 @@
     const perSub = c.sum && si.perSub !== false ? Object.entries(bySub).sort((a, b) => b[1] - a[1]).map(([id, n]) => `<span>${esc(subShort(c, id))} <b>${AR(n)}</b></span>`).join('') : '';
     const perDay = c.sum && si.perDay ? days.map(d => `<span>${DAYS[d]} <b>${AR(sl.filter(x => x.day === d).length)}</b></span>`).join('') : '';
     const compact = !!(stat.length || perSub || perDay);
-    const link = (c.links[target] || c.link0 || '').trim(), qr = link ? qrSvg(link, T.a) : '';
+    const link = (c.links[target] || (D.lk ? D.lk(c.kind, target) : '') || c.link0 || '').trim(), qr = link ? qrSvg(link, T.a) : '';
     const dec = svgUrl(IC.flower, T.l);
     return `<div class="dz ${compact ? 'dz-c' : ''}" dir="rtl" style="--a:${T.a};--b:${T.b};--p:${T.p};--l:${T.l}">
       <span class="dz-fl" style="background-image:${dec};top:18px;left:300px;width:46px;height:46px"></span><span class="dz-fl" style="background-image:${dec};top:520px;left:-14px;width:70px;height:70px;opacity:.5"></span><span class="dz-fl" style="background-image:${dec};top:-10px;left:-10px;width:90px;height:90px;opacity:.45"></span>
@@ -79,11 +81,11 @@
   // ---------- التقارير العامة: الجدول العام للفصول/للمعلمين وملخص الأنصبة ----------
   const clsAbbr = (ids) => { const base = id => { const t = cName(id).split(/\s+/); const sec = t.filter(x => /^[أ-ي]$/.test(x)).pop() || ''; return (t[0] || '') + (sec ? ' ' + sec : ''); }; const m = {}; ids.forEach(id => { m[id] = base(id); }); const dup = new Set(Object.values(m).filter((v, i, a) => a.indexOf(v) !== i)); ids.forEach(id => { if (dup.has(m[id])) { const n = cName(id); const st = /متوسط/.test(n) ? 'م' : /ثانوي/.test(n) ? 'ث' : /ابتدائ/.test(n) ? 'ب' : ''; m[id] = m[id].replace(' ', ' ' + st + ' ').replace(/\s+$/, '') || n; if (!/ /.test(m[id])) m[id] += ' ' + st; } }); return m; };
   function entities(c, D) {
-    if (c.kind === 'mteacher' || (c.kind === 'load' && c.loadBy !== 'class')) return [...new Set(D.slots.filter(s => s.teacher_id && s.subject_id).map(s => s.teacher_id))].map(id => [id, (A.person(id) || {}).full_name || '—']).sort((a, b) => a[1].localeCompare(b[1], 'ar'));
+    if (c.kind === 'mteacher' || (c.kind === 'load' && c.loadBy !== 'class')) return [...new Set(D.slots.filter(s => s.teacher_id && s.subject_id).map(s => s.teacher_id))].map(id => [id, pName(id) || '—']).sort((a, b) => a[1].localeCompare(b[1], 'ar'));
     return (S.allClasses && S.allClasses.length ? S.allClasses : S.classes).filter(x => D.slots.some(s => s.class_id === x.id && s.subject_id)).map(x => [x.id, x.name]);
   }
   function masterPages(c, D) {
-    const sec = A.section(), T = THEMES[c.theme] || THEMES.navy, B = A.bell, s = D.sched;
+    const sec = A.section(), T = THEMES[c.theme] || THEMES.navy, B = D.bell || A.bell, s = D.sched;
     const allDays = s ? B.actDays(s, sec) : Array.from({ length: sec.days || 5 }, (_, i) => i);
     const P = s ? B.maxP(s, sec) : (sec.periods || 7);
     const ents = entities(c, D), isT = c.kind === 'mteacher' || (c.kind === 'load' && c.loadBy !== 'class');
@@ -175,30 +177,37 @@
 
   // ---------- الواجهة ----------
   A.ttDesign = async function (root, opts = {}) {
-    const sec = A.section(); let c = loadCfg(); if (opts.version) c.version = opts.version;
+    const sec = A.section(), X = opts.ds || null; DSM = X; let c = loadCfg(); if (opts.version) c.version = opts.version;
     root.innerHTML = '<div class="card"><div class="spinner"></div></div>';
-    const vers = (await api.list('timetable_versions', { section_id: S.sectionId })).filter(v => v.status !== 'archived').sort((a, b) => (a.status === 'approved' ? -1 : 0) - (b.status === 'approved' ? -1 : 0));
+    const vers = X ? [{ id: 'ds', label: X.label, status: 'ds' }] : (await api.list('timetable_versions', { section_id: S.sectionId })).filter(v => v.status !== 'archived').sort((a, b) => (a.status === 'approved' ? -1 : 0) - (b.status === 'approved' ? -1 : 0));
     if (!vers.length) { root.innerHTML = `<div class="card">${A.emptyBox('لا يوجد جدول بعد', 'أنشئ جدولاً أو استورده أولاً.')}</div>`; return; }
     if (!vers.some(v => v.id === c.version)) c.version = (vers.find(v => v.status === 'approved') || vers[0]).id;
     const bell = A.bell.bellOf(sec);
-    const slotCache = {}; const slotsOf = async id => slotCache[id] || (slotCache[id] = await api.list('timetable_slots', { version_id: id }));
-    let D = { slots: await slotsOf(c.version), sched: null };
-    const pickSched = () => { D.sched = c.sched === 'none' ? null : (bell.schedules.find(s => s.id === c.sched) || A.bell.activeSched(bell)); };
+    // جدول التعليم عن بعد: حصصه وأيامه وتوقيته وروابطه من الجدول نفسه
+    const XM = X ? (X.meta || {}) : null, XP = X ? (XM.periods || Math.max(1, ...(X.slots || []).map(x => x.p + 1))) : 0, XD = X ? (XM.days || [0, 1, 2, 3, 4]) : [];
+    const mn = t => { const [h, m] = String(t || '0:0').split(':'); return (+h) * 60 + (+m || 0); };
+    const XB = X ? { actDays: () => XD, maxP: () => XP, schedP: (s0, s1, d) => d == null ? XP : Math.min(XP, +(XM.perDay || {})[d] || XP), timeline: (s0, P) => { const it = []; for (let p = 0; p < P; p++) { const tm = (XM.times || [])[p]; it.push({ k: 'p', i: p, from: tm && tm[0] ? mn(tm[0]) : 0, to: tm && tm[1] ? mn(tm[1]) : 0 }); (XM.breaks || []).filter(b => +b.after === p + 1 && p + 1 < P).forEach(b => it.push({ k: 'b', label: b.label || 'استراحة', from: mn(b.from), to: mn(b.to) })); } return { items: it, start: 0, end: 0 }; } } : null;
+    const xSlots = () => (X.slots || []).filter(x => XD.includes(x.d) && x.p >= 0 && x.p < XP && (x.s || x.sn)).map(x => ({ class_id: x.c, teacher_id: x.t || (x.tn ? 'tn:' + x.tn : null), day: x.d, period: x.p, subject_id: x.s || 'sn:' + x.sn }));
+    const XL = X ? (X.links || {}) : {};
+    const slotCache = {}; const slotsOf = async id => X ? xSlots() : slotCache[id] || (slotCache[id] = await api.list('timetable_slots', { version_id: id }));
+    if (X) c.version = 'ds';
+    let D = { slots: await slotsOf(c.version), sched: null, bell: XB, lk: X ? (k, t) => (k === 'class' ? (XL.cls || {})[t] : (XL.tch || {})[t]) || '' : null };
+    const pickSched = () => { if (X) { D.sched = (XM.times || []).length ? { id: 'ds', name: XM.schedName || X.label } : null; return; } D.sched = c.sched === 'none' ? null : (bell.schedules.find(s => s.id === c.sched) || A.bell.activeSched(bell)); };
     pickSched();
-    const targets = () => c.kind === 'class' ? (S.allClasses && S.allClasses.length ? S.allClasses : S.classes).filter(x => D.slots.some(s => s.class_id === x.id && s.subject_id)).map(x => [x.id, x.name]) : [...new Set(D.slots.filter(s => s.teacher_id && s.subject_id).map(s => s.teacher_id))].map(id => [id, (A.person(id) || {}).full_name || '—']).sort((a, b) => a[1].localeCompare(b[1], 'ar'));
+    const targets = () => c.kind === 'class' ? (S.allClasses && S.allClasses.length ? S.allClasses : S.classes).filter(x => D.slots.some(s => s.class_id === x.id && s.subject_id)).map(x => [x.id, x.name]) : [...new Set(D.slots.filter(s => s.teacher_id && s.subject_id).map(s => s.teacher_id))].map(id => [id, pName(id) || '—']).sort((a, b) => a[1].localeCompare(b[1], 'ar'));
     let tg = targets(); let cur = tg.some(t => t[0] === c.cur) ? c.cur : (tg[0] || [])[0];
     const M = !!MASTER[c.kind];
-    const vLbl = v => `${v.label}${v.status === 'approved' ? ' (المعتمد)' : v.scheduled ? ' (مجدول)' : ' (مسودة)'}`;
+    const vLbl = v => `${v.label}${v.status === 'ds' ? '' : v.status === 'approved' ? ' (المعتمد)' : v.scheduled ? ' (مجدول)' : ' (مسودة)'}`;
     root.innerHTML = `<div class="dzw"><aside class="card dz-side" aria-label="إعدادات التصميم">
-        <h2 style="margin:0 0 4px">تصميم الجداول وتصديرها</h2><p class="small muted" style="margin:0 0 10px">كل تعديل يظهر مباشرة في المعاينة، ويُحفظ للمرة القادمة.</p>
-        <div class="kpick dz-kinds" id="zK">${[['class', 'جدول فصل'], ['teacher', 'جدول معلم'], ['mclass', 'الجدول العام للفصول'], ['mteacher', 'الجدول العام للمعلمين'], ['load', 'ملخص الأنصبة']].map(([k, l]) => `<button type="button" data-k="${k}" class="${c.kind === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+        <h2 style="margin:0 0 4px">${X ? 'تصميم وطباعة: ' + esc(X.label) : 'تصميم الجداول وتصديرها'}</h2><p class="small muted" style="margin:0 0 10px">${X ? `الحصص والتوقيت والروابط من الجدول نفسه (${esc(X.date_from)} — ${esc(X.date_to)}). ` : ''}كل تعديل يظهر مباشرة في المعاينة، ويُحفظ للمرة القادمة.</p>
+        <div class="kpick dz-kinds" id="zK">${[['class', 'جدول فصل'], ['teacher', 'جدول معلم'], ['mclass', 'الجدول العام للفصول'], ['mteacher', 'الجدول العام للمعلمين'], ['load', X ? 'الإسناد والأنصبة' : 'ملخص الأنصبة']].map(([k, l]) => `<button type="button" data-k="${k}" class="${c.kind === k ? 'on' : ''}">${l}</button>`).join('')}</div>
         <div class="field"><label for="zT">${M ? 'معاينة الصفحة' : c.kind === 'class' ? 'الفصل' : 'المعلم'}</label><select class="in" id="zT"></select></div>
         ${c.kind === 'mclass' || c.kind === 'mteacher' ? `<div class="field"><label>التقسيم</label><div class="kpick" id="zSp"><button type="button" data-sp="all" class="${c.split !== 'day' ? 'on' : ''}">كل الأيام في صفحة</button><button type="button" data-sp="day" class="${c.split === 'day' ? 'on' : ''}">صفحة لكل يوم (أوضح)</button></div></div>` : ''}
         ${c.kind === 'load' ? `<div class="field"><label>الملخص حسب</label><div class="kpick" id="zLb"><button type="button" data-lb="teacher" class="${c.loadBy !== 'class' ? 'on' : ''}">المعلمين</button><button type="button" data-lb="class" class="${c.loadBy === 'class' ? 'on' : ''}">الفصول</button></div></div>
           <fieldset class="dz-fs"><legend>أعمدة الملخص</legend>${[['total', c.loadBy === 'class' ? 'عدد الحصص' : 'مجموع النصاب', true], ['subs', 'عدد المواد', true], ['subList', 'تفصيل المواد وحصص كل مادة', true], ['oth', c.loadBy === 'class' ? 'عدد المعلمين' : 'عدد الفصول', true], ['othList', c.loadBy === 'class' ? 'أسماء المعلمين' : 'أسماء الفصول', false], ['days', 'الحصص في كل يوم', true]].map(([k, l, d]) => `<label class="chk"><input type="checkbox" data-lc="${k}" ${(c.lc || {})[k] ?? d ? 'checked' : ''}> ${l}</label>`).join('')}</fieldset>` : ''}
         ${!M ? `<fieldset class="dz-fs"><legend><label class="chk" style="margin:0"><input type="checkbox" data-b="sum" ${c.sum ? 'checked' : ''}> <b>ملخص وإحصائية على الجدول</b></label></legend>${[['total', c.kind === 'class' ? 'عدد الحصص' : 'مجموع النصاب', true], ['subs', 'عدد المواد', true], ['other', c.kind === 'class' ? 'عدد المعلمين' : 'عدد الفصول', true], ['free', c.kind === 'class' ? 'الحصص الفارغة' : 'حصص الفراغ', false], ['perSub', 'توزيع الحصص على المواد', true], ['perDay', 'الحصص في كل يوم', false]].map(([k, l, d]) => `<label class="chk"><input type="checkbox" data-si="${k}" ${(c.si || {})[k] ?? d ? 'checked' : ''} ${c.sum ? '' : 'disabled'}> ${l}</label>`).join('')}</fieldset>` : ''}
-        <div class="field"><label for="zV">الجدول</label><select class="in" id="zV">${vers.map(v => `<option value="${v.id}" ${v.id === c.version ? 'selected' : ''}>${esc(vLbl(v))}</option>`).join('')}</select></div>
-        <div class="field"><label for="zS">التوقيت (من «اليوم الدراسي والجدول الزمني»)</label><select class="in" id="zS"><option value="">الساري اليوم</option>${bell.schedules.map(s => `<option value="${s.id}" ${c.sched === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}<option value="none" ${c.sched === 'none' ? 'selected' : ''}>بدون توقيت</option></select></div>
+        <div class="field" ${X ? 'style="display:none"' : ''}><label for="zV">الجدول</label><select class="in" id="zV">${vers.map(v => `<option value="${v.id}" ${v.id === c.version ? 'selected' : ''}>${esc(vLbl(v))}</option>`).join('')}</select></div>
+        <div class="field" ${X ? 'style="display:none"' : ''}><label for="zS">التوقيت (من «اليوم الدراسي والجدول الزمني»)</label><select class="in" id="zS"><option value="">الساري اليوم</option>${bell.schedules.map(s => `<option value="${s.id}" ${c.sched === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}<option value="none" ${c.sched === 'none' ? 'selected' : ''}>بدون توقيت</option></select></div>
         <div class="field"><label for="zTi">العنوان</label><input class="in" id="zTi" data-c="${M ? 'title2' : 'title'}" value="${esc(M ? (c.title2 || '') : c.title)}" placeholder="${M ? 'يُختار تلقائياً حسب نوع التقرير' : ''}"></div>
         <div class="field"><label for="zTg">الشارة (اختياري)</label><input class="in" id="zTg" data-c="tag" value="${esc(c.tag)}" list="zTgL" placeholder="مثال: للتعليم عن بعد"><datalist id="zTgL"><option>للتعليم عن بعد</option><option>للتعليم الحضوري</option><option>دوام شهر رمضان</option><option>الفصل الدراسي الثاني</option></datalist></div>
         <fieldset class="dz-fs"><legend>إظهار</legend>
@@ -206,7 +215,7 @@
           ${c.kind === 'load' ? '' : `<label class="chk"><input type="checkbox" data-b="who" ${c.who ? 'checked' : ''}> ${c.kind === 'class' || c.kind === 'mclass' ? 'اسم المعلم تحت المادة' : 'المادة تحت الفصل'}</label>`}<label class="chk"><input type="checkbox" data-b="nums" ${c.nums ? 'checked' : ''}> أرقام الحصص</label>
           <label class="chk"><input type="checkbox" data-b="shortN" ${c.shortN ? 'checked' : ''}> أسماء مواد مختصرة</label></fieldset>
         <div class="field"><label>اللون</label><div class="dz-th">${Object.entries(THEMES).map(([k, t]) => `<button type="button" data-th="${k}" class="${c.theme === k ? 'on' : ''}" style="background:linear-gradient(135deg,${t.a} 55%,${t.b} 55%)" aria-label="لون ${({ navy: "كحلي", sky: "أزرق", green: "أخضر", purple: "بنفسجي" })[k]}" title="${({ navy: "كحلي", sky: "أزرق", green: "أخضر", purple: "بنفسجي" })[k]}"></button>`).join('')}</div></div>
-        ${M ? '' : `<details class="dz-det"><summary>رابط القاعة الافتراضية (QR)</summary>
+        ${M ? '' : `<details class="dz-det"><summary>رابط القاعة الافتراضية (QR)${X ? ' — من روابط الجدول' : ''}</summary>
           <div class="field"><label for="zL">رابط ${c.kind === 'class' ? 'هذا الفصل' : 'هذا المعلم'}</label><input class="in" id="zL" dir="ltr" placeholder="https://…"></div>
           <div class="field"><label for="zL0">رابط عام لكل الجداول (إن لم يُحدد رابط خاص)</label><input class="in" id="zL0" dir="ltr" data-c="link0" value="${esc(c.link0)}" placeholder="https://…"></div>
           <div class="grid g2"><div class="field"><label for="zQ1">عنوان الزر</label><input class="in" id="zQ1" data-c="qrT" value="${esc(c.qrT)}"></div><div class="field"><label for="zQ2">النص الفرعي</label><input class="in" id="zQ2" data-c="qrS" value="${esc(c.qrS)}"></div></div>
@@ -224,7 +233,7 @@
     const drawSh = () => { const ids = [...new Set(D.slots.filter(s => s.subject_id).map(s => s.subject_id))].sort((a, b) => (A.subjName(a) || '').localeCompare(A.subjName(b) || '', 'ar')); $('#zSh', root).innerHTML = ids.map(id => `<label><span>${esc(A.subjName(id))}</span><input class="in" data-sh="${id}" value="${esc(c.short[id] || '')}" placeholder="${esc(subShort(Object.assign({}, c, { short: {} }), id))}"></label>`).join(''); $$('[data-sh]', root).forEach(i => i.oninput = () => { if (i.value.trim()) c.short[i.dataset.sh] = i.value.trim(); else delete c.short[i.dataset.sh]; changed(); }); };
     const fit = () => { const st = $('#zStage', root), sc = $('#zPv', root); if (!st) return; const k = Math.min(1, (st.clientWidth - 4) / 1123); sc.style.transform = `scale(${k})`; st.style.height = Math.ceil(794 * k) + 'px'; };
     const draw = () => { if (M) { mp = masterPages(c, D); const zt = $('#zT', root); if (zt.options.length !== mp.length) drawT(); } if (!M && !cur) { $('#zPv', root).innerHTML = A.emptyBox('لا توجد حصص في هذا الجدول'); return; } $('#zPv', root).innerHTML = curHTML(); const zl = $('#zL', root); if (zl) zl.value = c.links[cur] || ''; fit();
-      const s = D.sched; $('#zInfo', root).textContent = s ? `التوقيت: ${s.name} · ${AR(A.bell.maxP(s, sec))} حصص · الأيام: ${A.bell.actDays(s, sec).map(d => DAYS[d]).join('، ')}` : 'بدون توقيت — يظهر الجدول بعدد حصص القسم.'; };
+      const s = D.sched; $('#zInfo', root).textContent = X ? `${X.label} · ${AR(XP)} حصص · الأيام: ${XD.map(d => DAYS[d]).join('، ')}${s ? '' : ' · بدون توقيت'}` : s ? `التوقيت: ${s.name} · ${AR(A.bell.maxP(s, sec))} حصص · الأيام: ${A.bell.actDays(s, sec).map(d => DAYS[d]).join('، ')}` : 'بدون توقيت — يظهر الجدول بعدد حصص القسم.'; };
     let sv = null; const changed = () => { draw(); clearTimeout(sv); sv = setTimeout(() => saveCfg(Object.assign({}, c, { cur })), 900); };
     new ResizeObserver(fit).observe($('#zStage', root));
     $$('#zK button', root).forEach(b => b.onclick = () => { c.kind = b.dataset.k; saveCfg(c); A.ttDesign(root, opts); });

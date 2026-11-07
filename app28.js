@@ -68,6 +68,10 @@
   const isClash = (m, x) => { const t = tKey(x); return !!t && (m[t + '|' + x.d + '|' + x.p] || []).length > 1; };
 
   // شبكة فصل (مشتركة بين المعاينة والتعديل)
+  // لون مميز لكل مادة (للخانات وعناصر الخانة السفلية)
+  const hue = k => { let h = 0; for (const ch of String(k)) h = (h * 31 + ch.charCodeAt(0)) % 360; return h; };
+  const subjVar = x => `--sc:hsl(${hue(sKey(x))} 62% 44%);--sb:hsl(${hue(sKey(x))} 70% 96%)`;
+  A._liveHue = subjVar;
   function grid(slots, c, days, nOf, o = {}) {
     const P = Math.max(1, ...days.map(nOf), ...slots.filter(x => x.c === c).map(x => x.p + 1)); const cm = clashMap(slots);
     return `<div class="scroll"><table class="tbl lvx-g"><thead><tr><th>اليوم</th>${Array.from({ length: P }, (_, p) => `<th>${PER[p] || AR(p + 1)}</th>`).join('')}</tr></thead><tbody>${days.map(d => `<tr><th>${DAYS[d]}</th>${Array.from({ length: P }, (_, p) => {
@@ -75,7 +79,7 @@
       if (!x) return `<td class="${off ? 'off' : 'emp'}">${o.edit && !off ? `<button class="lvx-c add" data-xc="${d}|${p}" aria-label="إضافة حصة ${DAYS[d]} ${AR(p + 1)}">+</button>` : '<span class="faint">—</span>'}</td>`;
       const cl = isClash(cm, x), mv = o.orig && o.orig(x);
       const inner = `<b>${esc(sName(x))}</b><small>${esc(tName(x) || 'بلا معلم')}</small>${cl ? '<i class="lvx-w">تعارض</i>' : mv ? '<i class="lvx-m">نُقلت</i>' : ''}`;
-      return `<td class="${cl ? 'clash' : ''} ${off ? 'off' : ''}">${o.edit ? `<button class="lvx-c" data-xc="${d}|${p}">${inner}</button>` : `<div class="lvx-c ro">${inner}</div>`}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>`;
+      return `<td class="${cl ? 'clash' : ''} ${off ? 'off' : ''}">${o.edit ? `<button class="lvx-c sj" style="${subjVar(x)}" data-xc="${d}|${p}" draggable="true" title="اسحب لنقلها أو تبديلها، أو اضغط لتعديلها">${inner}</button>` : `<div class="lvx-c ro sj" style="${subjVar(x)}">${inner}</div>`}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>`;
   }
 
   // ---------------- نافذة التحويل ----------------
@@ -87,13 +91,16 @@
     const appr = vers.find(v => v.status === 'approved') || vers[0];
     const preS = bell.schedules.find(s => /بعد/.test(s.name + ' ' + (s.tag || ''))) || A.bell.activeSched(bell);
     const [wf, wt] = H.curWeek(); const t0 = H.today();
+    const WKS = []; (S.weeks || []).filter(w => !w.archived && w.start_date).slice().sort((x, y) => x.number - y.number).forEach(w => { if (!WKS.some(x => x.number === w.number)) WKS.push(w); });
+    const WKT = (WKS.find(w => w.start_date <= t0 && t0 <= H.addD(w.start_date, 6)) || {}).id, WK0 = WKT || (WKS.find(w => w.start_date > t0) || WKS[WKS.length - 1] || {}).id;
     const m = A.modal(`<h3>تحويل يوم أو أسبوع للتعلم عن بعد</h3>
       <p class="sub">يُنشأ جدول استثنائي من الجدول الذي تختاره: تحذف المواد غير المناسبة، وتُرحَّل الحصص الباقية تلقائياً <b>بعدد موحّد لكل الفصول وبلا تعارض للمعلمين</b>. الجدول المعتمد والخطط وما كتبه المعلمون لا يتغير شيء منها.</p>
       <div class="grid g2">
         <div class="field"><label for="cvSrc">من جدول</label><select class="in" id="cvSrc">${vers.map(v => `<option value="v:${v.id}" ${appr && v.id === appr.id ? 'selected' : ''}>${esc(v.label)}${v.status === 'approved' ? ' (المعتمد)' : ' (مسودة)'}</option>`).join('')}${dss.map(d => `<option value="d:${d.id}">جدول استثنائي: ${esc(d.label)}</option>`).join('')}</select></div>
         <div class="field"><label for="cvL">الاسم</label><input class="in" id="cvL" value="جدول التعليم عن بعد"></div>
-        <div class="field"><label>المدة</label><div class="kpick" id="cvMode"><button data-m="day" class="on">يوم واحد</button><button data-m="range">أسبوع أو عدة أيام</button></div></div>
-        <div class="field" id="cvDayBox"><label for="cvDay">اليوم</label><input class="in" type="date" id="cvDay" value="${t0 >= wf && t0 <= wt ? t0 : wf}"></div>
+        <div class="field"><label>المدة</label><div class="kpick" id="cvMode"><button data-m="week" class="on">أسبوع دراسي</button><button data-m="day">يوم واحد</button><button data-m="range">فترة محددة</button></div></div>
+        <div class="field" id="cvWkBox"><label for="cvWk">الأسبوع</label><select class="in" id="cvWk">${WKS.map(w => `<option value="${w.id}" ${w.id === WK0 ? 'selected' : ''}>الأسبوع ${esc(w.word)} — ${AR(A.dmy(A.parseDate(w.start_date)))}${w.id === WKT ? ' (الحالي)' : ''}</option>`).join('')}</select><span class="small muted">تُضبط الفترة على أيام الأسبوع المختار تلقائياً (مع استبعاد أيام إجازته).</span></div>
+        <div class="field" id="cvDayBox" style="display:none"><label for="cvDay">اليوم</label><input class="in" type="date" id="cvDay" value="${t0 >= wf && t0 <= wt ? t0 : wf}"></div>
         <div class="field" id="cvRgBox" style="display:none"><label>الفترة</label><div class="row" style="gap:6px"><input class="in" type="date" id="cvF" value="${wf}" aria-label="من"><input class="in" type="date" id="cvT" value="${wt}" aria-label="إلى"></div></div>
         <div class="field" style="grid-column:1/-1"><label>الأيام المشمولة</label><div class="row" id="cvDays" style="gap:6px;flex-wrap:wrap"></div></div>
         <div class="field"><label for="cvS">التوقيت (من أداة التوقيت)</label><select class="in" id="cvS">${bell.schedules.map(s => `<option value="${s.id}" ${s.id === preS.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>
@@ -102,18 +109,21 @@
       </div>
       <div class="acts"><button class="btn" id="cvGo">معاينة الترحيل</button></div>
       <div id="cvRes"></div>`, { cls: 'wide' });
-    const el = m.el, q = s => el.querySelector(s); let mode = 'day', src = [], res = null, pv = null;
-    const range = () => mode === 'day' ? [q('#cvDay').value, q('#cvDay').value] : [q('#cvF').value, q('#cvT').value];
+    const el = m.el, q = s => el.querySelector(s); let mode = 'week', src = [], res = null, pv = null;
+    const wkSel = () => WKS.find(w => w.id === q('#cvWk').value);
+    const range = () => { if (mode === 'week') { const w = wkSel(); if (!w) return ['', '']; return [w.start_date, H.addD(w.start_date, ((A.section() || {}).days || 5) - 1)]; } return mode === 'day' ? [q('#cvDay').value, q('#cvDay').value] : [q('#cvF').value, q('#cvT').value]; };
     const secDays = Array.from({ length: Math.max(5, sec.days || 5) }, (_, i) => i).filter(d => d < (sec.days || 5));
     const drawDays = () => { const [f, t] = range(); const on = new Set(); if (f && t && t >= f) for (let x = f, i = 0; x <= t && i < 31; x = H.addD(x, 1), i++) { const w = dowOf(x); if (secDays.includes(w)) on.add(w); }
-      q('#cvDays').innerHTML = on.size ? [...on].sort().map(d => `<label class="chk"><input type="checkbox" data-cvd="${d}" checked> ${DAYS[d]}</label>`).join('') : '<span class="small" style="color:var(--bad)">الفترة لا تحتوي أيام دراسة</span>'; };
+      q('#cvDays').innerHTML = on.size ? [...on].sort().map(d => `<label class="chk"><input type="checkbox" data-cvd="${d}" ${wkHol().includes(d) ? '' : 'checked'}> ${DAYS[d]}${wkHol().includes(d) ? ' <span class="small" style="color:#B7791F">(إجازة)</span>' : ''}</label>`).join('') : '<span class="small" style="color:var(--bad)">الفترة لا تحتوي أيام دراسة</span>'; };
     const days = () => $$('[data-cvd]', el).filter(i => i.checked).map(i => +i.dataset.cvd);
+    const wkHol = () => mode === 'week' && wkSel() ? (wkSel().holidays || []).map(h => +h.day) : [];
     const metaOf = () => H.metaFrom(q('#cvS').value);
     const drawN = () => { const M0 = metaOf(), cur = +q('#cvN').value || M0.periods; q('#cvN').innerHTML = Array.from({ length: 10 }, (_, i) => `<option value="${i + 1}" ${i + 1 === Math.min(cur, 10) ? 'selected' : ''}>${AR(i + 1)} حصص${i + 1 === M0.periods ? ' (حسب التوقيت)' : ''}</option>`).join(''); };
     const loadSrc = async () => { const v = q('#cvSrc').value; if (v.startsWith('v:')) src = (await api.list('timetable_slots', { version_id: v.slice(2) })).filter(x => x.subject_id).map(x => ({ c: x.class_id, d: x.day, p: x.period, s: x.subject_id, t: x.teacher_id || null })); else src = JSON.parse(JSON.stringify((dss.find(d => d.id === v.slice(2)) || {}).slots || []));
       const cnt = {}; src.forEach(x => { const k = sKey(x); if (!k) return; (cnt[k] = cnt[k] || { k, n: 0, name: sName(x) }).n++; });
       q('#cvEx').innerHTML = Object.values(cnt).sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(o => `<label class="chk"><input type="checkbox" value="${esc(o.k)}" ${PE_RE.test(o.name) ? 'checked' : ''}> ${esc(o.name)} <span class="small muted">(${AR(o.n)})</span></label>`).join('') || '<span class="muted small">الجدول فارغ</span>'; };
-    $$('#cvMode button', el).forEach(b => b.onclick = () => { mode = b.dataset.m; $$('#cvMode button', el).forEach(x => x.classList.toggle('on', x === b)); q('#cvDayBox').style.display = mode === 'day' ? '' : 'none'; q('#cvRgBox').style.display = mode === 'day' ? 'none' : ''; drawDays(); });
+    $$('#cvMode button', el).forEach(b => b.onclick = () => { mode = b.dataset.m; $$('#cvMode button', el).forEach(x => x.classList.toggle('on', x === b)); q('#cvDayBox').style.display = mode === 'day' ? '' : 'none'; q('#cvRgBox').style.display = mode === 'range' ? '' : 'none'; q('#cvWkBox').style.display = mode === 'week' ? '' : 'none'; drawDays(); });
+    q('#cvWk').onchange = drawDays;
     ['#cvDay', '#cvF', '#cvT'].forEach(s => q(s).onchange = drawDays);
     q('#cvS').onchange = drawN; q('#cvSrc').onchange = () => A.run(null, loadSrc);
     drawDays(); drawN(); await loadSrc();
@@ -187,7 +197,7 @@
           return `<div class="lvp-cnt"><b>عدد الحصص في الأسبوع لكل فصل</b> <span class="small muted">(السعة ${AR(caps)})</span><div>${all.map(x => { const n = cnt(x); return `<button class="lvp-c ${n < caps ? 'lo' : n > caps ? 'hi' : ''} ${x === c ? 'on' : ''}" data-gc="${x}">${esc(H.cName(x))} <b>${AR(n)}</b></button>`; }).join('')}</div>${lo.length ? `<p class="small" style="color:#B7791F;margin:4px 0 0">${AR(lo.length)} فصل أقل من السعة — أكمله من الخانة أدناه أو بـ«تعبئة الفراغات آلياً».</p>` : ''}</div>`; })()}
           ${(() => { const P = ds.pool.map((x, i) => ({ ...x, i })).filter(x => poolAll || x.c === c); const W = { removed: 'محذوفة', over: 'زائدة', manual: 'أُزيلت يدوياً' };
             return `<div class="lvp-box"><div class="row" style="justify-content:space-between;gap:6px;flex-wrap:wrap"><b>خانة الحصص المحذوفة والزائدة (${AR(P.length)}${poolAll ? '' : ' لهذا الفصل'} · ${AR(ds.pool.length)} إجمالاً)</b><label class="chk small"><input type="checkbox" id="xePA" ${poolAll ? 'checked' : ''}> كل الفصول</label></div>
-              ${P.length ? `<div class="lvp-items">${P.map(x => `<span class="lvp-it ${x.why} ${pick && pick._i === x.i ? 'on' : ''}"><button type="button" data-pk="${x.i}" title="اختر ثم اضغط خانة فارغة"><b>${esc(sName(x))}</b><small>${esc(tName(x) || 'بلا معلم')}${poolAll ? ' · ' + esc(H.cName(x.c)) : ''} · ${W[x.why] || ''}</small></button><button type="button" class="x" data-pkx="${x.i}" aria-label="حذف من الخانة">×</button></span>`).join('')}</div>` : '<p class="small muted" style="margin:6px 0 0">لا توجد حصص في الخانة.</p>'}</div>`; })()}</div>`;
+              ${P.length ? `<div class="lvp-items">${P.map(x => `<span class="lvp-it ${x.why} ${pick && pick._i === x.i ? 'on' : ''}" style="${subjVar(x)}"><button type="button" data-pk="${x.i}" draggable="true" title="اسحبها إلى خانة في الجدول، أو اضغطها ثم اضغط الخانة"><b>${esc(sName(x))}</b><small>${esc(tName(x) || 'بلا معلم')}${poolAll ? ' · ' + esc(H.cName(x.c)) : ''} · ${W[x.why] || ''}</small></button><button type="button" class="x" data-pkx="${x.i}" aria-label="حذف من الخانة">×</button></span>`).join('')}</div>` : '<p class="small muted" style="margin:6px 0 0">لا توجد حصص في الخانة.</p>'}<p class="small muted" style="margin:6px 0 0"><span class="lvp-k removed">المحذوفة (كالبدنية)</span> <span class="lvp-k over">الزائدة</span> <span class="lvp-k manual">أُزيلت يدوياً</span> · اسحب أي حصة من الجدول إلى هنا لإزالتها.</p></div>`; })()}</div>`;
       $('#xeC', B).onchange = e => { h.setCls(e.target.value); pick = null; draw(); };
       $$('[data-gc]', B).forEach(b => b.onclick = () => { h.setCls(b.dataset.gc); pick = null; draw(); });
       const pa = $('#xePA', B); if (pa) pa.onchange = e => { poolAll = e.target.checked; draw(); };
@@ -196,8 +206,9 @@
       $$('[data-pkx]', B).forEach(b => b.onclick = () => A.run(b, async () => { if (!(await A.confirmBox('حذف هذه الحصة من الخانة؟', 'حذف', true))) return; ds.pool.splice(+b.dataset.pkx, 1); pick = null; await persist(''); }));
       $('#xeAuto', B).onclick = () => autoDialog(c);
       $$('[data-xc]', B).forEach(b => b.onclick = () => { const [d, p] = b.dataset.xc.split('|').map(Number);
-        if (pick && b.classList.contains('add')) return A.run(b, async () => { const it = pick; const clash = busyT(tKey(it), d, p); ds.slots.push({ c: it.c, d, p, s: it.s, sn: it.sn, t: it.t, tn: it.tn }); ds.pool.splice(it._i, 1); pick = null; await persist(clash ? 'وُضعت الحصة — تنبيه: المعلم لديه حصة أخرى في الوقت نفسه (بالأحمر)' : 'وُضعت الحصة'); });
+        if (pick) return A.run(b, () => dropOn({ pool: pick._i }, d, p, c));
         cellDialog(c, d, p); });
+      bindSmart(c);
       $('#xeDelS', B).onclick = () => { const mm = A.modal(`<h3>حذف مادة من كامل الجدول الاستثنائي</h3><div class="perm-grid">${Object.values(subs).sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(o => `<label class="chk"><input type="checkbox" value="${esc(o.k)}"> ${esc(o.name)} <span class="small muted">(${AR(o.n)})</span></label>`).join('')}</div>
           <label class="chk" style="margin-top:8px"><input type="checkbox" id="xdRe" checked> ترحيل الحصص الباقية تلقائياً بعد الحذف (بلا تعارض)</label><div class="acts"><button class="btn bad" id="xdGo">حذف</button></div>`);
         mm.el.querySelector('#xdGo').onclick = e => A.run(e.currentTarget, async () => { const ex = new Set($$('input[value]:checked', mm.el).map(i => i.value)); if (!ex.size) throw new Error('اختر مادة'); const n0 = ds.slots.length;
@@ -231,6 +242,35 @@
       });
       if (g('#xcDel')) g('#xcDel').onclick = e => A.run(e.currentTarget, async () => { toPool(x, 'manual'); ds.slots = ds.slots.filter(y => y !== x); mm.close(); await persist('نُقلت الحصة إلى خانة الحصص أسفل الجدول'); });
     };
+    // ---------- اقتراحات ذكية + سحب وإفلات ----------
+    const verdict = (it, d, p, self, c) => { const tk = tKey(it); const cl = tk ? ds.slots.filter(y => y !== self && y.c !== c && y.d === d && y.p === p && tKey(y) === tk) : []; if (cl.length) return { v: 'bad', cl };
+      const k = sKey(it), same = ds.slots.filter(y => y !== self && y.c === c && y.d === d && sKey(y) === k).length; return { v: same >= 2 ? 'day' : 'ok', cl: [] }; };
+    const markCells = (it, self, c) => $$('[data-xc]', B).forEach(b => { const [d, p] = b.dataset.xc.split('|').map(Number); b.classList.remove('sg-ok', 'sg-bad', 'sg-day'); if (!it) return; if (self && self.d === d && self.p === p) return; const r = verdict(it, d, p, self, c); b.classList.add('sg-' + r.v); b.title = r.v === 'bad' ? 'تعارض: ' + tName(it) + ' لديه حصة في ' + r.cl.map(y => H.cName(y.c)).join('، ') : r.v === 'day' ? 'المادة مكررة في هذا اليوم' : 'مناسبة ✓'; });
+    const clashMsg = (it, d, p, self, c) => { const r = verdict(it, d, p, self, c); return r.v === 'bad' ? `تعارض: «${esc(tName(it))}» لديه حصة في الوقت نفسه في ${r.cl.map(y => esc(H.cName(y.c))).join('، ')}.` : r.v === 'day' ? `«${esc(sName(it))}» مكررة مرتين أو أكثر في هذا اليوم.` : ''; };
+    function bindSmart(c) {
+      if (pick) markCells(pick, null, c);
+      let drag = null;
+      const start = (e, info) => { drag = info; try { e.dataTransfer.setData('text/plain', 'x'); e.dataTransfer.effectAllowed = 'move'; } catch (_) { } const it = info.pool != null ? ds.pool[info.pool] : info.cell; markCells(it, info.cell || null, c); B.classList.add('dragging'); };
+      const end = () => { B.classList.remove('dragging'); markCells(null, null, c); $$('.drop-on', B).forEach(x => x.classList.remove('drop-on')); };
+      $$('[data-pk]', B).forEach(b => { b.ondragstart = e => { const it = ds.pool[+b.dataset.pk]; if (it.c !== c) { e.preventDefault(); h.setCls(it.c); draw(); return A.toast('فُتح فصل هذه الحصة — اسحبها الآن', 'ok'); } start(e, { pool: +b.dataset.pk }); }; b.ondragend = end; });
+      $$('.lvx-c[data-xc]:not(.add)', B).forEach(b => { b.ondragstart = e => { const [d, p] = b.dataset.xc.split('|').map(Number); start(e, { cell: ds.slots.find(y => y.c === c && y.d === d && y.p === p) }); }; b.ondragend = end; });
+      const over = e => { if (!drag) return; e.preventDefault(); e.currentTarget.classList.add('drop-on'); }, leave = e => e.currentTarget.classList.remove('drop-on');
+      $$('[data-xc]', B).forEach(b => { b.ondragover = over; b.ondragleave = leave; b.ondrop = e => { e.preventDefault(); const info = drag; drag = null; end(); if (!info) return; const [d, p] = b.dataset.xc.split('|').map(Number); A.run(null, () => dropOn(info, d, p, c)); }; });
+      const pb = $('.lvp-box', B); if (pb) { pb.ondragover = e => { if (drag && drag.cell) { e.preventDefault(); pb.classList.add('drop-on'); } }; pb.ondragleave = () => pb.classList.remove('drop-on'); pb.ondrop = e => { e.preventDefault(); const info = drag; drag = null; end(); if (!info || !info.cell) return; A.run(null, async () => { toPool(info.cell, 'manual'); ds.slots = ds.slots.filter(y => y !== info.cell); await persist('نُقلت الحصة إلى الخانة'); }); }; }
+    }
+    async function dropOn(info, d, p, c) {
+      const o = ds.slots.find(y => y.c === c && y.d === d && y.p === p);
+      if (info.pool != null) { const it = ds.pool[info.pool]; const m = clashMsg(it, d, p, null, c);
+        if (m && !(await A.confirmBox(m + '<br>هل تريد وضعها رغم ذلك؟', 'وضع'))) return;
+        if (o) toPool(o, 'manual'), ds.slots = ds.slots.filter(y => y !== o);
+        ds.slots.push({ c, d, p, s: it.s || null, sn: it.sn || '', t: it.t || null, tn: it.tn || '' }); ds.pool.splice(info.pool, 1); pick = null;
+        return persist(o ? 'وُضعت الحصة ونُقلت السابقة إلى الخانة' : 'وُضعت الحصة'); }
+      const x = info.cell; if (!x || (x.d === d && x.p === p)) return;
+      const m1 = clashMsg(x, d, p, x, c), m2 = o ? clashMsg(o, x.d, x.p, o, c) : '';
+      if ((m1 || m2) && !(await A.confirmBox([m1, m2].filter(Boolean).join('<br>') + '<br>المتابعة رغم ذلك؟', o ? 'تبديل' : 'نقل'))) return;
+      const sd = x.d, sp = x.p; x.d = d; x.p = p; if (o) { o.d = sd; o.p = sp; }
+      return persist(o ? 'بُدّلت الحصتان' : 'نُقلت الحصة');
+    }
     // ---------- التعبئة الآلية للفراغات وفق قواعد ----------
     function autoFill(R) {
       const caps = capOf(), all = classes();

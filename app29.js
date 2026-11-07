@@ -106,7 +106,7 @@
   const Q_RE = /^\s*(?:§\s*|س\s*[0-9٠-٩]+\s*[\/\-:)]?\s*|\(?\s*[0-9٠-٩]{1,3}\s*[\)\-\.ـ:]\s*)/;
   const OPT_RE = /^\s*\(?\s*([أابجدهوa-fA-F])\s*[\)\-\.ـ:]\s*(.+)$/;
   const SEC_RE = /^\s*(?:السؤال|سؤال)\s+(?:ال)?(?:أول|اول|ثاني|ثالث|رابع|خامس|سادس|[0-9٠-٩]+)/;
-  const kindOf = t => /اختر|اختاري|ظلل|ضع دائرة|الإجابة الصحيحة|الاجابة الصحيحة/.test(t) ? 'mcq' : /صح|خطأ|خطا|✓|✗|صواب/.test(t) ? 'tf' : /أكمل|اكمل|املأ|املئي|الفراغ|أكملي/.test(t) ? 'short' : /علل|اشرح|وضح|وضّح|أجب|اجب|قارن|اكتب|عرف|عرّف/.test(t) ? 'essay' : '';
+  const kindOf = t => /^\s*(?:§\s*)?(?:السؤال\s+\S+\s*[:：\-]?\s*)?(?:صل|صلي|زاوج|طابق)/.test(t) || /صل\s+(?:بين|من)|المناسب من العمود/.test(t) ? 'match' : /رتب|رتّب|رتبي/.test(t) ? 'order' : /اختر|اختاري|ظلل|ضع دائرة|الإجابة الصحيحة|الاجابة الصحيحة/.test(t) ? 'mcq' : /صح|خطأ|خطا|✓|✗|صواب/.test(t) ? 'tf' : /أكمل|اكمل|املأ|املئي|الفراغ|أكملي/.test(t) ? 'short' : /علل|اشرح|وضح|وضّح|أجب|اجب|قارن|اكتب|عرف|عرّف/.test(t) ? 'essay' : '';
   // تقسيم سطر فيه عدة خيارات: «أ) ٣  ب) ٥  ج) ٧»
   const splitInline = l => { const m = [...l.matchAll(/(?:^|\s)\(?([أابجده])\s*[\)\-ـ]\s*/g)]; if (m.length < 2) return null; return m.map((x, i) => clean(l.slice(x.index + x[0].length, i + 1 < m.length ? m[i + 1].index : undefined))).filter(Boolean); };
   function parseLines(lines) {
@@ -115,9 +115,9 @@
     for (let raw of lines) {
       let l = clean(raw); if (!l) continue;
       if (!qs.length && !cur && !title && l.length < 80 && !Q_RE.test(l) && /اختبار|ورقة عمل|واجب|تقويم|مراجعة|نشاط/.test(l)) { title = l.replace(/^§\s*/, ''); continue; }
-      if (SEC_RE.test(l) || (/^(اختر|ضع|أكمل|اكمل|أجب|اجب|علل|صل|املأ|ظلل)/.test(l.replace(/^§\s*/, '')) && l.length < 90 && !OPT_RE.test(l))) { push(); const k = kindOf(l); if (k) sec = k; continue; }
+      if (SEC_RE.test(l) || (/^(اختر|ضع|أكمل|اكمل|أجب|اجب|علل|صل|زاوج|رتب|رتّب|املأ|ظلل)/.test(l.replace(/^§\s*/, '')) && l.length < 90 && !OPT_RE.test(l))) { push(); const k = kindOf(l); if (k) sec = k; continue; }
       const ans = l.match(/^(?:الإجابة|الاجابة|الجواب|الحل)\s*(?:الصحيحة)?\s*[:：\-]\s*(.+)$/);
-      if (ans && cur) { const a = clean(ans[1]); if (cur.qtype === 'mcq' || cur.options.length) { const k = LETTER(a.split(/\s/)[0]); const i = k >= 0 ? k : cur.options.findIndex(o => A.normKey(o.t) === A.normKey(a)); cur.options.forEach((o, j) => o.ok = j === i); } else if (cur.qtype === 'tf') cur.answer = TF(a) || cur.answer; else cur.answer = a; continue; }
+      if (ans && cur) { const a = clean(ans[1]); if (cur.qtype === 'blank') { const p = a.split(/\s*[،,؛]\s*|\s+-\s+/).filter(Boolean); cur.options = cur.options.map((o, j) => ({ t: p[j] || o.t || '' })); if (p.length > cur.options.length) p.slice(cur.options.length).forEach(t => cur.options.push({ t })); continue; } if (cur.qtype === 'mcq' || (cur.options.length && cur.qtype !== 'match' && cur.qtype !== 'order')) { const k = LETTER(a.split(/\s/)[0]); const i = k >= 0 ? k : cur.options.findIndex(o => A.normKey(o.t) === A.normKey(a)); cur.options.forEach((o, j) => o.ok = j === i); } else if (cur.qtype === 'tf') cur.answer = TF(a) || cur.answer; else if (cur.qtype === 'blank') { const p = a.split(/\s*[،,؛]\s*|\s+-\s+/).filter(Boolean); cur.options = cur.options.map((o, j) => ({ t: p[j] || o.t || '' })); if (p.length > cur.options.length) p.slice(cur.options.length).forEach(t => cur.options.push({ t })); } else cur.answer = a; continue; }
       const om = l.match(OPT_RE);
       if (cur && om && !Q_RE.test(l.replace(OPT_RE, ''))) { const inl = splitInline(l); (inl || [om[2]]).forEach(t => { const ok = OK_MARK.test(t); cur.options.push({ t: clean(t.replace(OK_MARK, '')), ...(ok ? { ok: true } : {}) }); }); cur.qtype = 'mcq'; continue; }
       if (Q_RE.test(l)) { push(); let body = clean(l.replace(Q_RE, '')); let tf = '';
@@ -125,13 +125,17 @@
         if (tm) { tf = TF(tm[1] || ''); body = clean(body.replace(tm[0], '')); }
         const inl = splitInline(body); let opts = [];
         if (inl) { const first = body.search(/(?:^|\s)\(?[أابجده]\s*[\)\-ـ]\s*/); opts = inl; body = clean(body.slice(0, first)); }
-        cur = { body, qtype: tm ? 'tf' : opts.length ? 'mcq' : sec || (/\.{3,}|…{1,}|_{3,}/.test(body) ? 'short' : 'essay'), options: opts.map(t => { const ok = OK_MARK.test(t); return { t: clean(t.replace(OK_MARK, '')), ...(ok ? { ok: true } : {}) }; }), answer: tf, points: 1 };
+        if (sec === 'match') { const pm = body.split(/\s*(?:←|→|=|:|—|–|\s-\s)\s*/); if (pm.length >= 2 && pm[0] && pm[1]) { const last = qs[qs.length - 1]; const pair = { t: clean(pm[0]), m: clean(pm.slice(1).join(' ')) }; if (last && last.qtype === 'match' && last._grp) last.options.push(pair); else { cur = { body: 'صل كل عنصر بما يناسبه', qtype: 'match', options: [pair], answer: '', points: 1, _grp: 1 }; push(); } continue; } }
+        if (sec === 'order' && !opts.length) { const it = body.split(/\s*[،,؛/]\s*|\s+-\s+/).filter(Boolean); if (it.length >= 3) { cur = { body: 'رتّب ما يلي', qtype: 'order', options: it.map(t => ({ t: clean(t) })), answer: '', points: 1 }; continue; } }
+        const nb = (body.match(/\.{3,}|…+|_{3,}/g) || []).length;
+        if (!tm && !opts.length && nb && (sec === 'short' || sec === '' || sec === 'blank')) { cur = { body, qtype: 'blank', options: Array.from({ length: nb }, () => ({ t: '' })), answer: '', points: nb > 1 ? nb : 1 }; continue; }
+        cur = { body, qtype: tm ? 'tf' : opts.length ? 'mcq' : (sec === 'order' || sec === 'match' ? '' : sec) || (/\.{3,}|…{1,}|_{3,}/.test(body) ? 'short' : 'essay'), options: opts.map(t => { const ok = OK_MARK.test(t); return { t: clean(t.replace(OK_MARK, '')), ...(ok ? { ok: true } : {}) }; }), answer: tf, points: 1 };
         continue; }
       if (cur) { if (!cur.options.length) cur.body = clean(cur.body + ' ' + l); else cur.options[cur.options.length - 1].t = clean(cur.options[cur.options.length - 1].t + ' ' + l); }
       else if (l.length > 8 && /[؟?]|\.{3,}/.test(l)) { cur = { body: l.replace(/^§\s*/, ''), qtype: sec || 'essay', options: [], answer: '', points: 1 }; }
     }
     push();
-    qs.forEach(q => { if (q.qtype === 'mcq' && q.options.length < 2) { q.qtype = sec === 'tf' ? 'tf' : 'short'; q.options = []; } if (q.qtype !== 'mcq') q.options = q.qtype === 'mcq' ? q.options : []; if (q.qtype === 'mcq' && !q.options.length) q.qtype = 'essay'; });
+    qs.forEach(q => { if (q.qtype === 'mcq' && q.options.length < 2) { q.qtype = sec === 'tf' ? 'tf' : 'short'; q.options = []; } if (!['mcq', 'blank', 'match', 'order'].includes(q.qtype)) q.options = []; delete q._grp; if (q.qtype === 'mcq' && !q.options.length) q.qtype = 'essay'; });
     return { title, qs };
   }
   A._parseQ = parseLines;
@@ -150,7 +154,8 @@
     return { qs: all, title, rep };
   }
 
-  A.importQ = function (after) {
+  A._fileLines = async f => { const n = f.name.toLowerCase(); return /\.pdf$/.test(n) || f.type === 'application/pdf' ? pdfLines(f) : /\.docx$/.test(n) ? docxLines(f) : /\.(txt|md)$/.test(n) || (f.type || '').startsWith('text/') ? (await f.text()).split(/\r?\n/) : null; };
+  A.importQ = function (after, pre) {
     const X = A._assess; if (!X) return;
     let Q = [], title = '';
     const m = A.modal(`<h3>استيراد اختبار أو ورقة عمل من ملف</h3>
@@ -167,24 +172,31 @@
     const q = s => m.el.querySelector(s);
     const dv = q('#iqDv'); if (dv) dv.onclick = () => A.driveDialog(S.me);
     q('#iqTpl').onclick = e => { e.preventDefault(); const ws = XLSX.utils.aoa_to_sheet([['السؤال', 'النوع', 'أ', 'ب', 'ج', 'د', 'الإجابة', 'الدرجة'], ['ناتج ٣ × ٤ يساوي', 'اختيار', '٧', '١٢', '١٤', '١٦', 'ب', 1], ['الشمس نجم', 'صواب وخطأ', '', '', '', '', 'صح', 1], ['عاصمة المملكة هي ......', 'أكمل', '', '', '', '', 'الرياض', 1]]); ws['!views'] = [{ RTL: true }]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'الأسئلة'); XLSX.writeFile(wb, 'قالب أسئلة - منصة دينا.xlsx'); };
-    const load = r => { Q = Q.concat(r.qs.map(x => ({ ...x, on: true }))); title = title || r.title; q('#iqR').innerHTML = `<div class="notice ${Q.length ? 'ok' : 'warn'}" style="display:block">${r.rep.map(esc).join(' · ')}${Q.length ? ` — المجموع ${AR(Q.length)} سؤال. راجعها قبل الحفظ.` : ' — لم تُستخرج أسئلة. جرّب ملف Word أو قالب Excel.'}</div>`; draw(); };
+    const load = r => { Q = Q.concat(r.qs.map(x => { const d = A.dupOf ? A.dupOf(x.body, X.QB) : null; return { level: A.bloomOf ? A.bloomOf(x.body, x.qtype) : '', ...x, dup: d ? d.body : '', on: !d }; })); title = title || r.title; q('#iqR').innerHTML = `<div class="notice ${Q.length ? 'ok' : 'warn'}" style="display:block">${r.rep.map(esc).join(' · ')}${Q.length ? ` — المجموع ${AR(Q.length)} سؤال. راجعها قبل الحفظ.` : ' — لم تُستخرج أسئلة. جرّب ملف Word أو قالب Excel.'}</div>`; draw(); };
     q('#iqF').onchange = e => A.run(null, async () => { const f = [...e.target.files]; if (!f.length) return; q('#iqR').textContent = 'جارٍ قراءة الملفات…'; load(await readFiles(f)); e.target.value = ''; });
     q('#iqTGo').onclick = () => { const r = parseLines(q('#iqT').value.split(/\r?\n/)); load({ ...r, rep: [`النص: ${AR(r.qs.length)}`] }); };
-    const problems = x => { if (!x.body) return 'بلا نص'; if (x.qtype === 'mcq') { if (x.options.filter(o => o.t).length < 2) return 'خياران على الأقل'; if (!x.options.some(o => o.ok)) return 'حدّد الإجابة الصحيحة'; } if ((x.qtype === 'tf' || x.qtype === 'short') && !String(x.answer || '').trim()) return 'اكتب الإجابة'; return ''; };
+    const problems = x => { if (!x.body) return 'بلا نص'; if (x.qtype === 'mcq') { if (x.options.filter(o => o.t).length < 2) return 'خياران على الأقل'; if (!x.options.some(o => o.ok)) return 'حدّد الإجابة الصحيحة'; } if ((x.qtype === 'tf' || x.qtype === 'short') && !String(x.answer || '').trim()) return 'اكتب الإجابة';
+      if (x.qtype === 'blank') { const n = (x.body.match(/\.{3,}|…+|_{3,}/g) || []).length; if (!n) return 'ضع نقاطاً (......) مكان الفراغ'; if (x.options.length < n || x.options.slice(0, n).some(o => !String(o.t || '').trim())) return 'اكتب إجابة كل فراغ'; }
+      if (x.qtype === 'match' && x.options.filter(o => o.t && o.m).length < 2) return 'زوجان على الأقل';
+      if (x.qtype === 'order' && x.options.filter(o => o.t).length < 2) return 'عنصران على الأقل'; return ''; };
     const draw = () => {
       const L = q('#iqL'); if (!Q.length) { L.innerHTML = ''; return; }
       const sel = Q.filter(x => x.on), bad = sel.filter(problems).length, pts = sel.reduce((a, x) => a + (+x.points || 0), 0);
       L.innerHTML = `<div class="iq-bar"><b>${AR(sel.length)} سؤال محدد · ${AR(pts)} درجة</b>${bad ? `<span class="pill st-returned">${AR(bad)} تحتاج إكمالاً</span>` : '<span class="pill st-approved">جاهزة</span>'}
           <label class="small">الدرس <select class="in" id="iqLs" style="width:auto"><option value="">—</option>${X.CUR.map(l => `<option value="${l.id}">${esc(l.lesson)}</option>`).join('')}</select></label>
-          <label class="small">المستوى <select class="in" id="iqLv" style="width:auto">${X.LV.map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select></label>
+          <label class="small" title="يُستخدم لما لم يُصنَّف تلقائياً">المستوى الافتراضي <select class="in" id="iqLv" style="width:auto">${X.LV.map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select></label>
           <button class="btn ghost sm" id="iqAll" type="button">${sel.length === Q.length ? 'إلغاء تحديد الكل' : 'تحديد الكل'}</button></div>
         <div class="iq-list">${Q.map((x, i) => { const pr = problems(x); return `<div class="iq-q ${x.on ? '' : 'off'} ${pr && x.on ? 'need' : ''}">
           <div class="iq-qh"><label class="chk"><input type="checkbox" data-on="${i}" ${x.on ? 'checked' : ''}> <b>${AR(i + 1)}</b></label>
             <select class="in" data-ty="${i}" aria-label="نوع السؤال">${X.QT.map(([k, n]) => `<option value="${k}" ${x.qtype === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
             <label class="small">الدرجة <input class="in" type="number" min="0.5" step="0.5" data-pt="${i}" value="${x.points}" style="width:70px"></label>
-            ${pr && x.on ? `<span class="iq-pr">${esc(pr)}</span>` : ''}<button type="button" class="btn bad sm" data-rm="${i}" aria-label="حذف السؤال">×</button></div>
+            <select class="in" data-lv="${i}" aria-label="المستوى المعرفي" style="width:auto">${X.LV.map(([k, n]) => `<option value="${k}" ${x.level === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
+            ${x.dup ? `<span class="pill st-returned" title="${esc(x.dup)}">مكرر في البنك</span>` : ''}${pr && x.on ? `<span class="iq-pr">${esc(pr)}</span>` : ''}<button type="button" class="btn bad sm" data-rm="${i}" aria-label="حذف السؤال">×</button></div>
           <textarea class="in" rows="2" data-bd="${i}" aria-label="نص السؤال">${esc(x.body)}</textarea>
           ${x.qtype === 'mcq' ? `<div class="iq-opts">${x.options.map((o, j) => `<label class="${o.ok ? 'ok' : ''}"><input type="radio" name="ok${i}" data-ok="${i}|${j}" ${o.ok ? 'checked' : ''} aria-label="الإجابة الصحيحة"><span>${LETTERS[j] || AR(j + 1)}</span><input class="in" data-op="${i}|${j}" value="${esc(o.t)}"></label>`).join('')}<button type="button" class="btn ghost sm" data-oa="${i}">+ خيار</button></div>`
+            : x.qtype === 'blank' ? `<div class="iq-opts">${x.options.map((o, j) => `<label><span>ف${AR(j + 1)}</span><input class="in" data-bo="${i}|${j}" value="${esc(o.t || '')}" placeholder="إجابة الفراغ"></label>`).join('')}<button type="button" class="btn ghost sm" data-ba="${i}">+ فراغ</button><label class="chk small"><input type="checkbox" data-bk="${i}" ${x.answer === 'bank' ? 'checked' : ''}> بنك كلمات</label></div>`
+            : x.qtype === 'match' ? `<div class="iq-opts">${x.options.map((o, j) => `<label><input class="in" data-ml="${i}|${j}" value="${esc(o.t || '')}" placeholder="العنصر"><span>←</span><input class="in" data-mr="${i}|${j}" value="${esc(o.m || '')}" placeholder="ما يقابله"></label>`).join('')}<button type="button" class="btn ghost sm" data-ma="${i}">+ زوج</button></div>`
+            : x.qtype === 'order' ? `<div class="iq-opts">${x.options.map((o, j) => `<label><span>${AR(j + 1)}</span><input class="in" data-oi="${i}|${j}" value="${esc(o.t || '')}"></label>`).join('')}<button type="button" class="btn ghost sm" data-oa2="${i}">+ عنصر</button><span class="small muted">بالترتيب الصحيح</span></div>`
             : x.qtype === 'tf' ? `<div class="iq-opts"><label class="${x.answer === 'صواب' ? 'ok' : ''}"><input type="radio" name="tf${i}" data-tf="${i}|صواب" ${x.answer === 'صواب' ? 'checked' : ''}> صواب</label><label class="${x.answer === 'خطأ' ? 'ok' : ''}"><input type="radio" name="tf${i}" data-tf="${i}|خطأ" ${x.answer === 'خطأ' ? 'checked' : ''}> خطأ</label></div>`
             : `<input class="in" data-an="${i}" value="${esc(x.answer || '')}" placeholder="${x.qtype === 'short' ? 'الإجابة الصحيحة (افصل البدائل بـ | )' : 'الإجابة النموذجية (اختياري — يُصحَّح يدوياً)'}">`}
         </div>`; }).join('')}</div>
@@ -194,7 +206,7 @@
           <button class="btn ghost" data-pr="0" type="button">${I.print || ''} طباعة ورقية</button><button class="btn ghost" data-pr="1" type="button">نموذج الإجابة</button></div>`;
       const re = () => draw();
       $$('[data-on]', L).forEach(c => c.onchange = () => { Q[+c.dataset.on].on = c.checked; re(); });
-      $$('[data-ty]', L).forEach(c => c.onchange = () => { const x = Q[+c.dataset.ty]; x.qtype = c.value; if (x.qtype === 'mcq' && x.options.length < 2) x.options = [{ t: '' }, { t: '' }, { t: '' }, { t: '' }]; if (x.qtype === 'tf') x.answer = TF(x.answer); re(); });
+      $$('[data-ty]', L).forEach(c => c.onchange = () => { const x = Q[+c.dataset.ty]; x.qtype = c.value; if (x.qtype === 'mcq' && x.options.length < 2) x.options = [{ t: '' }, { t: '' }, { t: '' }, { t: '' }]; if (x.qtype === 'tf') x.answer = TF(x.answer); if (x.qtype === 'blank') { const n = Math.max(1, (x.body.match(/\.{3,}|…+|_{3,}/g) || []).length); x.options = Array.from({ length: n }, (_, j) => ({ t: j === 0 && x.answer && x.answer !== 'bank' ? x.answer.split('|')[0] : '' })); x.answer = ''; } if (x.qtype === 'match' && !x.options.some(o => o.m !== undefined)) x.options = [{ t: '', m: '' }, { t: '', m: '' }, { t: '', m: '' }]; if (x.qtype === 'order' && x.options.length < 2) x.options = [{ t: '' }, { t: '' }, { t: '' }]; re(); });
       $$('[data-pt]', L).forEach(c => c.oninput = () => { Q[+c.dataset.pt].points = +c.value || 1; });
       $$('[data-bd]', L).forEach(c => c.oninput = () => { Q[+c.dataset.bd].body = c.value; });
       $$('[data-bd]', L).forEach(c => c.onchange = re);
@@ -204,14 +216,25 @@
       $$('[data-tf]', L).forEach(c => c.onchange = () => { const [i, v] = c.dataset.tf.split('|'); Q[+i].answer = v; re(); });
       $$('[data-an]', L).forEach(c => c.oninput = () => { Q[+c.dataset.an].answer = c.value; }); $$('[data-an]', L).forEach(c => c.onchange = re);
       $$('[data-rm]', L).forEach(b => b.onclick = () => { Q.splice(+b.dataset.rm, 1); re(); });
+      const ij = v => v.split('|').map(Number);
+      $$('[data-lv]', L).forEach(c => c.onchange = () => { Q[+c.dataset.lv].level = c.value; });
+      $$('[data-bo]', L).forEach(c => { c.oninput = () => { const [i, j] = ij(c.dataset.bo); Q[i].options[j].t = c.value; }; c.onchange = re; });
+      $$('[data-ba]', L).forEach(b => b.onclick = () => { Q[+b.dataset.ba].options.push({ t: '' }); re(); });
+      $$('[data-bk]', L).forEach(c => c.onchange = () => { Q[+c.dataset.bk].answer = c.checked ? 'bank' : ''; });
+      $$('[data-ml]', L).forEach(c => { c.oninput = () => { const [i, j] = ij(c.dataset.ml); Q[i].options[j].t = c.value; }; c.onchange = re; });
+      $$('[data-mr]', L).forEach(c => { c.oninput = () => { const [i, j] = ij(c.dataset.mr); Q[i].options[j].m = c.value; }; c.onchange = re; });
+      $$('[data-ma]', L).forEach(b => b.onclick = () => { Q[+b.dataset.ma].options.push({ t: '', m: '' }); re(); });
+      $$('[data-oi]', L).forEach(c => { c.oninput = () => { const [i, j] = ij(c.dataset.oi); Q[i].options[j].t = c.value; }; c.onchange = re; });
+      $$('[data-oa2]', L).forEach(b => b.onclick = () => { Q[+b.dataset.oa2].options.push({ t: '' }); re(); });
       q('#iqAll').onclick = () => { const all = Q.every(x => x.on); Q.forEach(x => x.on = !all); re(); };
       const ready = () => { const s = Q.filter(x => x.on); if (!s.length) throw new Error('حدّد سؤالاً واحداً على الأقل'); const b = s.find(problems); if (b) throw new Error(`السؤال ${AR(Q.indexOf(b) + 1)}: ${problems(b)}`); return s; };
       const saveBank = async () => { const s = ready(); const lesson = q('#iqLs').value || null, level = q('#iqLv').value;
-        const rows = s.map(x => ({ school_id: X.sch(), subject_id: X.ctx.subj, grade_key: X.ctx.grade, qtype: x.qtype, lesson_id: lesson, level, difficulty: 2, points: +x.points || 1, skill: '', body: x.body.trim(), explanation: '', image_url: null, shared: true, options: x.qtype === 'mcq' ? x.options.filter(o => o.t.trim()).map(o => ({ t: o.t.trim(), ...(o.ok ? { ok: true } : {}) })) : [], answer: x.qtype === 'mcq' ? '' : String(x.answer || '') }));
+        const rows = s.map(x => ({ school_id: X.sch(), subject_id: X.ctx.subj, grade_key: X.ctx.grade, qtype: x.qtype, lesson_id: x.lesson_id || lesson, points: +x.points || 1, skill: '', body: x.body.trim(), explanation: '', image_url: null, shared: true, options: X.packOpts(x), answer: x.qtype === 'mcq' || x.qtype === 'match' || x.qtype === 'order' ? '' : x.qtype === 'blank' ? (x.answer === 'bank' ? 'bank' : '') : String(x.answer || ''), level: x.level || level, difficulty: x.difficulty || 2 }));
         const ins = await api.ins('questions', rows); await X.loadCtx(); return ins; };
       q('#iqBank').onclick = e => A.run(e.currentTarget, async () => { const r = await saveBank(); m.close(); A.toast(`أُضيف ${AR(r.length)} سؤال إلى بنك الأسئلة`, 'ok'); after && after(); });
       $$('[data-mk]', L).forEach(b => b.onclick = e => A.run(e.currentTarget, async () => { const r = await saveBank(); const ti = q('#iqTi').value.trim() || X.KQ[b.dataset.mk]; m.close(); A.toast(`حُفظت ${AR(r.length)} سؤال — اختر الفصول ثم انشر`, 'ok'); A.LS.set('as_t', 'quizzes'); X.quizEditor({ kind: b.dataset.mk, title: ti, question_ids: r.map(x => x.id) }, after); }));
       $$('[data-pr]', L).forEach(b => b.onclick = () => { try { const s = b.dataset.pr === '1' ? ready() : Q.filter(x => x.on); X.printPaper(q('#iqTi').value.trim() || 'ورقة عمل', s.map(x => ({ ...x, options: x.options || [] })), b.dataset.pr === '1'); } catch (er) { A.toast(er.message, 'err'); } });
     };
+    if (pre) load(pre);
   };
 })();

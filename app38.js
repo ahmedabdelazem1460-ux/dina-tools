@@ -58,25 +58,29 @@
     const m = A.modal(`<h3>${esc(A.subjName(subj))} — ${esc(A.gradeName(...grade.split('|').reverse()))}</h3>
       <p class="sub">${A.cnt(L.length, 'حصة', 'حصص')} هذا الأسبوع: ${Object.entries(byC).map(([c, l]) => `${esc(cName(c))} (${AR(l.length)})`).join(' · ')} — محضَّر ${AR(L.filter(isPrepared).length)}.</p>
       <div class="row" style="gap:6px;margin-bottom:6px;flex-wrap:wrap"><button class="btn ghost sm" id="sdA" type="button">تحديد الكل</button><button class="btn ghost sm" id="sdN" type="button">غير المحضَّرة فقط</button></div>
-      <div class="perm-grid">${L.map(e => { const x = prepOf(e); return `<label class="chk"><input type="checkbox" value="${e.id}" ${x ? '' : 'checked'}> ${DAYS[e.day]} · الحصة ${AR(e.period + 1)} · ${esc(cName(e.class_id))} ${x ? `<span class="pill st-approved">محضَّرة: ${esc((x.lesson || '').slice(0, 24))}</span>` : (e.topic || '').trim() ? `<span class="small muted">(${esc(e.topic.slice(0, 24))})</span>` : ''}</label>`; }).join('')}</div>
+      <div class="perm-grid">${L.map(e => { const x = prepOf(e); return `<label class="chk"><input type="checkbox" value="${e.id}"> ${DAYS[e.day]} · الحصة ${AR(e.period + 1)} · ${esc(cName(e.class_id))} ${x ? `<span class="pill st-approved">محضَّرة: ${esc((x.lesson || '').slice(0, 24))}</span>` : (e.topic || '').trim() ? `<span class="small muted">(${esc(e.topic.slice(0, 24))})</span>` : ''}</label>`; }).join('')}</div>
       <p class="small muted">تحضير واحد للحصص المحددة (درس واحد يُدرَّس لعدة فصول، أو عدة حصص للدرس نفسه). يمكنك بعد ذلك فتح أي حصة وتعديلها منفردة.</p>
       <div class="acts"><button class="btn ok" id="sdGo">تحضير المحدد</button></div>`, { cls: 'wide' });
     const ch = () => $$('.perm-grid input', m.el);
-    m.el.querySelector('#sdA').onclick = () => ch().forEach(i => i.checked = true);
-    m.el.querySelector('#sdN').onclick = () => ch().forEach(i => i.checked = !isPrepared(L.find(e => e.id === i.value)));
-    m.el.querySelector('#sdGo').onclick = () => { const ids = ch().filter(i => i.checked).map(i => i.value); if (!ids.length) return A.toast('حدّد حصة', 'err'); m.close(); quick(L.filter(e => ids.includes(e.id)), done); };
+    m.el.querySelector('#sdA').onclick = () => { ch().forEach(i => i.checked = true); m.el.querySelector('#sdGo').textContent = `تحضير ${A.cnt(ch().length, 'حصة', 'حصص')} بتحضير واحد`; };
+    m.el.querySelector('#sdN').onclick = () => { ch().forEach(i => i.checked = !isPrepared(L.find(e => e.id === i.value))); const n = ch().filter(i => i.checked).length; m.el.querySelector('#sdGo').textContent = n ? `تحضير ${A.cnt(n, 'حصة', 'حصص')} بتحضير واحد` : 'حدّد الحصص أولاً'; };
+    const sync2 = () => { const n = ch().filter(i => i.checked).length; m.el.querySelector('#sdGo').textContent = n ? `تحضير ${A.cnt(n, 'حصة', 'حصص')} بتحضير واحد` : 'حدّد الحصص أولاً'; }; ch().forEach(i => i.onchange = sync2); sync2();
+    m.el.querySelector('#sdGo').onclick = () => { const ids = ch().filter(i => i.checked).map(i => i.value); if (!ids.length) return A.toast('حدّد الحصص التي تريد تحضيرها', 'err'); m.close(); quick(L.filter(e => ids.includes(e.id)), done); };
   }
 
   // ---------- التحضير السريع ----------
   async function quick(ES, done) {
-    await loadP(); const e0 = ES[0], c0 = A.cls(e0.class_id), x = prepOf(e0);
+    await loadP(); const e0 = ES[0], c0 = A.cls(e0.class_id); let x = prepOf(e0);
+    const others = x ? ((x.data || {}).links || []).filter(l => !ES.some(e => e.id === l.e)) : [];
+    const old = { topic: x ? x.lesson : '', homework: x ? ((x.data || {}).homework || '') : '', perf: x ? ((x.data || {}).perf_task || '') : '' };
     const D = JSON.parse(JSON.stringify((x && x.data) || {})); D.resources = D.resources || []; D.files = D.files || []; D.quiz_ids = D.quiz_ids || [];
     const F = { lesson: x ? x.lesson : (e0.topic || '').trim(), unit: x ? x.unit : '', lesson_id: x ? x.lesson_id : null, objectives: D.objectives || '', homework: D.homework || (e0.homework || ''), perf: D.perf_task || ptxt(e0) || '', perfType: (e0.perf_task || {}).type || '', notes: D.notes || '' };
     let CUR = []; try { CUR = await api.list('curriculum', { school_id: S.school.id, subject_id: e0.subject_id, grade_key: gk(c0) }, { order: 'sort' }); } catch (_) { }
     const myQ = (P.quizzes || []).filter(z => z.subject_id === e0.subject_id && (!z.grade_key || z.grade_key === gk(c0)));
     const locked = ES.filter(e => e.status === 'approved');
     const m = A.modal(`<h3>تحضير ${ES.length > 1 ? AR(ES.length) + ' حصص' : 'الحصة'} — ${esc(A.subjName(e0.subject_id))}</h3>
-      <p class="sub">${ES.map(e => `${DAYS[e.day]} · الحصة ${PER[e.period] || AR(e.period + 1)} · ${esc(cName(e.class_id))}`).join(' — ')}<br><span class="small">كل الخانات اختيارية — احفظ ما تريد فقط.</span></p><div id="qpB"></div>`, { cls: 'wide xl' });
+      <p class="sub">${ES.map(e => `${DAYS[e.day]} · الحصة ${PER[e.period] || AR(e.period + 1)} · ${esc(cName(e.class_id))}`).join(' — ')}<br><span class="small">كل الخانات اختيارية — احفظ ما تريد فقط. ${ES.length > 1 ? `<b>سيُطبَّق هذا التحضير على ${A.cnt(ES.length, 'حصة', 'حصص')}.</b>` : ''}</span></p>
+      ${others.length ? `<div class="notice warn" style="display:block">هذا التحضير مشترك مع ${A.cnt(others.length, 'حصة أخرى', 'حصص أخرى')}: ${others.map(l => `${DAYS[l.d]} الحصة ${AR(l.p + 1)} ${esc(cName(l.c))}`).join('، ')}.<label class="chk" style="margin-top:4px"><input type="checkbox" id="qpAll"> طبّق التعديل على كل الحصص المشتركة (وإلا يُفصل تحضير هذه الحصة وحدها)</label></div>` : ''}<div id="qpB"></div>`, { cls: 'wide xl' });
     const B = m.el.querySelector('#qpB'), q = s => B.querySelector(s);
     const draw = () => {
       B.innerHTML = `<div class="grid g3"><div class="field"><label for="qpC">من دروس المنهج</label><select class="in" id="qpC"><option value="">—</option>${CUR.map(l => `<option value="${l.id}" ${l.id === F.lesson_id ? 'selected' : ''}>${esc(l.unit ? l.unit + ' — ' : '')}${esc(l.lesson)}</option>`).join('')}</select></div>
@@ -91,7 +95,8 @@
         <div class="field"><label>صور وملفات</label><div class="qp-files">${D.files.map((f, i) => `<div class="qp-f">${/^image\//.test(f.t || '') || /^data:image/.test(f.u) ? `<img src="${esc(f.u)}" alt="${esc(f.n)}">` : '<span class="qp-ic">📄</span>'}<a href="${esc(f.u)}" target="_blank" rel="noopener" class="small">${esc(f.n)}</a><button class="btn ghost sm" data-fx="${i}" type="button" aria-label="حذف الملف">×</button></div>`).join('')}
           <label class="qp-up">${I.plus || '+'} رفع صور أو ملفات<input type="file" id="qpF" multiple accept="image/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx" hidden></label></div><div id="qpUp" class="small muted" role="status"></div></div>
         <div class="sec-box" style="margin-top:6px"><label class="chk"><input type="checkbox" id="qpPl" checked> ربط بالخطة الأسبوعية — يُكتب الدرس في «الموضوع» والواجب والمهمة الأدائية في ${ES.length > 1 ? 'الحصص المحددة' : 'الحصة'}</label>
-          <label class="chk"><input type="checkbox" id="qpOv"> استبدال ما كُتب سابقاً في الخطة (وإلا تُملأ الخانات الفارغة فقط)</label>
+          <label class="chk"><input type="checkbox" id="qpOv"> استبدال ما كتبتَه يدوياً في الخطة (وإلا تُملأ الخانات الفارغة فقط)</label>
+          <p class="small muted" style="margin:2px 0 0">ما أضافه هذا التحضير إلى الخطة يتبعه: إذا عدّلته هنا يتعدّل، وإذا مسحته هنا يُمسح من الخطة.</p>
           <label class="chk"><input type="checkbox" id="qpQL" checked> إضافة رابط الاختبار المختار إلى الواجب</label>
           ${locked.length ? `<p class="small" style="color:var(--bad);margin:4px 0 0">${AR(locked.length)} حصة معتمدة لن تتغير خطتها.</p>` : ''}</div>
         <div class="acts" style="flex-wrap:wrap"><button class="btn ok" id="qpSv" type="button">حفظ وربط</button>${A.prepEditor ? '<button class="btn ghost" id="qpFull" type="button">حفظ وفتح التحضير الكامل</button>' : ''}${x ? '<button class="btn ghost" id="qpUn" type="button">فك الربط</button>' : ''}</div>`;
@@ -111,7 +116,11 @@
       $$('[data-fx]', B).forEach(b => b.onclick = () => { rd(); D.files.splice(+b.dataset.fx, 1); draw(); });
       q('#qpF').onchange = ev => A.run(null, async () => { rd(); const fs = [...ev.target.files]; if (!fs.length) return; const big = fs.find(f => f.size > 15e6); if (big) throw new Error(`«${big.name}» أكبر من ١٥ ميجابايت`); let k = 0; for (const f of fs) { q('#qpUp').textContent = `جارٍ الرفع ${AR(++k)} من ${AR(fs.length)}…`; const u = await api.uploadAsset(f); D.files.push({ n: f.name, u, t: f.type }); } draw(); A.toast(`رُفع ${AR(fs.length)} ملف`, 'ok'); });
       const save = async () => {
-        rd(); D.resources = D.resources.filter(r => r.u); D.objectives = F.objectives; D.homework = F.homework; D.perf_task = F.perf; D.notes = F.notes; D.periods = ES.length;
+        rd();
+        const allEl = m.el.querySelector('#qpAll');
+        if (x && others.length && allEl && !allEl.checked) { // فصل هذه الحصة بتحضير مستقل دون المساس بالحصص الأخرى
+          await api.upd('lesson_preps', x.id, { data: { ...x.data, links: others }, updated_at: new Date().toISOString() }); x.data = { ...x.data, links: others }; x = null; D.links = [];
+        } else if (x && others.length && allEl && allEl.checked) { const more = myEntries().filter(e => others.some(l => l.e === e.id)); more.forEach(e => { if (!ES.includes(e)) ES.push(e); }); } D.resources = D.resources.filter(r => r.u); D.objectives = F.objectives; D.homework = F.homework; D.perf_task = F.perf; D.notes = F.notes; D.periods = ES.length;
         const links = ES.map(e => ({ w: e.week_id, e: e.id, c: e.class_id, d: e.day, p: e.period }));
         // حصة كانت مربوطة بتحضير آخر تُفك منه أولاً
         for (const e of ES) { const o = prepOf(e); if (o && (!x || o.id !== x.id)) { const ol = ((o.data || {}).links || []).filter(l => l.e !== e.id); await api.upd('lesson_preps', o.id, { data: { ...o.data, links: ol }, updated_at: new Date().toISOString() }); o.data = { ...o.data, links: ol }; } }
@@ -123,16 +132,25 @@
         let n = 0;
         if (q('#qpPl').checked) { const ov = q('#qpOv').checked, ql = q('#qpQL').checked; const qz = (P.quizzes || []).filter(z => D.quiz_ids.includes(z.id) && z.status === 'published');
           const hwFull = [F.homework.trim(), ...(ql ? qz.map(z => `${KQ[z.kind] || 'اختبار'}: ${base()}student.html?q=${z.code}`) : [])].filter(Boolean).join('\n');
+          const same = (a, b) => String(a || '').trim() === String(b || '').trim();
+          const fromPrep = (cur, prev) => !!String(prev || '').trim() && (same(cur, prev) || String(cur || '').trim().startsWith(String(prev).trim()));
           for (const e of ES) { if (e.status === 'approved') continue; const patch = {};
-            if (F.lesson.trim() && (ov || !(e.topic || '').trim())) patch.topic = F.lesson.trim();
-            if (hwFull && (ov || !(e.homework || '').trim())) patch.homework = hwFull;
-            if (F.perf.trim() && (ov || !ptxt(e))) patch.perf_task = { ...(e.perf_task || {}), type: F.perfType || (e.perf_task || {}).type || '', text: F.perf.trim() };
+            const nt = F.lesson.trim(), ct = (e.topic || '').trim();
+            if (nt ? (ov || !ct || fromPrep(ct, old.topic)) && !same(ct, nt) : fromPrep(ct, old.topic)) patch.topic = nt;
+            const ch2 = (e.homework || '').trim();
+            if (hwFull ? (ov || !ch2 || fromPrep(ch2, old.homework)) && !same(ch2, hwFull) : fromPrep(ch2, old.homework)) patch.homework = hwFull;
+            const np = F.perf.trim(), cp = ptxt(e) || '';
+            if (np ? (ov || !cp || fromPrep(cp, old.perf)) && !same(cp, np) : fromPrep(cp, old.perf)) patch.perf_task = np ? { ...(e.perf_task || {}), type: F.perfType || (e.perf_task || {}).type || '', text: np } : null;
             if (!Object.keys(patch).length) continue; const r = await api.saveEntry(e.id, patch); Object.assign(e, r); n++; } }
         await loadP(true); return { saved, n };
       };
       q('#qpSv').onclick = ev => A.run(ev.currentTarget, async () => { const r = await save(); m.close(); A.toast(r.n ? `حُفظ التحضير وأُضيف إلى ${A.cnt(r.n, 'حصة', 'حصص')} في الخطة` : 'حُفظ التحضير', 'ok'); done && done(); });
       const fu = q('#qpFull'); if (fu) fu.onclick = ev => A.run(ev.currentTarget, async () => { const r = await save(); m.close(); A.prepEditor(r.saved, () => { loadP(true).then(() => done && done()); }); });
-      const un = q('#qpUn'); if (un) un.onclick = ev => A.run(ev.currentTarget, async () => { const ol = ((x.data || {}).links || []).filter(l => !ES.some(e => e.id === l.e)); await api.upd('lesson_preps', x.id, { data: { ...x.data, links: ol }, updated_at: new Date().toISOString() }); await loadP(true); m.close(); A.toast('فُكّ الربط — التحضير باقٍ في «تحضيراتي»، والخطة لم تتغير', 'ok'); done && done(); });
+      const un = q('#qpUn'); if (un) un.onclick = () => { const cm = A.modal(`<h3>فك ربط ${ES.length > 1 ? 'الحصص' : 'الحصة'} بالتحضير</h3><p>يبقى التحضير في «تحضيراتي». هل تريد أيضاً مسح ما أضافه التحضير إلى الخطة (الموضوع والواجب والمهمة الأدائية)؟ ما كتبته يدوياً لا يُمس.</p><div class="acts" style="flex-wrap:wrap"><button class="btn bad" id="unC">فك الربط ومسح ما أضافه</button><button class="btn ghost" id="unK">فك الربط فقط</button></div>`);
+        cm.el.querySelector('#unC').onclick = e2 => go(true, e2.currentTarget); cm.el.querySelector('#unK').onclick = e2 => go(false, e2.currentTarget);
+        const go = (clear, b) => A.run(b, async () => { cm.close(); const ol = ((x.data || {}).links || []).filter(l => !ES.some(e => e.id === l.e)); await api.upd('lesson_preps', x.id, { data: { ...x.data, links: ol }, updated_at: new Date().toISOString() }); let n = 0;
+        if (clear) for (const e of ES) { if (e.status === 'approved') continue; const p = {}; const fp = (cur, prev) => !!String(prev || '').trim() && String(cur || '').trim().startsWith(String(prev).trim()); if (fp(e.topic, old.topic)) p.topic = ''; if (fp(e.homework, old.homework)) p.homework = ''; if (fp(ptxt(e), old.perf)) p.perf_task = null; if (Object.keys(p).length) { Object.assign(e, await api.saveEntry(e.id, p)); n++; } }
+        await loadP(true); m.close(); A.toast(clear ? `فُكّ الربط${n ? ' ومُسح ما أضافه التحضير من ' + A.cnt(n, 'حصة', 'حصص') : ''}` : 'فُكّ الربط — التحضير باقٍ في «تحضيراتي»', 'ok'); done && done(); }); };
     };
     draw();
   }

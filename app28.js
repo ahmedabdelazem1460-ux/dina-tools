@@ -164,6 +164,10 @@
   };
 
   // ---------------- تبويب «تعديل الحصص والإسناد» ----------------
+  // الحصص خارج التوقيت (بعد آخر حصة في اليوم، أو في يوم غير مفعّل) تنتقل إلى خانة الحصص الزائدة أسفل الجدول
+  A._liveFit = ds => { const M = ds.meta || {}, days = M.days || [0, 1, 2, 3, 4], n = d => Math.min(M.periods || 7, (M.perDay && M.perDay[d]) || M.periods || 7); const keep = [], out = [];
+    (ds.slots || []).forEach(x => (days.includes(x.d) && x.p >= 0 && x.p < n(x.d) ? keep : out).push(x)); if (!out.length) return 0;
+    ds.pool = (Array.isArray(ds.pool) ? ds.pool : []).concat(out.map(x => ({ c: x.c, s: x.s || null, sn: x.sn || '', t: x.t || null, tn: x.tn || '', why: 'over' }))); ds.slots = keep; return out.length; };
   A.liveEditTab = function (ds, B, h) {
     const H = L_(); const M = ds.meta || {}; const days = M.days || [0, 1, 2, 3, 4];
     const nOf = d => (M.perDay && M.perDay[d]) || M.periods || 7;

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>اللوحة اليومية — مدارس دينا العالمية</title>
+<meta name="theme-color" content="#082B5A">
+<link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+<style>
+@font-face{font-family:'GE SS Two';font-weight:400 500;src:url(fonts/gess-two-medium.woff2) format('woff2');font-display:swap}
+@font-face{font-family:'GE SS Two';font-weight:600 900;src:url(fonts/gess-two-bold.woff2) format('woff2');font-display:swap}
+@font-face{font-family:'Myriad Pro';font-weight:400;src:url(fonts/myriad-pro-regular.woff2) format('woff2');font-display:swap}
+:root{--n:#082B5A;--b:#005499;--s:#3AB1DB;--p:#E4EBF5;--m:#5E9BD3}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:#061F43;color:#fff;font-family:'GE SS Two','Myriad Pro',system-ui,sans-serif}
+.wrap{display:grid;grid-template-rows:auto 1fr auto;height:100vh}
+header{display:flex;align-items:center;gap:2vw;padding:1.6vh 2.4vw;background:linear-gradient(180deg,#0A3268,#082B5A);border-bottom:.5vh solid var(--s)}
+header img{height:7vh}header .t{flex:1}header h1{margin:0;font-size:3.2vh;font-weight:800}header small{display:block;color:var(--s);font-size:2vh}
+.clock{text-align:center;font-family:'Myriad Pro',sans-serif}.clock b{display:block;font-size:6vh;line-height:1;letter-spacing:.1vh;direction:ltr}.clock span{font-family:'GE SS Two';font-size:1.9vh;color:#BFD9F2}
+.now{background:rgba(58,177,219,.15);border:1px solid rgba(58,177,219,.6);border-radius:1.6vh;padding:1vh 1.6vw;text-align:center;min-width:16vw}.now b{display:block;font-size:2.8vh}.now span{font-size:1.8vh;color:#BFD9F2;direction:ltr;display:inline-block}
+main{position:relative;overflow:hidden}
+.slide{position:absolute;inset:0;padding:3vh 3vw;display:flex;flex-direction:column;opacity:0;transform:translateX(-3vw);transition:opacity .8s,transform .8s;pointer-events:none}
+.slide.on{opacity:1;transform:none}
+.slide h2{margin:0 0 2.4vh;font-size:4.4vh;display:flex;align-items:center;gap:1.4vw}.slide h2::before{content:"";width:1vh;height:5vh;border-radius:1vh;background:var(--s)}
+.big{flex:1;display:grid;place-items:center;text-align:center}.big .q{font-size:6vh;font-weight:800;line-height:1.5;max-width:80vw}.big .by{font-size:3vh;color:var(--s);margin-top:2vh}
+.card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:2vh;padding:2vh 2vw}
+.grid{display:grid;gap:1.6vh 1.6vw;grid-template-columns:repeat(auto-fit,minmax(26vw,1fr));align-content:start;flex:1;overflow:hidden}
+.row{display:flex;justify-content:space-between;align-items:center;gap:1vw;font-size:3vh;padding:1.2vh 0;border-bottom:1px solid rgba(255,255,255,.1)}.row:last-child{border:0}.row b{color:#fff}.row span{color:#BFD9F2}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(18vw,1fr));gap:2vh 2vw;flex:1;align-content:center}
+.kpi{text-align:center;padding:3vh 1vw;border-radius:2.4vh;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14)}.kpi b{display:block;font-size:9vh;line-height:1.1;font-family:'Myriad Pro','GE SS Two'}.kpi span{font-size:2.8vh;color:#BFD9F2}
+.kpi.bad b{color:#FC8181}.kpi.warn b{color:#F6E05E}.kpi.ok b{color:#68D391}.kpi.info b{color:var(--s)}
+table{width:100%;border-collapse:separate;border-spacing:0 .8vh;font-size:2.8vh}th{color:var(--s);font-weight:800;text-align:start;padding:0 1vw}td{background:rgba(255,255,255,.06);padding:1.2vh 1vw}td:first-child{border-radius:0 1.2vh 1.2vh 0}td:last-child{border-radius:1.2vh 0 0 1.2vh}
+tr.cur td{background:rgba(58,177,219,.3)}
+.empty{flex:1;display:grid;place-items:center;font-size:3.4vh;color:#BFD9F2}
+footer{display:flex;align-items:center;background:#0A3268;border-top:.4vh solid var(--s);height:7vh;overflow:hidden}
+footer .lb{background:var(--s);color:var(--n);font-weight:800;font-size:2.6vh;padding:0 2vw;height:100%;display:flex;align-items:center;white-space:nowrap}
+.tk{flex:1;overflow:hidden;white-space:nowrap}.tk span{display:inline-block;padding-inline-start:100%;font-size:3vh;animation:tk 40s linear infinite}
+@keyframes tk{from{transform:translateX(0)}to{transform:translateX(100%)}}
+.dots{position:absolute;bottom:1.4vh;left:50%;transform:translateX(-50%);display:flex;gap:.8vh}.dots i{width:1.2vh;height:1.2vh;border-radius:50%;background:rgba(255,255,255,.3)}.dots i.on{background:var(--s)}
+.err{display:grid;place-items:center;height:100vh;font-size:3vh;text-align:center;padding:4vw}
+@media (prefers-reduced-motion:reduce){.slide{transition:none}.tk span{animation:none;padding:0}}
+</style>
+</head>
+<body>
+<div id="app"><div class="err">جارٍ التحميل…</div></div>
+<script src="config.js"></script>
+<script>
+(function () {
+  const C = window.APP_CONFIG, app = document.getElementById('app');
+  const AR = s => String(s).replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'], PER = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
+  const token = new URLSearchParams(location.search).get('t');
+  const toMin = t => { const [h, m] = String(t || '0:0').split(':').map(Number); return h * 60 + m; };
+  const t12 = m => { const h = Math.floor(m / 60) % 24, mm = String(m % 60).padStart(2, '0'); return `${h % 12 || 12}:${mm}`; };
+  let D = null, idx = 0, slides = [];
+  function sched(b, day) { if (!b || !b.schedules || !b.schedules.length) return null; const a = (b.acts || []).find(x => x.from <= day && day <= (x.to || x.from)); return b.schedules.find(s => s.id === (a && a.sched)) || b.schedules.find(s => s.id === b.def) || b.schedules[0]; }
+  function timeline(s, P) { const out = []; let t = toMin(s.start); for (let p = 0; p < P; p++) { const d = +(s.perDur || {})[p] || +s.dur || 45; out.push({ k: 'p', i: p, from: t, to: t + d }); t += d; if (p === P - 1) break; const br = (s.breaks || []).filter(b => +b.after === p + 1); if (br.length) br.forEach(b => { out.push({ k: 'b', label: b.label || 'الفسحة', from: t, to: t + (+b.dur || 0) }); t += +b.dur || 0; }); else if (+s.pass > 0) t += +s.pass; } return out; }
+  const tl = () => { const s = D && sched(D.bell, D.day); if (!s) return []; const P = Math.min(+s.np || D.periods || 7, D.periods || 7); return timeline(s, P); };
+  const nowItem = () => { const d = new Date(), n = d.getHours() * 60 + d.getMinutes(); return tl().find(x => n >= x.from && n < x.to); };
+  async function fetchData() { const r = await fetch(`${C.supabaseUrl}/rest/v1/rpc/board_view`, { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ p_token: token }) }); if (!r.ok) throw new Error('الرابط غير صالح أو أُوقف'); return r.json(); }
+  function build() {
+    const B = D.board || {}, S = [], hide = new Set(B.hide || []), at = D.att || {}, cur = nowItem();
+    const add = (k, html) => { if (!hide.has(k)) S.push(html); };
+    add('word', `<section class="slide"><h2>${esc((B.word || {}).title || 'كلمة اليوم')}</h2><div class="big"><div><div class="q">${esc((B.word || {}).text || 'صباح العلم والعمل — مرحباً بكم في يوم دراسي جديد')}</div>${(B.word || {}).by ? `<div class="by">${esc(B.word.by)}</div>` : ''}</div></div></section>`);
+    if ((B.value || {}).title || (B.value || {}).text) add('value', `<section class="slide"><h2>قيمة الأسبوع: ${esc(B.value.title || '')}</h2><div class="big"><div class="q">${esc(B.value.text || '')}</div></div></section>`);
+    add('att', `<section class="slide"><h2>الحضور اليوم</h2><div class="kpis"><div class="kpi info"><b>${AR(at.students || 0)}</b><span>طالب في القسم</span></div><div class="kpi bad"><b>${AR(at.absent || 0)}</b><span>غائب</span></div><div class="kpi warn"><b>${AR(at.late || 0)}</b><span>متأخر</span></div><div class="kpi info"><b>${AR((at.excused || 0) + (at.early || 0))}</b><span>مستأذن / خروج مبكر</span></div>${at.students ? `<div class="kpi ok"><b>${AR(Math.max(0, Math.round(100 * (at.students - (at.absent || 0)) / at.students)))}٪</b><span>نسبة الحضور</span></div>` : ''}</div></section>`);
+    add('duty', `<section class="slide"><h2>المناوبة اليوم</h2>${(D.duty || []).length ? `<div class="grid">${D.duty.map(x => `<div class="card"><div class="row"><span>${esc(x.place || 'مناوبة')}</span><b>${esc(x.name || '—')}</b></div></div>`).join('')}</div>` : '<div class="empty">لم تُحدَّد المناوبة لهذا اليوم</div>'}</section>`);
+    add('standby', `<section class="slide"><h2>حصص الانتظار اليوم</h2>${(D.standby || []).length ? `<table><thead><tr><th>الحصة</th><th>المنتظرون</th></tr></thead><tbody>${D.standby.map(x => `<tr class="${cur && cur.k === 'p' && cur.i === x.p ? 'cur' : ''}"><td>${PER[x.p] || AR(x.p + 1)}</td><td>${(x.names || []).filter(Boolean).map((n, k) => `منتظر ${AR(k + 1)}: <b>${esc(n)}</b>`).join(' &nbsp; · &nbsp; ') || '—'}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">لا يوجد جدول انتظار</div>'}</section>`);
+    if ((D.cover || []).length) add('cover', `<section class="slide"><h2>تأمين الحصص اليوم</h2><table><thead><tr><th>الحصة</th><th>الفصل</th><th>المادة</th><th>البديل</th></tr></thead><tbody>${D.cover.slice(0, 12).map(x => `<tr class="${cur && cur.k === 'p' && cur.i === x.p ? 'cur' : ''}"><td>${PER[x.p] || AR(x.p + 1)}</td><td>${esc(x.cls)}</td><td>${esc(x.subj || '')}</td><td><b>${esc(x.sub || '—')}</b></td></tr>`).join('')}</tbody></table></section>`);
+    const off = [...new Set([...(D.staffOff || []), ...(D.absentStaff || [])].filter(Boolean))];
+    if (off.length) add('off', `<section class="slide"><h2>غياب المنسوبين اليوم</h2><div class="grid">${off.map(n => `<div class="card" style="font-size:3vh">${esc(n)}</div>`).join('')}</div></section>`);
+    if ((B.events || []).length) add('events', `<section class="slide"><h2>فعاليات اليوم</h2><table><tbody>${B.events.map(e => `<tr><td style="width:18vw;direction:ltr;text-align:center">${esc(e.time || '')}</td><td><b>${esc(e.title || '')}</b>${e.place ? ` — <span style="color:#BFD9F2">${esc(e.place)}</span>` : ''}</td></tr>`).join('')}</tbody></table></section>`);
+    if ((B.ann || '').trim()) add('ann', `<section class="slide"><h2>إعلان</h2><div class="big"><div class="q" style="font-size:5vh">${esc(B.ann)}</div></div></section>`);
+    const T = tl().filter(x => x.k === 'p'); if (T.length) add('times', `<section class="slide"><h2>مواعيد الحصص</h2><table><tbody>${tl().map(x => `<tr class="${cur && cur.from === x.from ? 'cur' : ''}"><td>${x.k === 'p' ? 'الحصة ' + (PER[x.i] || AR(x.i + 1)) : '☕ ' + esc(x.label)}</td><td style="direction:ltr;text-align:center">${AR(t12(x.from))} – ${AR(t12(x.to))}</td></tr>`).join('')}</tbody></table></section>`);
+    return S;
+  }
+  function render() {
+    const B = D.board || {}, d = new Date(D.day + 'T00:00:00');
+    const hij = (() => { try { return new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', { day: 'numeric', month: 'long', year: 'numeric' }).format(d); } catch (_) { return ''; } })();
+    const greg = new Intl.DateTimeFormat('ar-SA-u-ca-gregory', { day: 'numeric', month: 'long', year: 'numeric' }).format(d);
+    slides = build(); if (idx >= slides.length) idx = 0;
+    const news = (B.news || []).filter(Boolean); if (!news.length) news.push(`${D.school || 'مدارس دينا العالمية'} — نتمنى لكم يوماً دراسياً موفقاً`);
+    app.innerHTML = `<div class="wrap"><header><img src="assets/logo_white.svg" alt="مدارس دينا العالمية"><div class="t"><h1>${esc(B.title || 'اللوحة اليومية')} — ${esc(D.section || '')}</h1><small>${DAYS[D.dow]} · ${esc(hij)} · ${esc(greg)}</small></div><div class="now" id="now"></div><div class="clock"><b id="clk"></b><span id="clkS"></span></div></header>
+      <main id="sl">${slides.join('')}<div class="dots">${slides.map((_, i) => `<i class="${i === idx ? 'on' : ''}"></i>`).join('')}</div></main>
+      <footer><div class="lb">أخبار المدرسة</div><div class="tk"><span>${news.map(esc).join(' &nbsp; ◆ &nbsp; ')}</span></div></footer></div>`;
+    show(); tick();
+  }
+  function show() { const ss = app.querySelectorAll('.slide'), ds = app.querySelectorAll('.dots i'); ss.forEach((s, i) => s.classList.toggle('on', i === idx)); ds.forEach((s, i) => s.classList.toggle('on', i === idx)); }
+  function tick() { const d = new Date(); const c = document.getElementById('clk'); if (!c) return; c.textContent = AR(t12(d.getHours() * 60 + d.getMinutes())) + (d.getHours() < 12 ? ' ص' : ' م'); document.getElementById('clkS').textContent = AR(String(d.getSeconds()).padStart(2, '0')) + ' ث';
+    const it = nowItem(), n = document.getElementById('now'); n.innerHTML = it ? (it.k === 'p' ? `<b>الحصة ${PER[it.i] || AR(it.i + 1)}</b><span>${AR(t12(it.from))} – ${AR(t12(it.to))}</span>` : `<b>☕ ${esc(it.label)}</b><span>${AR(t12(it.from))} – ${AR(t12(it.to))}</span>`) : '<b>خارج وقت الحصص</b>'; }
+  async function boot() {
+    if (!token) { app.innerHTML = '<div class="err">الرابط غير مكتمل — افتح رابط الشاشة كما نسخته من المنصة</div>'; return; }
+    try { D = await fetchData(); render(); } catch (e) { app.innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }
+    setInterval(tick, 1000);
+    setInterval(() => { if (!slides.length) return; idx = (idx + 1) % slides.length; show(); }, Math.max(6, +((D.board || {}).secs) || 12) * 1000);
+    setInterval(async () => { try { const n = await fetchData(); const ch = JSON.stringify(n) !== JSON.stringify(D); D = n; if (ch) render(); } catch (_) { } }, 60000);
+  }
+  boot();
+})();
+</script>
+</body>
+</html>

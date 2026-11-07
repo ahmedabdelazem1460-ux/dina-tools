@@ -1,0 +1,1 @@
+-- 058: اللوحة اليومية للمدرسة (daily_boards, board_tokens, board_view) — طُبّق في قاعدة البيانات

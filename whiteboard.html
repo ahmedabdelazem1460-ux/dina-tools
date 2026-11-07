@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>السبورة التفاعلية — مدارس دينا العالمية</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+<style>
+@font-face{font-family:'GE SS Two';font-weight:400 500;src:url(fonts/gess-two-medium.woff2) format('woff2');font-display:swap}
+@font-face{font-family:'GE SS Two';font-weight:600 900;src:url(fonts/gess-two-bold.woff2) format('woff2');font-display:swap}
+:root{--navy:#082B5A;--blue:#005499;--sky:#3AB1DB;--line:#C9D7EC}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden}
+body{font-family:'GE SS Two',Tahoma,sans-serif;color:var(--navy);background:#E4EBF5;display:flex;flex-direction:column}
+.tb{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--navy);color:#fff;flex-wrap:wrap;border-bottom:4px solid var(--sky)}
+.tb img{height:30px}.tb .g{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:0 6px;border-inline-start:1px solid rgba(255,255,255,.2)}
+.tb button,.tb label.b{font:inherit;font-size:13px;font-weight:700;border:0;border-radius:10px;min-width:40px;min-height:40px;padding:4px 8px;background:rgba(255,255,255,.12);color:#fff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:4px}
+.tb button.on{background:#fff;color:var(--navy)}.tb button:focus-visible{outline:3px solid var(--sky)}
+.cl{width:28px!important;min-width:28px!important;height:28px;min-height:28px!important;border-radius:50%!important;padding:0!important;border:2px solid #fff!important}.cl.on{outline:3px solid var(--sky)}
+input[type=range]{width:80px;accent-color:var(--sky)}
+.wrap{flex:1;position:relative;overflow:hidden}canvas{position:absolute;inset:0;touch-action:none;cursor:crosshair}
+.pg{font-variant-numeric:tabular-nums}
+.txt{position:absolute;z-index:3;font:inherit;border:2px dashed var(--sky);background:rgba(255,255,255,.9);padding:4px 6px;min-width:120px;outline:none;direction:rtl}
+@media (max-width:640px){.tb{gap:3px}.tb .g{padding:0 3px}.hide-s{display:none}}
+</style>
+</head>
+<body>
+<div class="tb" role="toolbar" aria-label="أدوات السبورة">
+  <img src="assets/logo_white.svg" alt="مدارس دينا العالمية" class="hide-s">
+  <div class="g" id="tools"></div>
+  <div class="g" id="cols"></div>
+  <div class="g"><label class="b" title="السُمك" aria-label="السُمك"><input type="range" id="sz" min="2" max="40" value="5"></label></div>
+  <div class="g"><button id="undo" title="تراجع (Ctrl+Z)">↶</button><button id="redo" title="إعادة">↷</button><button id="clr" title="مسح الصفحة">مسح</button></div>
+  <div class="g"><button id="bg" title="الخلفية">الخلفية</button><label class="b" title="إدراج صورة">صورة<input type="file" id="img" accept="image/*" hidden></label></div>
+  <div class="g"><button id="pv" aria-label="الصفحة السابقة">‹</button><span class="pg" id="pgn"></span><button id="nx" aria-label="الصفحة التالية">›</button><button id="add" title="صفحة جديدة">+ صفحة</button></div>
+  <div class="g"><button id="png" title="حفظ صورة">PNG</button><button id="pdf" title="طباعة / PDF">PDF</button><button id="fs" title="ملء الشاشة">⛶</button></div>
+</div>
+<div class="wrap" id="wrap"><canvas id="cv" aria-label="مساحة الرسم"></canvas></div>
+<script>
+(function () {
+  const AR = s => String(s).replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+  const TOOLS = [['pen', '✎', 'قلم'], ['hl', '▮', 'قلم تظليل'], ['er', '⌫', 'ممحاة'], ['line', '／', 'خط'], ['arrow', '➜', 'سهم'], ['rect', '▭', 'مستطيل'], ['ell', '◯', 'دائرة'], ['text', 'نص', 'نص'], ['move', '✋', 'تحريك الصور']];
+  const COLS = ['#082B5A', '#005499', '#3AB1DB', '#C62D22', '#2F855A', '#C9A44C', '#AE95DA', '#111111', '#FFFFFF'];
+  const BGS = ['white', 'grid', 'lines', 'dark'];
+  const KEY = 'dina_wb_' + (new URLSearchParams(location.search).get('id') || 'default');
+  const LSg = k => { try { return localStorage.getItem(k); } catch (_) { return null; } }, LSs = (k, v) => { try { localStorage.setItem(k, v); } catch (_) { } };
+  let st = { pages: [{ items: [], bg: 'white' }], cur: 0 }; try { const s = JSON.parse(LSg(KEY) || 'null'); if (s && s.pages) st = s; } catch (_) { }
+  let tool = 'pen', col = COLS[0], size = 5, redo = [], drawing = null, imgs = {}, dragImg = null;
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d'), wrap = document.getElementById('wrap');
+  const pg = () => st.pages[st.cur];
+  const save = () => LSs(KEY, JSON.stringify(st));
+  function fit() { const r = wrap.getBoundingClientRect(), d = window.devicePixelRatio || 1; cv.width = r.width * d; cv.height = r.height * d; cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px'; ctx.setTransform(d, 0, 0, d, 0, 0); render(); }
+  function bg(c, w, h, b) { c.fillStyle = b === 'dark' ? '#0f2a24' : '#fff'; c.fillRect(0, 0, w, h); c.strokeStyle = b === 'dark' ? 'rgba(255,255,255,.08)' : '#E4EBF5'; c.lineWidth = 1;
+    if (b === 'grid') { for (let x = 0; x < w; x += 30) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, h); c.stroke(); } for (let y = 0; y < h; y += 30) { c.beginPath(); c.moveTo(0, y); c.lineTo(w, y); c.stroke(); } }
+    if (b === 'lines') for (let y = 40; y < h; y += 40) { c.beginPath(); c.moveTo(0, y); c.lineTo(w, y); c.stroke(); } }
+  function draw(c, it) {
+    c.save(); c.lineCap = c.lineJoin = 'round'; c.strokeStyle = it.c; c.fillStyle = it.c; c.lineWidth = it.s;
+    if (it.t === 'pen' || it.t === 'hl' || it.t === 'er') { c.globalAlpha = it.t === 'hl' ? .35 : 1; if (it.t === 'er') { c.strokeStyle = pg().bg === 'dark' ? '#0f2a24' : '#fff'; c.globalAlpha = 1; } c.beginPath(); it.p.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); if (it.p.length === 1) c.lineTo(it.p[0][0] + .1, it.p[0][1]); c.stroke(); }
+    else if (it.t === 'line' || it.t === 'arrow') { c.beginPath(); c.moveTo(it.x1, it.y1); c.lineTo(it.x2, it.y2); c.stroke(); if (it.t === 'arrow') { const a = Math.atan2(it.y2 - it.y1, it.x2 - it.x1), L = 10 + it.s * 2; c.beginPath(); c.moveTo(it.x2, it.y2); c.lineTo(it.x2 - L * Math.cos(a - .45), it.y2 - L * Math.sin(a - .45)); c.lineTo(it.x2 - L * Math.cos(a + .45), it.y2 - L * Math.sin(a + .45)); c.closePath(); c.fill(); } }
+    else if (it.t === 'rect') c.strokeRect(Math.min(it.x1, it.x2), Math.min(it.y1, it.y2), Math.abs(it.x2 - it.x1), Math.abs(it.y2 - it.y1));
+    else if (it.t === 'ell') { c.beginPath(); c.ellipse((it.x1 + it.x2) / 2, (it.y1 + it.y2) / 2, Math.abs(it.x2 - it.x1) / 2, Math.abs(it.y2 - it.y1) / 2, 0, 0, Math.PI * 2); c.stroke(); }
+    else if (it.t === 'text') { c.font = `700 ${it.s * 4 + 12}px 'GE SS Two', Tahoma, sans-serif`; c.textAlign = 'right'; c.direction = 'rtl'; String(it.v).split('\n').forEach((l, i) => c.fillText(l, it.x, it.y + i * (it.s * 4 + 18))); }
+    else if (it.t === 'img') { const im = imgs[it.src] || (imgs[it.src] = Object.assign(new Image(), { src: it.src, onload: render })); if (im.complete) c.drawImage(im, it.x, it.y, it.w, it.h); }
+    c.restore();
+  }
+  function render() { const w = cv.clientWidth, h = cv.clientHeight; bg(ctx, w, h, pg().bg); [...pg().items.filter(i => i.t === 'img'), ...pg().items.filter(i => i.t !== 'img')].forEach(i => draw(ctx, i)); if (drawing) draw(ctx, drawing); document.getElementById('pgn').textContent = AR(st.cur + 1) + ' / ' + AR(st.pages.length); }
+  const pos = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); const [x, y] = pos(e); redo = [];
+    if (tool === 'text') { e.preventDefault(); return textAt(x, y); }
+    if (tool === 'move') { const im = pg().items.slice().reverse().find(i => i.t === 'img' && x >= i.x && x <= i.x + i.w && y >= i.y && y <= i.y + i.h); if (im) dragImg = { im, dx: x - im.x, dy: y - im.y, corner: x > im.x + im.w - 24 && y > im.y + im.h - 24 }; return; }
+    const sz = tool === 'hl' ? size * 3 : tool === 'er' ? size * 4 : size;
+    drawing = ['pen', 'hl', 'er'].includes(tool) ? { t: tool, c: col, s: sz, p: [[x, y]] } : { t: tool, c: col, s: sz, x1: x, y1: y, x2: x, y2: y }; render(); });
+  cv.addEventListener('pointermove', e => { const [x, y] = pos(e);
+    if (dragImg) { const i = dragImg.im; if (dragImg.corner) { const r = i.h / i.w; i.w = Math.max(40, x - i.x); i.h = i.w * r; } else { i.x = x - dragImg.dx; i.y = y - dragImg.dy; } render(); return; }
+    if (!drawing) return; if (drawing.p) { const ev = e.getCoalescedEvents ? e.getCoalescedEvents() : [e]; ev.forEach(k => drawing.p.push(pos(k))); } else { drawing.x2 = x; drawing.y2 = y; } render(); });
+  const end = () => { if (dragImg) { dragImg = null; save(); return; } if (!drawing) return; pg().items.push(drawing); drawing = null; save(); render(); };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  function textAt(x, y) { const ta = document.createElement('div'); ta.className = 'txt'; ta.contentEditable = 'true'; ta.style.right = (cv.clientWidth - x) + 'px'; ta.style.top = (y - 20) + 'px'; ta.style.color = col; ta.style.fontSize = (size * 4 + 12) + 'px'; wrap.appendChild(ta); ta.focus();
+    const done = () => { const v = ta.innerText.trim(); ta.remove(); if (v) { pg().items.push({ t: 'text', c: col, s: size, x, y: y + size * 2 + 6, v }); save(); render(); } };
+    ta.addEventListener('blur', done); ta.addEventListener('keydown', e => { if (e.key === 'Escape') { ta.innerText = ''; ta.blur(); } }); }
+  // الأدوات
+  const tl = document.getElementById('tools'); tl.innerHTML = TOOLS.map(([k, i, n]) => `<button data-t="${k}" title="${n}" aria-label="${n}">${i}</button>`).join('');
+  const cl = document.getElementById('cols'); cl.innerHTML = COLS.map(c => `<button class="cl" data-c="${c}" style="background:${c}" aria-label="لون"></button>`).join('');
+  const mark = () => { tl.querySelectorAll('[data-t]').forEach(b => b.classList.toggle('on', b.dataset.t === tool)); cl.querySelectorAll('[data-c]').forEach(b => b.classList.toggle('on', b.dataset.c === col)); cv.style.cursor = tool === 'move' ? 'move' : tool === 'text' ? 'text' : 'crosshair'; };
+  tl.onclick = e => { const b = e.target.closest('[data-t]'); if (b) { tool = b.dataset.t; mark(); } };
+  cl.onclick = e => { const b = e.target.closest('[data-c]'); if (b) { col = b.dataset.c; if (tool === 'er') tool = 'pen'; mark(); } };
+  document.getElementById('sz').oninput = e => size = +e.target.value;
+  const undo = () => { const it = pg().items.pop(); if (it) { redo.push(it); save(); render(); } };
+  const redo1 = () => { const it = redo.pop(); if (it) { pg().items.push(it); save(); render(); } };
+  document.getElementById('undo').onclick = undo; document.getElementById('redo').onclick = redo1;
+  document.getElementById('clr').onclick = () => { if (pg().items.length && confirm('مسح كل ما في هذه الصفحة؟')) { redo = pg().items.slice().reverse(); pg().items = []; save(); render(); } };
+  document.getElementById('bg').onclick = () => { pg().bg = BGS[(BGS.indexOf(pg().bg) + 1) % BGS.length]; if (pg().bg === 'dark' && col === '#082B5A') col = '#FFFFFF'; mark(); save(); render(); };
+  document.getElementById('add').onclick = () => { st.pages.splice(st.cur + 1, 0, { items: [], bg: pg().bg }); st.cur++; redo = []; save(); render(); };
+  document.getElementById('pv').onclick = () => { if (st.cur > 0) { st.cur--; redo = []; save(); render(); } };
+  document.getElementById('nx').onclick = () => { if (st.cur < st.pages.length - 1) { st.cur++; redo = []; save(); render(); } };
+  document.getElementById('img').onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { const im = new Image(); im.onload = () => { const W = cv.clientWidth * .6, k = Math.min(1, W / im.width, cv.clientHeight * .7 / im.height); pg().items.push({ t: 'img', src: r.result, x: 40, y: 40, w: im.width * k, h: im.height * k }); imgs[r.result] = im; tool = 'move'; mark(); save(); render(); }; im.src = r.result; }; r.readAsDataURL(f); e.target.value = ''; };
+  const pageCanvas = p => { const w = cv.clientWidth, h = cv.clientHeight, c = document.createElement('canvas'); c.width = w * 2; c.height = h * 2; const x = c.getContext('2d'); x.scale(2, 2); bg(x, w, h, p.bg); const keep = st.cur; st.cur = st.pages.indexOf(p); [...p.items.filter(i => i.t === 'img'), ...p.items.filter(i => i.t !== 'img')].forEach(i => draw(x, i)); st.cur = keep; return c; };
+  document.getElementById('png').onclick = () => { const a = document.createElement('a'); a.download = 'سبورة-' + (st.cur + 1) + '.png'; a.href = pageCanvas(pg()).toDataURL('image/png'); a.click(); };
+  document.getElementById('pdf').onclick = () => { const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;left:-9999px;width:10px;height:10px'; document.body.appendChild(f); f.contentDocument.write('<html><head><style>@page{size:A4 landscape;margin:8mm}body{margin:0}img{width:100%;page-break-after:always;display:block}</style></head><body>' + st.pages.map(p => '<img src="' + pageCanvas(p).toDataURL('image/png') + '">').join('') + '</body></html>'); f.contentDocument.close(); setTimeout(() => { f.contentWindow.print(); setTimeout(() => f.remove(), 2000); }, 500); };
+  document.getElementById('fs').onclick = () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => { });
+  document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo1() : undo(); } });
+  window.addEventListener('resize', fit); mark(); fit();
+})();
+</script>
+</body>
+</html>

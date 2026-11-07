@@ -4,6 +4,7 @@
 (function () {
   const A = window.APP, V = window.VIEWS; if (!A) return;
   const { S, api, $, $$, esc, AR, I } = A;
+  A.I.stucodes = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 11h5M18.5 8.5v5"/></svg>';
   const can = () => S.me && (S.me.is_owner || A.perm('structure') || (A.hasModule && (A.hasModule('attendance') || A.hasModule('supervision'))));
   if (A.NAV && !A.NAV.some(n => n[0] === 'stucodes')) { const i = A.NAV.findIndex(n => n[0] === 'attendance'); A.NAV.splice(i < 0 ? A.NAV.length : i + 1, 0, ['stucodes', 'حسابات الطلاب', () => can()]); }
   const base = () => location.href.split('#')[0].replace(/[^/]*$/, '');

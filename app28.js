@@ -224,4 +224,64 @@
         mm.close(); A.printDoc(ds.label, sub, body, true); }; };
     draw();
   };
+
+  // ---------------- ما يظهر لولي الأمر (إعدادات المالك لكل جدول) ----------------
+  const VIS0 = { teacher: 1, topic: 1, homework: 1, note: 1, llink: 1, join: 1, room: 1, times: 1, export: 1, legend: 1, views: ['day', 'table', 'week', 'hw'] };
+  A.liveVisTab = function (ds, B, onSave) {
+    const v = Object.assign({}, VIS0, (ds.meta || {}).vis || {}); v.views = (v.views || []).slice();
+    const F = [['join', 'زر «دخول الحصة» والروابط'], ['room', 'زر «دخول قاعة الفصل» في الأعلى'], ['teacher', 'اسم المعلم/المعلمة'], ['times', 'أوقات الحصص'], ['topic', 'الدرس / الموضوع'], ['homework', 'الواجب'], ['note', 'ملاحظة المعلم'], ['llink', 'رابط الدرس (عرض، فيديو…)'], ['legend', 'دلالة الألوان'], ['export', 'أزرار الطباعة والتصدير والتقويم']];
+    const W = [['day', 'اليوم (بطاقات)'], ['table', 'جدول الأسبوع'], ['week', 'الأسبوع كاملاً'], ['hw', 'الدروس والواجبات']];
+    B.innerHTML = `<p class="small muted" style="margin:0 0 8px">تتحكم هنا فيما يراه ولي الأمر في هذا الجدول. التغيير يصل فوراً لصفحة ولي الأمر، والمعاينة بالأسفل تعكسه. المعلمون يرون حصصهم كاملة دائماً. وعبارات «لم يُضف الدرس» و«بلا رابط» لا تظهر لولي الأمر إطلاقاً — تظهر لك وحدك.</p>
+      <div class="grid g2" style="align-items:start"><div class="sec-box"><b>عناصر الحصة</b><div class="perm-grid" style="margin-top:6px">${F.map(([k, l]) => `<label class="chk"><input type="checkbox" data-vf="${k}" ${v[k] ? 'checked' : ''}> ${l}</label>`).join('')}</div></div>
+      <div class="sec-box"><b>طرق العرض المتاحة</b><div class="perm-grid" style="margin-top:6px">${W.map(([k, l]) => `<label class="chk"><input type="checkbox" data-vw="${k}" ${v.views.includes(k) ? 'checked' : ''}> ${l}</label>`).join('')}</div><p class="small muted" style="margin:6px 0 0">أول طريقة محددة هي ما يُفتح افتراضياً.</p>
+        <div class="row" style="gap:6px;margin-top:8px"><button class="btn ghost sm" id="vAll" type="button">إظهار الكل</button><button class="btn ghost sm" id="vMin" type="button">الجدول والدخول فقط</button></div></div></div>`;
+    let tm; const go = () => { clearTimeout(tm); tm = setTimeout(() => A.run(null, () => onSave(JSON.parse(JSON.stringify(v)))), 350); };
+    $$('[data-vf]', B).forEach(c => c.onchange = () => { v[c.dataset.vf] = c.checked ? 1 : 0; go(); });
+    $$('[data-vw]', B).forEach(c => c.onchange = () => { const on = $$('[data-vw]', B).filter(x => x.checked).map(x => x.dataset.vw); if (!on.length) { c.checked = true; return A.toast('اترك طريقة عرض واحدة على الأقل', 'warn'); } v.views = W.map(w => w[0]).filter(k => on.includes(k)); go(); });
+    $('#vAll', B).onclick = () => { Object.assign(v, JSON.parse(JSON.stringify(VIS0))); A.liveVisTab({ ...ds, meta: { ...(ds.meta || {}), vis: v } }, B, onSave); onSave(JSON.parse(JSON.stringify(v))); };
+    $('#vMin', B).onclick = () => { Object.assign(v, { teacher: 1, topic: 0, homework: 0, note: 0, llink: 0, join: 1, room: 1, times: 1, export: 0, legend: 0, views: ['day', 'table'] }); A.liveVisTab({ ...ds, meta: { ...(ds.meta || {}), vis: v } }, B, onSave); onSave(JSON.parse(JSON.stringify(v))); };
+  };
+
+  // ---------------- تقرير إنجاز المعلمين في الجدول الاستثنائي ----------------
+  A.liveRepTab = async function (ds, B) {
+    const H = L_(); const M = ds.meta || {};
+    const dates = []; { const ws = A.parseDate(ds.date_from); ws.setDate(ws.getDate() - ws.getDay()); for (let i = 0; i < 7 * 6; i++) { const x = new Date(ws); x.setDate(ws.getDate() + i); const iso = A.isoDate(x); if (iso < ds.date_from) continue; if (iso > ds.date_to) break; if ((M.days || [0, 1, 2, 3, 4]).includes(x.getDay())) dates.push({ iso, d: x.getDay() }); } }
+    B.innerHTML = '<div class="spinner"></div>';
+    let E = []; try { E = await api.list('live_entries', { ds_id: ds.id }); } catch (_) { }
+    const L = ds.links || {}, linkOf = x => (L.cell || {})[`${x.c}|${x.d}|${x.p}`] || (L.cls || {})[x.c] || (x.t && (L.tch || {})[x.t]) || '';
+    const teachers = [...new Set(ds.slots.map(tKey).filter(Boolean))].map(k => ({ k, n: tName(ds.slots.find(x => tKey(x) === k)) })).sort((a, b) => a.n.localeCompare(b.n, 'ar'));
+    const st = { scope: 'all', day: (dates.find(x => x.iso >= H.today()) || dates[0] || {}).iso, from: ds.date_from, to: ds.date_to, t: '' };
+    const rows = () => {
+      const inR = dt => st.scope === 'day' ? dt === st.day : st.scope === 'range' ? dt >= st.from && dt <= st.to : true;
+      const sel = dates.filter(x => inR(x.iso));
+      const by = {};
+      sel.forEach(({ iso, d }) => ds.slots.filter(x => x.d === d && (!st.t || tKey(x) === st.t)).forEach(x => { const k = tKey(x) || '—'; const o = by[k] = by[k] || { n: tName(x) || 'بلا معلم', linked: !!x.t, tot: 0, topic: 0, hw: 0, any: 0, link: 0, miss: [] };
+        const e = E.find(y => y.class_id === x.c && y.day === x.d && y.period === x.p) || {}; const has = (e.topic || '').trim() || (e.homework || '').trim() || (e.note || '').trim() || (e.link || '').trim();
+        o.tot++; if ((e.topic || '').trim()) o.topic++; if ((e.homework || '').trim()) o.hw++; if (has) o.any++; if (linkOf(x)) o.link++; if (!has) o.miss.push({ iso, d, p: x.p, c: x.c, s: sName(x) }); }));
+      return Object.values(by).sort((a, b) => (a.any / a.tot) - (b.any / b.tot) || a.n.localeCompare(b.n, 'ar'));
+    };
+    const pc = (a, b) => b ? Math.round(100 * a / b) : 0;
+    const label = () => st.scope === 'day' ? `يوم ${DAYS[A.parseDate(st.day).getDay()]} ${AR(A.dmy(A.parseDate(st.day)))}` : st.scope === 'range' ? `من ${AR(A.dmy(A.parseDate(st.from)))} إلى ${AR(A.dmy(A.parseDate(st.to)))}` : `كامل الفترة ${AR(A.dmy(A.parseDate(ds.date_from)))} — ${AR(A.dmy(A.parseDate(ds.date_to)))}`;
+    const table = (R, forPrint) => `<table class="${forPrint ? '' : 'tbl'}"><thead><tr><th>المعلم</th><th>الحصص</th><th>أُضيف لها بيانات</th><th>الإنجاز</th><th>الدرس</th><th>الواجب</th><th>لها رابط دخول</th></tr></thead><tbody>${R.map(r => { const p = pc(r.any, r.tot); return `<tr><td><b>${esc(r.n)}</b>${r.linked ? '' : ' <small style="color:#B7791F">(غير مرتبط)</small>'}</td><td>${AR(r.tot)}</td><td>${AR(r.any)}</td><td>${forPrint ? AR(p) + '٪' : `<div class="lvr-bar"><i style="width:${p}%;background:${p >= 80 ? '#2F855A' : p >= 50 ? '#D69E2E' : '#C53030'}"></i></div><b>${AR(p)}٪</b>`}</td><td>${AR(r.topic)}</td><td>${AR(r.hw)}</td><td>${AR(r.link)}/${AR(r.tot)}</td></tr>`; }).join('') || '<tr><td colspan="7">لا توجد حصص في هذا النطاق</td></tr>'}</tbody></table>`;
+    const draw = () => {
+      const R = rows(), T = R.reduce((a, r) => ({ tot: a.tot + r.tot, any: a.any + r.any, link: a.link + r.link }), { tot: 0, any: 0, link: 0 });
+      B.innerHTML = `<div class="row" style="gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:10px">
+          <div class="field" style="margin:0"><label>النطاق</label><div class="kpick" id="rpS">${[['all', 'كامل الفترة'], ['day', 'يوم'], ['range', 'فترة محددة']].map(([k, l]) => `<button data-s="${k}" class="${st.scope === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
+          ${st.scope === 'day' ? `<div class="field" style="margin:0"><label for="rpD">اليوم</label><select class="in" id="rpD">${dates.map(x => `<option value="${x.iso}" ${x.iso === st.day ? 'selected' : ''}>${DAYS[x.d]} ${AR(A.dmy(A.parseDate(x.iso)))}</option>`).join('')}</select></div>` : ''}
+          ${st.scope === 'range' ? `<div class="field" style="margin:0"><label for="rpF">من</label><input class="in" type="date" id="rpF" value="${st.from}" min="${ds.date_from}" max="${ds.date_to}"></div><div class="field" style="margin:0"><label for="rpT">إلى</label><input class="in" type="date" id="rpT" value="${st.to}" min="${ds.date_from}" max="${ds.date_to}"></div>` : ''}
+          <div class="field" style="margin:0"><label for="rpTc">المعلم</label><select class="in" id="rpTc"><option value="">كل المعلمين</option>${teachers.map(t => `<option value="${esc(t.k)}" ${t.k === st.t ? 'selected' : ''}>${esc(t.n)}</option>`).join('')}</select></div>
+          <button class="btn ghost sm" id="rpP" type="button">${I.print || ''} طباعة / PDF</button><button class="btn ghost sm" id="rpX" type="button">تصدير Excel</button></div>
+        <div class="lvx-sum" style="margin:0 0 10px"><div class="k"><b>${AR(pc(T.any, T.tot))}٪</b>نسبة الإنجاز</div><div class="k"><b>${AR(T.any)}/${AR(T.tot)}</b>حصة أُضيف لها درس أو واجب</div><div class="k ${T.link < T.tot ? 'w' : 'ok'}"><b>${AR(T.link)}/${AR(T.tot)}</b>حصة لها رابط دخول</div><div class="k"><b>${AR(R.filter(r => pc(r.any, r.tot) < 50).length)}</b>معلم أقل من ٥٠٪</div></div>
+        <div class="scroll">${table(R)}</div>
+        ${st.t && R[0] && R[0].miss.length ? `<details class="dz-det" open><summary>حصص لم تُضف لها بيانات (${AR(R[0].miss.length)})</summary><ul class="small">${R[0].miss.map(m => `<li>${DAYS[m.d]} ${AR(A.dmy(A.parseDate(m.iso)))} · الحصة ${AR(m.p + 1)} · ${esc(H.cName(m.c))} — ${esc(m.s)}</li>`).join('')}</ul></details>` : ''}
+        <p class="small muted">«أُضيف لها بيانات» = كتب المعلم الدرس أو الواجب أو ملاحظة أو رابط درس. هذا التقرير لك وحدك.</p>`;
+      $$('#rpS button', B).forEach(b => b.onclick = () => { st.scope = b.dataset.s; draw(); });
+      const g = id => $(id, B); if (g('#rpD')) g('#rpD').onchange = e => { st.day = e.target.value; draw(); };
+      if (g('#rpF')) g('#rpF').onchange = e => { st.from = e.target.value; draw(); }; if (g('#rpT')) g('#rpT').onchange = e => { st.to = e.target.value; draw(); };
+      g('#rpTc').onchange = e => { st.t = e.target.value; draw(); };
+      g('#rpP').onclick = () => { const R2 = rows(); A.printDoc('تقرير إنجاز المعلمين — ' + ds.label, label() + (st.t ? ' · ' + (teachers.find(t => t.k === st.t) || {}).n : ''), table(R2, true) + (st.t && R2[0] && R2[0].miss.length ? `<h3>حصص لم تُضف لها بيانات</h3><table><tr><th>اليوم</th><th>الحصة</th><th>الفصل</th><th>المادة</th></tr>${R2[0].miss.map(m => `<tr><td>${DAYS[m.d]} ${AR(A.dmy(A.parseDate(m.iso)))}</td><td>${AR(m.p + 1)}</td><td>${esc(H.cName(m.c))}</td><td>${esc(m.s)}</td></tr>`).join('')}</table>` : ''), false); };
+      g('#rpX').onclick = () => { if (!window.XLSX) return; const R2 = rows(); const ws = XLSX.utils.json_to_sheet(R2.map(r => ({ 'المعلم': r.n, 'الحصص': r.tot, 'أُضيف لها بيانات': r.any, 'نسبة الإنجاز %': pc(r.any, r.tot), 'الدرس': r.topic, 'الواجب': r.hw, 'لها رابط دخول': r.link }))); ws['!views'] = [{ RTL: true }]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'الإنجاز'); XLSX.writeFile(wb, `إنجاز المعلمين - ${ds.label}.xlsx`); };
+    };
+    draw();
+  };
 })();

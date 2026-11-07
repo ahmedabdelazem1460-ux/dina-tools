@@ -171,28 +171,76 @@
       ${rows.map(([sid, o]) => `<tr><td><b>${esc(A.subjName(sid))}</b></td><td>${AR(o.n)}</td><td>${Object.entries(o.t).map(([t, n]) => t ? `${esc(A.personName(t))}${Object.keys(o.t).length > 1 ? ` <span class="small muted">(${AR(n)})</span>` : ''}` : `<a href="#" class="assignlink" data-assign-c="${c}" data-assign-s="${sid}">بلا معلم — إسناد</a>`).join('، ')}</td></tr>`).join('') || `<tr><td colspan="3" class="muted">لا توجد حصص</td></tr>`}
       </tbody></table></div></div>`;
   }
-  // تعديل حصة واحدة في الجدول المعتمد — يسري فوراً على الأسابيع الجارية والقادمة دون مسّ ما أدخله المعلمون
-  async function slotDialog(c, d, p, onDone) {
+  // تعديل حصة: إما في الجدول المعتمد (هذا الأسبوع والقادمة) أو في أسبوع واحد فقط دون مسّ الجدول وباقي الأسابيع
+  const upWeeks = () => { const tz = new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10); const add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); }; return (S.weeks || []).filter(w => !w.archived && add(w.start_date, 6) >= tz).slice().sort((a, b) => a.start_date < b.start_date ? -1 : 1); };
+  const wkName = w => `الأسبوع ${w.word || AR(w.number)}`;
+  async function slotDialog(c, d, p, onDone, opt = {}) {
     if (!T.versions.length || !approved()) await loadVersions();
     const v = approved(); if (!v) return A.toast('لا يوجد جدول معتمد', 'err');
     const sl = await slotsOf(v.id); const s = sl.find(x => x.class_id === c && x.day === d && x.period === p) || {};
     const busy = tid => sl.filter(x => x.teacher_id === tid && x.day === d && x.period === p && x.class_id !== c);
+    const wks = upWeeks(); const defW = opt.week || (wks.find(w => w.id === S.weekId) || wks[0] || {}).id;
     const m = A.modal(`<h3>تعديل حصة — ${esc((A.cls(c) || {}).name || '')} · ${DAYS[d]} · الحصة ${PER[p]}</h3>
-      <p class="sub">يُطبَّق على الجدول المعتمد، ثم على الأسبوع الحالي والأسابيع القادمة فوراً. الخلية التي فيها محتوى من المعلم لا تُغيَّر مادتها تلقائياً؛ تظهر لك في «تعارضات تحتاج قرارك».</p>
+      <fieldset class="sdscope"><legend class="small muted">نطاق التعديل</legend>
+        <label class="sdopt"><input type="radio" name="sdM" value="week" ${opt.week ? 'checked' : ''} ${wks.length ? '' : 'disabled'}><span><b>أسبوع واحد فقط</b><small>تتغير الحصة في الأسبوع المختار وحده، ويبقى الجدول المعتمد وباقي الأسابيع كما هي</small></span></label>
+        <label class="sdopt"><input type="radio" name="sdM" value="all" ${opt.week ? '' : 'checked'}><span><b>هذا الأسبوع والقادمة</b><small>تعديل الجدول المعتمد نفسه — يسري على الأسبوع الحالي وما بعده</small></span></label>
+      </fieldset>
+      <div id="sdWk" class="field" style="display:none"><label for="sdWs">الأسبوع</label><select class="in" id="sdWs">${wks.map(w => `<option value="${w.id}" ${w.id === defW ? 'selected' : ''}>${esc(wkName(w))} — ${esc(w.start_date)}</option>`).join('')}</select></div>
       <div class="grid g2"><div class="field"><label for="sdS">المادة</label><select class="in" id="sdS">${subjOpts(s.subject_id)}</select></div>
       <div class="field"><label for="sdT">المعلم</label><select class="in" id="sdT">${teachersOpts(s.teacher_id)}</select></div></div>
+      <div id="sdInfo" class="small"></div>
       <div id="sdW" class="small" style="min-height:20px"></div>
-      <div class="acts"><button class="btn" id="sdGo">حفظ التعديل</button></div>`);
-    const warn = () => { const t = m.el.querySelector('#sdT').value; const b = t ? busy(t) : []; m.el.querySelector('#sdW').innerHTML = b.length ? `<div class="notice warn" style="display:block">تعارض: ${esc(A.personName(t))} لديه حصة في نفس الوقت في ${b.map(x => esc((A.cls(x.class_id) || {}).name || '')).join('، ')}. يمكنك الحفظ مؤقتاً وسيظهر التعارض بوضوح في الجدول.</div>` : ''; };
-    m.el.querySelector('#sdT').onchange = warn; warn();
-    m.el.querySelector('#sdGo').onclick = e => A.run(e.currentTarget, async () => {
-      const sid = m.el.querySelector('#sdS').value || null, tid = m.el.querySelector('#sdT').value || null;
-      const r = await api.editSlot(c, d, p, sid, tid);
-      T.slots[v.id] = null; m.close();
-      const parts = []; if (r.teacher_fixed) parts.push(`حُدِّث المعلم في ${A.cnt(r.teacher_fixed, 'خلية', 'خلايا')}`); if (r.subject_changed) parts.push(`تغيّرت المادة في ${A.cnt(r.subject_changed, 'خلية فارغة', 'خلايا فارغة')}`); if (r.conflicts) parts.push(`${A.cnt(r.conflicts, 'خلية فيها محتوى', 'خلايا فيها محتوى')} بانتظار قرارك`);
-      A.toast('حُفظت الحصة' + (parts.length ? ' — ' + parts.join(' · ') : ''), 'ok');
-      await A.loadWeek(); if (onDone) await onDone();
+      <div class="acts"><button class="btn" id="sdGo">حفظ التعديل</button><button class="btn ghost" id="sdRs" style="display:none">إرجاعها كما في الجدول</button></div>`);
+    const q = x => m.el.querySelector(x); let cur = null;
+    const mode = () => (m.el.querySelector('[name=sdM]:checked') || {}).value;
+    const has = e => !!(e && ((e.topic || '').trim() || (e.homework || '').trim() || (e.note || '').trim()));
+    const warn = () => { const t = q('#sdT').value; const b = t ? busy(t) : []; q('#sdW').innerHTML = b.length ? `<div class="notice warn" style="display:block">تعارض: ${esc(A.personName(t))} لديه حصة في نفس الوقت في ${b.map(x => esc((A.cls(x.class_id) || {}).name || '')).join('، ')}${mode() === 'all' ? '. يمكنك الحفظ مؤقتاً وسيظهر التعارض بوضوح في الجدول' : ' حسب الجدول المعتمد'}.</div>` : ''; };
+    const info = async () => {
+      const wk = mode() === 'week'; q('#sdWk').style.display = wk ? '' : 'none'; q('#sdRs').style.display = 'none';
+      if (!wk) { q('#sdS').value = s.subject_id || ''; q('#sdT').value = s.teacher_id || ''; q('#sdInfo').innerHTML = `<p class="sub" style="margin:0">يُطبَّق على الجدول المعتمد، ثم على الأسبوع الحالي والقادمة فوراً. الخلية التي فيها محتوى من المعلم لا تُغيَّر مادتها تلقائياً؛ تظهر في «تعارضات تحتاج قرارك». الحصص المعدّلة لأسبوع واحد لا تتأثر.</p>`; warn(); return; }
+      const wid = q('#sdWs').value; q('#sdInfo').innerHTML = '<span class="muted">جارٍ التحميل…</span>';
+      try { cur = (await api.list('plan_entries', { week_id: wid, class_id: c, day: d, period: p }))[0] || null; } catch (_) { cur = null; }
+      if (mode() !== 'week' || q('#sdWs').value !== wid) return;
+      if (cur) { q('#sdS').value = cur.subject_id || ''; q('#sdT').value = cur.teacher_id || ''; }
+      q('#sdRs').style.display = cur && cur.override ? '' : 'none';
+      const now = cur ? `في هذا الأسبوع الآن: <b>${esc(A.subjName(cur.subject_id) || '—')}</b>${cur.teacher_id ? ' · ' + esc(A.personName(cur.teacher_id)) : ''}${cur.override ? ' <span class="pill" style="background:#F3E8FF;color:#6B21A8">معدّلة لهذا الأسبوع</span>' : ''}` : 'لا توجد خلية لهذا الأسبوع بعد — ستُنشأ.';
+      q('#sdInfo').innerHTML = `<div class="notice" style="display:block">${now}
+        ${has(cur) ? `<div style="margin-top:8px"><b>كتب المعلم في هذه الحصة:</b> <span class="muted">${esc([cur.topic, cur.homework && 'واجب: ' + cur.homework, cur.note && 'ملاحظة: ' + cur.note].filter(Boolean).join(' · ').slice(0, 160))}</span>
+        <div class="sdkeep" role="radiogroup" aria-label="ما كتبه المعلم"><label><input type="radio" name="sdC" value="keep" checked> إبقاء ما كتبه المعلم كما هو</label><label><input type="radio" name="sdC" value="clear"> حذفه (يُحفظ نسخة في سجل التعديلات)</label></div></div>` : ''}</div>`;
+      warn();
+    };
+    m.el.querySelectorAll('[name=sdM]').forEach(r => r.onchange = info); q('#sdWs').onchange = info;
+    q('#sdT').onchange = warn; info();
+    const content = () => (m.el.querySelector('[name=sdC]:checked') || {}).value || 'keep';
+    const done = async msg => { T.slots[v.id] = null; m.close(); A.toast(msg, 'ok'); await A.loadWeek(); if (onDone) await onDone(); };
+    q('#sdRs').onclick = e => A.run(e.currentTarget, async () => {
+      await api.editWeekCell(q('#sdWs').value, c, d, p, null, null, content(), true);
+      await done('أُرجعت الحصة كما في الجدول المعتمد لهذا الأسبوع' + (content() === 'clear' ? ' — وحُذف المحتوى (محفوظ في السجل)' : ''));
     });
+    q('#sdGo').onclick = e => A.run(e.currentTarget, async () => {
+      const sid = q('#sdS').value || null, tid = q('#sdT').value || null;
+      if (mode() === 'week') {
+        const wid = q('#sdWs').value; const w = wks.find(x => x.id === wid) || {};
+        await api.editWeekCell(wid, c, d, p, sid, tid, content(), false);
+        return done(`حُفظت الحصة لـ${wkName(w)} فقط — الجدول المعتمد وباقي الأسابيع بلا تغيير` + (has(cur) ? (content() === 'clear' ? ' · حُذف المحتوى (محفوظ في السجل)' : ' · بقي ما كتبه المعلم') : ''));
+      }
+      const r = await api.editSlot(c, d, p, sid, tid);
+      const parts = []; if (r.teacher_fixed) parts.push(`حُدِّث المعلم في ${A.cnt(r.teacher_fixed, 'خلية', 'خلايا')}`); if (r.subject_changed) parts.push(`تغيّرت المادة في ${A.cnt(r.subject_changed, 'خلية فارغة', 'خلايا فارغة')}`); if (r.conflicts) parts.push(`${A.cnt(r.conflicts, 'خلية فيها محتوى', 'خلايا فيها محتوى')} بانتظار قرارك`);
+      await done('حُفظت الحصة' + (parts.length ? ' — ' + parts.join(' · ') : ''));
+    });
+  }
+  // قائمة الحصص المعدّلة لأسبوع واحد في الفصل المختار
+  async function overridesPanel(el, c, refresh) {
+    if (!el) return; const wks = upWeeks(); if (!wks.length) { el.innerHTML = ''; return; }
+    let l = []; try { l = await api.list('plan_entries', { class_id: c, week_id: wks.map(w => w.id), override: true }); } catch (_) { }
+    if (!l.length) { el.innerHTML = ''; return; }
+    const wn = id => wkName(wks.find(w => w.id === id) || {});
+    l.sort((a, b) => (wks.findIndex(w => w.id === a.week_id) - wks.findIndex(w => w.id === b.week_id)) || a.day - b.day || a.period - b.period);
+    el.innerHTML = `<details class="sec-box" open style="margin-top:14px;border-color:#A855F7"><summary><b>حصص معدّلة لأسبوع واحد (${AR(l.length)})</b> <span class="small muted">لا تتأثر بتعديل الجدول — والجدول المعتمد لم يتغير</span></summary>
+      <div class="scroll" style="margin-top:8px"><table class="tbl"><thead><tr><th>الأسبوع</th><th>اليوم/الحصة</th><th>المادة</th><th>المعلم</th><th>المحتوى</th><th></th></tr></thead><tbody>
+      ${l.map(x => `<tr><td>${esc(wn(x.week_id))}</td><td>${DAYS[x.day]} · ${PER[x.period]}</td><td><b>${esc(A.subjName(x.subject_id) || '—')}</b></td><td>${esc(x.teacher_id ? A.personName(x.teacher_id) : '—')}</td><td class="small">${esc((x.topic || '').slice(0, 60)) || '<span class="muted">—</span>'}</td><td><button class="btn ghost sm" data-ovw="${x.week_id}" data-ovd="${x.day}" data-ovp="${x.period}">تعديل / إرجاع</button></td></tr>`).join('')}
+      </tbody></table></div></details>`;
+    $$('[data-ovw]', el).forEach(b => b.onclick = () => slotDialog(c, +b.dataset.ovd, +b.dataset.ovp, refresh, { week: b.dataset.ovw }));
   }
   A.slotDialog = slotDialog;
   // خلايا فيها محتوى مادتها تخالف الجدول بعد التعديل — قرار صريح فقط
@@ -218,10 +266,11 @@
     const allClash = [...cm.values()];
     box.insertAdjacentHTML('beforeend', `${allClash.length ? `<details class="notice warn" style="display:block;margin-bottom:10px"><summary><b>${A.cnt(allClash.length, 'تعارض', 'تعارضات')} في القسم</b> — معلم في أكثر من فصل في نفس الحصة (مسموح مؤقتاً ويظهر بلون مميز). اضغط لعرضها.</summary><div style="margin-top:6px">${allClash.map(l => `<button class="ldc ldbtn" data-gc="${l[0].class_id}">${esc(A.personName(l[0].teacher_id))} · ${DAYS[l[0].day]} الحصة ${PER[l[0].period]}: ${l.map(x => esc((A.cls(x.class_id) || {}).name || '')).join(' + ')}</button>`).join('')}</div></details>` : ''}
       <details class="ttfold" ${open ? 'open' : ''}><summary><b>جدول ${esc((A.cls(T.cls) || {}).name || '')}</b> <span class="small muted">${canE ? 'اضغط ✎ على أي حصة لتصحيحها — يسري فوراً على الخطط والأسابيع القادمة' : 'اضغط للطي أو الفتح'}</span></summary>${grid(sl, T.cls, false, null, { clash: cm, edit: canE })}</details>
-      ${classSummary(sl, T.cls)}<div id="cfp"></div>`);
+      ${classSummary(sl, T.cls)}<div id="ovp"></div><div id="cfp"></div>`);
     const fold = $('.ttfold', box); fold.ontoggle = () => A.LS.set('ttfold', fold.open ? '1' : '0');
     $$('[data-gc]', box).forEach(b => b.onclick = () => { T.cls = b.dataset.gc; ttView(box); });
     $$('[data-sd]', box).forEach(b => b.onclick = () => slotDialog(T.cls, +b.dataset.sd, +b.dataset.sp, () => ttView(box)));
+    overridesPanel($('#ovp', box), T.cls, () => ttView(box));
     conflictsPanel($('#cfp', box), () => ttView(box));
   }
   async function ttAssign(box) {

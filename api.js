@@ -71,6 +71,7 @@
       approveTT: (id, apply) => sb.rpc('approve_timetable', { p_version: id, p_apply_open_weeks: apply }).then(ok),
       deleteVersion: id => T('timetable_versions').delete().eq('id', id).then(ok),
       assignTeacher: (c, s, t) => sb.rpc('assign_teacher', { p_class: c, p_subject: s, p_teacher: t }).then(ok),
+      editWeekCell: (w, c, d, p, s, t, content, reset) => sb.rpc('edit_week_cell', { p_week: w, p_class: c, p_day: d, p_period: p, p_subject: s || null, p_teacher: t || null, p_content: content || 'keep', p_reset: !!reset }).then(ok),
       editSlot: (c, d, p, s, t) => sb.rpc('edit_slot', { p_class: c, p_day: d, p_period: p, p_subject: s || null, p_teacher: t || null }).then(ok),
       slotConflicts: s => sb.rpc('slot_conflicts', { p_section: s }).then(ok),
       slotConflictReset: id => sb.rpc('slot_conflict_reset', { p_entry: id }).then(ok),

@@ -143,14 +143,23 @@
         let x = D.timetable_slots.find(y => y.version_id === v.id && y.class_id === c && y.day === d && y.period === p);
         if (!x) { x = { id: uid(), version_id: v.id, class_id: c, day: d, period: p }; D.timetable_slots.push(x); }
         x.subject_id = s || null; x.teacher_id = t || null; let a = 0, b = 0, k = 0;
-        D.plan_entries.forEach(e => { const w = find('weeks', e.week_id); if (!w || w.section_id !== cl.section_id || e.class_id !== c || e.day !== d || e.period !== p) return;
+        D.plan_entries.forEach(e => { const w = find('weeks', e.week_id); if (!w || e.override || w.section_id !== cl.section_id || e.class_id !== c || e.day !== d || e.period !== p) return;
           if (e.subject_id === x.subject_id) { if (e.teacher_id !== x.teacher_id) { e.teacher_id = x.teacher_id; a++; } }
           else if (!e.topic && !e.homework && !e.note) { e.subject_id = x.subject_id; e.teacher_id = x.teacher_id; b++; } else k++; });
         return wait({ teacher_fixed: a, subject_changed: b, conflicts: k });
       },
+      async editWeekCell(wid, c, d, p, s, t, content, reset) {
+        const w = find('weeks', wid); let e = D.plan_entries.find(x => x.week_id === wid && x.class_id === c && x.day === d && x.period === p);
+        if (!e) { e = { id: uid(), week_id: wid, class_id: c, day: d, period: p, topic: '', homework: '', note: '', status: 'empty' }; D.plan_entries.push(e); }
+        if (reset) { const v = D.timetable_versions.find(x => x.section_id === w.section_id && x.status === 'approved'); const sl = D.timetable_slots.find(x => x.version_id === v.id && x.class_id === c && x.day === d && x.period === p) || {}; s = sl.subject_id || null; t = sl.teacher_id || null; }
+        (D.audit_log = D.audit_log || []).push({ id: uid(), action: reset ? 'week_cell_reset' : 'week_cell_edit', entity_id: e.id, details: { old: { subject_id: e.subject_id, teacher_id: e.teacher_id, topic: e.topic, homework: e.homework, note: e.note } } });
+        Object.assign(e, { subject_id: s || null, teacher_id: t || null, override: !reset });
+        if (content === 'clear') Object.assign(e, { topic: '', homework: '', note: '', perf_task: null, status: 'empty' });
+        return wait(clone(e));
+      },
       async slotConflicts(sec) {
         const v = D.timetable_versions.find(x => x.section_id === sec && x.status === 'approved'); if (!v) return wait([]);
-        const out = []; D.weeks.filter(w => w.section_id === sec).forEach(w => D.plan_entries.filter(e => e.week_id === w.id).forEach(e => { const s = D.timetable_slots.find(x => x.version_id === v.id && x.class_id === e.class_id && x.day === e.day && x.period === e.period) || {}; if ((s.subject_id || null) !== (e.subject_id || null)) out.push({ entry_id: e.id, week_number: w.number, class_id: e.class_id, day: e.day, period: e.period, entry_subject: e.subject_id, slot_subject: s.subject_id || null, slot_teacher: s.teacher_id || null, topic: e.topic, status: e.status }); }));
+        const out = []; D.weeks.filter(w => w.section_id === sec).forEach(w => D.plan_entries.filter(e => e.week_id === w.id).forEach(e => { const s = D.timetable_slots.find(x => x.version_id === v.id && x.class_id === e.class_id && x.day === e.day && x.period === e.period) || {}; if (!e.override && (s.subject_id || null) !== (e.subject_id || null)) out.push({ entry_id: e.id, week_number: w.number, class_id: e.class_id, day: e.day, period: e.period, entry_subject: e.subject_id, slot_subject: s.subject_id || null, slot_teacher: s.teacher_id || null, topic: e.topic, status: e.status }); }));
         return wait(out);
       },
       async slotConflictApply(id) { const e = find('plan_entries', id); const w = find('weeks', e.week_id); const v = D.timetable_versions.find(x => x.section_id === w.section_id && x.status === 'approved'); const s = D.timetable_slots.find(x => x.version_id === v.id && x.class_id === e.class_id && x.day === e.day && x.period === e.period) || {}; e.subject_id = s.subject_id || null; e.teacher_id = s.teacher_id || null; return wait(null); },

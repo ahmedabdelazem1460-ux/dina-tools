@@ -31,12 +31,17 @@
     topic: ['#005499', '#E1F0FB', 'الدرس', '<path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2zM4 5v16"/>'],
     homework: ['#B7791F', '#FFF4DC', 'الواجب', '<path d="M9 4h6l1 2h3v15H5V6h3z"/><path d="M9 12l2 2 4-4"/>'],
     note: ['#6B4FA3', '#EFEAF8', 'ملاحظة', '<path d="M4 5h16v11H8l-4 4z"/>'],
+    perf: ['#2E8B57', '#E6F4EC', 'مهمة أدائية', '<path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/>'],
     llink: ['#0E8A9E', '#E0F5F8', 'رابط الدرس', '<path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/>'],
   };
   const ico = (k, sz = 15) => svg(IC[k][3], sz);
-  const KEYS = ['topic', 'homework', 'note'];
-  const hasInfo = y => KEYS.some(k => (y[k] || '').trim()) || !!safe(y.llink);
-  const dots = y => `<span class="lv-dots" aria-hidden="true">${KEYS.filter(k => (y[k] || '').trim()).map(k => `<i style="--c:${IC[k][0]}"></i>`).join('')}${safe(y.llink) ? `<i style="--c:${IC.llink[0]}"></i>` : ''}</span>`;
+  const KEYS = ['topic', 'homework', 'note', 'perf'];
+  // عناصر إضافية يضيفها المعلم لحصة عن بعد
+  const EX = { note: { l: 'ملاحظة', c: '#6B4FA3', ph: 'مثال: تجهيز الكتاب والدفتر' }, perf: { l: 'مهمة أدائية', c: '#2E8B57', ph: 'وصف المهمة وموعد التسليم' }, ws: { l: 'ورقة عمل', c: '#0E8A9E', ph: 'اسم الورقة أو المطلوب فيها' }, prep: { l: 'تجهيزات مطلوبة', c: '#B7791F', ph: 'مثال: ألوان، مسطرة، الكتاب ص ٤٥' }, act: { l: 'نشاط / تكليف', c: '#005499', ph: 'وصف النشاط' }, read: { l: 'قراءة / مراجعة', c: '#3AB1DB', ph: 'ما يُقرأ أو يُراجع' }, quiz: { l: 'اختبار قصير', c: '#C0392B', ph: 'موضوع الاختبار وموعده' }, link: { l: 'رابط إضافي', c: '#0E8A9E', ph: 'وصف الرابط' }, other: { l: 'أخرى', c: '#5F7896', ph: 'النص' } };
+  const exOf = y => (Array.isArray(y.extra) ? y.extra : []).filter(x => x && ((x.t || '').trim() || safe(x.u)));
+  const hasInfo = y => KEYS.some(k => (y[k] || '').trim()) || !!safe(y.llink) || exOf(y).length > 0;
+  const dots = y => `<span class="lv-dots" aria-hidden="true">${KEYS.filter(k => (y[k] || '').trim()).map(k => `<i style="--c:${IC[k][0]}"></i>`).join('')}${safe(y.llink) ? `<i style="--c:${IC.llink[0]}"></i>` : ''}${exOf(y).length ? `<i style="--c:#5F7896"></i>` : ''}</span>`;
+  const exHtml = y => exOf(y).map(x => { const t = EX[x.k] || EX.other; return `<div class="lv-x lv-xx" style="--c:${t.c};--bg2:${t.c}14"><b><i class="lv-xd"></i> ${esc(t.l)}:</b> ${esc(x.t || '')}${safe(x.u) ? ` <a href="${esc(safe(x.u))}" target="_blank" rel="noopener" class="lv-xl">فتح ↗</a>` : ''}</div>`; }).join('');
 
   const CSS = `.lv{--n:#082B5A;--b:#005499;--s:#3AB1DB;--p:#E4EBF5;--l:#D5E1F0;--m:#4D6A8F;border:1px solid #C9DAEE;border-radius:20px;background:#fff;margin:0 0 16px;overflow:hidden;box-shadow:0 1px 0 #fff inset,0 18px 40px -26px rgba(8,43,90,.55)}
     .lv-h{position:relative;background:radial-gradient(120% 140% at 100% 0,#0B4F96 0,#082B5A 55%,#061F43 100%);color:#fff;padding:16px 18px 18px;display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;overflow:hidden}
@@ -83,6 +88,7 @@
     .lv-ag .lv-list{padding:10px}
     .lv-hw{padding:10px 12px 14px;display:grid;gap:10px}.lv-hwd{border:1px solid var(--l);border-radius:16px;overflow:hidden}.lv-hwd h4{margin:0;padding:8px 12px;background:#EAF1F9;color:var(--n);font-size:15px;display:flex;gap:8px;align-items:center}.lv-hwd h4 span{font-weight:500;font-size:12px;color:var(--m)}
     .lv-hwi{display:grid;grid-template-columns:minmax(110px,160px) 1fr;gap:10px;padding:10px 12px;border-top:1px solid #EEF3F9}.lv-hwi:first-of-type{border-top:0}.lv-hwi>b{color:var(--n)}.lv-hwi>b small{display:block;font-weight:500;color:var(--m);font-size:12px}.lv-hwi .lv-x{margin:0 0 4px}
+    .lv-xd{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c);vertical-align:middle}.lv-xl{color:var(--c);font-weight:800;text-decoration:none;white-space:nowrap}.lv-xl:hover{text-decoration:underline}
     .lv-note{font-size:12px;color:#5F7896;padding:0 14px 14px;margin:0}
     .lv-leg{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px 0;font-size:12px}.lv-leg span{display:inline-flex;align-items:center;gap:5px;color:var(--c);background:var(--bg2);border-radius:999px;padding:2px 10px;font-weight:700}.lv-leg span i{width:8px;height:8px;border-radius:50%;background:var(--c)}
     .lv-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#082B5A;color:#fff;padding:10px 18px;border-radius:12px;z-index:50;font-weight:700;box-shadow:0 10px 30px -10px rgba(0,0,0,.5)}
@@ -101,17 +107,17 @@
   const details = (y, x, p, tm, o, s) => {
     const blocks = KEYS.filter(k => (y[k] || '').trim()).map(k => `<div class="lv-x" style="--c:${IC[k][0]};--bg2:${IC[k][1]}"><b>${ico(k, 14)} ${IC[k][2]}:</b> ${esc(y[k])}</div>`).join('');
     return `<div class="lv-meta"><span>${svg(G.clock, 14)} الحصة ${PER[p] || AR(p + 1)}${tm[0] ? ` · <span class="tm">${t12(tm[0])} – ${t12(tm[1])}</span>` : ''}</span>${y.teacher ? `<span>${svg(G.user, 14)} ${esc(y.teacher)}</span>` : ''}</div>
-      ${blocks}${safe(y.llink) ? `<a class="lv-ll" href="${esc(safe(y.llink))}" target="_blank" rel="noopener" style="--c:${IC.llink[0]};--bg2:${IC.llink[1]}">${ico('llink', 15)} فتح رابط الدرس</a>` : ''}
-      ${!blocks && !safe(y.llink) && (o.teacher || o.owner) ? `<span class="lv-empty ${o.owner ? 'own' : ''}">${o.teacher ? 'لم تُضف بيانات لهذه الحصة بعد.' : 'لم يُضف المعلم الدرس أو الواجب بعد — يظهر لك فقط'}</span>` : ''}
+      ${blocks}${exHtml(y)}${safe(y.llink) ? `<a class="lv-ll" href="${esc(safe(y.llink))}" target="_blank" rel="noopener" style="--c:${IC.llink[0]};--bg2:${IC.llink[1]}">${ico('llink', 15)} فتح رابط الدرس</a>` : ''}
+      ${!blocks && !exOf(y).length && !safe(y.llink) && (o.teacher || o.owner) ? `<span class="lv-empty ${o.owner ? 'own' : ''}">${o.teacher ? 'لم تُضف بيانات لهذه الحصة بعد.' : 'لم يُضف المعلم الدرس أو الواجب بعد — يظهر لك فقط'}</span>` : ''}
       ${o.owner && !safe(y.link) && !(s && safe(s.cls_link)) ? '<span class="lv-empty own">لا يوجد رابط دخول لهذه الحصة — يظهر لك فقط</span>' : ''}
-      ${o.edit ? `<button type="button" class="lv-ed" data-lved="${esc(s.id)}|${esc(y.c || '')}|${x.d}|${p}">✎ ${hasInfo(y) ? 'تعديل بيانات الحصة' : 'إضافة الدرس والواجب والرابط'}</button>` : ''}`;
+      ${o.edit ? `<button type="button" class="lv-ed" data-lved="${esc(s.id)}|${esc(y.c || '')}|${x.d}|${p}">✎ ${hasInfo(y) ? 'تعديل بيانات الحصة' : 'إضافة الرابط والعناصر الإضافية'}</button>` : ''}`;
   };
 
   // ما يظهر لولي الأمر — يتحكم فيه المالك من إعدادات الجدول (meta.vis)
-  const VIS0 = { teacher: 1, topic: 1, homework: 1, note: 1, llink: 1, join: 1, room: 1, times: 1, export: 1, legend: 1, views: ['day', 'table', 'week', 'hw'] };
+  const VIS0 = { teacher: 1, topic: 1, homework: 1, note: 1, perf: 1, extra: 1, llink: 1, join: 1, room: 1, times: 1, export: 1, legend: 1, views: ['day', 'table', 'week', 'hw'] };
   function html(s, o = {}) {
     const VS = Object.assign({}, VIS0, (s.meta || {}).vis || {});
-    if (!o.teacher) { const k = (y, f) => VS[f] ? y[f] : ''; s = { ...s, cls_link: VS.join && VS.room ? s.cls_link : '', meta: { ...(s.meta || {}), times: VS.times ? (s.meta || {}).times : [] }, cells: (s.cells || []).map(y => ({ ...y, teacher: k(y, 'teacher'), topic: k(y, 'topic'), homework: k(y, 'homework'), note: k(y, 'note'), llink: k(y, 'llink'), link: VS.join ? y.link : '' })) }; }
+    if (!o.teacher) { const k = (y, f) => VS[f] ? y[f] : ''; s = { ...s, cls_link: VS.join && VS.room ? s.cls_link : '', meta: { ...(s.meta || {}), times: VS.times ? (s.meta || {}).times : [] }, cells: (s.cells || []).map(y => ({ ...y, teacher: k(y, 'teacher'), topic: k(y, 'topic'), homework: k(y, 'homework'), note: k(y, 'note'), perf: k(y, 'perf'), extra: VS.extra ? y.extra : [], llink: k(y, 'llink'), link: VS.join ? y.link : '' })) }; }
     const M = s.meta || {}, vd = visibleDays(s); if (!vd.length) return '';
     const td = o.today || iso(new Date()), sel = (vd.find(x => x.date === td) || vd.find(x => x.date > td) || vd[0]);
     const id = 'lv' + Math.random().toString(36).slice(2, 8);
@@ -141,7 +147,7 @@
     return `<section class="lv" id="${id}" aria-label="${esc(s.label || 'جدول استثنائي')}"><div class="lv-h"><div class="lv-ht">${s.tag ? `<span class="lv-tag">${esc(s.tag)}</span>` : ''}<h3>${esc(s.label || 'جدول استثنائي')}${o.clsName ? ` — ${esc(o.clsName)}` : ''}</h3><span class="lv-dt">${svg(G.day, 14)} ${dmy(s.from)} — ${dmy(s.to)}</span></div>${room && !o.teacher ? `<a class="lv-room" ${o.preview || !s.id ? '' : `data-jr="${esc(s.id)}|${esc(o.cls || '')}"`} href="${esc(room)}" target="_blank" rel="noopener">${CAM} دخول قاعة الفصل</a>` : ''}</div>
       <div class="lv-bar"><div class="lv-seg" role="tablist" aria-label="طريقة العرض">${views.map(([k, l, g]) => `<button role="tab" class="${k === cur ? 'on' : ''}" data-lvv="${k}" aria-selected="${k === cur}">${svg(g, 16)} ${l}</button>`).join('')}</div>
         <div class="lv-tools">${o.preview || (!o.teacher && !VS.export) ? '' : `<button type="button" class="lv-tb" data-lva="print" title="طباعة" aria-label="طباعة">${svg(G.print, 16)} <span>طباعة</span></button><button type="button" class="lv-tb" data-lva="pdf" title="تصدير PDF" aria-label="تصدير PDF">${svg(G.pdf, 16)} <span>PDF</span></button><button type="button" class="lv-tb" data-lva="png" title="حفظ صورة" aria-label="حفظ صورة">${svg(G.img, 16)} <span>صورة</span></button>${(M.times || []).length ? `<button type="button" class="lv-tb" data-lva="ics" title="إضافة الحصص إلى تقويم الجوال" aria-label="إضافة الحصص إلى التقويم">${svg(G.cal, 16)} <span>التقويم</span></button>` : ''}`}</div></div>
-      <div class="lv-leg" aria-label="دلالة الألوان" ${!o.teacher && !VS.legend ? 'hidden' : ''}>${['topic', 'homework', 'note', 'llink'].map(k => `<span style="--c:${IC[k][0]};--bg2:${IC[k][1]}"><i></i>${IC[k][2]}</span>`).join('')}<span style="--c:#2E8B57;--bg2:#E5F4EA"><i></i>الحصة الجارية</span></div>
+      <div class="lv-leg" aria-label="دلالة الألوان" ${!o.teacher && !VS.legend ? 'hidden' : ''}>${['topic', 'homework', 'note', 'perf', 'llink'].map(k => `<span style="--c:${IC[k][0]};--bg2:${IC[k][1]}"><i></i>${IC[k][2]}</span>`).join('')}<span style="--c:#2E8B57;--bg2:#E5F4EA"><i></i>الحصة الجارية</span></div>
       <div data-lvp="day" ${cur === 'day' ? '' : 'hidden'}><div class="lv-days" role="tablist" aria-label="الأيام">${vd.map(x => `<button role="tab" data-lvd="${x.date}" class="${x.date === sel.date ? 'on' : ''} ${x.date === td ? 'today' : ''}" aria-selected="${x.date === sel.date}">${DAYS[x.d]}<span>${dmy(x.date)}</span></button>`).join('')}</div>
         ${vd.map(x => `<div class="lv-list" data-lvl="${x.date}" ${x.date === sel.date ? '' : 'hidden'}>${rows(x, 'd')}</div>`).join('')}<p class="lv-note">اضغط اسم المادة لعرض الدرس والواجب والملاحظات.</p></div>
       <div data-lvp="table" ${cur === 'table' ? '' : 'hidden'}>${week}<p class="lv-note">اضغط أي حصة لعرض تفاصيلها وزر الدخول.</p></div>
@@ -168,7 +174,7 @@
     const dt = y => KEYS.filter(k => (y[k] || '').trim()).map(k => `<span class="dot" style="background:${IC[k][0]}"></span>`).join('') + (safe(y.llink) ? `<span class="dot" style="background:${IC.llink[0]}"></span>` : '');
     const tbl = `<table><thead><tr><th>اليوم</th>${Array.from({ length: P }, (_, p) => { const tm = (M.times || [])[p] || []; return `<th>${PER[p] || AR(p + 1)}${tm[0] ? `<small><span style="direction:ltr;display:inline-block">${t12(tm[0])} – ${t12(tm[1])}</span></small>` : ''}</th>${brkAfter(p).map(b => `<th class="brk">${esc(b.label || 'استراحة')}</th>`).join('')}`; }).join('')}</tr></thead><tbody>${vd.map(x => `<tr><th>${DAYS[x.d]}<small>${dmy(x.date)}</small></th>${Array.from({ length: P }, (_, p) => { const bk = brkAfter(p).map(() => '<td class="brk"></td>').join(''); if (p >= nOf(M, x.d, P)) return '<td class="off"></td>' + bk; const c = (s.cells || []).filter(y => y.d === x.d && y.p === p); return `<td>${c.map(y => `<b>${esc(y.subject || '')}</b>${y.teacher ? `<small>${esc(y.teacher)}</small>` : ''}<div>${dt(y)}</div>`).join('') || '—'}</td>${bk}`; }).join('')}</tr>`).join('')}</tbody></table>`;
     const items = vd.flatMap(x => (s.cells || []).filter(y => y.d === x.d && hasInfo(y)).sort((a, b) => a.p - b.p).map(y => ({ x, y })));
-    const hw = items.length ? `<h2>الدروس والواجبات</h2><table class="hw"><thead><tr><th>اليوم</th><th>المادة</th><th>الدرس</th><th>الواجب</th><th>ملاحظة</th></tr></thead><tbody>${items.map(({ x, y }) => `<tr><td>${DAYS[x.d]} ${dmy(x.date)}</td><td class="k">${esc(y.subject || '')}</td><td>${esc(y.topic || '')}</td><td>${esc(y.homework || '')}</td><td>${esc(y.note || '')}</td></tr>`).join('')}</tbody></table>` : '';
+    const hw = items.length ? `<h2>الدروس والواجبات</h2><table class="hw"><thead><tr><th>اليوم</th><th>المادة</th><th>الدرس</th><th>الواجب</th><th>ملاحظات وعناصر أخرى</th></tr></thead><tbody>${items.map(({ x, y }) => `<tr><td>${DAYS[x.d]} ${dmy(x.date)}</td><td class="k">${esc(y.subject || '')}</td><td>${esc(y.topic || '')}</td><td>${esc(y.homework || '')}</td><td>${esc([y.note, y.perf ? 'مهمة أدائية: ' + y.perf : '', ...exOf(y).map(x => (EX[x.k] || EX.other).l + ': ' + (x.t || '') + (safe(x.u) ? ' (' + safe(x.u) + ')' : ''))].filter(v => (v || '').trim()).join(' · '))}</td></tr>`).join('')}</tbody></table>` : '';
     return docWrap(`${esc(s.label || 'جدول استثنائي')}${s.tag ? `<span class="tag">${esc(s.tag)}</span>` : ''}`, `${o.clsName ? esc(o.clsName) + ' · ' : ''}${dmy(s.from)} — ${dmy(s.to)}`,
       `${part !== 'hw' ? `${tbl}<p class="leg">${['topic', 'homework', 'note', 'llink'].map(k => `<span class="dot" style="background:${IC[k][0]}"></span> ${IC[k][2]}`).join(' &nbsp; ')}</p>` : ''}${part !== 'table' ? hw : ''}`);
   }
@@ -245,5 +251,5 @@
     if (kind === 'pdf') { await pdfHtml(doc, nm + '.pdf'); return toast('حُفظ ملف PDF'); }
     const cv = await renderHtml(doc); download(cv.toDataURL('image/png'), nm + '.png'); toast('حُفظت الصورة');
   }
-  window.DinaLive = { html, bind, docHtml, exportDoc, svg, G };
+  window.DinaLive = { html, bind, docHtml, exportDoc, svg, G, EX };
 })();

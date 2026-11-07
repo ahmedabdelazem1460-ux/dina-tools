@@ -210,7 +210,7 @@
         $$('[data-lcell]', B).forEach(i => i.oninput = () => { const v = i.value.trim(); if (v) L.cell[i.dataset.lcell] = v; else delete L.cell[i.dataset.lcell]; later(); drawPrev(); });
       }
     };
-    let PE = []; entriesOf([ds.id]).then(e => { PE = e; drawPrev(); });
+    let PE = []; entriesOf([ds.id], [ds]).then(e => { PE = e; drawPrev(); });
     const drawPrev = () => { const c = pv, cells = ds.slots.filter(x => x.c === c).map(x => A._liveEntries ? A._liveEntries.withEntry({ c: x.c, d: x.d, p: x.p, subject: A.subjName(x.s), teacher: x.t ? A.personName(x.t) : (x.tn || ''), link: linkOf(c, x.d, x.p, x.t) }, PE, ds.id) : ({ d: x.d, p: x.p, subject: A.subjName(x.s) || x.sn, teacher: x.t ? A.personName(x.t) : (x.tn || ''), link: linkOf(c, x.d, x.p, x.t) })); $('#lvPrev', box).innerHTML = A.liveTable({ label: ds.label, tag: ds.tag, from: ds.date_from, to: ds.date_to, meta: M, cells, cls_link: L.cls[c] }, { now: null, today: today(), preview: true, owner: true }); A.bindLive($('#lvPrev', box)); };
     $$('#lvTab button', box).forEach(x => x.classList.toggle('on', x.dataset.t === tab));
     $$('#lvTab button', box).forEach(b => b.onclick = () => { tab = b.dataset.t; $$('#lvTab button', box).forEach(x => x.classList.toggle('on', x === b)); drawBody(); });
@@ -236,23 +236,64 @@
 
   // بطاقة للمعلم في «خطتي»: حصصه في الجداول الاستثنائية المنشورة السارية
   const ERR = { 'not your period': 'هذه الحصة ليست لك', 'link must start with https://': 'الرابط يجب أن يبدأ بـ https://', 'no such period': 'الحصة غير موجودة في هذا الجدول', 'not found': 'الجدول غير موجود' };
-  const saveEntry = async (ds, c, d, p, v) => { if (!api.rpc) return api.ups('live_entries', [{ ds_id: ds, class_id: c, day: d, period: p, topic: v.topic.trim(), homework: v.homework.trim(), note: v.note.trim(), link: v.link }], 'ds_id,class_id,day,period'); try { return await api.rpc('save_live_entry', { p_ds: ds, p_class: c, p_day: d, p_period: p, p_topic: v.topic, p_homework: v.homework, p_note: v.note, p_link: v.link }); } catch (e) { throw new Error(ERR[e.message] || e.message); } };
-  // نافذة إدخال بيانات الحصة (للمعلم) — منفصلة تماماً عن الخطة الأسبوعية
+  const saveEntry = async (ds, c, d, p, v) => { if (!api.rpc) return api.ups('live_entries', [{ ds_id: ds, class_id: c, day: d, period: p, topic: v.topic.trim(), homework: v.homework.trim(), note: v.note.trim(), link: v.link, extra: v.extra || [] }], 'ds_id,class_id,day,period'); try { await api.rpc('save_live_entry', { p_ds: ds, p_class: c, p_day: d, p_period: p, p_topic: v.topic, p_homework: v.homework, p_note: v.note, p_link: v.link }); return await api.rpc('save_live_extra', { p_ds: ds, p_class: c, p_day: d, p_period: p, p_extra: v.extra || [] }); } catch (e) { throw new Error(ERR[e.message] || e.message); } };
+  // أنواع العناصر الإضافية (تُعرض لولي الأمر بأيقونة ولون)
+  const EX = () => (window.DinaLive && window.DinaLive.EX) || {};
+  const perfTxt = pt => pt && (pt.text || '').trim() ? pt.text.trim() + ((pt.due || '').trim() ? ' — التسليم: ' + pt.due.trim() : '') : '';
+  // نافذة الحصة (للمعلم): الدرس والواجب يأتيان تلقائياً من الخطة الأسبوعية — يضيف المعلم الرابط وما يشاء من عناصر
   function entryDialog(ds, c, d, p, cur, done) {
     const sl = (ds.slots || []).find(x => x.c === c && x.d === d && x.p === p) || {};
-    const plan = S.entries.find(e => e.class_id === c && e.day === d && e.period === p && e.teacher_id === S.me.id && (e.topic || e.homework));
-    const m = A.modal(`<h3>بيانات الحصة — ${esc(A.subjName(sl.s))} · ${esc(cName(c))}</h3><p class="sub">${DAYS[d]} · الحصة ${PER[p] || AR(p + 1)} · ${esc(ds.label)}. تظهر لولي الأمر بأيقونات ملونة، ولا تؤثر على الخطة الأسبوعية.</p>
-      ${plan ? `<button class="btn ghost sm" id="leCp" style="margin-bottom:8px">نسخ الموضوع والواجب من خطتي الأسبوعية</button>` : ''}
-      <div class="field"><label for="leT"><span class="lv-dotk" style="--c:#005499"></span> الدرس / الموضوع</label><textarea class="in" id="leT" rows="2" placeholder="مثال: الفعل الماضي ص ٤٥">${esc(cur.topic || '')}</textarea></div>
-      <div class="field"><label for="leH"><span class="lv-dotk" style="--c:#B7791F"></span> الواجب</label><input class="in" id="leH" value="${esc(cur.homework || '')}" placeholder="اختياري"></div>
-      <div class="field"><label for="leN"><span class="lv-dotk" style="--c:#6B4FA3"></span> ملاحظة لولي الأمر</label><input class="in" id="leN" value="${esc(cur.note || '')}" placeholder="اختياري — مثل: تجهيز الكتاب والدفتر"></div>
-      <div class="field"><label for="leL"><span class="lv-dotk" style="--c:#0E8A9E"></span> رابط الدرس (عرض، فيديو، ورقة عمل…)</label><input class="in" id="leL" dir="ltr" value="${esc(cur.llink || '')}" placeholder="https://…"><span class="small muted">رابط دخول الحصة نفسه تضيفه الإدارة لكل فصل.</span></div>
-      <div class="acts"><button class="btn" id="leGo">حفظ</button></div>`);
-    const el = m.el, cp = el.querySelector('#leCp'); if (cp) cp.onclick = () => { el.querySelector('#leT').value = plan.topic || ''; el.querySelector('#leH').value = plan.homework || ''; };
-    el.querySelector('#leGo').onclick = e => A.run(e.currentTarget, async () => { const v = { topic: el.querySelector('#leT').value, homework: el.querySelector('#leH').value, note: el.querySelector('#leN').value, link: el.querySelector('#leL').value.trim() }; if (v.link && !urlOk(v.link)) throw new Error('الرابط يجب أن يبدأ بـ https://'); await saveEntry(ds.id, c, d, p, v); m.close(); A.toast('حُفظت بيانات الحصة — تظهر لولي الأمر', 'ok'); done(); });
+    const pl = cur.plan || null, own = cur.own || { topic: cur.topic || '', homework: cur.homework || '', note: cur.note || '' };
+    const ov = !!((own.topic || '').trim() || (own.homework || '').trim() || (own.note || '').trim());
+    let X = (cur.extra || []).map(x => ({ ...x }));
+    const stP = pl ? (pl.status === 'approved' ? '<span class="pill st-approved">معتمدة — تظهر لولي الأمر</span>' : '<span class="pill st-submitted">تظهر لولي الأمر بعد اعتماد الخطة</span>') : '';
+    const PC = { topic: '#005499', homework: '#B7791F', note: '#6B4FA3', perf: '#2E8B57' }; const pRow = (k, l, v) => v ? `<div class="le-pr" style="--c:${PC[k]}"><b>${l}</b><span>${esc(v)}</span></div>` : '';
+    const planBox = pl && ((pl.topic || '').trim() || (pl.homework || '').trim() || (pl.note || '').trim() || perfTxt(pl.perf_task))
+      ? `<div class="le-plan"><div class="le-ph"><b>من خطتك الأسبوعية</b> <span class="small muted">يظهر تلقائياً — لا حاجة لإعادة كتابته</span> ${stP}</div>${pRow('topic', 'الدرس', pl.topic)}${pRow('homework', 'الواجب', pl.homework)}${pRow('note', 'ملاحظة', pl.note)}${pRow('perf', 'مهمة أدائية', perfTxt(pl.perf_task))}</div>`
+      : `<div class="le-plan empty"><b>لا يوجد درس لهذه الحصة في خطتك الأسبوعية.</b><span class="small">أضِفه في الخطة الأسبوعية ليظهر هنا تلقائياً، أو اكتبه لهذه الحصة فقط من «تخصيص لهذه الحصة».</span></div>`;
+    const m = A.modal(`<h3>حصة عن بعد — ${esc(A.subjName(sl.s))} · ${esc(cName(c))}</h3><p class="sub">${DAYS[d]} · الحصة ${PER[p] || AR(p + 1)} · ${esc(ds.label)}. الخطة الأسبوعية لا تتغير.</p>
+      ${planBox}
+      <div class="field le-main"><label for="leL"><span class="lv-dotk" style="--c:#0E8A9E"></span> رابط الدرس <span class="small muted">(عرض، فيديو، ورقة عمل…)</span></label><input class="in" id="leL" dir="ltr" value="${esc(cur.llink || '')}" placeholder="https://…"><span class="small muted">رابط دخول الحصة نفسه تضيفه الإدارة لكل فصل.</span></div>
+      <div class="le-ex"><div class="row" style="justify-content:space-between;gap:6px;flex-wrap:wrap"><b>عناصر إضافية</b><span class="small muted">اختياري — تظهر لولي الأمر تحت الحصة</span></div><div id="leX"></div>
+        <div class="le-add" id="leAdd">${Object.entries(EX()).filter(([k]) => !['topic', 'homework', 'note0'].includes(k)).map(([k, v]) => `<button type="button" class="btn ghost sm" data-xa="${k}" style="--c:${v.c}"><i></i>${esc(v.l)}</button>`).join('')}</div></div>
+      <details class="dz-det le-ov" ${ov ? 'open' : ''}><summary>تخصيص الدرس والواجب لهذه الحصة فقط</summary><p class="small muted" style="margin:6px 0">يحل محل ما في الخطة في هذه الحصة عن بعد فقط، ولا يغيّر الخطة الأسبوعية. اتركه فارغاً ليظهر ما في الخطة.</p>
+        <div class="field"><label for="leT">الدرس / الموضوع</label><textarea class="in" id="leT" rows="2" placeholder="${esc((pl && pl.topic) || 'مثال: الفعل الماضي ص ٤٥')}">${esc(own.topic || '')}</textarea></div>
+        <div class="grid g2"><div class="field"><label for="leH">الواجب</label><input class="in" id="leH" value="${esc(own.homework || '')}" placeholder="${esc((pl && pl.homework) || 'اختياري')}"></div><div class="field"><label for="leN">ملاحظة لولي الأمر</label><input class="in" id="leN" value="${esc(own.note || '')}" placeholder="${esc((pl && pl.note) || 'اختياري')}"></div></div></details>
+      <div class="acts"><button class="btn" id="leGo">حفظ</button></div>`, { cls: 'wide' });
+    const el = m.el, xb = el.querySelector('#leX');
+    const drawX = () => { xb.innerHTML = X.map((x, i) => { const t = EX()[x.k] || EX().other || { l: 'أخرى', c: '#5F7896' }; return `<div class="le-xr" style="--c:${t.c}"><select class="in" data-xk="${i}" aria-label="النوع">${Object.entries(EX()).filter(([k]) => !['topic', 'homework'].includes(k)).map(([k, v]) => `<option value="${k}" ${k === x.k ? 'selected' : ''}>${esc(v.l)}</option>`).join('')}</select><input class="in" data-xt="${i}" value="${esc(x.t || '')}" placeholder="${esc(t.ph || 'النص')}" aria-label="النص"><input class="in" data-xu="${i}" dir="ltr" value="${esc(x.u || '')}" placeholder="رابط (اختياري)" aria-label="رابط"><button type="button" class="btn bad sm" data-xd="${i}" aria-label="حذف">×</button></div>`; }).join('');
+      $$('[data-xk]', xb).forEach(s2 => s2.onchange = () => { X[+s2.dataset.xk].k = s2.value; drawX(); });
+      $$('[data-xt]', xb).forEach(s2 => s2.oninput = () => { X[+s2.dataset.xt].t = s2.value; });
+      $$('[data-xu]', xb).forEach(s2 => s2.oninput = () => { X[+s2.dataset.xu].u = s2.value; });
+      $$('[data-xd]', xb).forEach(b => b.onclick = () => { X.splice(+b.dataset.xd, 1); drawX(); }); };
+    drawX();
+    $$('[data-xa]', el).forEach(b => b.onclick = () => { if (X.length >= 12) return A.toast('الحد ١٢ عنصراً', 'warn'); X.push({ k: b.dataset.xa, t: '', u: '' }); drawX(); const l = $$('[data-xt]', xb).pop(); if (l) l.focus(); });
+    el.querySelector('#leGo').onclick = e => A.run(e.currentTarget, async () => {
+      const ex = X.map(x => ({ k: x.k, t: (x.t || '').trim(), u: (x.u || '').trim() })).filter(x => x.t || x.u);
+      const bad = ex.find(x => x.u && !urlOk(x.u)); if (bad) throw new Error('روابط العناصر الإضافية يجب أن تبدأ بـ https://');
+      const v = { topic: el.querySelector('#leT').value, homework: el.querySelector('#leH').value, note: el.querySelector('#leN').value, link: el.querySelector('#leL').value.trim(), extra: ex };
+      if (v.link && !urlOk(v.link)) throw new Error('الرابط يجب أن يبدأ بـ https://');
+      await saveEntry(ds.id, c, d, p, v); m.close(); A.toast('حُفظت — تظهر لولي الأمر', 'ok'); done(); });
   }
-  const entriesOf = async ids => { try { return ids.length ? await api.list('live_entries', { ds_id: ids }) : []; } catch (_) { return []; } };
-  const withEntry = (cell, E, ds) => { const e = E.find(x => x.ds_id === ds && x.class_id === cell.c && x.day === cell.d && x.period === cell.p); return e ? { ...cell, topic: e.topic, homework: e.homework, note: e.note, llink: e.link } : cell; };
+  // ربط كل حصة عن بعد بحصتها في الخطة الأسبوعية (نفس الفصل واليوم والمادة، بالترتيب) — قراءة فقط
+  const withPlan = async (dsl, E) => {
+    const W = (S.weeks || []).filter(w => !w.archived);
+    const cd = (ds, d) => { const x = A.parseDate(ds.date_from); x.setDate(x.getDate() - x.getDay() + d); return iso(x); };
+    const wOf = dt => W.find(w => w.start_date <= dt && addD(w.start_date, 6) >= dt);
+    const need = new Set(); dsl.forEach(ds => (ds.slots || []).forEach(x => { const w = x.s && wOf(cd(ds, x.d)); if (w) need.add(w.id); }));
+    E.forEach(e => { if (!e.own) e.own = { topic: e.topic || '', homework: e.homework || '', note: e.note || '' }; });
+    if (!need.size) return E;
+    const P = (await api.list('plan_entries', { week_id: [...need] }).catch(() => [])) || [];
+    const idx = {}; P.forEach(e => { if (!e.subject_id) return; const k = `${e.week_id}|${e.class_id}|${e.day}|${e.subject_id}`; (idx[k] = idx[k] || []).push(e); }); Object.values(idx).forEach(l => l.sort((a, b) => a.period - b.period));
+    dsl.forEach(ds => (ds.slots || []).forEach(x => { if (!x.s) return; const w = wOf(cd(ds, x.d)); const l = w && idx[`${w.id}|${x.c}|${x.d}|${x.s}`]; if (!l) return;
+      const rk = ds.slots.filter(y => y.c === x.c && y.d === x.d && y.s === x.s && y.p < x.p).length, best = l[Math.min(rk, l.length - 1)];
+      let e = E.find(y => y.ds_id === ds.id && y.class_id === x.c && y.day === x.d && y.period === x.p);
+      if (!e) { e = { ds_id: ds.id, class_id: x.c, day: x.d, period: x.p, topic: '', homework: '', note: '', link: '', extra: [], own: { topic: '', homework: '', note: '' }, virtual: true }; E.push(e); }
+      e.plan = best; ['topic', 'homework', 'note'].forEach(k => { e[k] = (e.own[k] || '').trim() || best[k] || ''; }); e.perf = perfTxt(best.perf_task); }));
+    return E;
+  };
+  const entriesOf = async (ids, dsl) => { let E = []; try { E = ids.length ? (await api.list('live_entries', { ds_id: ids })) || [] : []; } catch (_) { E = []; } try { await withPlan(dsl || ((await api.list('display_schedules', { id: ids })) || []), E); } catch (_) { } return E; };
+  const withEntry = (cell, E, ds) => { const e = E.find(x => x.ds_id === ds && x.class_id === cell.c && x.day === cell.d && x.period === cell.p); return e ? { ...cell, topic: e.topic, homework: e.homework, note: e.note, llink: e.link, perf: e.perf || '', extra: e.extra || [], plan: e.plan || null, own: e.own } : cell; };
   A._liveEntries = { entriesOf, withEntry };
 
   // بطاقة للمعلم في «خطتي»: حصصه في الجداول الاستثنائية المنشورة السارية، مع إضافة بيانات كل حصة
@@ -262,7 +303,7 @@
     const paint = async () => { try {
       const t = today(), l = (await api.list('display_schedules', { section_id: S.sectionId })).filter(d => d.published && d.date_to >= t && d.date_from <= addD(t, 7)); const old = $('#lvMy', root);
       if (!l.length) { if (old) old.remove(); return; } const anchor = $('#myMode', root) || $('.head', root); if (!anchor) return;
-      const E = await entriesOf(l.map(d => d.id));
+      const E = await entriesOf(l.map(d => d.id), l);
       const html = l.map(d => { const mine = (d.slots || []).filter(x => x.t === S.me.id); if (!mine.length) return ''; const L = d.links || {}; const cells = mine.map(x => withEntry({ c: x.c, d: x.d, p: x.p, subject: A.subjName(x.s) + ' — ' + cName(x.c), teacher: '', link: (L.cell || {})[`${x.c}|${x.d}|${x.p}`] || (L.cls || {})[x.c] || (L.tch || {})[x.t] || '' }, E, d.id)); return A.liveTable({ id: d.id, label: d.label, tag: d.tag, from: d.date_from, to: d.date_to, meta: d.meta, cells }, { today: t, now: null, teacher: true, edit: A.week() ? true : true }); }).join('');
       if (!html) { if (old) old.remove(); return; }
       const box = old || (anchor.insertAdjacentHTML('afterend', '<div id="lvMy"></div>'), $('#lvMy', root));

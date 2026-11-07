@@ -332,10 +332,10 @@
   };
 
   // ---------------- ما يظهر لولي الأمر (إعدادات المالك لكل جدول) ----------------
-  const VIS0 = { teacher: 1, topic: 1, homework: 1, note: 1, llink: 1, join: 1, room: 1, times: 1, export: 1, legend: 1, views: ['day', 'table', 'week', 'hw'] };
+  const VIS0 = { teacher: 1, topic: 1, homework: 1, note: 1, perf: 1, extra: 1, llink: 1, join: 1, room: 1, times: 1, export: 1, legend: 1, views: ['day', 'table', 'week', 'hw'] };
   A.liveVisTab = function (ds, B, onSave) {
     const v = Object.assign({}, VIS0, (ds.meta || {}).vis || {}); v.views = (v.views || []).slice();
-    const F = [['join', 'زر «دخول الحصة» والروابط'], ['room', 'زر «دخول قاعة الفصل» في الأعلى'], ['teacher', 'اسم المعلم/المعلمة'], ['times', 'أوقات الحصص'], ['topic', 'الدرس / الموضوع'], ['homework', 'الواجب'], ['note', 'ملاحظة المعلم'], ['llink', 'رابط الدرس (عرض، فيديو…)'], ['legend', 'دلالة الألوان'], ['export', 'أزرار الطباعة والتصدير والتقويم']];
+    const F = [['join', 'زر «دخول الحصة» والروابط'], ['room', 'زر «دخول قاعة الفصل» في الأعلى'], ['teacher', 'اسم المعلم/المعلمة'], ['times', 'أوقات الحصص'], ['topic', 'الدرس / الموضوع'], ['homework', 'الواجب'], ['note', 'ملاحظة المعلم'], ['perf', 'المهمة الأدائية (من الخطة)'], ['extra', 'العناصر الإضافية (أوراق عمل، تجهيزات…)'], ['llink', 'رابط الدرس (عرض، فيديو…)'], ['legend', 'دلالة الألوان'], ['export', 'أزرار الطباعة والتصدير والتقويم']];
     const W = [['day', 'اليوم (بطاقات)'], ['table', 'جدول الأسبوع'], ['week', 'الأسبوع كاملاً'], ['hw', 'الدروس والواجبات']];
     B.innerHTML = `<p class="small muted" style="margin:0 0 8px">تتحكم هنا فيما يراه ولي الأمر في هذا الجدول. التغيير يصل فوراً لصفحة ولي الأمر، والمعاينة بالأسفل تعكسه. المعلمون يرون حصصهم كاملة دائماً. وعبارات «لم يُضف الدرس» و«بلا رابط» لا تظهر لولي الأمر إطلاقاً — تظهر لك وحدك.</p>
       <div class="grid g2" style="align-items:start"><div class="sec-box"><b>عناصر الحصة</b><div class="perm-grid" style="margin-top:6px">${F.map(([k, l]) => `<label class="chk"><input type="checkbox" data-vf="${k}" ${v[k] ? 'checked' : ''}> ${l}</label>`).join('')}</div></div>
@@ -345,7 +345,7 @@
     $$('[data-vf]', B).forEach(c => c.onchange = () => { v[c.dataset.vf] = c.checked ? 1 : 0; go(); });
     $$('[data-vw]', B).forEach(c => c.onchange = () => { const on = $$('[data-vw]', B).filter(x => x.checked).map(x => x.dataset.vw); if (!on.length) { c.checked = true; return A.toast('اترك طريقة عرض واحدة على الأقل', 'warn'); } v.views = W.map(w => w[0]).filter(k => on.includes(k)); go(); });
     $('#vAll', B).onclick = () => { Object.assign(v, JSON.parse(JSON.stringify(VIS0))); A.liveVisTab({ ...ds, meta: { ...(ds.meta || {}), vis: v } }, B, onSave); onSave(JSON.parse(JSON.stringify(v))); };
-    $('#vMin', B).onclick = () => { Object.assign(v, { teacher: 1, topic: 0, homework: 0, note: 0, llink: 0, join: 1, room: 1, times: 1, export: 0, legend: 0, views: ['day', 'table'] }); A.liveVisTab({ ...ds, meta: { ...(ds.meta || {}), vis: v } }, B, onSave); onSave(JSON.parse(JSON.stringify(v))); };
+    $('#vMin', B).onclick = () => { Object.assign(v, { teacher: 1, topic: 0, homework: 0, note: 0, perf: 0, extra: 0, llink: 0, join: 1, room: 1, times: 1, export: 0, legend: 0, views: ['day', 'table'] }); A.liveVisTab({ ...ds, meta: { ...(ds.meta || {}), vis: v } }, B, onSave); onSave(JSON.parse(JSON.stringify(v))); };
   };
 
   // ---------------- تقرير إنجاز المعلمين في الجدول الاستثنائي ----------------
@@ -353,7 +353,7 @@
     const H = L_(); const M = ds.meta || {};
     const dates = []; { const ws = A.parseDate(ds.date_from); ws.setDate(ws.getDate() - ws.getDay()); for (let i = 0; i < 7 * 6; i++) { const x = new Date(ws); x.setDate(ws.getDate() + i); const iso = A.isoDate(x); if (iso < ds.date_from) continue; if (iso > ds.date_to) break; if ((M.days || [0, 1, 2, 3, 4]).includes(x.getDay())) dates.push({ iso, d: x.getDay() }); } }
     B.innerHTML = '<div class="spinner"></div>';
-    let E = []; try { E = await api.list('live_entries', { ds_id: ds.id }); } catch (_) { }
+    let E = []; try { E = A._liveEntries ? await A._liveEntries.entriesOf([ds.id], [ds]) : await api.list('live_entries', { ds_id: ds.id }); } catch (_) { }
     const L = ds.links || {}, linkOf = x => (L.cell || {})[`${x.c}|${x.d}|${x.p}`] || (L.cls || {})[x.c] || (x.t && (L.tch || {})[x.t]) || '';
     const teachers = [...new Set(ds.slots.map(tKey).filter(Boolean))].map(k => ({ k, n: tName(ds.slots.find(x => tKey(x) === k)) })).sort((a, b) => a.n.localeCompare(b.n, 'ar'));
     const st = { scope: 'all', day: (dates.find(x => x.iso >= H.today()) || dates[0] || {}).iso, from: ds.date_from, to: ds.date_to, t: '' };

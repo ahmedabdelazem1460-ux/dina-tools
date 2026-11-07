@@ -52,7 +52,7 @@
     // البيانات الإضافية (جداول عن بعد + الاختبارات) دون تأخير اللوحة
     let live = null, quiz = null;
     try { const td = iso(new Date()), l = (await api.list('display_schedules', { section_id: S.sectionId })).filter(d => d.published && d.date_to >= td && d.date_from <= td);
-      if (l.length) { const E = await api.list('live_entries', { ds_id: l.map(d => d.id) }).catch(() => []); let n = 0, total = 0;
+      if (l.length) { const E = await (A._liveEntries ? A._liveEntries.entriesOf(l.map(d => d.id), l) : api.list('live_entries', { ds_id: l.map(d => d.id) })).catch(() => []); let n = 0, total = 0;
         l.forEach(d => (d.slots || []).filter(x => x.t === S.me.id).forEach(x => { total++; const e = E.find(y => y.ds_id === d.id && y.class_id === x.c && y.day === x.d && y.period === x.p); if (!e || !((e.topic || '').trim() || (e.homework || '').trim())) n++; }));
         if (total) live = { n, total }; } } catch (_) { }
     try { const zs = (await api.list('quizzes', { school_id: S.school.id, teacher_id: S.me.id }, { select: 'id,status' })); const pub = zs.filter(z => z.status === 'published');

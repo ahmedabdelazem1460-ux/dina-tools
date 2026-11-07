@@ -41,25 +41,33 @@
   }
   function keyTerms(ss) {
     const f = new Map(), raw = new Map();
-    ss.forEach(s => s.split(/\s+/).forEach(w => { const c = w.replace(/[^؀-ۿa-z0-9]/gi, ''); const n = norm(c); if (n.length < 4 || STOP.has(n) || /^[0-9٠-٩]+$/.test(n)) return; const k = stem(n); f.set(k, (f.get(k) || 0) + 1); if (!raw.has(k) || c.length < raw.get(k).length) raw.set(k, c); }));
+    ss.forEach(s => s.split(/\s+/).forEach(w => { const c = w.replace(/[^؀-ۿa-z0-9]/gi, ''); const n = norm(c); if (n.length < 4 || STOP.has(n) || /^[0-9٠-٩]+$/.test(n) || (/^[يتن]/.test(n) && !/^ال/.test(n) && n.length <= 6)) return; const k = stem(n); f.set(k, (f.get(k) || 0) + 1); if (!raw.has(k) || c.length < raw.get(k).length) raw.set(k, c); }));
     // المصطلحات المعرَّفة تأخذ أولوية
     ss.forEach(s => { const m = s.match(DEF_RE); if (m) { const t = m[1].trim().split(/\s+/).slice(-3).join(' '); const k = stem(norm(t)); f.set(k, (f.get(k) || 0) + 5); raw.set(k, t.replace(/[^؀-ۿa-z0-9\s]/gi, '')); } });
-    return [...f.entries()].filter(([, n]) => n >= 1).sort((a, b) => b[1] - a[1]).map(([k]) => raw.get(k)).filter(Boolean);
+    const all = [...f.entries()].filter(([, n]) => n >= 1).sort((a, b) => b[1] - a[1]).map(([k]) => raw.get(k)).filter(Boolean);
+    const multi = all.filter(t => t.includes(' ')).map(t => norm(t).split(' '));
+    return all.filter(t => t.includes(' ') || !multi.some(ws => ws.includes(norm(t))));
   }
   const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const hasAl = t => /^ال/.test(t);
-  function distract(ans, terms, n) {
-    const a = norm(ans);
-    const pool = terms.filter(t => norm(t) !== a && !norm(t).includes(a) && !a.includes(norm(t)));
+  const ANT = [['يزيد', 'يقل'], ['تزداد', 'تقل'], ['أكبر', 'أصغر'], ['أعلى', 'أدنى'], ['يمتص', 'يطلق'], ['يرتفع', 'ينخفض'], ['أسرع', 'أبطأ'], ['الأولى', 'الأخيرة'], ['يجذب', 'يطرد'], ['موجب', 'سالب'], ['صلب', 'غاز'], ['ساخن', 'بارد'], ['الشمال', 'الجنوب'], ['الشرق', 'الغرب'], ['قبل', 'بعد'], ['داخل', 'خارج'], ['يحتوي', 'لا يحتوي'], ['يمكن', 'لا يمكن'], ['دائماً', 'أحياناً']];
+  const negate = s => { for (const [a, b] of ANT) { const ra = new RegExp('(^|\\s)' + a + '(?=\\s|$)'), rb = new RegExp('(^|\\s)' + b + '(?=\\s|$)'); if (ra.test(s)) return s.replace(ra, '$1' + b); if (rb.test(s)) return s.replace(rb, '$1' + a); } return null; };
+  const NUM = /[0-9٠-٩]+(?:[.,٫][0-9٠-٩]+)?/;
+  const toN = x => +String(x).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[,٫]/, '.');
+  const numD = (x, ar) => { const n = toN(x), c = new Set(); [n * 2, n / 2, n + (n >= 10 ? 10 : 1), n - (n >= 10 ? 10 : 1), n + (n >= 100 ? 100 : 5), Math.round(n * 1.5)].forEach(v => { v = Math.round(v * 100) / 100; if (v > 0 && v !== n) c.add(v); }); return shuffle([...c]).slice(0, 3).map(v => ar ? String(v).replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[d]) : String(v)); };
+  function distract(ans, terms, n, pref) {
+    if (pref && pref.length) { const a0 = norm(ans), P = shuffle(pref.filter(t => norm(t) !== a0 && !norm(t).includes(a0) && !a0.includes(norm(t)))); if (P.length >= n) return P.slice(0, n); }
+    const a = norm(ans), sa = stem(a).slice(0, 4), seen = new Set([sa]);
+    const pool = terms.filter(t => { const k = norm(t); return k !== a && !k.includes(a) && !a.includes(k) && stem(k).slice(0, 4) !== sa; });
     const same = pool.filter(t => hasAl(t) === hasAl(ans) && t.split(' ').length === ans.split(' ').length);
-    return shuffle(same.length >= n ? same.slice(0, n * 3) : pool.slice(0, n * 4)).slice(0, n);
+    return shuffle(same.length >= n ? same.slice(0, n * 3) : pool.slice(0, n * 4)).filter(t => { const k = stem(norm(t)).slice(0, 4); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, n);
   }
   function findTerm(s, terms) {
     for (const t of terms) { const re = new RegExp('(^|\\s)(' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')(?=$|[\\s،,.؛:؟?!])'); if (re.test(s)) return t; }
     return null;
   }
   A.genFromText = function (text, opt) {
-    opt = Object.assign({ types: ['blank', 'mcq', 'tf', 'match', 'short'], max: 20 }, opt || {});
+    opt = Object.assign({ types: ['blank', 'mcq', 'multi', 'tf', 'match', 'short'], max: 20 }, opt || {});
     const ss = sentences(text), terms = keyTerms(ss).slice(0, 60), out = [], used = new Set();
     const put = q => { const k = norm(q.body); if (used.has(k)) return; used.add(k); q.level = A.bloomOf(q.body, q.qtype); out.push(q); };
     const defs = ss.map(s => { const m = s.match(DEF_RE); return m && (m[2].match(/[،,]/g) || []).length < 2 ? { s, term: m[1].trim().split(/\s+/).slice(-3).join(' ').replace(/[^؀-ۿa-z0-9\s]/gi, ''), def: m[2].replace(/[.؛،]+$/, '').trim() } : null; }).filter(Boolean);
@@ -70,6 +78,15 @@
     }
     // ما المقصود بـ (مقالي / قصير بإجابة نموذجية)
     if (opt.types.includes('short')) defs.slice(0, 3).forEach(d => put({ body: `ما المقصود بـ «${d.term}»؟`, qtype: 'essay', options: [], answer: d.def, points: 2 }));
+    // علّل: من جمل السبب والنتيجة
+    if (opt.types.includes('short')) ss.map(s => s.match(/^(.{8,90}?)\s+(?:بسبب|لأن|لان|نتيجة ل|نتيجةً ل|وذلك لأن|وذلك ل|مما يؤدي إلى)\s+(.{4,})$/)).filter(Boolean).slice(0, 3).forEach(m => put({ body: `علّل: ${m[1].replace(/[.،؛]+$/, '')}.`, qtype: 'essay', options: [], answer: m[2].replace(/[.؛]+$/, ''), points: 2 }));
+    // متعدد الإجابات: من جمل المكوّنات والأنواع
+    if (opt.types.includes('multi')) ss.forEach(s => { if (out.length >= opt.max) return; const m = s.match(/^(.*?)(?:تتكون|يتكون|تتألف|يتألف|تشمل|يشمل|من أنواع|من أمثلة|من خصائص|من مكونات)\s+(.{2,40}?)\s*(?:من|:|هي)\s+(.+)$/) || s.match(/^(?:من\s+)?(أنواع|أمثلة|خصائص|مكونات|أجزاء)\s+(.{2,40}?)\s*(?::|هي)\s+(.+)$/); if (!m) return;
+      const items = m[3].split(/\s*[،,]\s*|\s+و(?=\S)/).map(x => x.replace(/^و/, '').replace(/[.؛]+$/, '').trim()).filter(x => x && x.split(' ').length <= 5); if (items.length < 2) return;
+      const d = distract(items[0], terms.filter(t => !items.some(i => norm(i).includes(norm(t)) || norm(t).includes(norm(i)))), 2); if (d.length < 1) return;
+      put({ body: `اختر كل ما ينطبق على ${(m[1] + ' ' + m[2]).replace(/\s+/g, ' ').trim()}:`, qtype: 'multi', options: shuffle([...items.slice(0, 4).map(t => ({ t, ok: true })), ...d.map(t => ({ t }))]), answer: '', points: Math.min(4, items.length) }); });
+    // الأرقام والتواريخ: اختيار من متعدد ببدائل رقمية
+    if (opt.types.includes('mcq')) ss.filter(s => NUM.test(s) && s.split(' ').length >= 5).slice(0, 3).forEach(s => { const n = s.match(NUM)[0], ar = /[٠-٩]/.test(n), d = numD(n, ar); if (d.length < 2) return; put({ body: s.replace(n, '......').replace(/[.؛]+$/, '') + ' :', qtype: 'mcq', options: shuffle([{ t: n, ok: true }, ...d.map(t => ({ t }))]), answer: '', points: 1 }); });
     let ti = 0;
     for (const s of shuffle(ss)) {
       if (out.length >= opt.max) break;
@@ -78,8 +95,8 @@
       const kinds = opt.types.filter(k => ['blank', 'mcq', 'tf'].includes(k)); if (!kinds.length) break;
       const k = kinds[ti++ % kinds.length];
       if (k === 'blank') put({ body, qtype: 'blank', options: [{ t }], answer: '', points: 1 });
-      else if (k === 'mcq') { const d = distract(t, terms, 3); if (d.length < 2) { put({ body, qtype: 'blank', options: [{ t }], answer: '', points: 1 }); continue; } const o = shuffle([{ t, ok: true }, ...d.map(x => ({ t: x }))]); put({ body: body + ' :', qtype: 'mcq', options: o, answer: '', points: 1 }); }
-      else if (k === 'tf') { const wrong = Math.random() < 0.5 ? distract(t, terms, 1)[0] : null; put({ body: (wrong ? s.replace(t, wrong) : s).replace(/[.؛]+$/, ''), qtype: 'tf', options: [], answer: wrong ? 'خطأ' : 'صواب', points: 1 }); }
+      else if (k === 'mcq') { const d = distract(t, terms, 3, defs.some(x => x.term === t) ? defs.map(x => x.term) : null); if (d.length < 2) { put({ body, qtype: 'blank', options: [{ t }], answer: '', points: 1 }); continue; } const o = shuffle([{ t, ok: true }, ...d.map(x => ({ t: x }))]); put({ body: body + ' :', qtype: 'mcq', options: o, answer: '', points: 1 }); }
+      else if (k === 'tf') { const isDef = defs.some(x => x.s === s); const alt = isDef ? distract(t, terms, 1, defs.map(x => x.term))[0] : distract(t, terms, 1)[0]; const neg = Math.random() < 0.55 ? (negate(s) || (alt && (!isDef || defs.some(x => x.term === alt)) ? s.replace(t, alt) : null)) : null; put({ body: (neg || s).replace(/[.؛]+$/, ''), qtype: 'tf', options: [], answer: neg ? 'خطأ' : 'صواب', points: 1 }); }
     }
     // رتّب: من أول تعداد يجده (أولاً.. ثانياً أو سطر بفواصل)
     if (opt.types.includes('order')) { const l = ss.find(s => (s.match(/[،,]/g) || []).length >= 3 && /مراحل|خطوات|يمر|تبدأ|ثم|بالترتيب/.test(s)); if (l) { const it = l.replace(/^.*?(?:هي|:)\s*/, '').split(/\s*[،,]\s*(?:ثم\s+)?|\s+ثم\s+/).map(x => x.replace(/^و(?=ال)/, '').replace(/[.؛]+$/, '').trim()).filter(x => x && x.split(' ').length <= 6); if (it.length >= 3) put({ body: 'رتّب ما يلي ترتيباً صحيحاً', qtype: 'order', options: it.map(t => ({ t })), answer: '', points: it.length > 3 ? 2 : 1 }); } }
@@ -88,7 +105,7 @@
 
   A.qGenText = function (after) {
     const X = A._assess; if (!X) return;
-    const T = [['blank', 'أكمل الفراغ'], ['mcq', 'اختيار من متعدد'], ['tf', 'صواب وخطأ'], ['match', 'صل'], ['order', 'ترتيب'], ['short', 'ما المقصود بـ (مقالي)']];
+    const T = [['blank', 'أكمل الفراغ'], ['mcq', 'اختيار من متعدد'], ['multi', 'متعدد الإجابات'], ['tf', 'صواب وخطأ'], ['match', 'صل'], ['order', 'ترتيب'], ['short', 'ما المقصود بـ / علّل (مقالي)']];
     const m = A.modal(`<h3>توليد أسئلة من نص الدرس</h3>
       <p class="sub">ارفع ملف الدرس أو الملخص (PDF أو Word) من مجلدك في Drive أو من جهازك، أو الصق النص. تستخرج المنصة المصطلحات والتعريفات وتولّد أسئلة مقترحة تراجعها وتعدّلها قبل الحفظ — لا يُحفظ شيء دون موافقتك. المادة والصف: <b>${esc(A.subjName(X.ctx.subj))} · ${esc(X.gLabel(X.ctx.grade))}</b>.</p>
       <div class="iq-src"><label class="iq-drop" for="gnF"><input type="file" id="gnF" accept=".pdf,.docx,.txt,application/pdf"><b>ملف الدرس</b><span>PDF · Word — على الجوال اختر «Drive»</span></label>

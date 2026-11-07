@@ -210,8 +210,11 @@
         $$('[data-lcell]', B).forEach(i => i.oninput = () => { const v = i.value.trim(); if (v) L.cell[i.dataset.lcell] = v; else delete L.cell[i.dataset.lcell]; later(); drawPrev(); });
       }
     };
-    let PE = []; entriesOf([ds.id], [ds]).then(e => { PE = e; drawPrev(); });
-    const drawPrev = () => { const c = pv, cells = ds.slots.filter(x => x.c === c).map(x => A._liveEntries ? A._liveEntries.withEntry({ c: x.c, d: x.d, p: x.p, subject: A.subjName(x.s), teacher: x.t ? A.personName(x.t) : (x.tn || ''), link: linkOf(c, x.d, x.p, x.t) }, PE, ds.id) : ({ d: x.d, p: x.p, subject: A.subjName(x.s) || x.sn, teacher: x.t ? A.personName(x.t) : (x.tn || ''), link: linkOf(c, x.d, x.p, x.t) })); $('#lvPrev', box).innerHTML = A.liveTable({ label: ds.label, tag: ds.tag, from: ds.date_from, to: ds.date_to, meta: M, cells, cls_link: L.cls[c] }, { now: null, today: today(), preview: true, owner: true }); A.bindLive($('#lvPrev', box)); };
+    // المعاينة تعيد ربط الحصص بالخطة بعد كل تعديل أو تسكين (لا يُخزَّن الربط، يُحسب دائماً من الجدول الحالي)
+    let PE = [], prT = 0, sig = '';
+    const drawPrev = () => { const k = JSON.stringify(ds.slots) + '|' + JSON.stringify(M.days || ''); if (k !== sig) { sig = k; clearTimeout(prT); prT = setTimeout(() => entriesOf([ds.id], [ds]).then(e => { PE = e; drawPrev0(); }), 250); } drawPrev0(); };
+    const leftNote = c => { const l = (ds._planLeft || []).filter(e => e.class_id === c && ((e.topic || '').trim() || (e.homework || '').trim())); return l.length ? `<div class="le-left"><b>دروس في الخطة الأسبوعية بلا حصة عن بعد (${AR(l.length)})</b> — المادة لها حصص في الخطة أكثر من الجدول عن بعد، فبقيت آخر دروسها بلا حصة. يظهر لك وحدك:<ul>${l.map(e => `<li>${esc(A.subjName(e.subject_id))} — ${DAYS[e.day]} ح${AR(e.period + 1)}: ${esc((e.topic || e.homework || '').slice(0, 80))}</li>`).join('')}</ul></div>` : ''; };
+    const drawPrev0 = () => { const c = pv, cells = ds.slots.filter(x => x.c === c).map(x => A._liveEntries ? A._liveEntries.withEntry({ c: x.c, d: x.d, p: x.p, subject: A.subjName(x.s), teacher: x.t ? A.personName(x.t) : (x.tn || ''), link: linkOf(c, x.d, x.p, x.t) }, PE, ds.id) : ({ d: x.d, p: x.p, subject: A.subjName(x.s) || x.sn, teacher: x.t ? A.personName(x.t) : (x.tn || ''), link: linkOf(c, x.d, x.p, x.t) })); $('#lvPrev', box).innerHTML = A.liveTable({ label: ds.label, tag: ds.tag, from: ds.date_from, to: ds.date_to, meta: M, cells, cls_link: L.cls[c] }, { now: null, today: today(), preview: true, owner: true }) + leftNote(c); A.bindLive($('#lvPrev', box)); };
     $$('#lvTab button', box).forEach(x => x.classList.toggle('on', x.dataset.t === tab));
     $$('#lvTab button', box).forEach(b => b.onclick = () => { tab = b.dataset.t; $$('#lvTab button', box).forEach(x => x.classList.toggle('on', x === b)); drawBody(); });
     $('#lvPv', box).onchange = e => { pv = e.target.value; drawPrev(); if (tab === 'cell') drawBody(); };
@@ -249,7 +252,7 @@
     const stP = pl ? (pl.status === 'approved' ? '<span class="pill st-approved">معتمدة — تظهر لولي الأمر</span>' : '<span class="pill st-submitted">تظهر لولي الأمر بعد اعتماد الخطة</span>') : '';
     const PC = { topic: '#005499', homework: '#B7791F', note: '#6B4FA3', perf: '#2E8B57' }; const pRow = (k, l, v) => v ? `<div class="le-pr" style="--c:${PC[k]}"><b>${l}</b><span>${esc(v)}</span></div>` : '';
     const planBox = pl && ((pl.topic || '').trim() || (pl.homework || '').trim() || (pl.note || '').trim() || perfTxt(pl.perf_task))
-      ? `<div class="le-plan"><div class="le-ph"><b>من خطتك الأسبوعية</b> <span class="small muted">يظهر تلقائياً — لا حاجة لإعادة كتابته</span> ${stP}</div>${pRow('topic', 'الدرس', pl.topic)}${pRow('homework', 'الواجب', pl.homework)}${pRow('note', 'ملاحظة', pl.note)}${pRow('perf', 'مهمة أدائية', perfTxt(pl.perf_task))}</div>`
+      ? `<div class="le-plan"><div class="le-ph"><b>من خطتك الأسبوعية</b> <span class="pill">درس ${DAYS[pl.day]} — الحصة ${PER[pl.period] || AR(pl.period + 1)}</span> <span class="small muted">يظهر تلقائياً — لا حاجة لإعادة كتابته</span> ${stP}</div>${pRow('topic', 'الدرس', pl.topic)}${pRow('homework', 'الواجب', pl.homework)}${pRow('note', 'ملاحظة', pl.note)}${pRow('perf', 'مهمة أدائية', perfTxt(pl.perf_task))}</div>`
       : `<div class="le-plan empty"><b>لا يوجد درس لهذه الحصة في خطتك الأسبوعية.</b><span class="small">أضِفه في الخطة الأسبوعية ليظهر هنا تلقائياً، أو اكتبه لهذه الحصة فقط من «تخصيص لهذه الحصة».</span></div>`;
     const m = A.modal(`<h3>حصة عن بعد — ${esc(A.subjName(sl.s))} · ${esc(cName(c))}</h3><p class="sub">${DAYS[d]} · الحصة ${PER[p] || AR(p + 1)} · ${esc(ds.label)}. الخطة الأسبوعية لا تتغير.</p>
       ${planBox}
@@ -275,21 +278,32 @@
       if (v.link && !urlOk(v.link)) throw new Error('الرابط يجب أن يبدأ بـ https://');
       await saveEntry(ds.id, c, d, p, v); m.close(); A.toast('حُفظت — تظهر لولي الأمر', 'ok'); done(); });
   }
-  // ربط كل حصة عن بعد بحصتها في الخطة الأسبوعية (نفس الفصل واليوم والمادة، بالترتيب) — قراءة فقط
+  // ربط حصص التعليم عن بعد بالخطة الأسبوعية — قراءة فقط، والخطة لا تتغير:
+  // لكل فصل ومادة: دروس الخطة في أيام التعلم عن بعد مرتبةً (اليوم ثم رقم الحصة) تُرحَّل بالتسلسل على حصص المادة في الجدول عن بعد مرتبةً بالطريقة نفسها.
+  // مثال: الرياضيات ٥ حصص — لو نُقلت حصة الأحد إلى الخميس، تأخذ حصص عن بعد الدروس ١ ثم ٢ ثم ٣… حسب ترتيبها في الأسبوع.
+  const refWeek = ds => { const sw = s0 => { const x = A.parseDate(s0); x.setDate(x.getDate() - x.getDay()); return iso(x); }; const a = sw(ds.date_from), b = sw(ds.date_to), t = sw(today()); return t < a ? a : t > b ? b : t; };
+  const remoteDays = ds => { const ws = refWeek(ds); return ((ds.meta || {}).days || [0, 1, 2, 3, 4]).filter(d => { const x = addD(ws, d); return x >= ds.date_from && x <= ds.date_to; }); };
+  A._livePlanMap = (ds, P) => {
+    const days = remoteDays(ds), out = {}, by = {};
+    (ds.slots || []).filter(x => x.s && days.includes(x.d)).sort((a, b) => a.d - b.d || a.p - b.p).forEach(x => { (by[x.c + '|' + x.s] = by[x.c + '|' + x.s] || []).push(x); });
+    const pl = {}; (P || []).filter(e => e.subject_id && days.includes(e.day)).sort((a, b) => a.day - b.day || a.period - b.period).forEach(e => { (pl[e.class_id + '|' + e.subject_id] = pl[e.class_id + '|' + e.subject_id] || []).push(e); });
+    const left = [];
+    Object.entries(by).forEach(([k, l]) => { const q = pl[k] || []; l.forEach((x, i) => { if (q[i]) out[`${x.c}|${x.d}|${x.p}`] = q[i]; }); q.slice(l.length).forEach(e => left.push(e)); });
+    Object.entries(pl).forEach(([k, q]) => { if (!by[k]) q.forEach(e => left.push(e)); });
+    return { map: out, left };
+  };
   const withPlan = async (dsl, E) => {
     const W = (S.weeks || []).filter(w => !w.archived);
-    const cd = (ds, d) => { const x = A.parseDate(ds.date_from); x.setDate(x.getDate() - x.getDay() + d); return iso(x); };
-    const wOf = dt => W.find(w => w.start_date <= dt && addD(w.start_date, 6) >= dt);
-    const need = new Set(); dsl.forEach(ds => (ds.slots || []).forEach(x => { const w = x.s && wOf(cd(ds, x.d)); if (w) need.add(w.id); }));
+    const wOf = ds => { const ws = refWeek(ds), mid = addD(ws, 3); return W.find(w => w.start_date <= mid && addD(w.start_date, 6) >= mid); };
     E.forEach(e => { if (!e.own) e.own = { topic: e.topic || '', homework: e.homework || '', note: e.note || '' }; });
+    const need = new Set(); dsl.forEach(ds => { const w = wOf(ds); if (w) need.add(w.id); });
     if (!need.size) return E;
     const P = (await api.list('plan_entries', { week_id: [...need] }).catch(() => [])) || [];
-    const idx = {}; P.forEach(e => { if (!e.subject_id) return; const k = `${e.week_id}|${e.class_id}|${e.day}|${e.subject_id}`; (idx[k] = idx[k] || []).push(e); }); Object.values(idx).forEach(l => l.sort((a, b) => a.period - b.period));
-    dsl.forEach(ds => (ds.slots || []).forEach(x => { if (!x.s) return; const w = wOf(cd(ds, x.d)); const l = w && idx[`${w.id}|${x.c}|${x.d}|${x.s}`]; if (!l) return;
-      const rk = ds.slots.filter(y => y.c === x.c && y.d === x.d && y.s === x.s && y.p < x.p).length, best = l[Math.min(rk, l.length - 1)];
-      let e = E.find(y => y.ds_id === ds.id && y.class_id === x.c && y.day === x.d && y.period === x.p);
-      if (!e) { e = { ds_id: ds.id, class_id: x.c, day: x.d, period: x.p, topic: '', homework: '', note: '', link: '', extra: [], own: { topic: '', homework: '', note: '' }, virtual: true }; E.push(e); }
-      e.plan = best; ['topic', 'homework', 'note'].forEach(k => { e[k] = (e.own[k] || '').trim() || best[k] || ''; }); e.perf = perfTxt(best.perf_task); }));
+    dsl.forEach(ds => { const w = wOf(ds); if (!w) return; const { map, left } = A._livePlanMap(ds, P.filter(e => e.week_id === w.id)); ds._planLeft = left;
+      Object.entries(map).forEach(([k, best]) => { const [c, d, p] = k.split('|'); const x = { c, d: +d, p: +p };
+        let e = E.find(y => y.ds_id === ds.id && y.class_id === x.c && y.day === x.d && y.period === x.p);
+        if (!e) { e = { ds_id: ds.id, class_id: x.c, day: x.d, period: x.p, topic: '', homework: '', note: '', link: '', extra: [], own: { topic: '', homework: '', note: '' }, virtual: true }; E.push(e); }
+        e.plan = best; ['topic', 'homework', 'note'].forEach(f => { e[f] = (e.own[f] || '').trim() || best[f] || ''; }); e.perf = perfTxt(best.perf_task); }); });
     return E;
   };
   const entriesOf = async (ids, dsl) => { let E = []; try { E = ids.length ? (await api.list('live_entries', { ds_id: ids })) || [] : []; } catch (_) { E = []; } try { await withPlan(dsl || ((await api.list('display_schedules', { id: ids })) || []), E); } catch (_) { } return E; };

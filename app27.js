@@ -321,18 +321,55 @@
   const my0 = V.my;
   if (my0) V.my = function (root) {
     const r = my0(root);
+    // «جدولي»: تبويب للجدول المعتمد وتبويب لكل جدول تعليم عن بعد منشور — مع الفروق والترحيل وما ينقص
+    let tabSel = null; const offCache = {};
+    const offSlots = async vid => { if (offCache[vid || 'ap']) return offCache[vid || 'ap']; let v = vid; if (!v) { const vs = (await api.list('timetable_versions', { section_id: S.sectionId }).catch(() => [])) || []; v = (vs.find(x => x.status === 'approved') || {}).id; } const r = v ? ((await api.list('timetable_slots', { version_id: v, teacher_id: S.me.id }).catch(() => [])) || []).filter(x => x.subject_id && x.teacher_id === S.me.id).map(x => ({ c: x.class_id, d: x.day, p: x.period, s: x.subject_id })) : []; return (offCache[vid || 'ap'] = r); };
+    const pl = p => PER[p] || AR(p + 1), at = (d, p) => `${DAYS[d]} · ${pl(p)}`;
+    const offGrid = (O, meta) => { const days = (meta && meta.days) || Array.from({ length: (A.section() || {}).days || 5 }, (_, i) => i), P = Math.max((A.section() || {}).periods || 7, ...O.map(x => x.p + 1));
+      if (!O.length) return A.emptyBox('لا توجد لك حصص في الجدول المعتمد');
+      return `<div class="scroll"><table class="tbl ms-g"><thead><tr><th>اليوم</th>${Array.from({ length: P }, (_, p) => `<th>${pl(p)}</th>`).join('')}</tr></thead><tbody>${days.map(d => `<tr><th>${DAYS[d]}</th>${Array.from({ length: P }, (_, p) => { const x = O.find(y => y.d === d && y.p === p); return `<td>${x ? `<b>${esc(A.subjName(x.s))}</b><small>${esc(cName(x.c))}</small>` : ''}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div><p class="small muted" style="margin:6px 0 0">${AR(O.length)} حصة في الأسبوع.</p>`; };
+    const compare = (ds, O, E) => {
+      const R = (ds.slots || []).filter(x => x.t === S.me.id && x.s), key = x => x.c + '|' + x.s, sort = (a, b) => a.d - b.d || a.p - b.p;
+      const keys = [...new Set([...O.map(key), ...R.map(key)])];
+      let same = 0; const moved = [], removed = [], added = [];
+      keys.forEach(k => { const o = O.filter(x => key(x) === k).sort(sort), r = R.filter(x => key(x) === k).sort(sort);
+        const eq = (u, v) => u.d === v.d && u.p === v.p; const o2 = o.filter(u => { const k2 = r.findIndex(v => eq(u, v)); if (k2 < 0) return true; r.splice(k2, 1); same++; return false; });
+        for (let i = 0; i < Math.max(o2.length, r.length); i++) { if (o2[i] && r[i]) moved.push([o2[i], r[i]]); else if (o2[i]) removed.push(o2[i]); else added.push(r[i]); } });
+      const L = ds.links || {}, linkOf = x => (L.cell || {})[`${x.c}|${x.d}|${x.p}`] || (L.cls || {})[x.c] || (L.tch || {})[x.t] || '';
+      const eOf = x => E.find(e => e.ds_id === ds.id && e.class_id === x.c && e.day === x.d && e.period === x.p) || {};
+      const carry = R.slice().sort(sort).map(x => ({ x, e: eOf(x) })).filter(o => o.e.plan);
+      const noLesson = R.filter(x => !((eOf(x).topic || '').trim())), notAppr = carry.filter(o => o.e.plan.status !== 'approved' && !((o.e.own || {}).topic || '').trim()), noLink = R.filter(x => !linkOf(x));
+      const left = (ds._planLeft || []).filter(e => R.some(x => x.c === e.class_id && x.s === e.subject_id) || e.teacher_id === S.me.id).filter(e => (e.topic || '').trim() || (e.homework || '').trim());
+      const nm = x => `<b>${esc(A.subjName(x.s))}</b> — ${esc(cName(x.c))}`;
+      const li = (cls, h) => `<li class="${cls}">${h}</li>`;
+      const issues = noLesson.length + notAppr.length + noLink.length + left.length;
+      const sec = (ic, t, n, body, tone) => `<details class="ms-s ${tone || ''}" ${n && tone === 'warn' ? 'open' : ''}><summary><span class="ms-si" aria-hidden="true">${ic}</span><b>${t}</b><span class="ms-n">${AR(n)}</span></summary>${n ? `<ul>${body}</ul>` : '<p class="small muted">لا يوجد.</p>'}</details>`;
+      return `<div class="ms-cmp"><div class="pal-k"><div class="k info"><b>${AR(O.length)}</b>حصة في المعتمد</div><div class="k info"><b>${AR(R.length)}</b>حصة عن بعد</div><div class="k ${moved.length ? 'warn' : 'ok'}"><b>${AR(moved.length)}</b>نُقل موعدها</div><div class="k ${removed.length ? 'warn' : ''}"><b>${AR(removed.length)}</b>حُذفت</div><div class="k"><b>${AR(added.length)}</b>أُضيفت</div><div class="k ${issues ? 'bad' : 'ok'}"><b>${AR(issues)}</b>${issues ? 'تحتاج إكمالاً' : 'مكتمل ✓'}</div></div>
+        ${sec('⚠', 'غير مكتمل', issues, [...noLesson.map(x => li('w', `${nm(x)} · ${at(x.d, x.p)} — <span>بلا درس: أضِفه في خطتك الأسبوعية أو من «تعديل بيانات الحصة»</span>`)), ...notAppr.map(o => li('w', `${nm(o.x)} · ${at(o.x.d, o.x.p)} — <span>الخطة غير معتمدة بعد، فلا يراها ولي الأمر</span>`)), ...noLink.map(x => li('w', `${nm(x)} · ${at(x.d, x.p)} — <span>لا يوجد رابط دخول (تضيفه الإدارة)</span>`)), ...left.map(e => li('w', `<b>${esc(A.subjName(e.subject_id))}</b> — ${esc(cName(e.class_id))} · درس ${at(e.day, e.period)} في الخطة — <span>لم يجد حصة عن بعد: «${esc((e.topic || e.homework).slice(0, 60))}»</span>`))].join(''), 'warn')}
+        ${sec('⇄', 'الفرق عن الجدول المعتمد', moved.length + removed.length + added.length, [...moved.map(([o, r]) => li('m', `${nm(o)} — <span class="ms-from">${at(o.d, o.p)}</span> ← <span class="ms-to">${at(r.d, r.p)}</span>`)), ...removed.map(o => li('r', `${nm(o)} — ${at(o.d, o.p)} <span class="pill st-returned">حُذفت في التعليم عن بعد</span>`)), ...added.map(r => li('a', `${nm(r)} — ${at(r.d, r.p)} <span class="pill st-approved">حصة جديدة</span>`))].join(''))}
+        ${sec('↪', 'ترحيل دروس الخطة', carry.length, carry.map(({ x, e }) => li(e.plan.day === x.d && e.plan.period === x.p ? '' : 'm', `${nm(x)} · ${at(x.d, x.p)} ← <span class="ms-from">درس ${at(e.plan.day, e.plan.period)}</span>${(e.plan.topic || '').trim() ? `: ${esc(e.plan.topic.slice(0, 70))}` : ' <span class="muted">(بلا موضوع في الخطة)</span>'}`)).join(''))}
+        <p class="small muted" style="margin:6px 2px 0">الترحيل بالتسلسل: الدرس الأول للمادة في الأسبوع ← أول حصة لها عن بعد، وهكذا. الخطة الأسبوعية لا تتغير.</p></div>`;
+    };
     const paint = async () => { try {
       const t = today(), l = (await api.list('display_schedules', { section_id: S.sectionId })).filter(d => d.published && d.date_to >= t && d.date_from <= addD(t, 7)); const old = $('#lvMy', root);
-      if (!l.length) { if (old) old.remove(); return; } const anchor = $('#myMode', root) || $('.head', root); if (!anchor) return;
-      const E = await entriesOf(l.map(d => d.id), l);
-      const html = l.map(d => { const mine = (d.slots || []).filter(x => x.t === S.me.id); if (!mine.length) return ''; const L = d.links || {}; const cells = mine.map(x => withEntry({ c: x.c, d: x.d, p: x.p, subject: A.subjName(x.s) + ' — ' + cName(x.c), teacher: '', link: (L.cell || {})[`${x.c}|${x.d}|${x.p}`] || (L.cls || {})[x.c] || (L.tch || {})[x.t] || '' }, E, d.id)); return A.liveTable({ id: d.id, label: d.label, tag: d.tag, from: d.date_from, to: d.date_to, meta: d.meta, cells }, { today: t, now: null, teacher: true, edit: A.week() ? true : true }); }).join('');
-      if (!html) { if (old) old.remove(); return; }
+      const anchor = $('#myMode', root) || $('.head', root); if (!anchor) return;
+      const mineL = l.filter(d => (d.slots || []).some(x => x.t === S.me.id));
+      if (!mineL.length) { if (old) old.remove(); return; }
+      const E = await entriesOf(mineL.map(d => d.id), mineL);
+      const O0 = await offSlots(null);
+      if (!tabSel || (tabSel !== 'off' && !mineL.some(d => d.id === tabSel))) tabSel = mineL[0].id;
       const box = old || (anchor.insertAdjacentHTML('afterend', '<div id="lvMy"></div>'), $('#lvMy', root));
       const keep = box.querySelector('.lv-days .on'), keepD = keep && keep.dataset.lvd;
-      box.innerHTML = html; hookJoin(); A.bindLive(box);
+      const tabs = `<div class="ms-tabs" role="tablist" aria-label="جداولي"><button type="button" role="tab" data-mst="off" class="${tabSel === 'off' ? 'on' : ''}" aria-selected="${tabSel === 'off'}"><span aria-hidden="true">📘</span> الجدول المعتمد</button>${mineL.map(d => `<button type="button" role="tab" data-mst="${d.id}" class="${tabSel === d.id ? 'on' : ''}" aria-selected="${tabSel === d.id}"><span aria-hidden="true">💻</span> ${esc(d.label)}<small>${esc(d.date_from)} — ${esc(d.date_to)}</small></button>`).join('')}</div>`;
+      let body = '';
+      if (tabSel === 'off') body = `<div class="card ms-off"><h3 style="margin:0 0 8px">الجدول المعتمد — حصصي</h3>${offGrid(O0)}</div>`;
+      else { const d = mineL.find(x => x.id === tabSel); const O = d.version_id ? await offSlots(d.version_id) : O0; const L = d.links || {}; const cells = (d.slots || []).filter(x => x.t === S.me.id).map(x => withEntry({ c: x.c, d: x.d, p: x.p, subject: A.subjName(x.s) + ' — ' + cName(x.c), teacher: '', link: (L.cell || {})[`${x.c}|${x.d}|${x.p}`] || (L.cls || {})[x.c] || (L.tch || {})[x.t] || '' }, E, d.id));
+        body = A.liveTable({ id: d.id, label: d.label, tag: d.tag, from: d.date_from, to: d.date_to, meta: d.meta, cells }, { today: t, now: null, teacher: true, edit: true }) + compare(d, O, E); }
+      box.innerHTML = `<section class="ms-wrap" aria-label="جداولي">${tabs}${body}</section>`; hookJoin(); A.bindLive(box);
+      $$('[data-mst]', box).forEach(b => b.onclick = () => { tabSel = b.dataset.mst; paint(); });
       if (keepD) { const b = box.querySelector(`[data-lvd="${keepD}"]`); if (b) b.click(); }
       box.querySelectorAll('[data-lved]').forEach(b => b.onclick = () => { const [ds, c, d, p] = b.dataset.lved.split('|'); const dsr = l.find(x => x.id === ds); const cur = withEntry({ c, d: +d, p: +p }, E, ds); entryDialog(dsr, c, +d, +p, cur, paint); });
-    } catch (_) {} };
+    } catch (e) { console.warn(e); } };
     paint();
     return r;
   };

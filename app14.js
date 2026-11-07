@@ -32,6 +32,7 @@
     const leads = (S.me.is_owner || (A.hasModule && A.hasModule('supervision')) || (A.viewOK && A.viewOK('records')));
     root.innerHTML = `<div class="card rec-card"><div class="head"><div class="grow"><h2>سجل المتابعة</h2><p class="sub" style="margin:2px 0 0">سجل درجات ومتابعة مرن لكل مادة وفصل — يُحفظ تلقائياً في حسابك على المنصة ويفتح من أي جهاز. أسماء طلاب فصولك تُضاف من المنصة تلقائياً.</p></div>
         <div class="row" style="gap:8px"><span class="rec-st" id="recSt" role="status" aria-live="polite">${pendingUpload ? 'يرفع نسختك المحلية…' : row ? 'محفوظ في السحابة · ' + A.fmtDT(row.updated_at) : 'جاهز'}</span>
+        <button class="btn ghost sm" id="recAtt" title="تعبئة أعمدة الحضور الفارغة من رصد الحصص">تعبئة الحضور من المنصة</button>
         ${leads ? '<button class="btn ghost sm" id="recView">سجلات المعلمين</button>' : ''}
         <a class="btn ghost sm" id="recFull" href="tools/records.html?embed=1&k=-${me}" target="_blank" rel="noopener">صفحة كاملة</a></div></div>
       <iframe id="recF" class="rec-frame" title="سجل المتابعة" src="tools/records.html?embed=1&k=-${me}&lang=${window.DINA_LANG === 'en' ? 'en' : 'ar'}&${ver.split('?')[1] || ''}"></iframe></div>`;
@@ -50,10 +51,20 @@
       if (e.origin !== location.origin || !e.data || e.source !== fr.contentWindow) return;
       if (e.data.type === 'dina-rec-ready') { const mine = (S.allEntries || S.entries).filter(x => x.teacher_id === me && x.subject_id); const uniq = a => [...new Set(a.filter(Boolean))].join('، ');
         fr.contentWindow.postMessage({ type: 'dina-rec-cover', v: { teacher: (A.person(me) || S.me).full_name, subjects: uniq(mine.map(x => A.subjName(x.subject_id))), classes: uniq(mine.map(x => (A.cls(x.class_id) || {}).name)) } }, location.origin);
-        if (students.length) fr.contentWindow.postMessage({ type: 'dina-rec-students', list: students }, location.origin); }
+        if (students.length) fr.contentWindow.postMessage({ type: 'dina-rec-students', list: students }, location.origin);
+        sendAtt(false); }
+      if (e.data.type === 'dina-rec-att-done') { if (e.data.n) A.toast(`عُبّئت ${AR(e.data.n)} خانة حضور في السجل من رصد الحصص في المنصة`, 'ok'); else if (attManual) A.toast('لا توجد خانات حضور فارغة تقابل رصداً في المنصة — تأكد أن أعمدة الأيام مفعّلة في الصفحة', 'warn'); attManual = false; }
       if (e.data.type === 'dina-rec-added' && e.data.n) A.toast(`أُضيف ${AR(e.data.n)} من طلاب فصولك إلى قاعدة الطلاب في السجل`, 'ok');
       if (e.data.type === 'dina-rec-flushed') { clearTimeout(tm); upload(); }
     };
+    // تعبئة أعمدة الحضور اليومية في السجل من «حضور الحصص» في المنصة (الخانات الفارغة فقط — لا يُمسّ ما كتبه المعلم)
+    let attManual = false;
+    const sendAtt = async manual => { attManual = manual; try {
+      const pa = await api.list('period_attendance', { teacher_id: me }, { select: 'student_id,day,status,subject_id,class_id' }); if (!pa.length) { if (manual) A.toast('لم ترصد حضور أي حصة في المنصة بعد', 'warn'); return; }
+      const ids = [...new Set(pa.map(x => x.student_id))]; const st = await api.list('students', { id: ids }, { select: 'id,full_name' });
+      const nm = Object.fromEntries(st.map(x => [x.id, x.full_name]));
+      fr.contentWindow.postMessage({ type: 'dina-rec-att', list: pa.filter(x => nm[x.student_id]).map(x => ({ n: nm[x.student_id], d: x.day, st: x.status, sj: A.subjName(x.subject_id) || '', cls: (A.cls(x.class_id) || {}).name || '' })) }, location.origin);
+    } catch (_) { if (manual) A.toast('تعذّر جلب رصد الحضور', 'err'); } };
     const flush = () => { try { fr.contentWindow.postMessage({ type: 'dina-rec-flush' }, location.origin); } catch (_) {} if (ls.get(DK(me))) upload(); };
     const onHash = () => { if (!/^#\/records/.test(location.hash)) { flush(); cleanup && cleanup(); } };
     addEventListener('storage', onStore); addEventListener('message', onMsg); addEventListener('hashchange', onHash); addEventListener('pagehide', flush);
@@ -61,6 +72,7 @@
     if (pendingUpload) upload();
     if (conflict) A.toast('وُجدت تعديلات أحدث على جهاز آخر فاعتُمدت؛ نسختك المحلية القديمة محفوظة احتياطياً على هذا الجهاز', 'warn');
     const vb = $('#recView', root); if (vb) vb.onclick = () => viewOthers();
+    const ab = $('#recAtt', root); if (ab) ab.onclick = () => sendAtt(true);
   };
 
   // اطلاع المالك والمشرف على سجلات المعلمين (نسخة للاطلاع — لا تُحفظ تعديلاتها)

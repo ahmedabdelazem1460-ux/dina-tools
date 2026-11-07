@@ -10,7 +10,7 @@
   function myClassStudents(all) {
     const mine = new Set(S.entries.filter(e => e.teacher_id === S.me.id).map(e => e.class_id));
     const ids = S.me.is_owner && !mine.size ? new Set(S.classes.map(c => c.id)) : mine;
-    return all.filter(s => ids.has(s.class_id)).map(s => { const c = A.cls(s.class_id) || {}; return { n: s.full_name, g: [c.grade_word, c.stage].filter(Boolean).join(' '), c: c.class_label || c.name || '' }; });
+    return all.filter(s => ids.has(s.class_id)).map(s => { const c = A.cls(s.class_id) || {}; return { n: s.full_name, g: A.gradeName(c.grade_word, c.stage), c: c.class_label || c.name || '' }; });
   }
 
   V.records = async function (root) {

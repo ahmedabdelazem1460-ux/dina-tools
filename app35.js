@@ -7,7 +7,7 @@
   const lead = () => S.me && (S.me.is_owner || (A.hasModule && A.hasModule('supervision')));
   if (A.NAV && !A.NAV.some(n => n[0] === 'prep')) { const i = A.NAV.findIndex(n => n[0] === 'assess'); A.NAV.splice(i < 0 ? A.NAV.length : i, 0, ['prep', 'التحضير', () => !!S.me && !(A.coordOnly && A.coordOnly())]); }
   const gk = c => c ? `${c.stage}|${c.grade_word}` : '';
-  const gLabel = k => { const [st, g] = (k || '|').split('|'); return g ? `${g} ${st}` : '—'; };
+  const gLabel = k => { const [st, g] = (k || '|').split('|'); return g ? A.gradeName(g, st) : '—'; };
   const mySubjects = () => { const m = new Set(S.entries.filter(e => e.teacher_id === S.me.id && e.subject_id).map(e => e.subject_id)); return (S.me.is_owner || lead() || !m.size) ? S.subjects : S.subjects.filter(s => m.has(s.id)); };
   const myGrades = () => { const mine = new Set(S.entries.filter(e => e.teacher_id === S.me.id).map(e => e.class_id)); const cl = S.classes.filter(c => c.active && (S.me.is_owner || lead() || !mine.size || mine.has(c.id))); return [...new Set(cl.map(gk))]; };
   const STRAT = ['التعلم التعاوني', 'العصف الذهني', 'الخرائط الذهنية', 'التعلم بالأقران', 'حل المشكلات', 'الاستقصاء', 'التجريب العملي', 'لعب الأدوار', 'القصة', 'الحوار والمناقشة', 'التعلم باللعب', 'فكّر - زاوج - شارك', 'المحطات التعليمية', 'الصف المقلوب', 'التعلم القائم على المشروع', 'القراءة الموجهة', 'النمذجة', 'التعلم الرقمي التفاعلي'];
@@ -117,12 +117,14 @@
       q('#peRa').onclick = () => { D.resources.push({ t: '', u: '' }); draw(); };
       q('#peGen').onclick = async () => { if (!P.lesson.trim()) return A.toast('اكتب اسم الدرس أو اختره من المنهج أولاً', 'warn'); const has = ['objectives', 'warmup', 'assessment', 'homework', 'perf_task'].some(k => String(D[k] || '').trim()) || D.activities.length; let over = true; if (has) over = await A.confirmBox('يوجد محتوى مكتوب. استبداله بالمقترح؟<br><span class="small muted">«إلغاء» = تعبئة الفارغ فقط.</span>', 'استبدال'); const g = generate(P.lesson, A.subjName(P.subject_id)); Object.keys(g).forEach(k => { const empty = Array.isArray(D[k]) ? !D[k].length : !String(D[k] || '').trim(); if (over || empty) D[k] = g[k]; }); draw(); A.toast('وُلّد التحضير — راجعه وعدّل ما تريد', 'ok'); };
       q('#pePr').onclick = () => printPrep({ ...P, data: D });
-      q('#peSv').onclick = e => A.run(e.currentTarget, async () => { if (!P.lesson.trim()) throw new Error('اكتب اسم الدرس'); D.resources = D.resources.filter(r => r.u); const row = { subject_id: P.subject_id, grade_key: P.grade_key, lesson_id: P.lesson_id, unit: P.unit.trim(), lesson: P.lesson.trim(), data: D, updated_at: new Date().toISOString() };
+      q('#peSv').onclick = e => A.run(e.currentTarget, async () => { if (!P.lesson.trim()) P.lesson = `تحضير ${A.subjName(P.subject_id) || ''} — ${new Date().toLocaleDateString('ar-SA')}`; D.resources = D.resources.filter(r => r.u); const row = { subject_id: P.subject_id, grade_key: P.grade_key, lesson_id: P.lesson_id, unit: P.unit.trim(), lesson: P.lesson.trim(), data: D, updated_at: new Date().toISOString() };
         if (x) await api.upd('lesson_preps', x.id, row); else await api.ins('lesson_preps', { ...row, school_id: S.school.id, kind: P.kind || 'mine' }); m.close(); A.toast('حُفظ التحضير', 'ok'); done && done(); });
     };
     draw();
   }
 
+  A.prepEditor = (x, done) => editor(x, x ? null : 'mine', done);
+  A.prepGen = generate;
   // ---------- الطباعة بنموذج دينا ----------
   function printPrep(x) {
     const d = x.data || {}, li = s => String(s || '').split('\n').filter(Boolean).map(t => `<li>${esc(t)}</li>`).join('');

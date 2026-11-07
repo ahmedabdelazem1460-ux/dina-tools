@@ -11,7 +11,7 @@
   const qLink = c => base() + 'student.html?q=' + c, rLink = t => base() + 'student.html?r=' + t;
   const sch = () => S.school.id;
   const gk = c => c ? `${c.stage}|${c.grade_word}` : '';
-  const gLabel = k => { const [st, g] = (k || '|').split('|'); return g ? `${g} ${st.replace('ال', 'ال')}` : '—'; };
+  const gLabel = k => { const [st, g] = (k || '|').split('|'); return g ? A.gradeName(g, st) : '—'; };
   const myClasses = () => { const mine = new Set(S.entries.filter(e => e.teacher_id === S.me.id).map(e => e.class_id)); const all = S.classes.filter(c => c.active); return (S.me.is_owner || A.anyPerm('review') || !mine.size) ? all : all.filter(c => mine.has(c.id)); };
   const mySubjects = () => { const m = new Set(S.entries.filter(e => e.teacher_id === S.me.id && e.subject_id).map(e => e.subject_id)); return (S.me.is_owner || A.anyPerm('review') || !m.size) ? S.subjects : S.subjects.filter(s => m.has(s.id)); };
   const ctx = { subj: null, grade: null };

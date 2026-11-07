@@ -36,7 +36,7 @@
           ${live ? card('live', live.n, 'حصص عن بعد بلا درس أو واجب', `${AR(live.total)} حصة في الجدول الاستثنائي`, 'أضِفها', live.n ? 'warn' : '') : ''}
           ${quiz ? card('quiz', quiz.n, 'إجابات تحتاج تصحيحاً يدوياً', quiz.open ? `${AR(quiz.open)} اختبار منشور` : '', 'التصحيح', quiz.n ? 'warn' : '') : ''}
         </div>
-        <div id="myPa"></div><div id="myDu"></div>
+        <div id="myPa"></div><div id="myDu"></div><div id="myPrep"></div>
         ${todayL.length ? `<div class="mt-today"><span class="small muted">حصصك اليوم:</span>${todayL.map(e => `<span class="mt-p ${e.exec_status && e.exec_status !== 'pending' ? 'ok' : ''}">${AR(e.period + 1)} · ${esc(A.subjName(e.subject_id))} — ${esc((A.cls(e.class_id) || {}).name || '')}</span>`).join('')}</div>` : ''}`;
       $$('[data-mt]', box).forEach(b => b.onclick = () => {
         const k = b.dataset.mt;
@@ -48,7 +48,7 @@
         else if (k === 'quiz') { A.LS.set('as_t', 'results'); location.hash = '#/assess'; }
       });
     };
-    draw(null, null); if (A.myPeriodAtt) A.myPeriodAtt($('#myPa', box)); if (A.myDuty) A.myDuty($('#myDu', box));
+    draw(null, null); if (A.myPeriodAtt) A.myPeriodAtt($('#myPa', box)); if (A.myDuty) A.myDuty($('#myDu', box)); if (A.myPrepBoard) A.myPrepBoard($('#myPrep', box));
     // البيانات الإضافية (جداول عن بعد + الاختبارات) دون تأخير اللوحة
     let live = null, quiz = null;
     try { const td = iso(new Date()), l = (await api.list('display_schedules', { section_id: S.sectionId })).filter(d => d.published && d.date_to >= td && d.date_from <= td);
@@ -57,7 +57,7 @@
         if (total) live = { n, total }; } } catch (_) { }
     try { const zs = (await api.list('quizzes', { school_id: S.school.id, teacher_id: S.me.id }, { select: 'id,status' })); const pub = zs.filter(z => z.status === 'published');
       if (zs.length) { const at = await api.list('quiz_attempts', { quiz_id: zs.map(z => z.id) }, { select: 'quiz_id,pending_manual' }).catch(() => []); quiz = { n: at.filter(a => a.pending_manual).length, open: pub.length }; } } catch (_) { }
-    if (document.body.contains(box)) { draw(live, quiz); if (A.myPeriodAtt) A.myPeriodAtt($('#myPa', box)); if (A.myDuty) A.myDuty($('#myDu', box)); }
+    if (document.body.contains(box)) { draw(live, quiz); if (A.myPeriodAtt) A.myPeriodAtt($('#myPa', box)); if (A.myDuty) A.myDuty($('#myDu', box)); if (A.myPrepBoard) A.myPrepBoard($('#myPrep', box)); }
   }
 
   // ======================= (٢) استيراد الأسئلة من الملفات =======================

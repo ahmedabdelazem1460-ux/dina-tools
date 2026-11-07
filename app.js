@@ -86,6 +86,8 @@
   const cls = id => S.classes.find(c => c.id === id) || (S.allClasses || []).find(c => c.id === id);
   // المراحل داخل القسم: عرض مرحلة واحدة أو الكل (لا يغيّر أي بيانات)
   const stageOf = c => (c.stage || '').trim() || (/ابتدائي/.test(c.name) ? 'ابتدائي' : /متوسط/.test(c.name) ? 'متوسط' : /ثانوي/.test(c.name) ? 'ثانوي' : /^KG/i.test(c.name) ? 'KG' : 'أخرى');
+  // اسم الصف بالمذكر: «السادس الابتدائي» — المرحلة تبقى «المرحلة الابتدائية» (عرض فقط، لا يغيّر البيانات)
+  const gradeName = (word, stage) => { const st = String(stage || '').trim().replace(/^ال?ابتدائي(ة)?$/, 'الابتدائي').replace(/^ال?متوسط(ة)?$/, 'المتوسط').replace(/^ال?ثانوي(ة)?$/, 'الثانوي'); return [word, st].filter(Boolean).join(' '); };
   const STAGE_L = { 'ابتدائي': 'الابتدائية', 'متوسط': 'المتوسطة', 'ثانوي': 'الثانوية', KG: 'رياض الأطفال', Grade: 'Grades 1–12' };
   const myMem = (sec = S.sectionId) => S.memberships.find(m => m.staff_id === S.me.id && m.section_id === sec);
   function perm(p, sec = S.sectionId) {
@@ -820,7 +822,7 @@
   }
 
   // ---------- مشترك مع الملفات الأخرى ----------
-  window.APP = { coordOnly, NAV, navOK, ownerStamp, VIEW_PERMS, TITLE_SUGG, viewOK, stageOf, featMode, featGate, FEAT_DEF, PERF, perfName, start: () => start(), TOOL_PERMS, TOOL_KEYS, cnt, api, S, $, $$, esc, AR, DAYS, PER, ORD, STATUS, WSTATUS, ROLES, PERMS, ROLE_DEFAULTS, I, parseDate, isoDate, dmy, weekDates, fmtDT, pct, norm, normKey, genPass, toast, modal, confirmBox, run, pill, bar, emptyBox, download, section, week, subj, subjName, person, personName, cls, myMem, perm, anyPerm, holidayOf, required, filled, stats, loadSection, loadWeek, refreshPeople, refreshMyCards, delegOf, shell, route, renderNav, LS, DEMO };
+  window.APP = { gradeName, coordOnly, NAV, navOK, ownerStamp, VIEW_PERMS, TITLE_SUGG, viewOK, stageOf, featMode, featGate, FEAT_DEF, PERF, perfName, start: () => start(), TOOL_PERMS, TOOL_KEYS, cnt, api, S, $, $$, esc, AR, DAYS, PER, ORD, STATUS, WSTATUS, ROLES, PERMS, ROLE_DEFAULTS, I, parseDate, isoDate, dmy, weekDates, fmtDT, pct, norm, normKey, genPass, toast, modal, confirmBox, run, pill, bar, emptyBox, download, section, week, subj, subjName, person, personName, cls, myMem, perm, anyPerm, holidayOf, required, filled, stats, loadSection, loadWeek, refreshPeople, refreshMyCards, delegOf, shell, route, renderNav, LS, DEMO };
 
   // ---------- تشغيل ----------
   window.addEventListener('DOMContentLoaded', async () => {

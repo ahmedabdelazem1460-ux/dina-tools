@@ -34,14 +34,14 @@
     if (!(mod('attendance') || mod('counselor') || mod('supervision'))) { root.innerHTML = `<div class="card">${A.emptyBox('غير متاح لحسابك', 'يمنحه مالك النظام لمشرفي الأدوار والمرشد الطلابي من «المسميات والصلاحيات».')}</div>`; return; }
     root.innerHTML = '<div class="spinner"></div>';
     await loadStudents(true);
-    const tabs = [mod('attendance') && ['take', 'أخذ الحضور'], (mod('attendance') || mod('counselor')) && ['behavior', 'السلوك'], (mod('counselor') || S.me.is_owner) && ['refer', 'الإحالات'], ['reports', 'التقارير'], S.me.is_owner && ['students', 'الطلاب']].filter(Boolean);
+    const tabs = [(mod('attendance') || mod('counselor') || mod('supervision')) && A.attLive && ['live', 'لوحة الحضور اللحظية'], mod('attendance') && A.attPeriods && ['periods', 'حضور الحصص'], mod('attendance') && ['take', 'الحضور الصباحي'], (mod('attendance') || mod('counselor')) && ['behavior', 'السلوك'], (mod('counselor') || S.me.is_owner) && ['refer', 'الإحالات'], ['reports', 'التقارير'], S.me.is_owner && ['students', 'الطلاب']].filter(Boolean);
     let tab = A.LS.get('atttab'); if (!tabs.some(t => t[0] === tab)) tab = tabs[0][0];
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>الحضور والغياب والسلوك</h2><p class="sub" style="margin:2px 0 0">${AR(STU.length)} طالب في قاعدة البيانات · المزامنة لحظية بين المشرفين والمرشد الطلابي.</p></div></div>
       <div class="tabs">${tabs.map(([k, l]) => `<button data-t="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div><div id="atb"></div></div>`;
     $$('.tabs button', root).forEach(b => b.onclick = () => { A.LS.set('atttab', b.dataset.t); V.attendance(root); });
     const box = $('#atb', root);
     if (!STU.length && tab !== 'students') { box.innerHTML = A.emptyBox('لا يوجد طلاب بعد', S.me.is_owner ? 'استورد بيانات الطلاب من تبويب «الطلاب».' : 'يستورد مالك النظام بيانات الطلاب أولاً.'); return; }
-    ({ take: tTake, behavior: tBehavior, refer: tRefer, reports: tReports, students: tStudents })[tab](box);
+    ({ live: b => A.attLive(b), periods: b => A.attPeriods(b), take: tTake, behavior: tBehavior, refer: tRefer, reports: tReports, students: tStudents })[tab](box);
   };
 
   async function tTake(box) {

@@ -75,17 +75,31 @@ footer{text-align:center;color:var(--faint);font-size:12px;padding:10px 16px 30p
 .more{width:100%;justify-content:center}
 .print-only{display:none}.print-head{display:none;text-align:center;border-bottom:3px solid var(--sky);padding-bottom:8px;margin-bottom:10px}.print-head img{height:56px}
 
+main{max-width:1040px}.top-in{max-width:1040px}
+.seg button{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+@media (max-width:560px){.seg{overflow-x:auto;scrollbar-width:none}.seg button{flex:0 0 auto;padding:10px 12px}}
+.ptw{overflow-x:auto;border-radius:18px;box-shadow:var(--sh1);background:#fff;border:1px solid #C9DAEE}
+.ptbl{border-collapse:separate;border-spacing:0;width:100%;min-width:720px;font-size:13px}
+.ptbl thead th{background:linear-gradient(180deg,#0A3268,var(--navy));color:#fff;padding:10px 6px;font-weight:800;position:sticky;top:0}
+.ptbl tbody th{background:#EAF1F9;color:var(--navy);padding:8px 10px;white-space:nowrap;text-align:center;border-top:1px solid var(--border)}.ptbl tbody th small{display:block;font-weight:500;color:var(--muted);font-size:11px}
+.ptbl td{border-top:1px solid #E3ECF6;border-inline-start:1px solid #E3ECF6;padding:8px;vertical-align:top;min-width:120px;line-height:1.5}.ptbl tr:nth-child(even) td{background:#FBFDFF}
+.ptbl td b{display:block;color:var(--navy)}.ptbl .tp{font-size:12.5px;color:#0b1f3a;margin-top:2px}.ptbl .hw2{font-size:12px;color:var(--warn);background:var(--warnbg);border-radius:8px;padding:2px 6px;margin-top:4px}.ptbl .hw2::before{content:"الواجب: ";font-weight:800}.ptbl .nt2{font-size:12px;color:#6B4FA3;margin-top:3px}
+.ptbl tr.today th{background:var(--sky);color:var(--navy)}.ptbl tr.today td{background:#F2FAFE}.ptbl td.holi{background:var(--warnbg);color:var(--warn);font-weight:800;text-align:center;vertical-align:middle}
+.expo{align-items:center;background:#fff;border:1px solid var(--border);border-radius:16px;padding:10px 12px;margin-top:12px;box-shadow:var(--sh1)}.expo .btn[disabled]{opacity:.55;cursor:wait}
+.hero{position:relative;overflow:hidden;background:radial-gradient(120% 160% at 100% 0,#0B4F96 0,#082B5A 60%,#061F43 100%)!important;color:#fff;border:0!important}.hero h2{color:#fff}.hero .small{color:#BFD9F2!important}.hero::after{content:"";position:absolute;inset:auto 0 0 0;height:4px;background:linear-gradient(90deg,var(--sky),var(--mid),var(--sky))}
+.ls{transition:border-color .2s,box-shadow .2s}.ls:hover{border-color:#A9C8E8;box-shadow:var(--sh2)}
+@media print{.ptw{box-shadow:none;border:0;overflow:visible}.ptbl{min-width:0}.hero{background:#fff!important;color:#082B5A}.hero h2{color:#082B5A}}
 html.lang-en body,html.lang-en input,html.lang-en select,html.lang-en textarea,html.lang-en button{font-family:'Myriad Pro','GE SS Two',Tahoma,sans-serif}
 </style>
-<script src="i18n_en.js?v=1794015443"></script>
-<script src="i18n.js?v=1794015443"></script>
+<script src="i18n_en.js?v=1794016407"></script>
+<script src="i18n.js?v=1794016407"></script>
 </head>
 <body>
 <header class="top"><div class="top-in"><img src="assets/logo_white.svg" alt="مدارس دينا العالمية"><h1>خطط أبنائي<small id="schName">مدارس دينا العالمية</small></h1></div></header>
 <main id="app"><div class="spin" role="status" aria-label="جارٍ التحميل"></div></main>
 <footer>مدارس دينا العالمية · Dinaaedu · 920035881</footer>
-<script src="live.js?v=1794015443"></script>
-<script src="config.js?v=1794015443"></script>
+<script src="live.js?v=1794016407"></script>
+<script src="config.js?v=1794016407"></script>
 <script>
 (function () {
   const C = window.APP_CONFIG, $ = s => document.querySelector(s), app = $('#app');
@@ -152,6 +166,24 @@ html.lang-en body,html.lang-en input,html.lang-en select,html.lang-en textarea,h
       ${secs.length > 1 ? `<div class="seg" role="tablist">${secs.map(s => `<button role="tab" aria-selected="${s.id === st.sec}" class="${s.id === st.sec ? 'on' : ''}" data-sec="${s.id}">${esc(s.name)}</button>`).join('')}</div>` : ''}
       <div class="grid">${st.info.classes.filter(c => c.section === st.sec).map(c => `<button class="cls" data-pick="${c.id}">${esc(c.name)}</button>`).join('')}</div></div>`;
   }
+  // جدول الأسبوع: الأيام × الحصص
+  function planTable(d, w, today, forDoc) {
+    const E = d.entries, P = Math.max(1, ...E.map(e => e.period + 1)), hol = day => (w.holidays || []).find(h => h.day === day);
+    const cell = e => `<b>${esc(e.subject)}</b>${blank(e.topic) ? '' : `<div class="tp">${esc(e.topic)}</div>`}${blank(e.homework) ? '' : `<div class="hw2">${esc(e.homework)}</div>`}${blank(e.note) ? '' : `<div class="nt2">${esc(e.note)}</div>`}`;
+    return `<table class="${forDoc ? '' : 'ptbl'}"><thead><tr><th scope="col">اليوم</th>${Array.from({ length: P }, (_, p) => `<th scope="col">${PER[p] || AR(p + 1)}</th>`).join('')}</tr></thead><tbody>${Array.from({ length: d.class.days }, (_, i) => { const x = dateOf(w.start, i), h = hol(i); return `<tr class="${iso(x) === today && !forDoc ? 'today' : ''}"><th scope="row">${DAYS[i]}<small>${dmy(x)}</small></th>${h ? `<td colspan="${P}" class="holi">${esc(h.label || 'إجازة')}</td>` : Array.from({ length: P }, (_, p) => { const l = E.filter(e => e.day === i && e.period === p); return `<td>${l.map(cell).join('') || '<span class="faint">—</span>'}</td>`; }).join('')}</tr>`; }).join('')}</tbody></table>`;
+  }
+  // محتوى التصدير حسب العرض الحالي (اليوم / الأسبوع / الواجبات)
+  function planDoc() {
+    const d = st.data, w = d.week, nm = clsName(st.cur) || d.class.name, start = dateOf(w.start, 0), end = dateOf(w.start, d.class.days - 1);
+    const css = `<style>.pd td .tp{font-size:11px;color:#0b1f3a;margin-top:2px}.pd td .hw2{font-size:11px;color:#8A5A12;background:#FFF4DC;border-radius:6px;padding:1px 4px;margin-top:3px}.pd td .hw2::before{content:"الواجب: ";font-weight:800}.pd td .nt2{font-size:10.5px;color:#6B4FA3;margin-top:2px}.pd td.holi{background:#FFF4DC;color:#8A5A12;font-weight:800}</style>`;
+    const notes = d.notes.filter(n => n.day == null);
+    const notesHtml = notes.length ? `<h2>ملاحظات وتنبيهات</h2>${notes.map(n => `<p style="margin:4px 0">${n.title ? `<b>${esc(n.title)}:</b> ` : ''}${esc(n.body)}</p>`).join('')}` : '';
+    if (st.view === 'day') { const i = st.day || 0, l = d.entries.filter(e => e.day === i).sort((a, b) => a.period - b.period), x = dateOf(w.start, i);
+      return { title: `خطة يوم ${DAYS[i]} — ${nm}`, sub: `${dmy(x)} · الأسبوع ${w.word}`, name: `خطة ${DAYS[i]} - ${nm}`, body: css + `<table class="hw"><thead><tr><th>الحصة</th><th>المادة</th><th>الدرس</th><th>الواجب</th><th>ملاحظة</th></tr></thead><tbody>${l.map(e => `<tr><td>${PER[e.period] || AR(e.period + 1)}</td><td class="k">${esc(e.subject)}</td><td>${blank(e.topic) ? '' : esc(e.topic)}</td><td>${blank(e.homework) ? '' : esc(e.homework)}</td><td>${blank(e.note) ? '' : esc(e.note)}</td></tr>`).join('') || '<tr><td colspan="5">لم تُنشر خطة هذا اليوم</td></tr>'}</tbody></table>${d.notes.filter(n => n.day === i).map(n => `<p>${n.title ? `<b>${esc(n.title)}:</b> ` : ''}${esc(n.body)}</p>`).join('')}` }; }
+    if (st.view === 'hw') { const l = d.entries.filter(e => !blank(e.homework)).sort((a, b) => a.day - b.day || a.period - b.period);
+      return { title: `واجبات الأسبوع ${w.word} — ${nm}`, sub: `${dmy(start)} : ${dmy(end)}`, name: `واجبات الأسبوع ${w.word} - ${nm}`, body: css + `<table class="hw"><thead><tr><th>اليوم</th><th>المادة</th><th>الواجب</th></tr></thead><tbody>${l.map(e => `<tr><td>${DAYS[e.day]} ${dmy(dateOf(w.start, e.day))}</td><td class="k">${esc(e.subject)}</td><td>${esc(e.homework)}</td></tr>`).join('') || '<tr><td colspan="3">لا توجد واجبات منشورة</td></tr>'}</tbody></table>` }; }
+    return { title: `الخطة الأسبوعية — ${nm}`, sub: `الأسبوع ${w.word} · ${dmy(start)} : ${dmy(end)}`, name: `الخطة الأسبوعية ${w.word} - ${nm}`, body: css + planTable(d, w, '', true) + notesHtml };
+  }
   function render() {
     if (st.adding || !st.cur) {
       app.innerHTML = (st.kids.length ? kidsBar() : '') + picker() + postsHtml(st.gposts); bindKids(); bindPosts();
@@ -161,14 +193,15 @@ html.lang-en body,html.lang-en input,html.lang-en select,html.lang-en textarea,h
       return;
     }
     const d = st.data, w = d.week;
-    const views = [['day', 'خطة اليوم'], ['week', 'الأسبوع كاملاً'], ['hw', 'الواجبات']];
+    const IG = (window.DinaLive && window.DinaLive.G) || {}, SV = (g, z) => window.DinaLive && g ? window.DinaLive.svg(g, z || 16) : '';
+    const views = [['day', 'خطة اليوم', IG.day], ['table', 'جدول الأسبوع', IG.table], ['week', 'الأسبوع كاملاً', IG.week], ['hw', 'الواجبات', IG.hw]];
     let body = '';
     if (!w) body = `<div class="card">${emptyBox('لا توجد خطة منشورة حالياً', 'ستظهر هنا فور اعتمادها من المدرسة.')}</div>`;
     else {
       const idx = d.weeks.findIndex(x => x.id === w.id), prev = d.weeks[idx - 1], next = d.weeks[idx + 1];
       const start = dateOf(w.start, 0), end = dateOf(w.start, d.class.days - 1);
       body += `<div class="wk no-print"><button class="nav" data-w="${prev ? prev.id : ''}" ${prev ? '' : 'disabled'} aria-label="الأسبوع السابق">›</button><div class="t"><b>الأسبوع ${esc(w.word)}</b><span class="small muted">${dmy(start)} : ${dmy(end)}</span></div><button class="nav" data-w="${next ? next.id : ''}" ${next ? '' : 'disabled'} aria-label="الأسبوع التالي">‹</button></div>`;
-      body += `<div class="seg no-print" role="tablist" style="margin-bottom:12px">${views.map(([k, l]) => `<button role="tab" aria-selected="${st.view === k}" class="${st.view === k ? 'on' : ''}" data-v="${k}">${l}</button>`).join('')}</div>`;
+      body += `<div class="seg no-print" role="tablist" style="margin-bottom:12px">${views.map(([k, l, g]) => `<button role="tab" aria-selected="${st.view === k}" class="${st.view === k ? 'on' : ''}" data-v="${k}">${SV(g)}<span>${l}</span></button>`).join('')}</div>`;
       body += `<div class="print-head"><img src="assets/logo.svg" alt=""><h2>${esc(d.class.name)} — الأسبوع ${esc(w.word)}</h2><div class="small">${dmy(start)} : ${dmy(end)}</div></div>`;
       const hol = day => (w.holidays || []).find(h => h.day === day);
       const today = st.data.today;
@@ -179,6 +212,8 @@ html.lang-en body,html.lang-en input,html.lang-en select,html.lang-en textarea,h
       if (st.view === 'day') {
         body += `<div class="days no-print" role="tablist">${Array.from({ length: d.class.days }, (_, i) => { const x = dateOf(w.start, i); return `<button role="tab" aria-selected="${i === st.day}" class="${i === st.day ? 'on' : ''} ${iso(x) === today ? 'today' : ''}" data-d="${i}">${DAYS[i]}<span>${dmy(x)}</span></button>`; }).join('')}</div>`;
         body += `<div class="dayhead print-only"><span class="dn">${DAYS[st.day]}</span><span class="dd">${dmy(dateOf(w.start, st.day))}</span><span class="ln"></span></div>` + dayBlock(st.day);
+      } else if (st.view === 'table') {
+        body += `<div class="ptw" role="region" aria-label="جدول الأسبوع" tabindex="0">${planTable(d, w, today)}</div><p class="small muted no-print" style="margin:6px 2px 0">مرّر الجدول أفقياً على الجوال. الواجب باللون الذهبي والملاحظة بالبنفسجي.</p>`;
       } else if (st.view === 'week') {
         for (let i = 0; i < d.class.days; i++) body += `<div class="dayhead"><span class="dn">${DAYS[i]}</span><span class="dd">${dmy(dateOf(w.start, i))}</span><span class="ln"></span></div>` + dayBlock(i);
       } else {
@@ -188,19 +223,19 @@ html.lang-en body,html.lang-en input,html.lang-en select,html.lang-en textarea,h
       }
       const extra = N.filter(n => n.day == null);
       if (extra.length && st.view !== 'hw') body += `<div class="card"><h3>ملاحظات وتنبيهات</h3>${extra.map(n => `<div class="notice">${n.title ? `<b>${esc(n.title)}</b><br>` : ''}${esc(n.body)}</div>`).join('')}</div>`;
-      body += `<div class="acts no-print"><button class="btn" id="pr">طباعة / PDF</button><button class="btn" id="sh">مشاركة الرابط</button></div>`;
+      body += `<div class="acts no-print expo"><span class="small muted">${st.view === 'day' ? 'تصدير خطة اليوم' : st.view === 'hw' ? 'تصدير الواجبات' : 'تصدير خطة الأسبوع'}:</span><button class="btn" data-ex="print">${SV(IG.print)} طباعة</button><button class="btn pri" data-ex="pdf">${SV(IG.pdf)} PDF</button><button class="btn" data-ex="png">${SV(IG.img)} صورة</button><button class="btn" id="sh">مشاركة الرابط</button></div>`;
     }
     const RK = { worksheet: 'ورقة عمل', review: 'ملف مراجعة', test: 'اختبار', presentation: 'عرض تقديمي', video: 'فيديو', folder: 'مجلد', link: 'رابط' };
     const resHtml = (st.res || []).length ? `<section class="card no-print" aria-label="مصادر للمراجعة"><h3 style="margin:0 0 8px">مصادر للمراجعة والتدريب <span class="small muted">(${AR(st.res.length)})</span></h3>${st.res.map(r => `<a class="resl" href="${esc(r.url)}" target="_blank" rel="noopener"><span class="rk">${esc(RK[r.kind] || 'رابط')}</span><span><b>${esc(r.title)}</b>${r.subject || r.note ? `<br><span class="small muted">${esc([r.subject, r.note].filter(Boolean).join(' · '))}</span>` : ''}</span></a>`).join('')}</section>` : '';
     const QK = { quiz: 'اختبار قصير', worksheet: 'ورقة عمل', homework: 'واجب إلكتروني', remedial: 'ورقة دعم' }, DN = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
     const quzHtml = (st.quz || []).length ? `<section class="card no-print" aria-label="الواجبات وأوراق العمل الإلكترونية"><h3 style="margin:0 0 8px">الواجبات وأوراق العمل الإلكترونية <span class="small muted">(${AR(st.quz.length)})</span></h3>${st.quz.map(z => `<a class="resl" href="student.html?q=${encodeURIComponent(z.code)}" target="_blank" rel="noopener"><span class="rk">${esc(QK[z.kind] || 'واجب')}</span><span><b>${esc(z.title)}</b><br><span class="small muted">${esc([z.subject, z.flex ? 'متاح طوال الفترة' : (z.day != null ? DN[z.day] : 'هذا الأسبوع')].filter(Boolean).join(' · '))}</span></span></a>`).join('')}</section>` : '';
-    const liveHtml = st.live && window.DinaLive ? (st.live.list || []).map(x => window.DinaLive.html(x, { today: st.live.today, cls: st.cur })).join('') : '';
-    app.innerHTML = kidsBar() + postsHtml(st.posts) + `<div class="card" style="padding:12px 16px"><h2 style="margin:0">${esc(clsName(st.cur) || d.class.name)}</h2><span class="small muted">الخطة المعتمدة من المدرسة · تُحدَّث تلقائياً</span></div>` + liveHtml + body + quzHtml + resHtml;
+    const liveHtml = st.live && window.DinaLive ? (st.live.list || []).map(x => window.DinaLive.html(x, { today: st.live.today, cls: st.cur, clsName: clsName(st.cur) })).join('') : '';
+    app.innerHTML = kidsBar() + postsHtml(st.posts) + `<div class="card hero" style="padding:16px 18px"><h2 style="margin:0">${esc(clsName(st.cur) || d.class.name)}</h2><span class="small">الخطة المعتمدة من المدرسة · تُحدَّث تلقائياً</span></div>` + liveHtml + body + quzHtml + resHtml;
     bindKids(); bindPosts(); if (liveHtml) window.DinaLive.bind(app);
     app.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { st.view = b.dataset.v; LS.set('view', st.view); render(); });
     app.querySelectorAll('[data-d]').forEach(b => b.onclick = () => { st.day = +b.dataset.d; render(); });
     app.querySelectorAll('[data-w]').forEach(b => b.onclick = () => { if (b.dataset.w) load(b.dataset.w); });
-    const pr = $('#pr'); if (pr) pr.onclick = () => window.print();
+    app.querySelectorAll('[data-ex]').forEach(b => b.onclick = async () => { if (!window.DinaLive || !st.data.week) return window.print(); b.disabled = true; try { const x = planDoc(); await window.DinaLive.exportDoc(b.dataset.ex, x.title, x.sub, x.body, x.name); } catch (e) { toast(e.message || 'تعذّر التصدير'); } finally { b.disabled = false; } });
     const sh = $('#sh'); if (sh) sh.onclick = async () => { const u = `${location.origin}${location.pathname}?t=${token}`; try { if (navigator.share) await navigator.share({ title: 'خطط أبنائي — مدارس دينا', url: u }); else { await navigator.clipboard.writeText(u); toast('نُسخ الرابط'); } } catch (_) { } };
   }
   // تحديث تلقائي كل دقيقة عند فتح الصفحة

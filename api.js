@@ -46,6 +46,8 @@
       saveEntry: (id, patch) => T('plan_entries').update(patch).eq('id', id).select().single().then(ok),
       submitMyWeek: w => sb.rpc('submit_my_week', { p_week: w }).then(ok),
       review: (ids, status, note) => sb.rpc('review_entries', { p_ids: ids, p_status: status, p_note: note || '' }).then(ok),
+      requestPerf: (id, task) => sb.rpc('request_perf_task', { p_id: id, p_task: task }).then(ok),
+      decideChange: (id, req, approve, note) => sb.rpc('decide_entry_change', { p_id: id, p_req: req, p_approve: approve, p_note: note || '' }).then(ok),
       notes: w => T('notes').select('*').eq('week_id', w).order('created_at').then(ok),
       addNote: n => T('notes').insert(n).select().single().then(ok),
       updateNote: (id, p) => T('notes').update(p).eq('id', id).select().single().then(ok),

@@ -65,6 +65,11 @@
   };
 
   // ---------- صفحة «المصادر» ----------
+  const POL = () => Object.assign({ review: true, auto: 'none', trusted: [], trusted_scope: 'all', parents: false }, ((S.school || {}).settings || {}).res_policy || {});
+  const polText = (p, me) => { const tr = (p.trusted || []).includes(me); const sc = { subject: 'معلمي المادة', all: 'كل المعلمين' };
+    if (tr) return `مصادرك تُشارك مباشرة مع ${sc[p.trusted_scope] || 'كل المعلمين'} (أنت ضمن الموثوقين).`;
+    if (p.auto !== 'none') return p.review ? `كل مصدر تضيفه يُشارك مباشرة مع ${sc[p.auto]} حسب إعداد المالك.` : `مصدرك خاص بك، وإذا طلبت مشاركته يُشارك مباشرة مع ${sc[p.auto]}.`;
+    return p.review ? 'كل مصدر تضيفه يصل للمالك تلقائياً «بانتظار الاعتماد»، ولا يراه زملاؤك إلا بعد موافقته.' : 'مصدرك خاص بك والمالك؛ لمشاركته اضغط «طلب مشاركة» وينتظر موافقة المالك.'; };
   const SH = { private: ['خاص بصاحبه', 'st-empty'], pending: ['بانتظار اعتماد المالك', 'st-returned'], shared: ['مشترك', 'st-approved'], rejected: ['لم تُعتمد المشاركة', 'st-returned'] };
   const SCOPE = { all: 'كل المعلمين', subject: 'معلمو المادة', people: 'أشخاص محددون' };
   const stageOf = k => String(k || '').split('|')[0] || '';
@@ -84,25 +89,26 @@
     const loadCur = async () => { CUR = st.subj && st.grade ? await api.list('curriculum', { school_id: S.school.id, subject_id: st.subj, grade_key: st.grade }, { order: 'sort' }).catch(() => []) : []; };
     await loadCur();
     const inSec = r => !st.sec || !r.section_id || r.section_id === st.sec;
-    const T = own ? { all: ['كل مصادر المدرسة', r => true], pending: ['طلبات المشاركة', r => stOf(r) === 'pending'], shared: ['المشتركة بين المعلمين', r => stOf(r) === 'shared'], private: ['الخاصة بأصحابها', r => stOf(r) !== 'shared' && stOf(r) !== 'pending'], parents: ['المعروض لأولياء الأمور', r => r.visible_to_parents], nolesson: ['بلا درس', r => !r.lesson_id && !r.prep_id] }
+    const T = own ? { all: ['كل مصادر المدرسة', r => true], pending: ['طلبات المشاركة', r => stOf(r) === 'pending' || r.parents_req], shared: ['المشتركة بين المعلمين', r => stOf(r) === 'shared'], private: ['الخاصة بأصحابها', r => stOf(r) !== 'shared' && stOf(r) !== 'pending'], parents: ['المعروض لأولياء الأمور', r => r.visible_to_parents], nolesson: ['بلا درس', r => !r.lesson_id && !r.prep_id] }
       : { mine: ['مصادري', r => r.created_by === S.me.id], shared: ['المشتركة معي', r => r.created_by !== S.me.id && vis(r)], parents: ['المعروض لأولياء الأمور', r => r.created_by === S.me.id && r.visible_to_parents] };
     if (!T[st.tab]) st.tab = Object.keys(T)[0];
     const list = () => RES.filter(r => vis(r) && inSec(r) && T[st.tab][1](r) && (!st.stage || stageOf(r.grade_key) === st.stage || !r.grade_key) && (!st.subj || r.subject_id === st.subj) && (!st.grade || !r.grade_key || r.grade_key === st.grade) && (!st.kind || r.kind === st.kind) && (!st.lesson || r.lesson_id === st.lesson) && (!st.q || A.normKey(r.title + ' ' + r.note + ' ' + (A.personName(r.created_by) || '')).includes(A.normKey(st.q))));
     const canEd = r => own || r.created_by === S.me.id;
     const card = r => { const [, kl, kc] = kindOf(r.kind); const cl = (r.class_ids || []).map(id => (A.cls(id) || {}).name).filter(Boolean); const img = r.kind === 'image'; const ss = stOf(r), mine = r.created_by === S.me.id;
       return `<div class="res">${img ? `<a href="${esc(r.url)}" target="_blank" rel="noopener" class="res-img"><img src="${esc(r.url)}" alt="${esc(r.title)}" loading="lazy"></a>` : ''}<div class="row" style="gap:4px;flex-wrap:wrap"><span class="rk" style="--k:${kc}">${kl}</span>${ORIG[r.origin] ? `<span class="pill st-submitted">${ORIG[r.origin]}</span>` : ''}${own || mine ? `<span class="pill ${SH[ss][1]}">${SH[ss][0]}${ss === 'shared' ? ' · ' + SCOPE[r.share_scope || 'all'] : ''}</span>` : ''}</div><a class="rt" href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title)}</a>
-        <div class="small muted">${esc(A.subjName(r.subject_id) || 'عام')}${r.grade_key ? ' · ' + esc(gName(r.grade_key)) : ''}${cl.length ? ' · ' + esc(cl.join('، ')) : ''}${r.visible_to_parents ? ' · <span class="pill st-approved">يظهر لأولياء الأمور</span>' : ''}</div>${r.note ? `<div class="small" style="margin-top:4px">${r.lesson_id || r.prep_id ? 'الدرس: ' : ''}${esc(r.note)}</div>` : ''}${r.share_note && (own || mine) ? `<div class="small" style="margin-top:2px;color:#B7791F">${esc(r.share_note)}</div>` : ''}
+        <div class="small muted">${esc(A.subjName(r.subject_id) || 'عام')}${r.grade_key ? ' · ' + esc(gName(r.grade_key)) : ''}${cl.length ? ' · ' + esc(cl.join('، ')) : ''}${r.visible_to_parents ? ' · <span class="pill st-approved">يظهر لأولياء الأمور</span>' : ''}${r.parents_req && (own || mine) ? ' · <span class="pill st-returned">طلب إظهار لأولياء الأمور</span>' : ''}</div>${r.note ? `<div class="small" style="margin-top:4px">${r.lesson_id || r.prep_id ? 'الدرس: ' : ''}${esc(r.note)}</div>` : ''}${r.share_note && (own || mine) ? `<div class="small" style="margin-top:2px;color:#B7791F">${esc(r.share_note)}</div>` : ''}
         <div class="rf"><span class="small faint">${esc(A.personName(r.created_by) || '')}</span><span class="row" style="gap:4px;flex-wrap:wrap">
-          ${own && ss !== 'shared' ? `<button class="btn ok sm" data-ap="${r.id}">${ss === 'pending' ? 'اعتماد ومشاركة' : 'مشاركة'}</button>` : ''}${own && ss === 'pending' ? `<button class="btn ghost sm" data-rj="${r.id}">رفض</button>` : ''}${own && ss === 'shared' ? `<button class="btn ghost sm" data-ap="${r.id}">النطاق</button><button class="btn ghost sm" data-un="${r.id}">إيقاف المشاركة</button>` : ''}
+          ${own && r.parents_req ? `<button class="btn ok sm" data-pa="${r.id}">إظهار لأولياء الأمور</button><button class="btn ghost sm" data-pr="${r.id}">رفض الإظهار</button>` : ''}${own && ss !== 'shared' ? `<button class="btn ok sm" data-ap="${r.id}">${ss === 'pending' ? 'اعتماد ومشاركة' : 'مشاركة'}</button>` : ''}${own && ss === 'pending' ? `<button class="btn ghost sm" data-rj="${r.id}">رفض</button>` : ''}${own && ss === 'shared' ? `<button class="btn ghost sm" data-ap="${r.id}">النطاق</button><button class="btn ghost sm" data-un="${r.id}">إيقاف المشاركة</button>` : ''}
           ${!own && mine && (ss === 'private' || ss === 'rejected') ? `<button class="btn ghost sm" data-rq="${r.id}">طلب مشاركة</button>` : ''}${!own && mine && ss === 'pending' ? `<button class="btn ghost sm" data-cn="${r.id}">إلغاء الطلب</button>` : ''}${!own && mine && ss === 'shared' ? `<button class="btn ghost sm" data-cn="${r.id}">إيقاف المشاركة</button>` : ''}
           ${/^data:/.test(r.url) ? '' : `<button class="btn ghost sm" data-cp="${r.id}" aria-label="نسخ الرابط">نسخ</button>`}${canEd(r) ? `<button class="btn ghost sm" data-ed="${r.id}">تعديل</button><button class="btn bad sm" data-del="${r.id}" aria-label="حذف">×</button>` : ''}</span></div></div>`; };
     const paint = () => {
-      const pend = RES.filter(r => stOf(r) === 'pending').length;
+      const pend = RES.filter(r => stOf(r) === 'pending').length; const pol = POL();
       root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>المصادر</h2><p class="sub" style="margin:2px 0 0">مخزن المواد التعليمية للمدرسة: أوراق العمل والعروض والفيديو والصور والملفات وروابط Drive، مرتّبة بالمرحلة والصف والمادة والدرس.</p></div>
-        <div class="row"><button class="btn" id="rsAdd">${I.plus} إضافة مصدر</button><button class="btn ghost" id="rsPrint">${I.print} طباعة القائمة</button></div></div>
+        <div class="row"><button class="btn" id="rsAdd">${I.plus} إضافة مصدر</button>${own ? `<button class="btn ghost" id="rsPol">إعدادات المشاركة</button>` : ''}<button class="btn ghost" id="rsPrint">${I.print} طباعة القائمة</button></div></div>
+        ${own ? `<div class="notice info" style="display:block;margin:6px 0 0">الإعداد الحالي: ${pol.auto === 'none' ? '<b>انتظار موافقتك</b>' : `<b>موافقة مباشرة</b> مع ${pol.auto === 'subject' ? 'معلمي المادة' : 'كل المعلمين'}`} · ${pol.review ? 'كل مصدر جديد يُرسل للمراجعة تلقائياً' : 'يبقى خاصاً حتى يطلب المعلم المشاركة'}${(pol.trusted || []).length ? ` · ${AR(pol.trusted.length)} معلم موثوق` : ''}${pol.parents ? ' · إظهار المصادر لأولياء الأمور بموافقتك' : ''}</div>` : `<div class="notice info" style="display:block;margin:6px 0 0">${polText(pol, S.me.id)}${pol.parents ? ' وإظهار مصدرك لأولياء الأمور يحتاج موافقة المالك.' : ''}</div>`}
         <details class="rs-how"${A.LS.get('rs_how') === '0' ? '' : ' open'}><summary><b>كيف تعمل المصادر؟</b></summary><ul>
-          <li><b>ما تضيفه خاص بك:</b> كل مصدر يضيفه المعلم — هنا أو من التحضير — يراه هو والمالك فقط.</li>
-          <li><b>المشاركة بموافقة المالك:</b> ${own ? 'يطلب المعلم المشاركة فيظهر الطلب لك في «طلبات المشاركة»، وتحدد أنت من يراه: كل المعلمين، أو معلمو المادة، أو أشخاص محددون. ويمكنك إيقافها في أي وقت.' : 'إذا أردت أن يستفيد زملاؤك اضغط «طلب مشاركة»، ولا يظهر لهم إلا بعد اعتماد المالك وبالنطاق الذي يحدده.'}</li>
+          <li><b>الإضافة تلقائية:</b> كل رابط أو ملف يضيفه المعلم — هنا أو من التحضير — يُحفظ في المصادر ويراه المالك دائماً.</li>
+          <li><b>لا يرى المعلمون مصادر بعضهم إلا بإذن المالك:</b> ${own ? 'تختار من «إعدادات المشاركة»: انتظار موافقتك لكل مصدر، أو موافقة مباشرة لمعلمي المادة أو للجميع، أو معلمين موثوقين تُشارك مصادرهم مباشرة. ولكل مصدر تحدد النطاق أو توقف مشاركته في أي وقت.' : 'المالك يحدد طريقة المشاركة؛ ' + polText(pol, S.me.id)}</li>
           <li><b>مرتبط بالدرس:</b> اختر الصف والدرس عند الإضافة فيظهر المصدر داخل تحضير ذلك الدرس، وتُضيفه للحصة بضغطة.</li>
           <li><b>أولياء الأمور:</b> لا يرون أي مصدر إلا إذا فعّلت «يظهر لأولياء الأمور» للمصدر وحددت فصوله.</li>
           <li><b>من المكتبة:</b> مصادر تحضيرات «مكتبة المدرسة» تظهر للمعلمين عند تفعيل التحضير فقط.</li></ul></details>
@@ -121,6 +127,7 @@
       $('details.rs-how', root).ontoggle = e => A.LS.set('rs_how', e.target.open ? '1' : '0');
       $$('#rsT button', root).forEach(b => b.onclick = () => { st.tab = b.dataset.t; A.LS.set('rs_t2', st.tab); paint(); });
       $('#rsAdd', root).onclick = () => edit();
+      const pb = $('#rsPol', root); if (pb) pb.onclick = () => polDlg();
       $('#rsQ', root).oninput = e => { st.q = e.target.value; draw(); };
       const sc = $('#rsSec', root); if (sc) sc.onchange = e => { st.sec = e.target.value; A.LS.set('rs_sec', st.sec); paint(); };
       $('#rsSt', root).onchange = async e => { st.stage = e.target.value; A.LS.set('rs_st', st.stage); if (st.grade && stageOf(st.grade) !== st.stage && st.stage) { st.grade = ''; A.LS.set('rs_g', ''); } st.lesson = ''; await loadCur(); paint(); };
@@ -143,11 +150,29 @@
       $$('[data-cp]', box).forEach(b => b.onclick = () => navigator.clipboard.writeText(R(b.dataset.cp).url).then(() => A.toast('نُسخ الرابط', 'ok')));
       $$('[data-ed]', box).forEach(b => b.onclick = () => edit(R(b.dataset.ed)));
       $$('[data-ap]', box).forEach(b => b.onclick = () => shareDlg(R(b.dataset.ap)));
+      $$('[data-pa]', box).forEach(b => b.onclick = () => A.run(b, async () => up(R(b.dataset.pa), { visible_to_parents: true, parents_req: false }, 'يظهر الآن لأولياء الأمور')));
+      $$('[data-pr]', box).forEach(b => b.onclick = () => A.run(b, async () => up(R(b.dataset.pr), { parents_req: false }, 'رُفض إظهاره لأولياء الأمور')));
       $$('[data-rj]', box).forEach(b => b.onclick = () => A.run(b, async () => up(R(b.dataset.rj), { share_status: 'rejected', share_note: 'لم يعتمد المالك مشاركة هذا المصدر' }, 'رُفض الطلب — يبقى المصدر خاصاً بصاحبه')));
       $$('[data-un]', box).forEach(b => b.onclick = () => A.run(b, async () => up(R(b.dataset.un), { share_status: 'private', share_note: '' }, 'أُوقفت المشاركة')));
       $$('[data-rq]', box).forEach(b => b.onclick = () => A.run(b, async () => up(R(b.dataset.rq), { share_status: 'pending', share_note: '' }, 'أُرسل طلب المشاركة للمالك')));
       $$('[data-cn]', box).forEach(b => b.onclick = () => A.run(b, async () => up(R(b.dataset.cn), { share_status: 'private', share_note: '' }, 'أصبح المصدر خاصاً بك')));
       $$('[data-del]', box).forEach(b => b.onclick = async () => { const r = R(b.dataset.del); if (!(await A.confirmBox(r.prep_id ? 'حذف هذا المصدر من المخزن؟ يبقى في التحضير الذي أُضيف منه ويعود إذا حُفظ التحضير مرة أخرى.' : 'حذف هذا المصدر؟ الملف نفسه في Drive لا يتأثر.', 'حذف', true))) return; await A.run(null, async () => { await api.deleteResource(r.id); RES = RES.filter(x => x.id !== r.id); S._resAt = 0; paint(); }); });
+    };
+    // إعدادات المشاركة (للمالك) — تُطبّقها قاعدة البيانات على كل إضافة
+    const polDlg = () => {
+      const p = POL(); const T2 = (S.staff || []).filter(x => x.active !== false && !x.is_owner).sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'ar'));
+      const m = A.modal(`<h3>إعدادات مشاركة المصادر</h3><p class="sub">أنت ترى كل المصادر دائماً. هذه الإعدادات تحدد متى يرى المعلمون مصادر بعضهم، وتُطبَّق في قاعدة البيانات على كل مصدر جديد.</p>
+        <div class="field"><label>عند إضافة المعلم مصدراً</label><label class="chk"><input type="radio" name="pv" value="1" ${p.review ? 'checked' : ''}> يُرسل إليك تلقائياً للمراجعة</label><label class="chk"><input type="radio" name="pv" value="0" ${p.review ? '' : 'checked'}> يبقى خاصاً به حتى يطلب هو المشاركة</label></div>
+        <div class="field"><label>طريقة الاعتماد</label><label class="chk"><input type="radio" name="pa" value="none" ${p.auto === 'none' ? 'checked' : ''}> انتظار موافقتي على كل مصدر <span class="small muted">(يظهر في «طلبات المشاركة»)</span></label><label class="chk"><input type="radio" name="pa" value="subject" ${p.auto === 'subject' ? 'checked' : ''}> موافقة مباشرة — يراه معلمو المادة نفسها فقط</label><label class="chk"><input type="radio" name="pa" value="all" ${p.auto === 'all' ? 'checked' : ''}> موافقة مباشرة — يراه كل المعلمين</label></div>
+        <details class="dz-det"${(p.trusted || []).length ? ' open' : ''}><summary>معلمون موثوقون <span class="small muted">— تُشارك مصادرهم مباشرة دائماً</span></summary>
+          <div class="field" style="margin-top:6px"><label for="pTs">نطاق مصادر الموثوقين</label><select class="in" id="pTs" style="width:auto"><option value="all" ${p.trusted_scope === 'all' ? 'selected' : ''}>كل المعلمين</option><option value="subject" ${p.trusted_scope === 'subject' ? 'selected' : ''}>معلمو المادة</option></select></div>
+          <div class="perm-grid" id="pTr" style="max-height:35vh;overflow:auto">${T2.map(x => `<label class="chk"><input type="checkbox" value="${x.id}" ${(p.trusted || []).includes(x.id) ? 'checked' : ''}> ${esc(x.full_name)}</label>`).join('')}</div></details>
+        <label class="chk" style="margin-top:10px"><input type="checkbox" id="pPa" ${p.parents ? 'checked' : ''}> إظهار أي مصدر لأولياء الأمور يحتاج موافقتي</label>
+        <p class="small muted">التغيير يسري على المصادر الجديدة والطلبات القادمة؛ المصادر الحالية تبقى على حالتها وتتحكم فيها من بطاقاتها.</p>
+        <div class="acts"><button class="btn ok" id="pGo">حفظ الإعدادات</button></div>`, { cls: 'wide' });
+      m.el.querySelector('#pGo').onclick = e => A.run(e.currentTarget, async () => {
+        const np = { review: m.el.querySelector('[name=pv]:checked').value === '1', auto: m.el.querySelector('[name=pa]:checked').value, trusted: $$('#pTr input:checked', m.el).map(i => i.value), trusted_scope: m.el.querySelector('#pTs').value, parents: m.el.querySelector('#pPa').checked };
+        const settings = { ...(S.school.settings || {}), res_policy: np }; const r = await api.updateSchool(S.school.id, { settings }); S.school.settings = (r && r.settings) || settings; m.close(); paint(); A.toast('حُفظت إعدادات المشاركة', 'ok'); });
     };
     // اعتماد المشاركة ونطاقها (للمالك)
     const shareDlg = r => {
@@ -176,8 +201,8 @@
             <div class="field"><label for="reS">المادة</label><select class="in" id="reS"><option value="">عام</option>${S.subjects.map(s => `<option value="${s.id}" ${r.subject_id === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>
             <div class="field"><label for="reL">الدرس (اختياري)</label><select class="in" id="reL"><option value="">—</option>${C2.map(l => `<option value="${l.id}" ${r.lesson_id === l.id ? 'selected' : ''}>${esc(l.unit ? l.unit + ' — ' : '')}${esc(l.lesson)}</option>`).join('')}</select>${!C2.length && r.subject_id && r.grade_key ? '<span class="small muted">لا توجد دروس مدخلة لهذا الصف (من «التقويم ← المنهج والدروس»).</span>' : ''}</div>
             <div class="field"><label for="reN">وصف مختصر (اختياري)</label><input class="in" id="reN" value="${esc(r.note || '')}" placeholder="مثال: تدريبات على الدرس مع الحل"></div></div>
-          <div class="sec-box" style="margin-bottom:8px">${own ? `<label class="chk"><input type="checkbox" id="reSh" ${(r._share ?? stOf(r) === 'shared') ? 'checked' : ''}> مشترك مع كل المعلمين <span class="small muted">(تحديد نطاق أدق من زر «النطاق» في البطاقة)</span></label>` : `<p class="small" style="margin:0">🔒 المصدر خاص بك والمالك. لمشاركته مع زملائك اضغط «طلب مشاركة» في بطاقته بعد الحفظ.</p>`}
-            <label class="chk"><input type="checkbox" id="reP" ${r.visible_to_parents ? 'checked' : ''}> يظهر لأولياء الأمور في بوابتهم مع خطة الأسبوع</label></div>
+          <div class="sec-box" style="margin-bottom:8px">${own ? `<label class="chk"><input type="checkbox" id="reSh" ${(r._share ?? stOf(r) === 'shared') ? 'checked' : ''}> مشترك مع كل المعلمين <span class="small muted">(تحديد نطاق أدق من زر «النطاق» في البطاقة)</span></label>` : `<p class="small" style="margin:0">🔒 ${polText(POL(), S.me.id)}</p>`}
+            <label class="chk"><input type="checkbox" id="reP" ${r.visible_to_parents || r.parents_req ? 'checked' : ''}> يظهر لأولياء الأمور في بوابتهم مع خطة الأسبوع${!own && POL().parents ? ' <span class="small muted">(بعد موافقة المالك)</span>' : ''}${r.parents_req ? ' <span class="pill st-returned">بانتظار الموافقة</span>' : ''}</label></div>
           <div class="field"><label>الفصول (اتركها كلها فارغة ليظهر للجميع)</label><div class="perm-grid">${cls.map(c => `<label class="chk"><input type="checkbox" value="${c.id}" ${(r.class_ids || []).includes(c.id) ? 'checked' : ''}> ${esc(c.name)}</label>`).join('')}</div></div>
           <div class="acts"><button class="btn" id="reGo">حفظ</button></div>`;
         q('#reU').onchange = () => { q('#reK').value = guess(q('#reU').value); };
@@ -187,9 +212,9 @@
         q('#reF').onchange = e => A.run(null, async () => { const f = e.target.files[0]; if (!f) return; if (f.size > 15e6) throw new Error('الملف أكبر من ١٥ ميجابايت'); sync(); r.url = await api.uploadAsset(f); r.file_type = f.type || ''; r.kind = guess(r.url, f.type); if (!r.title.trim()) r.title = f.name; dr(); A.toast('رُفع الملف', 'ok'); });
         q('#reGo').onclick = e => A.run(e.currentTarget, async () => {
           sync(); const url = r.url; if (!/^(https?:\/\/|data:)/i.test(url || '')) throw new Error('اكتب رابطاً يبدأ بـ https:// أو ارفع ملفاً');
-          const row = { url, title: (r.title || '').trim() || host(url) || 'مصدر', kind: r.kind, subject_id: r.subject_id || null, grade_key: r.grade_key || null, lesson_id: r.lesson_id || null, note: (r.note || '').trim(), visible_to_parents: r.visible_to_parents, class_ids: r.class_ids, file_type: r.file_type || '' };
+          const row = { url, title: (r.title || '').trim() || host(url) || 'مصدر', kind: r.kind, subject_id: r.subject_id || null, grade_key: r.grade_key || null, lesson_id: r.lesson_id || null, note: (r.note || '').trim(), visible_to_parents: r.visible_to_parents && !(r.parents_req && !own), class_ids: r.class_ids, file_type: r.file_type || '' }; if (!r.visible_to_parents) row.parents_req = false; else if (r.parents_req && !own) delete row.visible_to_parents;
           if (own) Object.assign(row, r._share ? (stOf(r) === 'shared' ? {} : { share_status: 'shared', share_scope: 'all', share_to: [] }) : { share_status: 'private' });
-          if (r.id) { const x = await api.updateResource(r.id, row); Object.assign(r, x); } else RES.unshift(await api.addResource({ ...row, origin: 'manual', section_id: S.sectionId, school_id: S.school.id, ...(own ? {} : { share_status: 'private' }) }));
+          if (r.id) { const x = await api.updateResource(r.id, row); Object.assign(r, x); } else RES.unshift(await api.addResource({ ...row, origin: 'manual', section_id: S.sectionId, school_id: S.school.id }));
           m.close(); S._resAt = 0; paint(); A.toast('حُفظ المصدر', 'ok');
         });
       };

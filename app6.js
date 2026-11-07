@@ -5,21 +5,42 @@
 
   // ---------- أدوات مشتركة ----------
   const xlsx = (name, sheets) => { const wb = XLSX.utils.book_new(); sheets.forEach(([n, rows]) => { const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{}]); ws['!views'] = [{ RTL: true }]; Object.keys(ws).forEach(k => { const c = ws[k]; if (k[0] !== '!' && c && typeof c.v === 'string') { const u = c.v.match(/https?:\/\/[^\s،]+/); if (u) c.l = { Target: u[0], Tooltip: 'فتح الرابط' }; } }); XLSX.utils.book_append_sheet(wb, ws, n.slice(0, 31)); }); wb.Workbook = { Views: [{ RTL: true }] }; XLSX.writeFile(wb, name + '.xlsx'); };
+  // طباعة وPDF بهوية دينا: شريط عنوان كحلي بالشعار الأبيض، بطاقات ومؤشرات ملوّنة كما في الشاشة، رؤوس جداول تتكرر، وشريط سفلي في كل صفحة
   function printDoc(title, sub, bodyHtml, land) {
     const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;left:-9999px;width:1100px;height:800px;border:0'; document.body.appendChild(f);
     const base = location.href.replace(/[^/]*$/, '').split('#')[0];
+    const now = new Date(), dt = now.toLocaleDateString('ar-SA-u-ca-gregory', { day: 'numeric', month: 'long', year: 'numeric' });
+    const by = (S.me && S.me.full_name) || '';
     f.contentDocument.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><base href="${base}"><title>${esc(title)}</title><style>
-      @font-face{font-family:'GE SS Two';font-weight:400 500;src:url(fonts/gess-two-medium.woff2)}@font-face{font-family:'GE SS Two';font-weight:600 900;src:url(fonts/gess-two-bold.woff2)}@font-face{font-family:'Myriad Pro';src:url(fonts/myriad-pro-regular.woff2)}
-      @page{size:A4 ${land ? 'landscape' : 'portrait'};margin:14mm 12mm}body{font-family:'GE SS Two','Myriad Pro',sans-serif;color:#082B5A;margin:0}
-      header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #3AB1DB;padding-bottom:10px;margin-bottom:14px}header img{height:58px}
-      h1{margin:0;font-size:22px;font-weight:800}p.s{margin:4px 0 0;color:#005499;font-size:13px}
-      table{width:100%;border-collapse:collapse;font-size:12px}th{background:#082B5A;color:#fff;padding:7px;font-weight:800}td{border-bottom:1px solid #84B7E3;padding:6px;text-align:center;vertical-align:top}
-      tr:nth-child(even) td{background:#E4EBF5}.k{display:inline-block;border:1px solid #84B7E3;border-radius:12px;padding:8px 14px;margin:0 0 10px 8px}.k b{display:block;font-size:20px}
-      footer{margin-top:16px;border-top:2px solid #082B5A;padding-top:6px;font-size:11px;display:flex;justify-content:space-between}</style></head><body>
-      <header><div><h1>${esc(title)}</h1><p class="s">${esc(sub)}</p></div><img src="assets/logo.svg"></header>${bodyHtml}
-      <footer><span>${esc(S.school.name)}</span><span dir="ltr">Dinaaedu · 920035881</span></footer></body></html>`);
+      @font-face{font-family:'GE SS Two';font-weight:300;src:url(fonts/gess-two-light.woff2)}@font-face{font-family:'GE SS Two';font-weight:400 500;src:url(fonts/gess-two-medium.woff2)}@font-face{font-family:'GE SS Two';font-weight:600 900;src:url(fonts/gess-two-bold.woff2)}@font-face{font-family:'Myriad Pro';src:url(fonts/myriad-pro-regular.woff2)}
+      @page{size:A4 ${land ? 'landscape' : 'portrait'};margin:10mm 10mm 15mm;@bottom-right{content:'${esc(S.school.name || 'مدارس دينا العالمية')} · رحلتهم الكبرى… تبدأ من هنا';font-family:'GE SS Two';font-size:8.5pt;color:#005499;border-top:2px solid #3AB1DB;vertical-align:middle}@bottom-left{content:'Dinaaedu · 920035881   |   ' counter(page) ' / ' counter(pages);font-family:'GE SS Two';font-size:8.5pt;color:#082B5A;border-top:2px solid #3AB1DB;vertical-align:middle;direction:ltr}}
+      *{-webkit-print-color-adjust:exact;print-color-adjust:exact;box-sizing:border-box}
+      body{font-family:'GE SS Two','Myriad Pro',sans-serif;color:#082B5A;margin:0;font-size:12px}
+      .dz-hero{position:relative;overflow:hidden;border-radius:18px;background:linear-gradient(135deg,#082B5A 0%,#0B3F7E 55%,#005499 100%);color:#fff;padding:18px 24px;display:flex;align-items:center;gap:18px;margin-bottom:14px}
+      .dz-hero:before{content:'';position:absolute;inset:auto auto -40px -40px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(58,177,219,.35),transparent 70%)}
+      .dz-hero .dots{position:absolute;left:18px;top:14px;width:70px;height:46px;background-image:radial-gradient(circle,rgba(58,177,219,.7) 2.4px,transparent 3px);background-size:14px 14px;opacity:.8}
+      .dz-hero img{height:62px;position:relative}.dz-hero .t{flex:1;position:relative;border-inline-start:3px solid #3AB1DB;padding-inline-start:16px}
+      .dz-hero h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.2px}.dz-hero p{margin:5px 0 0;color:#BFE3F4;font-size:12.5px}
+      .dz-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.dz-meta span{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:99px;padding:2px 10px;font-size:10.5px;color:#fff}
+      .dz-star{position:absolute;left:110px;bottom:12px;width:16px;height:16px;opacity:.9}
+      h2,h3{color:#082B5A;break-after:avoid}h3,.rp-h{font-size:14px;margin:16px 0 8px;border-inline-start:4px solid #3AB1DB;padding-inline-start:8px}
+      table{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;margin:4px 0 8px;border:1px solid #CFE0F2;border-radius:12px;overflow:hidden}
+      thead{display:table-header-group}tr{break-inside:avoid}
+      th{background:#082B5A;color:#fff;padding:7px 6px;font-weight:800;text-align:center}tbody th{background:#E4EBF5;color:#082B5A;text-align:start}
+      td{border-top:1px solid #E1EAF5;padding:6px;text-align:center;vertical-align:middle}tbody tr:nth-child(even) td{background:#F6F9FD}
+      .k{display:inline-block;border:1px solid #CFE0F2;border-radius:14px;padding:8px 14px;margin:0 0 10px 8px;background:linear-gradient(180deg,#fff,#F3F8FD);box-shadow:inset 0 -3px 0 #3AB1DB}.k b{display:block;font-size:20px;color:#082B5A}
+      .scroll{overflow:visible!important}.muted{color:#6A7F9C}.small{font-size:10.5px}.pill{display:inline-block;background:#E4EBF5;border-radius:99px;padding:1px 8px;font-size:10px}
+      .dz-foot{position:fixed;bottom:-11mm;left:0;right:0;height:9mm;display:flex;align-items:center;justify-content:space-between;font-size:9.5px;color:#fff;background:linear-gradient(90deg,#3AB1DB,#005499);border-radius:8px;padding:0 12px}
+      .dz-foot b{font-weight:800}.dz-wm{position:fixed;left:6mm;bottom:2mm;width:110px;opacity:.05;z-index:-1}
+      .grid{display:grid;gap:12px}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}
+    </style></head><body>
+      <img class="dz-wm" src="assets/mark.svg" alt="">
+      <div class="dz-hero"><span class="dots"></span><svg class="dz-star" viewBox="0 0 40 40"><path d="M20 2l4 14 14 4-14 4-4 14-4-14-14-4 14-4z" fill="#BADF93"/></svg><div class="t"><h1>${esc(title)}</h1><p>${esc(sub)}</p><div class="dz-meta"><span>${esc(dt)}</span>${by ? `<span>أعدّه: ${esc(by)}</span>` : ''}<span>منصة دينا للتخطيط الدراسي</span></div></div><img src="assets/logo_white.svg" alt="مدارس دينا العالمية"></div>
+      ${bodyHtml}
+      </body></html>`);
     f.contentDocument.close();
-    setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 3000); }, 700);
+    const go = () => { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 3000); };
+    try { f.contentDocument.fonts.ready.then(() => setTimeout(go, 350)); } catch (_) { setTimeout(go, 900); }
   }
   A.printDoc = printDoc;
   const weeksPicker = (id, def = 4) => `<div class="field"><label>الأسابيع</label><div class="perm-grid" id="${id}">${S.weeks.slice().sort((a, b) => b.number - a.number).map((w, i) => `<label class="chk"><input type="checkbox" value="${w.id}" ${i < def ? 'checked' : ''}> الأسبوع ${esc(w.word)}${w.archived ? ' (أرشيف)' : ''}</label>`).join('')}</div></div>`;

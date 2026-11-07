@@ -1,0 +1,83 @@
+/* منصة دينا — متابعة الواجبات (للمالك ومن له صلاحية المراجعة)
+   الحِمل اليومي لكل فصل مع حدّ قابل للضبط، وواجبات كل معلم ونسبتها وأنواعها، والواجبات الإلكترونية وتسليماتها، وقائمة كاملة قابلة للتصفية والتصدير.
+   قراءة فقط: لا يغيّر شيئاً مما أدخله المعلمون. */
+(function () {
+  const A = window.APP, V = window.VIEWS; if (!A) return;
+  const { S, api, $, $$, esc, AR, DAYS } = A;
+  A.I.hwf = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12a4 4 0 0 1 4 4v12H8a4 4 0 0 1-4-4z"/><path d="M8 9h8M8 13h5"/><path d="M15 16l1.5 1.5L20 14"/></svg>';
+  const ok = () => !!(S.me && !S.realMe && (S.me.is_owner || (A.anyPerm && A.anyPerm('review'))));
+  if (A.NAV && !A.NAV.some(n => n[0] === 'hwf')) { const i = A.NAV.findIndex(n => n[0] === 'dash'); A.NAV.splice(i < 0 ? A.NAV.length : i + 1, 0, ['hwf', 'متابعة الواجبات', ok]); }
+  const hasHw = e => { const h = (e.homework || '').trim(); return !!h && !/^[-–—.\s]+$/.test(h) && !/^لا يوجد|^بدون/.test(h); };
+  const pct = (a, b) => b ? Math.round(a * 100 / b) : 0;
+  const tone = p => p >= 85 ? 'ok' : p >= 60 ? 'mid' : p > 0 ? 'low' : 'zero';
+  const HW_CSS = `.hf-kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:10px 0}.hf-kpi .k{border:1px solid #DCE7F3;border-radius:14px;padding:10px 12px;background:linear-gradient(180deg,#fff,#F5F9FD);font-size:12.5px;color:#4D6A8F;box-shadow:inset 0 -3px 0 #3AB1DB}.hf-kpi .k b{display:block;font-size:22px;color:#082B5A}.hf-kpi .k.bad{box-shadow:inset 0 -3px 0 #C0392B}.hf-kpi .k.bad b{color:#C0392B}.hf-kpi .k.ok b{color:#1F7A4A}
+.hf-h{margin:16px 0 8px;font-size:15px;color:#082B5A;border-inline-start:4px solid #3AB1DB;padding-inline-start:8px}
+.hf-m td{text-align:center;font-weight:800;min-width:64px;cursor:pointer}.hf-m td small{display:block;font-weight:500;font-size:10.5px;opacity:.75}.hf-m .c0{background:#F5F7FA;color:#9AA9BC}.hf-m .c1{background:#E3F3E9;color:#1F6B44}.hf-m .c2{background:#FFF3D6;color:#8A5A12}.hf-m .c3{background:#FDE2DE;color:#B23A2B}.hf-m tbody th{white-space:nowrap}
+.hf-bar{display:inline-flex;align-items:center;gap:6px;min-width:110px;color:#1F7A4A}.hf-bar.mid{color:#D99A1E}.hf-bar.low,.hf-bar.zero{color:#C0392B}.hf-bar i{display:block;height:8px;border-radius:8px;background:currentColor;flex:none;max-width:70px}.hf-bar b{color:#082B5A;font-size:12.5px}
+.hf-tx{max-width:380px;text-align:start!important;line-height:1.55}.hf-ty{display:flex;flex-wrap:wrap;gap:3px;justify-content:center}.hf-ty span{background:#E4EBF5;color:#005499;border-radius:99px;padding:1px 8px;font-size:11px}.hf-ty span.e{background:#E6F5FB;color:#0E7490}
+.hf-bl{display:grid;gap:6px}.hf-bl div{display:grid;grid-template-columns:150px 1fr 40px;align-items:center;gap:8px;font-size:13px}.hf-bl i{display:block;height:12px;border-radius:8px;background:linear-gradient(90deg,#3AB1DB,#005499)}.hf-bl b{color:#082B5A}`;
+  const css = document.createElement('style'); css.textContent = HW_CSS + `.hf-f{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:8px 0}.hf-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.hf-tabs button{border:1px solid #CFE0F2;background:#fff;border-radius:12px;padding:8px 14px;font:inherit;font-weight:800;color:#082B5A;cursor:pointer;min-height:42px}.hf-tabs button.on{background:#082B5A;color:#fff;border-color:#082B5A;box-shadow:0 3px 0 #3AB1DB}@media(max-width:640px){.hf-bl div{grid-template-columns:110px 1fr 34px}}`; document.head.appendChild(css);
+
+  V.hwf = async function (root) {
+    if (!ok()) { root.innerHTML = `<div class="card">${A.emptyBox('هذه الصفحة للمالك ومن له صلاحية المراجعة')}</div>`; return; }
+    const wk = A.week(); if (!wk) { root.innerHTML = `<div class="card">${A.emptyBox('لا يوجد أسبوع محدد')}</div>`; return; }
+    root.innerHTML = '<div class="card"><div class="spinner"></div></div>';
+    const st = Object.assign({ tab: 'load', max: 3, cls: '', tch: '', day: '', q: '' }, (() => { try { return JSON.parse(A.LS.get('hwf') || '{}'); } catch (_) { return {}; } })());
+    const save = () => A.LS.set('hwf', JSON.stringify(st));
+    const isT = id => A.isTestStaff && A.isTestStaff(id);
+    const CL = (S.classes || (S.allClasses || []).filter(c => c.section_id === S.sectionId)).filter(c => c.active !== false && !c.is_test).sort((a, b) => (a.sort || 0) - (b.sort || 0));
+    const days = Array.from({ length: (A.section() || {}).days || 5 }, (_, i) => i).filter(d => !(wk.holidays || []).some(h => +h.day === d));
+    const [ES, PR, QZ] = await Promise.all([api.entriesForWeeks([wk.id]).catch(() => []), api.list('lesson_preps', { school_id: S.school.id }).catch(() => []), api.list('quizzes', { week_id: wk.id }).catch(() => [])]);
+    const QA = (QZ || []).length ? ((await api.list('quiz_attempts', { quiz_id: QZ.map(z => z.id) }).catch(() => [])) || []) : [];
+    const E = (ES || []).filter(e => e.subject_id && e.teacher_id && !isT(e.teacher_id) && CL.some(c => c.id === e.class_id) && days.includes(e.day));
+    const prepOf = new Map(); (PR || []).forEach(p => ((p.data || {}).links || []).forEach(l => { if (l.w === wk.id && l.e) prepOf.set(l.e, p); }));
+    const typesOf = e => { const p = prepOf.get(e.id); return ((((p || {}).data || {}).hw || {}).types) || []; };
+    const qtOf = e => { const p = prepOf.get(e.id); return ((((p || {}).data || {}).hw || {}).q) || []; };
+    const HW = E.filter(hasHw);
+    const eq = (QZ || []).filter(z => z.status !== 'archived');
+    const attOf = z => QA.filter(a => a.quiz_id === z.id);
+    const cName = c => (CL.find(x => x.id === c) || {}).name || '';
+
+    const draw = () => {
+      // الحمل اليومي
+      const load = {}; CL.forEach(c => days.forEach(d => { load[c.id + '|' + d] = HW.filter(e => e.class_id === c.id && e.day === d).length + eq.filter(z => (z.class_ids || []).includes(c.id) && +z.day === d && z.kind === 'homework').length; }));
+      const over = Object.entries(load).filter(([, n]) => n > st.max);
+      const tIds = [...new Set(E.map(e => e.teacher_id))];
+      const T = tIds.map(t => { const x = E.filter(e => e.teacher_id === t), h = x.filter(hasHw), z = eq.filter(q => q.teacher_id === t), at = z.flatMap(attOf);
+        const ty = new Set(), qt = new Set(); h.forEach(e => { typesOf(e).forEach(v => ty.add(v)); qtOf(e).forEach(v => qt.add(v)); }); if (z.length) ty.add('واجب إلكتروني');
+        return { t, name: A.personName(t), n: x.length, h: h.length, p: pct(h.length, x.length), ty: [...ty], qt: [...qt], z: z.length, at: at.length, avg: at.length ? Math.round(at.reduce((a, r) => a + (r.max_score ? r.score * 100 / r.max_score : 0), 0) / at.length) : null }; }).sort((a, b) => b.p - a.p);
+      const noHw = T.filter(r => !r.h && !r.z);
+      const cnt = f => { const m = {}; HW.forEach(e => f(e).forEach(v => { m[v] = (m[v] || 0) + 1; })); return Object.entries(m).sort((a, b) => b[1] - a[1]); };
+      const byT = cnt(typesOf), byQ = cnt(qtOf);
+      const bar = p => `<span class="hf-bar ${tone(p)}"><i style="width:${p}%"></i><b>${AR(p)}٪</b></span>`;
+      const bars = l => l.length ? `<div class="hf-bl">${l.map(([k, v]) => `<div><span>${esc(k)}</span><i style="width:${pct(v, l[0][1])}%"></i><b>${AR(v)}</b></div>`).join('')}</div>` : '<p class="small muted">تظهر عندما يحدد المعلمون نوع الواجب وأنواع أسئلته في خانة الواجب بالتحضير.</p>';
+      const kpi = `<div class="hf-kpi"><div class="k"><b>${AR(HW.length)} / ${AR(E.length)}</b>حصص بواجب (${AR(pct(HW.length, E.length))}٪)</div><div class="k"><b>${AR(eq.length)}</b>واجب / اختبار إلكتروني</div><div class="k"><b>${AR(QA.length)}</b>تسليم إلكتروني</div><div class="k ${over.length ? 'bad' : 'ok'}"><b>${AR(over.length)}</b>يوم فصل فوق الحد (${AR(st.max)})</div><div class="k ${noHw.length ? 'bad' : 'ok'}"><b>${AR(noHw.length)}</b>معلم بلا واجبات</div><div class="k"><b>${AR(byT.length)}</b>نوع واجب مستخدم</div></div>`;
+      let body = '';
+      if (st.tab === 'load') body = `<h3 class="hf-h">الحِمل اليومي لكل فصل — الحد ${AR(st.max)} واجبات في اليوم</h3><div class="scroll"><table class="tbl hf-m"><thead><tr><th>الفصل</th>${days.map(d => `<th>${DAYS[d]}</th>`).join('')}<th>الأسبوع</th></tr></thead><tbody>${CL.map(c => { const tot = days.reduce((a, d) => a + load[c.id + '|' + d], 0); return `<tr><th>${esc(c.name)}</th>${days.map(d => { const n = load[c.id + '|' + d]; return `<td class="c${n === 0 ? 0 : n <= st.max - 1 ? 1 : n === st.max ? 2 : 3}" data-cd="${c.id}|${d}" title="اضغط للتفاصيل">${AR(n)}</td>`; }).join('')}<td><b>${AR(tot)}</b></td></tr>`; }).join('')}</tbody></table></div>
+        <p class="small muted">أخضر: ضمن الحد · أصفر: عند الحد · أحمر: فوق الحد · رمادي: بلا واجب. يشمل الواجبات المكتوبة في الخطة والواجبات الإلكترونية المحددة لليوم.</p>
+        <div class="grid g2" style="align-items:start"><div><h3 class="hf-h">تنويع الواجبات</h3>${bars(byT)}</div><div><h3 class="hf-h">أنواع الأسئلة</h3>${bars(byQ)}</div></div>`;
+      else if (st.tab === 'tch') body = `<h3 class="hf-h">المعلمون — ${esc('الأسبوع ' + (wk.word || AR(wk.number)))}</h3><div class="scroll"><table class="tbl"><thead><tr><th>المعلم</th><th>الحصص</th><th>بواجب</th><th>النسبة</th><th>أنواع الواجب</th><th>أنواع الأسئلة</th><th>إلكترونية</th><th>تسليمات</th><th>متوسط الدرجة</th></tr></thead><tbody>${T.map(r => `<tr data-ht="${r.t}" style="cursor:pointer"><th>${esc(r.name)}</th><td>${AR(r.n)}</td><td>${AR(r.h)}</td><td>${bar(r.p)}</td><td><div class="hf-ty">${r.ty.map(v => `<span class="${v === 'واجب إلكتروني' ? 'e' : ''}">${esc(v)}</span>`).join('') || '<span class="muted">—</span>'}</div></td><td><div class="hf-ty">${r.qt.map(v => `<span>${esc(v)}</span>`).join('') || '<span class="muted">—</span>'}</div></td><td>${AR(r.z)}</td><td>${AR(r.at)}</td><td>${r.avg == null ? '—' : AR(r.avg) + '٪'}</td></tr>`).join('')}</tbody></table></div>`;
+      else { const L = HW.filter(e => (!st.cls || e.class_id === st.cls) && (!st.tch || e.teacher_id === st.tch) && (st.day === '' || e.day === +st.day) && (!st.q || (e.homework + ' ' + A.subjName(e.subject_id)).includes(st.q))).sort((a, b) => a.day - b.day || cName(a.class_id).localeCompare(cName(b.class_id), 'ar') || a.period - b.period);
+        body = `<div class="hf-f"><select class="in" id="hfC"><option value="">كل الفصول</option>${CL.map(c => `<option value="${c.id}" ${st.cls === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select><select class="in" id="hfT"><option value="">كل المعلمين</option>${tIds.map(t => `<option value="${t}" ${st.tch === t ? 'selected' : ''}>${esc(A.personName(t))}</option>`).join('')}</select><select class="in" id="hfD"><option value="">كل الأيام</option>${days.map(d => `<option value="${d}" ${String(st.day) === String(d) ? 'selected' : ''}>${DAYS[d]}</option>`).join('')}</select><input class="in" id="hfQ" placeholder="بحث في الواجبات" value="${esc(st.q)}"></div>
+          <h3 class="hf-h">قائمة الواجبات (${AR(L.length)})</h3><div class="scroll"><table class="tbl"><thead><tr><th>اليوم</th><th>الفصل</th><th>المادة</th><th>المعلم</th><th>الواجب</th><th>النوع</th></tr></thead><tbody>${L.map(e => `<tr><td>${DAYS[e.day]}</td><td>${esc(cName(e.class_id))}</td><td>${esc(A.subjName(e.subject_id))}</td><td>${esc(A.personName(e.teacher_id))}</td><td class="hf-tx">${esc(e.homework)}</td><td><div class="hf-ty">${typesOf(e).map(v => `<span>${esc(v)}</span>`).join('')}</div></td></tr>`).join('') || `<tr><td colspan="6">${A.emptyBox('لا توجد واجبات بهذا الاختيار')}</td></tr>`}</tbody></table></div>
+          ${eq.length ? `<h3 class="hf-h">الواجبات والاختبارات الإلكترونية</h3><div class="scroll"><table class="tbl"><thead><tr><th>العنوان</th><th>النوع</th><th>المعلم</th><th>الفصول</th><th>اليوم</th><th>التسليمات</th></tr></thead><tbody>${eq.map(z => `<tr><td>${esc(z.title || '')}</td><td>${z.kind === 'homework' ? 'واجب' : 'اختبار'}</td><td>${esc(A.personName(z.teacher_id))}</td><td>${esc((z.class_ids || []).map(cName).filter(Boolean).join('، '))}</td><td>${z.day != null ? DAYS[z.day] : '—'}</td><td>${AR(attOf(z).length)}</td></tr>`).join('')}</tbody></table></div>` : ''}`; }
+      root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2 style="margin:0">متابعة الواجبات — الأسبوع ${esc(wk.word || AR(wk.number))}</h2><p class="sub" style="margin:2px 0 0">${esc(A.section().name)} · غيّر الأسبوع أو القسم من القائمة العلوية.</p></div>
+        <label class="small">الحد اليومي <select class="in" id="hfMax" style="width:auto">${[2, 3, 4, 5, 6].map(n => `<option ${st.max === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label><button class="btn ghost sm" id="hfX">Excel</button><button class="btn ghost sm" id="hfP">طباعة / PDF</button></div>
+        ${kpi}<div class="hf-tabs" role="tablist">${[['load', 'الحِمل اليومي'], ['tch', 'المعلمون'], ['list', 'قائمة الواجبات']].map(([k, l]) => `<button role="tab" data-tb="${k}" class="${st.tab === k ? 'on' : ''}" aria-selected="${st.tab === k}">${l}</button>`).join('')}</div><div id="hfB">${body}</div></div>`;
+      $$('[data-tb]', root).forEach(b => b.onclick = () => { st.tab = b.dataset.tb; save(); draw(); });
+      $('#hfMax', root).onchange = e => { st.max = +e.target.value; save(); draw(); };
+      $$('[data-cd]', root).forEach(td => td.onclick = () => { const [c, d] = td.dataset.cd.split('|'); const l = HW.filter(e => e.class_id === c && e.day === +d), z = eq.filter(q => (q.class_ids || []).includes(c) && +q.day === +d && q.kind === 'homework');
+        A.modal(`<h3>واجبات ${esc(cName(c))} — ${DAYS[+d]}</h3><div class="scroll"><table class="tbl"><thead><tr><th>المادة</th><th>المعلم</th><th>الواجب</th></tr></thead><tbody>${l.map(e => `<tr><td>${esc(A.subjName(e.subject_id))}</td><td>${esc(A.personName(e.teacher_id))}</td><td class="hf-tx">${esc(e.homework)}</td></tr>`).join('')}${z.map(q => `<tr><td>${esc(A.subjName(q.subject_id) || '')}</td><td>${esc(A.personName(q.teacher_id))}</td><td class="hf-tx">واجب إلكتروني: ${esc(q.title || '')}</td></tr>`).join('')}</tbody></table></div>${!l.length && !z.length ? A.emptyBox('لا واجبات') : ''}`, { cls: 'wide' }); });
+      $$('[data-ht]', root).forEach(tr => tr.onclick = () => { st.tab = 'list'; st.tch = tr.dataset.ht; save(); draw(); });
+      const f = (s, k, ev = 'onchange') => { const el = $(s, root); if (el) el[ev] = () => { st[k] = el.value; save(); draw(); if (k === 'q') { const q = $('#hfQ', root); q.focus(); q.setSelectionRange(q.value.length, q.value.length); } }; };
+      f('#hfC', 'cls'); f('#hfT', 'tch'); f('#hfD', 'day'); f('#hfQ', 'q', 'oninput');
+      $('#hfX', root).onclick = () => { if (!window.XLSX) return; const wb = XLSX.utils.book_new(); const add = (n, rows) => { const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{}]); ws['!views'] = [{ RTL: true }]; XLSX.utils.book_append_sheet(wb, ws, n); };
+        add('الحمل اليومي', CL.map(c => Object.assign({ 'الفصل': c.name }, Object.fromEntries(days.map(d => [DAYS[d], load[c.id + '|' + d]])), { 'الأسبوع': days.reduce((a, d) => a + load[c.id + '|' + d], 0) })));
+        add('المعلمون', T.map(r => ({ 'المعلم': r.name, 'الحصص': r.n, 'بواجب': r.h, 'النسبة %': r.p, 'أنواع الواجب': r.ty.join('، '), 'أنواع الأسئلة': r.qt.join('، '), 'إلكترونية': r.z, 'تسليمات': r.at, 'متوسط الدرجة %': r.avg == null ? '' : r.avg })));
+        add('الواجبات', HW.map(e => ({ 'اليوم': DAYS[e.day], 'الفصل': cName(e.class_id), 'المادة': A.subjName(e.subject_id), 'المعلم': A.personName(e.teacher_id), 'الواجب': e.homework, 'النوع': typesOf(e).join('، '), 'أنواع الأسئلة': qtOf(e).join('، ') })));
+        wb.Workbook = { Views: [{ RTL: true }] }; XLSX.writeFile(wb, `متابعة الواجبات - ${A.section().name} - الأسبوع ${wk.word || wk.number}.xlsx`); };
+      $('#hfP', root).onclick = () => { const B = $('#hfB', root).cloneNode(true); $$('.hf-f', B).forEach(x => x.remove()); A.printDoc('متابعة الواجبات', `${A.section().name} · الأسبوع ${wk.word || AR(wk.number)} · ${[['load', 'الحِمل اليومي'], ['tch', 'المعلمون'], ['list', 'قائمة الواجبات']].find(x => x[0] === st.tab)[1]}`, `<style>${HW_CSS}</style>${kpi}${B.innerHTML}`, true); };
+    };
+    draw();
+  };
+})();

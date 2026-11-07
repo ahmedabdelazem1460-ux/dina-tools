@@ -4,13 +4,14 @@
   const A = window.APP, V = window.VIEWS, { S, $, $$, esc, AR, I } = A;
   A.I.home = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>';
   const GROUPS = [
-    ['التخطيط والمتابعة', ['my', 'classes', 'dash', 'export', 'weeks', 'reports']],
+    ['التخطيط والمتابعة', ['my', 'classes', 'dash', 'hwf', 'export', 'weeks', 'reports']],
     ['الجداول والأنصبة', ['studio', 'timetable', 'nisab', 'plan', 'builder']],
     ['التقويم والتعلّم', ['prep', 'assess', 'games', 'labs', 'wboard', 'paper', 'analysis', 'records', 'resources']],
     ['الطلاب والإشراف', ['board', 'duty', 'attendance', 'stucodes', 'supervision', 'myreports', 'posts']],
     ['الإدارة', ['admin', 'roles', 'tui', 'testt', 'activity', 'archive', 'trash', 'dev']],
   ];
   const DESC = {
+    hwf: 'متابعة الواجبات: الحِمل اليومي لكل فصل، وواجبات كل معلم وأنواعها، والواجبات الإلكترونية وتسليماتها.',
     my: 'أدخل خطتك الأسبوعية لكل حصة وأرسلها للمراجعة.', classes: 'خطة كل فصل أسبوعياً مع الاعتماد والإرجاع والمعاينة.', dash: 'نسب الإنجاز والإرسال والاعتماد لكل فصل ومعلم.', export: 'ملفات PDF وWord للخطة بهوية دينا.', weeks: 'الأسابيع والمواعيد والإجازات.', reports: 'تقارير الالتزام والإنجاز والتنفيذ والتعديلات.',
     studio: 'استوديو الجداول: النصاب والتوزيع والتوليد والاعتماد في مكان واحد.', timetable: 'الجدول المعتمد لكل قسم وإسناد المعلمين.', nisab: 'احتساب النصاب واحتياج المعلمين.', plan: 'توزيع الحصص بقيود مرنة وتوليد آلي.', builder: 'بناء الجدول آلياً.',
     prep: 'تحضير الدروس بالمولّد الآلي، ومكتبة المدرسة، والإدراج في الخطة.', assess: 'الاختبارات الورقية والإلكترونية: أوراق تظليل وتصحيح آلي، بنك أسئلة، تحليل ولجان وخطط علاجية.', paper: 'اختبارات ورقية بأوراق تظليل وتصحيح آلي وتحليل ومشاركة.', analysis: 'تحليل نتائج الاختبارات.', records: 'سجل متابعة الطلاب بغلاف دينا وحفظ سحابي.', resources: 'مكتبة المصادر وأوراق العمل وروابط Drive.',

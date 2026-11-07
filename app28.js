@@ -18,13 +18,14 @@
   // ---------------- محرّك الترحيل ----------------
   // src: [{c,d,p,s,t,sn,tn}] · o: {days:[], exclude:Set(sKey), cap:d=>N}
   function rearrange(src, o) {
+    const isEx = x => o.excl ? o.excl(x) : o.exclude.has(sKey(x)); // o.excl: استبعاد حسب المادة والمرحلة
     const out = [], dropped = [], removed = {}, gaps = [], removedItems = [];
     let moved = 0;
-    const wk = {}; src.forEach(x => { if (!sKey(x) || o.exclude.has(sKey(x))) return; const k = x.c + '|' + sKey(x); wk[k] = (wk[k] || 0) + 1; });
-    src.forEach(x => { if (sKey(x) && o.exclude.has(sKey(x)) && o.days.includes(x.d)) { removed[sName(x)] = (removed[sName(x)] || 0) + 1; removedItems.push({ c: x.c, s: x.s || null, sn: x.sn || '', t: x.t || null, tn: x.tn || '', why: 'removed' }); } });
+    const wk = {}; src.forEach(x => { if (!sKey(x) || isEx(x)) return; const k = x.c + '|' + sKey(x); wk[k] = (wk[k] || 0) + 1; });
+    src.forEach(x => { if (sKey(x) && isEx(x) && o.days.includes(x.d)) { removed[sName(x)] = (removed[sName(x)] || 0) + 1; removedItems.push({ c: x.c, s: x.s || null, sn: x.sn || '', t: x.t || null, tn: x.tn || '', why: 'removed' }); } });
     for (const d of o.days) {
       const N = Math.max(1, o.cap(d));
-      const L = {}; src.filter(x => x.d === d && sKey(x) && !o.exclude.has(sKey(x))).sort((a, b) => a.p - b.p).forEach(x => (L[x.c] = L[x.c] || []).push({ ...x }));
+      const L = {}; src.filter(x => x.d === d && sKey(x) && !isEx(x)).sort((a, b) => a.p - b.p).forEach(x => (L[x.c] = L[x.c] || []).push({ ...x }));
       const drop = (arr, i, why) => { const [x] = arr.splice(i, 1); dropped.push({ ...x, why }); wk[x.c + '|' + sKey(x)]--; };
       // أولوية الحذف عند الزيادة: المادة المكررة في اليوم، ثم الأكثر حصصاً في الأسبوع، ثم الأخيرة
       const worst = arr => { let bi = arr.length - 1, bs = -1; arr.forEach((x, i) => { const rep = arr.filter(y => sKey(y) === sKey(x)).length, sc = (rep > 1 ? 1000 : 0) + (wk[x.c + '|' + sKey(x)] || 0) * 10 + i / 100; if (sc > bs) { bs = sc; bi = i; } }); return bi; };

@@ -112,7 +112,7 @@
     return { slots, report: `${slots.length} حصة${badC.size ? ' · فصول غير معروفة: ' + [...badC].join('، ') : ''}${badS.size ? ' · مواد غير معروفة: ' + [...badS].join('، ') : ''}${lost ? ` · ${lost} خانة معلم لم تُطابق` : ''}` };
   }
   A._liveImport = importFiles;
-  A._live = { metaFrom, ensureBell, curWeek, cName, allCls, addD, today };
+  A._live = { metaFrom, metaCustom, customFrom, ensureBell, curWeek, cName, allCls, addD, today };
 
   async function createDialog(root) {
     const vers = (await api.list('timetable_versions', { section_id: S.sectionId })).filter(v => v.status !== 'archived');

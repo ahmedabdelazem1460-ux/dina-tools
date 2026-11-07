@@ -93,7 +93,7 @@
         <div class="field"><label>سير الدرس والأنشطة</label><div class="pp-acts">${D.activities.map((a, i) => `<div class="pp-act"><input class="in" data-a="${i}|t" value="${esc(a.t || '')}" placeholder="المرحلة" ${ro}><textarea class="in" rows="2" data-a="${i}|d" placeholder="الوصف" ${ro}>${esc(a.d || '')}</textarea><label class="small"><input class="in" type="number" min="1" max="60" data-a="${i}|m" value="${a.m || ''}" style="width:64px" ${ro}> د</label>${own ? `<button class="btn bad sm" data-ax="${i}" type="button" aria-label="حذف">×</button>` : ''}</div>`).join('')}</div>${own ? `<button class="btn ghost sm" id="peAa" type="button">+ نشاط</button> <span class="small muted" id="peMin"></span>` : ''}</div>
         <div class="grid g2" style="align-items:start">
           <div class="field"><label for="peAs">التقويم</label><textarea class="in" id="peAs" rows="3" ${ro}>${esc(D.assessment || '')}</textarea></div>
-          <div class="field"><label for="peH">الواجب</label><textarea class="in" id="peH" rows="3" ${ro}>${esc(D.homework || '')}</textarea></div>
+          ${A.hwBox ? A.hwBox(D, { ro: !!ro, id: 'peH' }) : `<div class="field"><label for="peH">الواجب</label><textarea class="in" id="peH" rows="3" ${ro}>${esc(D.homework || '')}</textarea></div>`}
           <div class="field"><label for="pePt">المهمة الأدائية</label><textarea class="in" id="pePt" rows="3" ${ro}>${esc(D.perf_task || '')}</textarea></div>
           <div class="field"><label for="peE">الإثراء</label><textarea class="in" id="peE" rows="3" ${ro}>${esc(D.enrichment || '')}</textarea></div>
           <div class="field"><label for="peR">العلاج والدعم</label><textarea class="in" id="peR" rows="3" ${ro}>${esc(D.remedial || '')}</textarea></div>
@@ -107,7 +107,7 @@
       q('#peG').onchange = async e => { P.grade_key = e.target.value; await loadCur(); draw(); };
       q('#peC').onchange = e => { const l = CUR.find(y => y.id === e.target.value); P.lesson_id = l ? l.id : null; if (l) { P.lesson = l.lesson; P.unit = l.unit || P.unit; D.periods = l.periods || D.periods; } draw(); };
       q('#peU').oninput = e => P.unit = e.target.value; q('#peL').oninput = e => P.lesson = e.target.value; q('#peP').oninput = e => D.periods = +e.target.value || 1;
-      [['#peO', 'objectives'], ['#peW', 'warmup'], ['#peAs', 'assessment'], ['#peH', 'homework'], ['#pePt', 'perf_task'], ['#peE', 'enrichment'], ['#peR', 'remedial'], ['#peN', 'notes']].forEach(([s, k]) => q(s).oninput = e => D[k] = e.target.value);
+      [['#peO', 'objectives'], ['#peW', 'warmup'], ['#peAs', 'assessment'], ['#peH', 'homework'], ['#pePt', 'perf_task'], ['#peE', 'enrichment'], ['#peR', 'remedial'], ['#peN', 'notes']].forEach(([s, k]) => q(s).oninput = e => D[k] = e.target.value); if (A.hwBind && !ro) A.hwBind(B, D);
       $$('[data-sg]', B).forEach(c => c.onchange = () => { D.strategies = D.strategies.filter(x => x !== c.dataset.sg); if (c.checked) D.strategies.push(c.dataset.sg); c.parentElement.classList.toggle('on', c.checked); });
       $$('[data-tl]', B).forEach(c => c.onchange = () => { D.tools = D.tools.filter(x => x !== c.dataset.tl); if (c.checked) D.tools.push(c.dataset.tl); c.parentElement.classList.toggle('on', c.checked); });
       $$('[data-a]', B).forEach(i => i.oninput = () => { const [n, k] = i.dataset.a.split('|'); D.activities[+n][k] = k === 'm' ? +i.value || 0 : i.value; mins(); });

@@ -75,6 +75,7 @@
     const old = { topic: x ? x.lesson : '', homework: x ? ((x.data || {}).homework || '') : '', perf: x ? ((x.data || {}).perf_task || '') : '' };
     const D = JSON.parse(JSON.stringify((x && x.data) || {})); D.resources = D.resources || []; D.files = D.files || []; D.quiz_ids = D.quiz_ids || [];
     const F = { lesson: x ? x.lesson : (e0.topic || '').trim(), unit: x ? x.unit : '', lesson_id: x ? x.lesson_id : null, objectives: D.objectives || '', homework: D.homework || (e0.homework || ''), perf: D.perf_task || ptxt(e0) || '', perfType: (e0.perf_task || {}).type || '', notes: D.notes || '' };
+    F._hw = { homework: F.homework, hw: JSON.parse(JSON.stringify(D.hw || {})) };
     let CUR = []; try { CUR = await api.list('curriculum', { school_id: S.school.id, subject_id: e0.subject_id, grade_key: gk(c0) }, { order: 'sort' }); } catch (_) { }
     const myQ = (P.quizzes || []).filter(z => z.subject_id === e0.subject_id && (!z.grade_key || z.grade_key === gk(c0)));
     const locked = ES.filter(e => e.status === 'approved');
@@ -87,7 +88,7 @@
           <div class="field" style="grid-column:span 2"><label for="qpL">الدرس / الموضوع</label><input class="in" id="qpL" value="${esc(F.lesson)}" placeholder="اسم الدرس (اختياري)"></div></div>
         <div class="grid g2" style="align-items:start">
           <div class="field"><label for="qpO">الأهداف</label><textarea class="in" id="qpO" rows="3" placeholder="سطر لكل هدف">${esc(F.objectives)}</textarea>${A.prepGen ? '<button class="btn ghost sm" id="qpG" type="button">اقتراح أهداف وواجب ومهمة</button>' : ''}</div>
-          <div class="field"><label for="qpH">الواجب</label><textarea class="in" id="qpH" rows="3">${esc(F.homework)}</textarea></div>
+          ${A.hwBox ? (F._hw.homework = F.homework, A.hwBox(F._hw, { id: 'qpH' })) : `<div class="field"><label for="qpH">الواجب</label><textarea class="in" id="qpH" rows="3">${esc(F.homework)}</textarea></div>`}
           <div class="field"><label for="qpPt">المهمة الأدائية</label><select class="in" id="qpPT" style="margin-bottom:4px"><option value="">— النوع —</option>${(A.PERF || []).map(([k, l]) => `<option value="${k}" ${F.perfType === k ? 'selected' : ''}>${l}</option>`).join('')}</select><textarea class="in" id="qpPt" rows="2">${esc(F.perf)}</textarea></div>
           <div class="field"><label for="qpN">ملاحظات</label><textarea class="in" id="qpN" rows="3">${esc(F.notes)}</textarea></div></div>
         <div class="field"><label>اختبار أو ورقة عمل أو واجب إلكتروني</label><div class="row" style="gap:6px;flex-wrap:wrap">${myQ.length ? myQ.map(z => `<label class="chk"><input type="checkbox" data-qz="${z.id}" ${D.quiz_ids.includes(z.id) ? 'checked' : ''}> ${esc(z.title)} <span class="small muted">(${KQ[z.kind] || ''}${z.status === 'published' ? '' : ' — مسودة'})</span></label>`).join('') : '<span class="small muted">لا توجد اختبارات لهذه المادة والصف بعد.</span>'}<button class="btn ghost sm" id="qpQN" type="button">إنشاء من بنك الأسئلة</button></div></div>
@@ -100,6 +101,7 @@
           <label class="chk"><input type="checkbox" id="qpQL" checked> إضافة رابط الاختبار المختار إلى الواجب</label>
           ${locked.length ? `<p class="small" style="color:var(--bad);margin:4px 0 0">${AR(locked.length)} حصة معتمدة لن تتغير خطتها.</p>` : ''}</div>
         <div class="acts" style="flex-wrap:wrap"><button class="btn ok" id="qpSv" type="button">حفظ وربط</button>${A.prepEditor ? '<button class="btn ghost" id="qpFull" type="button">حفظ وفتح التحضير الكامل</button>' : ''}${x ? '<button class="btn ghost" id="qpUn" type="button">فك الربط</button>' : ''}</div>`;
+      if (A.hwBind) A.hwBind(B, F._hw);
       const rd = () => { F.lesson = q('#qpL').value; F.objectives = q('#qpO').value; F.homework = q('#qpH').value; F.perf = q('#qpPt').value; F.perfType = q('#qpPT').value; F.notes = q('#qpN').value; };
       q('#qpC').onchange = e => { rd(); const l = CUR.find(y => y.id === e.target.value); F.lesson_id = l ? l.id : null; if (l) { F.lesson = l.lesson; F.unit = l.unit || ''; } draw(); };
       q('#qpPT').onchange = e => { rd(); const t = (A.PERF || []).find(p => p[0] === e.target.value); if (t && !F.perf.trim()) F.perf = t[2]; draw(); };
@@ -120,7 +122,7 @@
         const allEl = m.el.querySelector('#qpAll');
         if (x && others.length && allEl && !allEl.checked) { // فصل هذه الحصة بتحضير مستقل دون المساس بالحصص الأخرى
           await api.upd('lesson_preps', x.id, { data: { ...x.data, links: others }, updated_at: new Date().toISOString() }); x.data = { ...x.data, links: others }; x = null; D.links = [];
-        } else if (x && others.length && allEl && allEl.checked) { const more = myEntries().filter(e => others.some(l => l.e === e.id)); more.forEach(e => { if (!ES.includes(e)) ES.push(e); }); } D.resources = D.resources.filter(r => r.u); D.objectives = F.objectives; D.homework = F.homework; D.perf_task = F.perf; D.notes = F.notes; D.periods = ES.length;
+        } else if (x && others.length && allEl && allEl.checked) { const more = myEntries().filter(e => others.some(l => l.e === e.id)); more.forEach(e => { if (!ES.includes(e)) ES.push(e); }); } D.resources = D.resources.filter(r => r.u); D.objectives = F.objectives; D.homework = F.homework; if (F._hw && F._hw.hw) D.hw = F._hw.hw; D.perf_task = F.perf; D.notes = F.notes; D.periods = ES.length;
         const links = ES.map(e => ({ w: e.week_id, e: e.id, c: e.class_id, d: e.day, p: e.period }));
         // حصة كانت مربوطة بتحضير آخر تُفك منه أولاً
         for (const e of ES) { const o = prepOf(e); if (o && (!x || o.id !== x.id)) { const ol = ((o.data || {}).links || []).filter(l => l.e !== e.id); await api.upd('lesson_preps', o.id, { data: { ...o.data, links: ol }, updated_at: new Date().toISOString() }); o.data = { ...o.data, links: ol }; } }

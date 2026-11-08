@@ -649,10 +649,10 @@
       const ex = base.filter(e => e.exec_status && e.exec_status !== 'pending').length;
       const wrN = base.filter(filled).length, hwN = base.filter(e => filled(e) && (e.homework || '').trim()).length, pfN = base.filter(e => e.perf_task && e.perf_task.text).length, ntN = base.filter(e => (e.note || '').trim()).length;
       head = `<div class="grid g4 dk" style="margin:8px 0 12px">
-        <div class="kpi navy"><div class="k">الإنجاز</div><div class="v">${AR(pct(s.filled, s.total))}<small>٪</small></div><div class="d">${AR(s.filled)} من ${cnt(s.total, 'حصة', 'حصص')}</div></div>
-        <div class="kpi"><div class="k">بانتظار المراجعة</div><div class="v">${AR(ready)}</div><div class="d">معتمدة ${AR(s.approved)} · مُعادة ${AR(s.returned)}</div></div>
-        <div class="kpi"><div class="k">التنفيذ اليومي</div><div class="v">${AR(ex)}</div><div class="d">حصة مؤكَّدة من ${AR(s.total)}</div></div>
-        <div class="kpi"><div class="k">الحصص التي فيها واجب</div><div class="v">${AR(pct(hwN, wrN))}<small>٪</small></div><div class="d">${AR(hwN)} من ${cnt(wrN, 'حصة مكتوبة', 'حصص مكتوبة')}</div></div></div>
+        <button type="button" class="kpi navy btnlike" data-tk="todo"><span class="more">التفاصيل</span><div class="k">الإنجاز</div><div class="v">${AR(pct(s.filled, s.total))}<small>٪</small></div><div class="d">${AR(s.filled)} من ${cnt(s.total, 'حصة', 'حصص')}</div></button>
+        <button type="button" class="kpi btnlike" data-tk="submitted"><span class="more">التفاصيل</span><div class="k">بانتظار المراجعة</div><div class="v">${AR(ready)}</div><div class="d">معتمدة ${AR(s.approved)} · مُعادة ${AR(s.returned)}</div></button>
+        <button type="button" class="kpi btnlike" data-tk="exec"><span class="more">التفاصيل</span><div class="k">التنفيذ اليومي</div><div class="v">${AR(ex)}</div><div class="d">حصة مؤكَّدة من ${AR(s.total)}</div></button>
+        <button type="button" class="kpi btnlike" data-tk="hw"><span class="more">التفاصيل</span><div class="k">الحصص التي فيها واجب</div><div class="v">${AR(pct(hwN, wrN))}<small>٪</small></div><div class="d">${AR(hwN)} من ${cnt(wrN, 'حصة مكتوبة', 'حصص مكتوبة')}</div></button></div>
         <p class="small muted" style="margin:-4px 0 10px"><b>مهام أدائية: ${AR(pfN)}</b> · <b>ملاحظات: ${AR(ntN)}</b> · آخر تحديث: ${s.last ? fmtDT(s.last) : 'لم يبدأ'}${p.specialty ? ' · ' + esc(p.specialty) : ''}${p.email ? ' · ' + esc(p.email) : ''}</p>
         <div class="row" style="gap:6px;margin-bottom:10px">${Object.values(pairs).sort((a, b) => (cls(a.c)?.sort ?? 0) - (cls(b.c)?.sort ?? 0)).map(x => `<span class="ldc">${esc(subjName(x.s))} — ${esc((cls(x.c) || {}).name || '')} <b>${AR(x.f)}/${AR(x.n)}</b> <span class="small" title="حصص فيها واجب">· واجب ${AR(x.h)}</span></span>`).join('')}</div>
         ${perm('review') && ready ? `<div class="row" style="margin-bottom:10px"><button class="btn ok sm" id="dApT">${I.check} اعتماد كل الجاهز لهذا المعلم (${AR(ready)})</button></div>` : ''}`;
@@ -683,6 +683,16 @@
     };
     let cur = kind;
     $$('#dfl button', m.el).forEach(b => b.onclick = () => draw(b.dataset.f)); draw(kind);
+    $$('[data-tk]', m.el).forEach(b => b.onclick = () => {
+      const k = b.dataset.tk; if (F[k]) { draw(k); const t = m.el.querySelector('#dfl'); if (t) t.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); return; }
+      if (!window.APP.attDrill) return;
+      const EXS = { done: 'نُفِّذت', modified: 'عُدِّلت ثم نُفِّذت', not_done: 'لم تُنفَّذ' };
+      const pick = k === 'exec' ? base.filter(e => e.exec_status && e.exec_status !== 'pending') : base.filter(e => filled(e) && (e.homework || '').trim());
+      const srt = pick.slice().sort((a, b) => a.day - b.day || a.period - b.period);
+      window.APP.attDrill(k === 'exec'
+        ? { title: 'التنفيذ اليومي المؤكَّد', sub: title, cols: ['اليوم', 'الحصة', 'الفصل', 'المادة', 'الدرس', 'الحالة', 'ملاحظة التنفيذ'], rows: srt.map(e => ({ cells: [DAYS[e.day], AR(e.period + 1), esc((cls(e.class_id) || {}).name || ''), esc(subjName(e.subject_id)), esc(e.topic || '—'), esc(EXS[e.exec_status] || e.exec_status), esc(e.exec_note || '—')], q: [(cls(e.class_id) || {}).name, subjName(e.subject_id), e.topic].join(' ') })) }
+        : { title: 'الحصص التي فيها واجب', sub: title, cols: ['اليوم', 'الحصة', 'الفصل', 'المادة', 'الدرس', 'الواجب'], rows: srt.map(e => ({ cells: [DAYS[e.day], AR(e.period + 1), esc((cls(e.class_id) || {}).name || ''), esc(subjName(e.subject_id)), esc(e.topic || '—'), esc(e.homework)], q: [(cls(e.class_id) || {}).name, subjName(e.subject_id), e.topic, e.homework].join(' ') })) });
+    });
     const apT = m.el.querySelector('#dApT');
     if (apT) apT.onclick = ev => run(ev.currentTarget, async () => {
       const ids = base.filter(F.submitted[1]).map(e => e.id); const n = await api.review(ids, 'approved');

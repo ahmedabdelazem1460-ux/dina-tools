@@ -227,13 +227,15 @@
     route();
   }
   // المراحل المسموحة لهذا الحساب في القسم (يحددها المالك) — فارغة = كل المراحل
-  const stageLim = () => { if (!S.me || S.me.is_owner) return null; const l = ((myMem() || {}).extra || {}).stages; return l && l.length ? l : null; };
+  const stageLim = () => { if (!S.me || S.me.is_owner) return null; const e = (myMem() || {}).extra || {}; const any = [e.stages, e.grades, e.classes].some(x => x && x.length); return any ? (e.stages || []) : null; };
   async function loadSection(keepWeek) {
     const [c, w] = await Promise.all([api.classes(S.sectionId), api.weeks(S.sectionId)]);
     S.allClasses = c; S.weeks = w;
     const order = ['KG', 'رياض الأطفال', 'ابتدائي', 'الابتدائية', 'Grade', 'متوسط', 'المتوسطة', 'ثانوي', 'الثانوية'];
     S.stages = [...new Set(c.map(stageOf))].sort((a, b) => (order.indexOf(a) + 1 || 9) - (order.indexOf(b) + 1 || 9));
-    const lim = stageLim(); const cA = lim ? c.filter(x => lim.includes(stageOf(x))) : c; if (lim) S.stages = S.stages.filter(x => lim.includes(x));
+    // نطاق الموظف: مراحل/صفوف/فصول (بلا اختيار = القسم كاملاً)
+    const sc = (() => { if (!S.me || S.me.is_owner) return null; const e = (myMem() || {}).extra || {}, st = e.stages || [], gr = e.grades || [], cl = e.classes || []; if (!st.length && !gr.length && !cl.length) return null; return x => st.includes(stageOf(x)) || gr.includes(stageOf(x) + '|' + (x.grade_word || '')) || cl.includes(x.id); })();
+    const cA = sc ? c.filter(sc) : c; if (sc) S.stages = S.stages.filter(x => cA.some(k => stageOf(k) === x));
     S.stage = LS.get('stage_' + S.sectionId) || 'all'; if (S.stage !== 'all' && !S.stages.includes(S.stage)) S.stage = 'all';
     S.classes = S.stage === 'all' ? cA : cA.filter(x => stageOf(x) === S.stage);
     const savedW = keepWeek || LS.get('week_' + S.sectionId);

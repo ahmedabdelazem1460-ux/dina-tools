@@ -29,7 +29,7 @@
   // القائمة: إخفاء عناصر عن المعلمين (المالك يرى كل شيء دائماً)
   const wrapNav = () => (A.NAV || []).forEach(n => { if (n._tui || typeof n[2] !== 'function') return; const f = n[2]; n[2] = function () { if (S.me && !S.me.is_owner && mine().nav.includes(n[0])) return false; return f.apply(this, arguments); }; n._tui = true; });
   if (A.NAV && !A.NAV.some(n => n[0] === 'tui')) A.NAV.push(['tui', 'تخصيص صفحة المعلم', () => isOwner()]);
-  setTimeout(wrapNav, 0);
+  setTimeout(wrapNav, 0); window.addEventListener('load', wrapNav); A.tuiWrapNav = wrapNav;
   // تطبيق عند كل عرض
   ['my', 'prep'].forEach(k => { const v0 = V[k]; if (v0) V[k] = function () { apply(); return v0.apply(this, arguments); }; });
   const ob = new MutationObserver(() => { if (!document.getElementById('tuiCss')) apply(); }); ob.observe(document.head, { childList: true });

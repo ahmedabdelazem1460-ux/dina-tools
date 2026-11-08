@@ -14,9 +14,9 @@
 
   V.board = async function (root) {
     if (!can()) { root.innerHTML = `<div class="card">${A.emptyBox('غير متاح لحسابك')}</div>`; return; }
-    let tab = A.LS.get('bd_t') || 'today';
+    let tab = A.LS.get('bd_t') || 'today'; if (tab === 'live' && A.liveOK && !A.liveOK()) tab = 'today';
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2 style="margin:0">اللوحة اليومية — ${esc((A.section() || {}).name || '')}</h2><p class="sub" style="margin:2px 0 0">أدخل بيانات اليوم مرة واحدة فتظهر على شاشة المدرسة تلقائياً، ويُطبع منها تقرير اليوم.</p></div></div>
-      <div class="kpick" id="bdT"><button data-t="today">بيانات اليوم</button><button data-t="screen">شاشة العرض</button><button data-t="live">المتابعة اللحظية</button></div><div id="bdB" style="margin-top:10px"></div></div>`;
+      <div class="kpick" id="bdT"><button data-t="today">بيانات اليوم</button><button data-t="screen">شاشة العرض</button>${A.liveOK && !A.liveOK() ? '' : '<button data-t="live">المتابعة اللحظية</button>'}</div><div id="bdB" style="margin-top:10px"></div></div>`;
     $$('#bdT button', root).forEach(b => { b.classList.toggle('on', b.dataset.t === tab); b.onclick = () => { A.LS.set('bd_t', b.dataset.t); V.board(root); }; });
     const B = $('#bdB', root);
     ({ today: tToday, screen: tScreen, live: tLive })[tab](B);

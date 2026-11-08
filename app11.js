@@ -173,11 +173,26 @@
         m.el.querySelector('#ego').onclick = e => A.run(e.currentTarget, async () => { const n = m.el.querySelector('#en').value.trim(); if (n.length < 5) throw new Error('اكتب الاسم كاملاً'); await api.upd('students', st.id, { full_name: n, class_id: m.el.querySelector('#ec').value, national_id: m.el.querySelector('#enid').value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\D/g, '') || null, student_no: m.el.querySelector('#eno').value.trim() || null, guardian_name: m.el.querySelector('#egn').value.trim() || null, guardian_phone: m.el.querySelector('#egp').value.trim() || null }); m.close(); await loadStudents(true); draw(); A.toast('حُفظ', 'ok'); }); });
       $$('[data-off]', box).forEach(b => b.onclick = async () => { if (!(await A.confirmBox('إيقاف هذا الطالب (نقل أو انسحاب)؟ يبقى سجله في التقارير.', 'إيقاف', true))) return; A.run(null, async () => { await api.upd('students', b.dataset.off, { active: false }); await loadStudents(true); draw(); }); });
       $('#stF', box).onchange = e => A.run(null, async () => {
-        const f = e.target.files[0]; if (!f) return; const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' }); const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
-        const allCls = []; for (const sec of S.sections) { const cl = sec.id === S.sectionId ? S.classes : await api.classes(sec.id); cl.forEach(c => allCls.push(c)); }
-        const norm = x => A.normKey(String(x || '')); const findC = n => allCls.find(c => norm(c.name) === norm(n));
-        const ok = [], bad = []; rows.forEach((r, i) => { const n = String(r['الاسم'] || r['اسم الطالب'] || '').trim(); const c = findC(r['الفصل']); if (!n || !c) bad.push(i + 2); else ok.push({ n, c, r }); });
-        if (!(await A.confirmBox(`سيُستورد ${A.cnt(ok.length, 'طالب', 'طلاب')}${bad.length ? `، وتُترك ${AR(bad.length)} صفوف لم يُعرف فصلها (الصفوف: ${bad.slice(0, 12).join('، ')})` : ''}. المطابق بالاسم والفصل يُحدَّث.`, 'استيراد'))) return;
+        const f = e.target.files[0]; if (!f) return; e.target.value = ''; const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+        // كل أوراق الملف (ورقة لكل فصل أو ورقة واحدة)، مع حفظ اسم الورقة للاستعانة به إذا لم يُعرف الفصل
+        const rows = []; wb.SheetNames.forEach(sn => XLSX.utils.sheet_to_json(wb.Sheets[sn], { defval: '' }).forEach((r, i) => rows.push({ r, sheet: sn, line: i + 2 })));
+        const allCls = []; for (const sec of S.sections) { const cl = sec.id === S.sectionId ? S.classes : await api.classes(sec.id); cl.filter(c => c.active !== false).forEach(c => allCls.push(c)); }
+        const norm = x => A.normKey(String(x || '')).replace(/\s+/g, ' ').trim();
+        const short = x => norm(x).replace(/ ?(ابتدائي|متوسط|ثانوي|بنين|بنات)(?=\s|$)/g, '').replace(/\s+/g, ' ').trim();
+        // القسم الحالي أولاً؛ ولا يُختار فصل من قسم آخر إلا إذا كان وحيداً بهذا الاسم — حتى لا يذهب طلاب البنين لفصل بالاسم نفسه في البنات
+        const pick = list => { const here = list.filter(c => c.section_id === S.sectionId); if (here.length === 1) return here[0]; if (!here.length && list.length === 1) return list[0]; return null; };
+        const findC = (name, sheet) => {
+          for (const v of [name, sheet]) { if (!String(v || '').trim()) continue; const c = pick(allCls.filter(x => norm(x.name) === norm(v))); if (c) return c; }
+          for (const v of [name, sheet]) { if (!String(v || '').trim()) continue; const c = pick(allCls.filter(x => short(x.name) === short(v))); if (c) return c; }
+          return null;
+        };
+        const ok = [], bad = []; rows.forEach(({ r, sheet, line }) => { const n = String(r['الاسم'] || r['اسم الطالب'] || '').trim(); if (!n) return; const c = findC(r['الفصل'], sheet); if (!c) bad.push(`${sheet} (${AR(line)})`); else ok.push({ n, c, r }); });
+        if (!ok.length && !bad.length) throw new Error('لم أجد صفوفاً فيها عمود «الاسم» في أي ورقة من الملف');
+        const byC = {}; ok.forEach(({ c }) => byC[c.id] = (byC[c.id] || 0) + 1);
+        const secName = id => esc((S.sections.find(x => x.id === id) || {}).name || '');
+        const sum = Object.entries(byC).map(([id, k]) => { const c = allCls.find(x => x.id === id); return `<li>${esc(c.name)} <span class="faint">· ${secName(c.section_id)}</span> — ${A.cnt(k, 'طالب', 'طلاب')}</li>`; }).join('');
+        if (!(await A.confirmBox(`<b>معاينة الاستيراد</b> (${A.cnt(wb.SheetNames.length, 'ورقة', 'أوراق')}):<ul style="margin:6px 0;padding-inline-start:18px;max-height:220px;overflow:auto">${sum || '<li>لا شيء</li>'}</ul>${bad.length ? `<div class="small" style="color:var(--warn)">تُترك ${A.cnt(bad.length, 'صف', 'صفوف')} لم يُعرف فصلها: ${esc(bad.slice(0, 8).join('، '))}${bad.length > 8 ? '…' : ''}<br>تأكد أن الفصل موجود في المنصة، وأنك في القسم الصحيح من القائمة العلوية.</div>` : ''}<div class="small muted" style="margin-top:6px">لا يُحذف أي طالب؛ المطابق بالاسم والفصل يُحدَّث فقط.</div>`, ok.length ? 'استيراد' : 'إغلاق'))) return;
+        if (!ok.length) return;
         const exist = new Map(STU.map(s => [norm(s.full_name) + '|' + s.class_id, s])); const add = [];
         for (const { n, c, r } of ok) { const nid = String(r['رقم الهوية'] || r['الهوية'] || r['السجل المدني'] || r['رقم الإقامة'] || r['رقم الهوية الوطنية'] || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\D/g, ''); const p = { ...(nid ? { national_id: nid } : {}), student_no: String(r['رقم الطالب'] || '').trim() || null, guardian_name: String(r['اسم ولي الأمر'] || '').trim() || null, guardian_phone: String(r['جوال ولي الأمر'] || '').trim() || null }; const x = exist.get(norm(n) + '|' + c.id); if (x) await api.upd('students', x.id, p); else add.push({ school_id: sch(), section_id: c.section_id, class_id: c.id, full_name: n, ...p }); }
         for (let i = 0; i < add.length; i += 400) await api.ins('students', add.slice(i, i + 400));

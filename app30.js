@@ -12,10 +12,11 @@
   const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
   // أوقات الحصص من «اليوم الدراسي والجدول الزمني»
   function times(cid) { try { const sec = A.section(), b = A.bell.bellOf(sec), s = A.bell.activeSched(b); return A.bell.timeline(s, A.bell.maxP(s, sec), cid).items.filter(x => x.k === 'p').map(x => ({ i: x.i, from: x.from, to: x.to, f: A.bell.fmt(x.from, s), t: A.bell.fmt(x.to, s) })); } catch (_) { return []; } }
+  A.attTimes = cid => times(cid); A.attPassed = (cid, day, p) => passed(cid, day, p); A.attEntryOf = (cid, day, p) => entryOf(cid, day, p);
   A.curPeriod = cid => { const n = nowMin(), t = times(cid).find(x => n >= x.from && n < x.to); return t ? t.i : -1; };
-  const passed = (cid, day, p) => { if (day < today()) return true; if (day > today()) return false; const t = times(cid).find(x => x.i === p); return t ? nowMin() >= t.from : false; };
+  var passed = (cid, day, p) => { if (day < today()) return true; if (day > today()) return false; const t = times(cid).find(x => x.i === p); return t ? nowMin() >= t.from : false; };
   // الحصة في ذلك اليوم: من خطة الأسبوع المحمّل إن كان اليوم داخله
-  const entryOf = (cid, day, p) => { const w = A.week(); if (!w) return null; const i = Math.round((A.parseDate(day) - A.parseDate(w.start_date)) / 864e5); if (i < 0 || i > 6) return null; return (S.allEntries || S.entries).find(e => e.class_id === cid && e.day === i && e.period === p) || null; };
+  var entryOf = (cid, day, p) => { const w = A.week(); if (!w) return null; const i = Math.round((A.parseDate(day) - A.parseDate(w.start_date)) / 864e5); if (i < 0 || i > 6) return null; return (S.allEntries || S.entries).find(e => e.class_id === cid && e.day === i && e.period === p) || null; };
   const save = (cid, day, p, rows) => api.rpc('save_period_attendance', { p_class: cid, p_day: day, p_period: p, p_rows: rows });
   const ERR = { 'no permission': 'ليست لديك صلاحية رصد هذه الحصة — يرصدها معلمها أو من مُنح صلاحية الحضور', 'future day': 'لا يمكن الرصد ليوم قادم', 'class not found': 'الفصل غير موجود' };
 
@@ -80,10 +81,14 @@
     let day = A.LS.get('lvday') || today(); if (day > today()) day = today();
     const draw = async () => {
       if (!document.body.contains(box)) { clearInterval(liveT); return; }
-      const [pa, stu] = await Promise.all([api.list('period_attendance', { school_id: S.school.id, day }).catch(() => []), api.list('students', { school_id: S.school.id, active: true }, { select: 'id,full_name,class_id' }).catch(() => [])]);
+      const [pa, stu, dl] = await Promise.all([api.list('period_attendance', { school_id: S.school.id, day }).catch(() => []), api.list('students', { school_id: S.school.id, active: true }, { select: 'id,full_name,class_id' }).catch(() => []), api.list('attendance', { school_id: S.school.id, day }).catch(() => [])]);
       const cls = S.classes.filter(c => c.active), P = (A.section() || {}).periods || 7, ids = new Set(cls.map(c => c.id));
       const L = pa.filter(x => ids.has(x.class_id)), sN = id => (stu.find(s => s.id === id) || {}).full_name || '—';
-      const by = k => new Set(L.filter(x => x.status === k).map(x => x.student_id));
+      // الغياب الصباحي (لليوم كاملاً) يُدمج مع غياب الحصص
+      const D = dl.filter(x => ids.has(x.class_id));
+      const by = k => new Set(L.filter(x => x.status === k).map(x => x.student_id).concat(D.filter(x => x.status === k).map(x => x.student_id)));
+      const dayAbs = new Set(D.filter(x => x.status === 'absent').map(x => x.student_id));
+      const dRate = D.length ? Math.round(100 * D.filter(x => x.status !== 'absent').length / D.length) : null;
       const abs = by('absent'), late = by('late'), exc = by('excused'), early = by('early');
       const total = stu.filter(s => ids.has(s.class_id)).length;
       const slots = []; cls.forEach(c => { for (let p = 0; p < P; p++) { const e = entryOf(c.id, day, p); if (e && e.subject_id) slots.push({ c: c.id, p, e }); } });
@@ -91,12 +96,16 @@
       const taken = new Set(L.map(x => x.class_id + '|' + x.period)).size;
       const rate = L.length ? Math.round(100 * L.filter(x => x.status !== 'absent').length / L.length) : null;
       const cell = (c, p) => { const l = L.filter(x => x.class_id === c && x.period === p), e = entryOf(c, day, p); if (l.length) { const a = l.filter(x => x.status === 'absent').length, t = l.filter(x => x.status === 'late').length; return `<td class="${a ? 'a' : 'ok'}" title="${esc(A.subjName((e || {}).subject_id) || '')}"><b>${a ? AR(a) : '✓'}</b>${t ? `<small>تأخر ${AR(t)}</small>` : ''}</td>`; } if (!e || !e.subject_id) return '<td class="na">—</td>'; return passed(c, day, p) ? `<td class="miss" title="${esc(A.personName(e.teacher_id) || '')}">لم تُرصد</td>` : '<td class="fut"></td>'; };
-      const absList = [...abs].map(id => ({ id, n: sN(id), c: (L.find(x => x.student_id === id) || {}).class_id, ps: L.filter(x => x.student_id === id && x.status === 'absent').map(x => x.period).sort((a, b) => a - b) })).sort((a, b) => b.ps.length - a.ps.length || a.n.localeCompare(b.n, 'ar'));
-      const other = L.filter(x => ['late', 'excused', 'early'].includes(x.status)).sort((a, b) => a.period - b.period);
+      const absList = [...abs].map(id => ({ id, n: sN(id), c: (L.find(x => x.student_id === id) || D.find(x => x.student_id === id) || {}).class_id, day: dayAbs.has(id), ps: L.filter(x => x.student_id === id && x.status === 'absent').map(x => x.period).sort((a, b) => a - b) })).sort((a, b) => (b.day - a.day) || b.ps.length - a.ps.length || a.n.localeCompare(b.n, 'ar'));
+      const psTxt = x => x.day ? 'اليوم كاملاً' + (x.ps.length ? ' · الحصص: ' + x.ps.map(p => AR(p + 1)).join('، ') : '') : 'الحصص: ' + x.ps.map(p => AR(p + 1)).join('، ');
+      const other = L.filter(x => ['late', 'excused', 'early'].includes(x.status)).concat(D.filter(x => ['late', 'excused', 'early'].includes(x.status)).map(x => ({ ...x, period: -1 }))).sort((a, b) => a.period - b.period);
+      const pTxt = p => p < 0 ? 'الصباحي' : 'الحصة ' + AR(p + 1);
+      const dCell = c => { const l = D.filter(x => x.class_id === c); if (!l.length) return '<td class="na">—</td>'; const a = l.filter(x => x.status === 'absent').length; return `<td class="${a ? 'a' : 'ok'}"><b>${a ? AR(a) : '✓'}</b></td>`; };
       box.innerHTML = `<div class="row" style="margin:12px 0;gap:8px;flex-wrap:wrap;align-items:center"><input type="date" class="in" id="lvD" value="${day}" max="${today()}" style="max-width:180px" aria-label="اليوم"><span class="rec-st ok" role="status">${day === today() ? 'لحظي · يتحدّث تلقائياً' : 'يوم سابق'}</span><button class="btn ghost sm" id="lvPr">${I.print || ''} التقرير اليومي</button></div>
         <div class="pal-k">
+          <div class="k"><b>${dRate == null ? '—' : AR(dRate) + '٪'}</b>الحضور الصباحي</div>
           <div class="k"><b>${rate == null ? '—' : AR(rate) + '٪'}</b>نسبة الحضور في الحصص</div>
-          <div class="k bad"><b>${AR(abs.size)}</b>طالب غائب في حصة أو أكثر</div>
+          <div class="k bad"><b>${AR(abs.size)}</b>طالب غائب (اليوم كاملاً أو حصة)</div>
           <div class="k warn"><b>${AR(late.size)}</b>متأخر</div>
           <div class="k info"><b>${AR(exc.size)}</b>مستأذن</div>
           <div class="k info"><b>${AR(early.size)}</b>خروج مبكر</div>
@@ -104,10 +113,10 @@
           <div class="k"><b>${AR(taken)}/${AR(slots.length)}</b>حصة مرصودة من ${AR(total)} طالب</div>
         </div>
         <h3 style="margin:16px 0 6px">الفصول × الحصص <span class="small muted">(الرقم = عدد الغائبين)</span></h3>
-        <div class="scroll"><table class="tbl pal-m"><thead><tr><th>الفصل</th>${Array.from({ length: P }, (_, p) => `<th>${PER[p] || AR(p + 1)}</th>`).join('')}</tr></thead><tbody>${cls.map(c => `<tr><th><button class="lnk" data-gc="${c.id}">${esc(c.name)}</button></th>${Array.from({ length: P }, (_, p) => cell(c.id, p).replace('<td', `<td data-cp="${c.id}|${p}"`)).join('')}</tr>`).join('')}</tbody></table></div>
+        <div class="scroll"><table class="tbl pal-m"><thead><tr><th>الفصل</th><th title="الحضور الصباحي لليوم كاملاً">صباحي</th>${Array.from({ length: P }, (_, p) => `<th>${PER[p] || AR(p + 1)}</th>`).join('')}</tr></thead><tbody>${cls.map(c => `<tr><th><button class="lnk" data-gc="${c.id}">${esc(c.name)}</button></th>${dCell(c.id)}${Array.from({ length: P }, (_, p) => cell(c.id, p).replace('<td', `<td data-cp="${c.id}|${p}"`)).join('')}</tr>`).join('')}</tbody></table></div>
         <div class="grid g2" style="margin-top:14px;align-items:start">
-          <div class="sec-box"><b>الغائبون اليوم (${AR(absList.length)})</b>${absList.length ? `<table class="tbl" style="margin-top:6px"><tbody>${absList.map(x => `<tr><td><b>${esc(x.n)}</b><div class="small muted">${esc(cName(x.c))}</div></td><td class="small">الحصص: ${x.ps.map(p => AR(p + 1)).join('، ')}</td></tr>`).join('')}</tbody></table>` : '<p class="small muted">لا غياب مسجّل.</p>'}</div>
-          <div class="sec-box"><b>التأخر والاستئذان والخروج المبكر (${AR(other.length)})</b>${other.length ? `<table class="tbl" style="margin-top:6px"><tbody>${other.map(x => `<tr><td><b>${esc(sN(x.student_id))}</b><div class="small muted">${esc(cName(x.class_id))}</div></td><td><span class="pill st-${x.status === 'late' ? 'returned' : 'submitted'}">${stName(x.status)}${x.minutes ? ' ' + AR(x.minutes) + ' د' : ''}</span></td><td class="small">الحصة ${AR(x.period + 1)}${x.note ? ' · ' + esc(x.note) : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="small muted">لا يوجد.</p>'}</div>
+          <div class="sec-box"><b>الغائبون اليوم (${AR(absList.length)})</b>${absList.length ? `<table class="tbl" style="margin-top:6px"><tbody>${absList.map(x => `<tr><td><b>${esc(x.n)}</b><div class="small muted">${esc(cName(x.c))}</div></td><td class="small">${psTxt(x)}</td></tr>`).join('')}</tbody></table>` : '<p class="small muted">لا غياب مسجّل.</p>'}</div>
+          <div class="sec-box"><b>التأخر والاستئذان والخروج المبكر (${AR(other.length)})</b>${other.length ? `<table class="tbl" style="margin-top:6px"><tbody>${other.map(x => `<tr><td><b>${esc(sN(x.student_id))}</b><div class="small muted">${esc(cName(x.class_id))}</div></td><td><span class="pill st-${x.status === 'late' ? 'returned' : 'submitted'}">${stName(x.status)}${x.minutes ? ' ' + AR(x.minutes) + ' د' : ''}</span></td><td class="small">${pTxt(x.period)}${x.note ? ' · ' + esc(x.note) : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="small muted">لا يوجد.</p>'}</div>
         </div>
         ${missing.length ? `<div class="sec-box" style="margin-top:12px;border-color:#C53030"><b>حصص مضت ولم تُرصد (${AR(missing.length)})</b><div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">${missing.map(x => `<button class="ldc ldbtn" data-cp="${x.c}|${x.p}">${esc(cName(x.c))} · ${AR(x.p + 1)} — ${esc(A.subjName(x.e.subject_id))}${x.e.teacher_id ? ' · ' + esc(A.personName(x.e.teacher_id)) : ''}</button>`).join('')}</div></div>` : ''}`;
       $('#lvD', box).onchange = e => { day = e.target.value; A.LS.set('lvday', day); draw(); };
@@ -116,12 +125,12 @@
       $('#lvPr', box).onclick = () => A.printDoc('التقرير اليومي للحضور', `${DAYS[dow(day)]} ${AR(A.dmy(A.parseDate(day)))} · ${(A.section() || {}).name || ''}`,
         `<div><span class="k"><b>${rate == null ? '—' : AR(rate) + '٪'}</b>نسبة الحضور</span><span class="k"><b>${AR(abs.size)}</b>غائب</span><span class="k"><b>${AR(late.size)}</b>متأخر</span><span class="k"><b>${AR(exc.size)}</b>مستأذن</span><span class="k"><b>${AR(early.size)}</b>خروج مبكر</span><span class="k"><b>${AR(missing.length)}</b>حصة لم تُرصد</span></div>
          <h3>الفصول × الحصص (عدد الغائبين)</h3><table><tr><th>الفصل</th>${Array.from({ length: P }, (_, p) => `<th>${AR(p + 1)}</th>`).join('')}</tr>${cls.map(c => `<tr><td><b>${esc(c.name)}</b></td>${Array.from({ length: P }, (_, p) => { const l = L.filter(x => x.class_id === c.id && x.period === p); const e = entryOf(c.id, day, p); return `<td>${l.length ? (l.filter(x => x.status === 'absent').length ? AR(l.filter(x => x.status === 'absent').length) : '✓') : e && e.subject_id && passed(c.id, day, p) ? 'لم تُرصد' : '—'}</td>`; }).join('')}</tr>`).join('')}</table>
-         <h3>الغائبون</h3><table><tr><th>الطالب</th><th>الفصل</th><th>الحصص</th></tr>${absList.map(x => `<tr><td>${esc(x.n)}</td><td>${esc(cName(x.c))}</td><td>${x.ps.map(p => AR(p + 1)).join('، ')}</td></tr>`).join('') || '<tr><td colspan="3">لا يوجد</td></tr>'}</table>
-         <h3>التأخر والاستئذان والخروج المبكر</h3><table><tr><th>الطالب</th><th>الفصل</th><th>الحالة</th><th>الحصة</th><th>ملاحظة</th></tr>${other.map(x => `<tr><td>${esc(sN(x.student_id))}</td><td>${esc(cName(x.class_id))}</td><td>${stName(x.status)}${x.minutes ? ' ' + AR(x.minutes) + ' د' : ''}</td><td>${AR(x.period + 1)}</td><td>${esc(x.note || '')}</td></tr>`).join('') || '<tr><td colspan="5">لا يوجد</td></tr>'}</table>`, true);
+         <h3>الغائبون</h3><table><tr><th>الطالب</th><th>الفصل</th><th>الغياب</th></tr>${absList.map(x => `<tr><td>${esc(x.n)}</td><td>${esc(cName(x.c))}</td><td>${psTxt(x)}</td></tr>`).join('') || '<tr><td colspan="3">لا يوجد</td></tr>'}</table>
+         <h3>التأخر والاستئذان والخروج المبكر</h3><table><tr><th>الطالب</th><th>الفصل</th><th>الحالة</th><th>الحصة</th><th>ملاحظة</th></tr>${other.map(x => `<tr><td>${esc(sN(x.student_id))}</td><td>${esc(cName(x.class_id))}</td><td>${stName(x.status)}${x.minutes ? ' ' + AR(x.minutes) + ' د' : ''}</td><td>${pTxt(x.period)}</td><td>${esc(x.note || '')}</td></tr>`).join('') || '<tr><td colspan="5">لا يوجد</td></tr>'}</table>`, true);
     };
     await draw();
     clearInterval(liveT); liveT = setInterval(() => { if (day === today() && !document.hidden) draw().catch(() => {}); }, 60000);
-    if (api.subscribe && !liveSub) { try { liveSub = api.subscribe('pa-' + S.school.id, 'period_attendance', null, () => { if (A._paLive) A._paLive(); }); } catch (_) { } }
+    if (api.subscribe && !liveSub) { try { liveSub = api.subscribe('pa-' + S.school.id, 'period_attendance', null, () => { if (A._paLive) A._paLive(); }); api.subscribe('pad-' + S.school.id, 'attendance', null, () => { if (A._paLive) A._paLive(); }); } catch (_) { } }
     A._paLive = () => { if (document.body.contains(box)) draw().catch(() => {}); };
   };
 

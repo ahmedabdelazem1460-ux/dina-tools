@@ -21,7 +21,9 @@
     if (S._attSub === S.me.id || !api.subscribe) return; S._attSub = S.me.id;
     try {
       if (mod('counselor')) api.subscribe('bh-' + sch(), 'behaviors', null, p => { const r = p && p.new; if (r && r.referred && r.by_staff !== S.me.id) A.toast('إحالة جديدة للمرشد الطلابي: ' + (stu(r.student_id).full_name || 'طالب'), 'ok'); if (A._attRefresh) A._attRefresh(); });
-      if (mod('attendance') || mod('counselor')) api.subscribe('att-' + sch(), 'attendance', null, () => { if (A._attRefresh) A._attRefresh(); });
+      // إحالات الغياب والتأخر تصل للموجه الطلابي لحظياً (تُجمع في تنبيه واحد)
+      let refQ = [], refT = null;
+      if (mod('attendance') || mod('counselor')) api.subscribe('att-' + sch(), 'attendance', null, p => { const r = p && p.new; if (mod('counselor') && r && r.referred && r.by_staff !== S.me.id && r.day === today()) { refQ.push(stu(r.student_id).full_name || 'طالب'); clearTimeout(refT); refT = setTimeout(() => { const u = [...new Set(refQ)]; refQ = []; A.toast(`إحالة غياب/تأخر للموجه: ${u.slice(0, 3).join('، ')}${u.length > 3 ? ' و' + AR(u.length - 3) + ' آخرين' : ''}`, 'ok'); }, 1500); } if (A._attRefresh) A._attRefresh(); });
       api.subscribe('spr-' + S.me.id, 'sup_records', null, p => { const r = p && p.new; if (r && r.teacher_id === S.me.id && r.status === 'sent') { A.toast('وصلك تقرير إشرافي جديد: ' + r.title, 'ok'); S.supCount = (S.supCount || 0) + 1; A.renderNav && A.renderNav(); } });
       const mine = await api.list('sup_records', { teacher_id: S.me.id }, { select: 'id,status' }); S.supCount = mine.filter(r => r.status !== 'draft').length; S.supPending = mine.filter(r => r.status === 'sent').length; if (S.supCount) A.renderNav && A.renderNav();
     } catch (_) { }
@@ -34,14 +36,14 @@
     if (!(mod('attendance') || mod('counselor') || mod('supervision'))) { root.innerHTML = `<div class="card">${A.emptyBox('غير متاح لحسابك', 'يمنحه مالك النظام لمشرفي الأدوار والمرشد الطلابي من «المسميات والصلاحيات».')}</div>`; return; }
     root.innerHTML = '<div class="spinner"></div>';
     await loadStudents(true);
-    const tabs = [(mod('attendance') || mod('counselor') || mod('supervision')) && A.attLive && ['live', 'لوحة الحضور اللحظية'], mod('attendance') && A.attPeriods && ['periods', 'حضور الحصص'], mod('attendance') && ['take', 'الحضور الصباحي'], (mod('attendance') || mod('counselor')) && ['behavior', 'السلوك'], (mod('counselor') || S.me.is_owner) && ['refer', 'الإحالات'], ['reports', 'التقارير'], S.me.is_owner && ['students', 'الطلاب']].filter(Boolean);
+    const tabs = [mod('attendance') && A.attRecord && ['record', 'رصد الحضور'], (mod('attendance') || mod('counselor') || mod('supervision')) && A.attLive && ['live', 'لوحة الحضور اللحظية'], mod('attendance') && A.attPeriods && ['periods', 'حضور الحصص'], mod('attendance') && ['take', 'الحضور الصباحي'], (mod('attendance') || mod('counselor')) && ['behavior', 'السلوك'], (mod('counselor') || S.me.is_owner) && ['refer', 'الإحالات'], ['reports', 'التقارير'], S.me.is_owner && ['students', 'الطلاب']].filter(Boolean);
     let tab = A.LS.get('atttab'); if (!tabs.some(t => t[0] === tab)) tab = tabs[0][0];
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>الحضور والغياب والسلوك</h2><p class="sub" style="margin:2px 0 0">${AR(STU.length)} طالب في قاعدة البيانات · المزامنة لحظية بين المشرفين والمرشد الطلابي.</p></div></div>
       <div class="tabs">${tabs.map(([k, l]) => `<button data-t="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div><div id="atb"></div></div>`;
     $$('.tabs button', root).forEach(b => b.onclick = () => { A.LS.set('atttab', b.dataset.t); V.attendance(root); });
     const box = $('#atb', root);
     if (!STU.length && tab !== 'students') { box.innerHTML = A.emptyBox('لا يوجد طلاب بعد', S.me.is_owner ? 'استورد بيانات الطلاب من تبويب «الطلاب».' : 'يستورد مالك النظام بيانات الطلاب أولاً.'); return; }
-    ({ live: b => A.attLive(b), periods: b => A.attPeriods(b), take: tTake, behavior: tBehavior, refer: tRefer, reports: tReports, students: tStudents })[tab](box);
+    ({ record: b => A.attRecord(b), live: b => A.attLive(b), periods: b => A.attPeriods(b), take: tTake, behavior: tBehavior, refer: tRefer, reports: b => (A.attReports ? A.attReports(b, { STU, stu }) : tReports(b)), students: tStudents })[tab](box);
   };
 
   async function tTake(box) {
@@ -111,13 +113,14 @@
     const draw = async () => {
       const [bh, ab] = await Promise.all([api.list('behaviors', { school_id: sch(), referred: true }, { order: 'created_at', desc: true }), api.list('attendance', { school_id: sch(), referred: true }, { order: 'day', desc: true })]);
       const open = bh.filter(r => r.status !== 'closed');
-      box.innerHTML = `<div class="grid g3" style="margin:12px 0"><div class="kpi"><div class="k">إحالات سلوكية مفتوحة</div><div class="v">${AR(open.length)}</div></div><div class="kpi"><div class="k">إحالات غياب وتأخر</div><div class="v">${AR(ab.length)}</div></div><div class="kpi"><div class="k">أُغلقت</div><div class="v">${AR(bh.length - open.length)}</div></div></div>
+      box.innerHTML = `<div id="atAl"></div><div class="grid g3" style="margin:12px 0"><div class="kpi"><div class="k">إحالات سلوكية مفتوحة</div><div class="v">${AR(open.length)}</div></div><div class="kpi"><div class="k">إحالات غياب وتأخر</div><div class="v">${AR(ab.length)}</div></div><div class="kpi"><div class="k">أُغلقت</div><div class="v">${AR(bh.length - open.length)}</div></div></div>
         <div class="scroll"><table class="tbl"><thead><tr><th>الطالب</th><th>الفصل</th><th>التاريخ</th><th>السبب</th><th>من أحال</th><th>الحالة</th><th style="width:28%">إجراء المرشد</th></tr></thead><tbody>
         ${bh.map(r => `<tr><td><b>${esc(stu(r.student_id).full_name || '')}</b></td><td>${esc((A.cls(r.class_id) || {}).name || '')}</td><td>${AR(r.day)}</td><td class="small">${esc(r.category)}${r.note ? ' — ' + esc(r.note) : ''}</td><td class="small">${esc(A.personName(r.by_staff) || '')}</td>
           <td><select class="in" data-bs="${r.id}" style="padding:6px">${[['open', 'جديد'], ['in_progress', 'قيد المتابعة'], ['closed', 'مغلق']].map(([k, l]) => `<option value="${k}" ${r.status === k ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
           <td><input class="in" data-bn="${r.id}" value="${esc(r.counselor_note)}" placeholder="الإجراء المتخذ" style="padding:6px"></td></tr>`).join('')}
         ${ab.map(r => `<tr><td><b>${esc(stu(r.student_id).full_name || '')}</b></td><td>${esc((A.cls(r.class_id) || {}).name || '')}</td><td>${AR(r.day)}</td><td class="small">${stName(r.status)}${r.note ? ' — ' + esc(r.note) : ''}</td><td class="small">${esc(A.personName(r.by_staff) || '')}</td><td><span class="pill st-submitted">إحالة حضور</span></td><td></td></tr>`).join('') || (bh.length ? '' : `<tr><td colspan="7">${A.emptyBox('لا توجد إحالات')}</td></tr>`)}
         </tbody></table></div>`;
+      if (A.attAlerts) A.attAlerts($('#atAl', box), STU);
       const can = mod('counselor') || S.me.is_owner;
       $$('[data-bs]', box).forEach(s => { s.disabled = !can; s.onchange = () => A.run(null, async () => { await api.upd('behaviors', s.dataset.bs, { status: s.value }); A.toast('حُدِّثت الحالة', 'ok'); }); });
       $$('[data-bn]', box).forEach(i => { i.readOnly = !can; i.onchange = () => A.run(null, async () => { await api.upd('behaviors', i.dataset.bn, { counselor_note: i.value.trim() }); A.toast('حُفظ الإجراء', 'ok'); }); });

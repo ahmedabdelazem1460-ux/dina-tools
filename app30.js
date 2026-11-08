@@ -103,14 +103,14 @@
       const dCell = c => { const l = D.filter(x => x.class_id === c); if (!l.length) return '<td class="na">—</td>'; const a = l.filter(x => x.status === 'absent').length; return `<td class="${a ? 'a' : 'ok'}"><b>${a ? AR(a) : '✓'}</b></td>`; };
       box.innerHTML = `<div class="row" style="margin:12px 0;gap:8px;flex-wrap:wrap;align-items:center"><input type="date" class="in" id="lvD" value="${day}" max="${today()}" style="max-width:180px" aria-label="اليوم"><span class="rec-st ok" role="status">${day === today() ? 'لحظي · يتحدّث تلقائياً' : 'يوم سابق'}</span><button class="btn ghost sm" id="lvPr">${I.print || ''} التقرير اليومي</button></div>
         <div class="pal-k">
-          <div class="k"><b>${dRate == null ? '—' : AR(dRate) + '٪'}</b>الحضور الصباحي</div>
-          <div class="k"><b>${rate == null ? '—' : AR(rate) + '٪'}</b>نسبة الحضور في الحصص</div>
-          <div class="k bad"><b>${AR(abs.size)}</b>طالب غائب (اليوم كاملاً أو حصة)</div>
-          <div class="k warn"><b>${AR(late.size)}</b>متأخر</div>
-          <div class="k info"><b>${AR(exc.size)}</b>مستأذن</div>
-          <div class="k info"><b>${AR(early.size)}</b>خروج مبكر</div>
-          <div class="k ${missing.length ? 'bad' : 'ok'}"><b>${AR(missing.length)}</b>حصة مضت ولم تُرصد</div>
-          <div class="k"><b>${AR(taken)}/${AR(slots.length)}</b>حصة مرصودة من ${AR(total)} طالب</div>
+          <button type="button" data-kd="dr" class="dd-k k"><b>${dRate == null ? '—' : AR(dRate) + '٪'}</b>الحضور الصباحي</button>
+          <button type="button" data-kd="pr" class="dd-k k"><b>${rate == null ? '—' : AR(rate) + '٪'}</b>نسبة الحضور في الحصص</button>
+          <button type="button" data-kd="ab" class="dd-k k bad"><b>${AR(abs.size)}</b>طالب غائب (اليوم كاملاً أو حصة)</button>
+          <button type="button" data-kd="lt" class="dd-k k warn"><b>${AR(late.size)}</b>متأخر</button>
+          <button type="button" data-kd="ex" class="dd-k k info"><b>${AR(exc.size)}</b>مستأذن</button>
+          <button type="button" data-kd="ea" class="dd-k k info"><b>${AR(early.size)}</b>خروج مبكر</button>
+          <button type="button" data-kd="miss" class="dd-k k ${missing.length ? 'bad' : 'ok'}"><b>${AR(missing.length)}</b>حصة مضت ولم تُرصد</button>
+          <button type="button" data-kd="tk" class="dd-k k"><b>${AR(taken)}/${AR(slots.length)}</b>حصة مرصودة من ${AR(total)} طالب</button>
         </div>
         <h3 style="margin:16px 0 6px">الفصول × الحصص <span class="small muted">(الرقم = عدد الغائبين)</span></h3>
         <div class="scroll"><table class="tbl pal-m"><thead><tr><th>الفصل</th><th title="الحضور الصباحي لليوم كاملاً">صباحي</th>${Array.from({ length: P }, (_, p) => `<th>${PER[p] || AR(p + 1)}</th>`).join('')}</tr></thead><tbody>${cls.map(c => `<tr><th><button class="lnk" data-gc="${c.id}">${esc(c.name)}</button></th>${dCell(c.id)}${Array.from({ length: P }, (_, p) => cell(c.id, p).replace('<td', `<td data-cp="${c.id}|${p}"`)).join('')}</tr>`).join('')}</tbody></table></div>
@@ -120,6 +120,17 @@
         </div>
         ${missing.length ? `<div class="sec-box" style="margin-top:12px;border-color:#C53030"><b>حصص مضت ولم تُرصد (${AR(missing.length)})</b><div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">${missing.map(x => `<button class="ldc ldbtn" data-cp="${x.c}|${x.p}">${esc(cName(x.c))} · ${AR(x.p + 1)} — ${esc(A.subjName(x.e.subject_id))}${x.e.teacher_id ? ' · ' + esc(A.personName(x.e.teacher_id)) : ''}</button>`).join('')}</div></div>` : ''}`;
       $('#lvD', box).onchange = e => { day = e.target.value; A.LS.set('lvday', day); draw(); };
+      // الضغط على أي رقم يعرض بياناته كاملة
+      const sec = id => cName(id), recRow = x => ({ cells: [`<b>${esc(sN(x.student_id))}</b>`, esc(sec(x.class_id)), stName(x.status), x.period >= 0 && x.period != null ? 'الحصة ' + AR(x.period + 1) : 'اليوم كاملاً', x.time_at ? AR(String(x.time_at).slice(0, 5)) : '', x.minutes ? AR(x.minutes) : '', esc(x.note || '')], q: sN(x.student_id) + ' ' + sec(x.class_id) });
+      const RC = ['الطالب', 'الفصل', 'الحالة', 'متى', 'الوقت', 'الدقائق', 'ملاحظة'], sub = `${DAYS[dow(day)]} ${A.arDate ? A.arDate(day) : AR(day)}`;
+      const byK = k => L.filter(x => x.status === k).concat(D.filter(x => x.status === k).map(x => ({ ...x, period: -1 })));
+      const DR = { dr: () => ({ title: 'الحضور الصباحي حسب الفصل', cols: ['الفصل', 'المرصودون', 'الغائبون', 'نسبة الحضور'], rows: cls.map(c => { const l = D.filter(x => x.class_id === c.id), a = l.filter(x => x.status === 'absent').length; return { cells: [`<b>${esc(c.name)}</b>`, AR(l.length), AR(a), l.length ? AR(Math.round(100 * (l.length - a) / l.length)) + '٪' : 'لم يُرصد'], q: c.name }; }) }),
+        pr: () => ({ title: 'الحضور في الحصص حسب الفصل', cols: ['الفصل', 'حصص مرصودة', 'سجلات', 'غياب', 'نسبة الحضور'], rows: cls.map(c => { const l = L.filter(x => x.class_id === c.id), a = l.filter(x => x.status === 'absent').length; return { cells: [`<b>${esc(c.name)}</b>`, AR(new Set(l.map(x => x.period)).size), AR(l.length), AR(a), l.length ? AR(Math.round(100 * (l.length - a) / l.length)) + '٪' : '—'], q: c.name }; }) }),
+        ab: () => ({ title: 'الطلاب الغائبون', cols: ['الطالب', 'الفصل', 'الغياب'], rows: absList.map(x => ({ cells: [`<b>${esc(x.n)}</b>`, esc(sec(x.c)), psTxt(x)], q: x.n + ' ' + sec(x.c) })) }),
+        lt: () => ({ title: 'المتأخرون', cols: RC, rows: byK('late').map(recRow) }), ex: () => ({ title: 'المستأذنون', cols: RC, rows: byK('excused').map(recRow) }), ea: () => ({ title: 'الخروج المبكر', cols: RC, rows: byK('early').map(recRow) }),
+        miss: () => ({ title: 'حصص مضت ولم تُرصد', cols: ['الفصل', 'الحصة', 'المادة', 'المعلم'], rows: missing.map(x => ({ cells: [`<b>${esc(sec(x.c))}</b>`, AR(x.p + 1), esc(A.subjName(x.e.subject_id)), esc(A.personName(x.e.teacher_id) || '')], q: sec(x.c) + ' ' + (A.personName(x.e.teacher_id) || '') })) }),
+        tk: () => ({ title: 'الحصص المرصودة', cols: ['الفصل', 'الحصة', 'المرصودون', 'الغائبون'], rows: [...new Set(L.map(x => x.class_id + '|' + x.period))].map(k => { const [c, p] = k.split('|'); const l = L.filter(x => x.class_id === c && x.period === +p); return { cells: [`<b>${esc(sec(c))}</b>`, AR(+p + 1), AR(l.length), AR(l.filter(x => x.status === 'absent').length)], q: sec(c) }; }) }) };
+      $$('[data-kd]', box).forEach(b => b.onclick = () => { const o = DR[b.dataset.kd](); if (A.attDrill) A.attDrill({ ...o, sub }); });
       $$('[data-cp]', box).forEach(b => b.onclick = () => { if (!canAll()) return; const [c, p] = b.dataset.cp.split('|'); if (b.classList.contains('fut') || b.classList.contains('na')) return; A.takePeriod(c, day, +p, draw); });
       $$('[data-gc]', box).forEach(b => b.onclick = () => { A.LS.set('pacls', b.dataset.gc); A.LS.set('paday', day); A.LS.set('atttab', 'periods'); V.attendance(box.closest('main') || document.querySelector('main')); });
       $('#lvPr', box).onclick = () => A.printDoc('التقرير اليومي للحضور', `${DAYS[dow(day)]} ${AR(A.dmy(A.parseDate(day)))} · ${(A.section() || {}).name || ''}`,

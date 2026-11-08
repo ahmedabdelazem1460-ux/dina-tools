@@ -97,6 +97,7 @@
       const all = m.el.querySelector('#lvmAll'); if (all) all.onclick = () => { m.close(); openModal(''); };
     };
     const op = $('#lvaOpen', el); if (op) op.onclick = () => openModal('');
+    ['lvAb', 'lvLt', 'lvEx'].forEach(id => { const k = document.getElementById(id); const box = k && k.closest('.k'); if (box) { box.classList.add('dd-k'); box.tabIndex = 0; box.setAttribute('role', 'button'); box.onclick = () => openModal(''); box.onkeydown = e => { if (e.key === 'Enter') openModal(''); }; } });
     $$('[data-cl]', el).forEach(b => b.onclick = () => openModal(b.dataset.cl));
     $('#lvaPr', el).onclick = () => A.printDoc('الحضور والغياب اليوم', `${sec.name || ''} · ${DAYS[A.parseDate(day).getDay()]} ${AR(A.dmy(A.parseDate(day)))}`, `<div style="display:flex;justify-content:center">${donut(M)}</div><h3>نسبة الغياب حسب الفصل</h3><table><tr><th>الفصل</th><th>الطلاب</th><th>الغائبون</th><th>النسبة</th></tr>${perCls.map(x => `<tr><td>${esc(x.c.name)}</td><td>${AR(x.n)}</td><td>${AR(x.ab)}</td><td>${AR(x.p)}٪</td></tr>`).join('')}</table>${details('')}`, false);
     // الأيقونة المتحركة التفاعلية

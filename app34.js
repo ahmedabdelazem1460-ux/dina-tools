@@ -59,7 +59,8 @@
   // ---------- التقرير اليومي A4 ----------
   async function report(day, D) {
     const sec = A.section(), d = A.parseDate(day).getDay();
-    const [subs, pa] = await Promise.all([api.list('substitutions', { section_id: sec.id, day }).catch(() => []), api.list('period_attendance', { section_id: sec.id, day }).catch(() => [])]);
+    const [subs, pa0, dl] = await Promise.all([api.list('substitutions', { section_id: sec.id, day }).catch(() => []), api.list('period_attendance', { section_id: sec.id, day }).catch(() => []), api.list('attendance', { school_id: S.school.id, day }).catch(() => [])]);
+    const secIds = new Set((S.classes || []).filter(c => c.section_id === sec.id).map(c => c.id)); const pa = pa0.concat(dl.filter(x => secIds.has(x.class_id)));
     const roster = ((sec.standby || {}).roster) || {}, P = sec.periods || 7, per = ((sec.standby || {}).per) || 2;
     const uniq = k => new Set(pa.filter(x => x.status === k).map(x => x.student_id)).size;
     const pn = id => A.personName(id) || '—';
@@ -105,7 +106,7 @@
         <div class="pal-k">
           <div class="k info"><b>${cur >= 0 ? (PER[cur] || AR(cur + 1)) : '—'}</b>الحصة الآن</div>
           <div class="k ${rc != null && rc < 80 ? 'bad' : 'ok'}"><b>${rc == null ? '—' : AR(rc) + '٪'}</b>رصد الحضور للحصص الماضية</div>
-          <div class="k bad"><b>${AR(uniq('absent'))}</b>طالب غائب</div><div class="k warn"><b>${AR(uniq('late'))}</b>متأخر</div><div class="k info"><b>${AR(uniq('excused') + uniq('early'))}</b>مستأذن/خروج</div>
+          <div class="k bad"><b id="lvAb">${AR(uniq('absent'))}</b>طالب غائب</div><div class="k warn"><b id="lvLt">${AR(uniq('late'))}</b>متأخر</div><div class="k info"><b id="lvEx">${AR(uniq('excused') + uniq('early'))}</b>مستأذن/خروج</div>
           <div class="k"><b>${AR(subs.length)}</b>حصة مؤمَّنة اليوم</div><div class="k"><b>${AR(clicks.length)}</b>دخول لحصص عن بعد اليوم</div><div class="k"><b>${AR(beh.length)}</b>ملاحظة سلوك اليوم</div>
           <div class="k ${req.length && done / req.length < .8 ? 'warn' : 'ok'}"><b>${req.length ? AR(Math.round(100 * done / req.length)) + '٪' : '—'}</b>إنجاز خطط الأسبوع</div>
         </div>
@@ -113,7 +114,8 @@
           <div class="sec-box"><b>الآن — ${cur >= 0 ? 'الحصة ' + (PER[cur] || AR(cur + 1)) : 'خارج وقت الحصص'}</b>${cur >= 0 ? `<table class="tbl" style="margin-top:6px"><tbody>${todaySlots.filter(e => e.period === cur).map(e => { const sbx = subs.find(x => x.class_id === e.class_id && x.period === cur); return `<tr><td><b>${esc((A.cls(e.class_id) || {}).name || '')}</b></td><td>${esc(A.subjName(e.subject_id))}</td><td class="small">${esc(sbx ? A.personName(sbx.sub_teacher) + ' (بديل)' : A.personName(e.teacher_id) || '')}</td><td>${taken.has(e.class_id + '|' + cur) ? '<span class="pill st-approved">حُضّر</span>' : '<span class="pill st-empty">لم يُحضَّر</span>'}</td></tr>`; }).join('') || '<tr><td>لا حصص</td></tr>'}</tbody></table>` : ''}</div>
           <div class="sec-box"><b>المنتظرون الآن</b><p style="margin:6px 0 0">${sb.filter(Boolean).map((t, k) => `منتظر ${AR(k + 1)}: <b>${esc(A.personName(t))}</b>`).join(' · ') || '<span class="small muted">لا يوجد</span>'}</p>
             <b style="display:block;margin-top:10px">تأمين اليوم</b>${subs.length ? `<ul class="small" style="margin:4px 0 0;padding-inline-start:18px">${subs.sort((a, b) => a.period - b.period).map(x => `<li>الحصة ${AR(x.period + 1)} · ${esc((A.cls(x.class_id) || {}).name || '')}: ${esc(A.personName(x.sub_teacher) || '—')} بدل ${esc(A.personName(x.absent_teacher) || '')}</li>`).join('')}</ul>` : '<p class="small muted" style="margin:4px 0 0">لا يوجد</p>'}</div>
-        </div><div id="lvDu"></div>`;
+        </div><div id="lvAtt"></div><div id="lvDu"></div>`;
+      if (A.attDash) A.attDash($('#lvAtt', B), { sec, day, pa }).then(M => { if (!M) return; $('#lvAb', B).textContent = AR(M.absent); $('#lvLt', B).textContent = AR(M.late); $('#lvEx', B).textContent = AR(M.excused + M.early); }).catch(() => { });
       if (A.dutyNowBox) A.dutyNowBox($('#lvDu', B)).catch(() => { });
     };
     await draw(); clearInterval(lvT); lvT = setInterval(() => { if (!document.hidden) draw().catch(() => { }); }, 60000);

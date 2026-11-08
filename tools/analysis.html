@@ -382,7 +382,7 @@ function pct(n){ return (Math.round(n*1000)/10)+'%'; }
 function currentSubject(){ return DB.subjects.find(s=>s.id===UI.subjectId) || null; }
 function subjectStudents(subject){
   if(!subject) return [];
-  return DB.students.filter(st => st.grade===subject.grade && st.section===subject.section);
+  return DB.students.filter(st => st.grade===subject.grade && st.section===subject.section && !st.left);
 }
 function getRecord(subjectId, studentId){
   DB.scores[subjectId] = DB.scores[subjectId] || {};
@@ -4099,6 +4099,27 @@ document.addEventListener('keydown', e=>{
 });
 initHistory();
 renderApp();
+</script>
+<script>
+/* مزامنة قاعدة الطلاب الموحدة في منصة دينا: المطابقة برقم الطالب في المنصة (pid)؛ تحديث الاسم والصف والفصل، وإضافة الجدد، والموقوف يُعلَّم «غادر» ولا تُحذف درجاته */
+addEventListener('message', function (e) {
+  if (e.origin !== location.origin || !e.data || e.data.type !== 'dina-students-sync') return;
+  var r = { add: 0, upd: 0, left: 0 };
+  try {
+    var nk = function (x) { return String(x || '').trim().replace(/\s+/g, ' ').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي'); };
+    var key = function (s) { return nk(s.name) + '|' + nk(s.grade) + '|' + nk(s.section); };
+    (e.data.list || []).forEach(function (s) {
+      if (!s || !s.pid || !s.name) return;
+      var st = DB.students.find(function (x) { return x.pid === s.pid; }) || DB.students.find(function (x) { return !x.pid && key(x) === key(s); });
+      if (st) { var ch = !st.pid || st.name !== s.name || st.grade !== s.grade || st.section !== s.section || st.left; st.pid = s.pid; st.name = s.name; st.grade = s.grade; st.section = s.section; if (!st.no && s.no) st.no = String(s.no); if (st.left) delete st.left; if (ch) r.upd++; }
+      else { DB.students.push({ id: uid('st'), pid: s.pid, name: s.name, grade: s.grade, section: s.section, no: s.no ? String(s.no) : '' }); r.add++; }
+    });
+    var gs = new Set(e.data.gone || []);
+    DB.students.forEach(function (x) { if (x.pid && gs.has(x.pid) && !x.left) { x.left = true; r.left++; } });
+    if (r.add || r.upd || r.left) { saveDB(); renderApp(); }
+  } catch (x) { r.err = String(x); }
+  parent.postMessage({ type: 'dina-students-synced', add: r.add, upd: r.upd, left: r.left, err: r.err || '' }, location.origin);
+});
 </script>
 </body>
 </html>

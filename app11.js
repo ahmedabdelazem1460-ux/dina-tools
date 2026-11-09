@@ -20,7 +20,7 @@
     if (prevAfter) await prevAfter.apply(this, arguments);
     if (S._attSub === S.me.id || !api.subscribe) return; S._attSub = S.me.id;
     try {
-      if (mod('counselor')) api.subscribe('bh-' + sch(), 'behaviors', null, p => { const r = p && p.new; if (r && r.referred && r.by_staff !== S.me.id) A.toast('إحالة جديدة للمرشد الطلابي: ' + (stu(r.student_id).full_name || 'طالب'), 'ok'); if (A._attRefresh) A._attRefresh(); });
+      if (mod('counselor') || mod('deputy')) api.subscribe('bh-' + sch(), 'behaviors', null, p => { const r = p && p.new, o = p && p.old; const fresh = r && r.referred && r.by_staff !== S.me.id && (p.eventType ? p.eventType === 'INSERT' : !(o && o.id)); const tg = r && r.target === 'deputy' ? 'deputy' : 'counselor'; if (fresh && mod(tg)) A.toast((tg === 'deputy' ? 'إحالة جديدة للوكيل: ' : 'إحالة جديدة للمرشد الطلابي: ') + (stu(r.student_id).full_name || 'طالب'), 'ok'); if (A._attRefresh) A._attRefresh(); });
       // إحالات الغياب والتأخر تصل للموجه الطلابي لحظياً (تُجمع في تنبيه واحد)
       let refQ = [], refT = null;
       if (mod('attendance') || mod('counselor')) api.subscribe('att-' + sch(), 'attendance', null, p => { const r = p && p.new; if (mod('counselor') && r && r.referred && r.by_staff !== S.me.id && r.day === today()) { refQ.push(stu(r.student_id).full_name || 'طالب'); clearTimeout(refT); refT = setTimeout(() => { const u = [...new Set(refQ)]; refQ = []; A.toast(`إحالة غياب/تأخر للموجه: ${u.slice(0, 3).join('، ')}${u.length > 3 ? ' و' + AR(u.length - 3) + ' آخرين' : ''}`, 'ok'); }, 1500); } if (A._attRefresh) A._attRefresh(); });

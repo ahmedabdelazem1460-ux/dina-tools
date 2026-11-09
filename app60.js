@@ -8,6 +8,10 @@
   const A = window.APP, V = window.VIEWS; if (!A) return;
   const { S, api, $, $$, esc, AR } = A;
   const isC = () => !!(S.me && A.hasModule && A.hasModule('counselor'));
+  const isD = () => !!(S.me && A.hasModule && A.hasModule('deputy'));
+  // جهة الإحالة: الموجه الطلابي (الافتراضي) أو الوكيل
+  const TO = { counselor: ['الموجه الطلابي', '🧭'], deputy: ['الوكيل', '🏫'] };
+  const toOf = r => (r && r.target) === 'deputy' ? 'deputy' : 'counselor';
   const today = () => new Date(Date.now() + 3 * 36e5).toISOString().slice(0, 10);
   const dt = d => d ? (A.arDate ? A.arDate(String(d).slice(0, 10)) : String(d).slice(0, 10)) : '—';
   const nm = id => (A.personName && A.personName(id)) || '—';
@@ -32,10 +36,12 @@
   // ---------- التنقل ----------
   A.I.refer = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>';
   A.I.counsel = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z"/><path d="M9.5 11.5h5M12 9v5"/></svg>';
+  A.I.deputy = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V8l7-5 7 5v13"/><path d="M10 21v-5h4v5M9 11h6"/></svg>';
   if (A.NAV) {
     const at = A.NAV.findIndex(n => n[0] === 'attendance');
     if (!A.NAV.some(n => n[0] === 'counsel')) A.NAV.splice(at < 0 ? A.NAV.length : at + 1, 0, ['counsel', 'الإرشاد الطلابي', () => isC()]);
-    if (!A.NAV.some(n => n[0] === 'refer')) A.NAV.splice(at < 0 ? A.NAV.length : at + 1, 0, ['refer', 'إحالة إلى الموجه', () => !!S.me]);
+    if (!A.NAV.some(n => n[0] === 'deputy')) A.NAV.splice(at < 0 ? A.NAV.length : at + 1, 0, ['deputy', 'إحالات الوكيل', () => isD()]);
+    if (!A.NAV.some(n => n[0] === 'refer')) A.NAV.splice(at < 0 ? A.NAV.length : at + 1, 0, ['refer', 'إحالة طالب', () => !!S.me]);
   }
 
   const css = `
@@ -69,29 +75,88 @@
   .cs-bars{display:grid;gap:6px}.cs-bar{display:grid;grid-template-columns:minmax(110px,190px) 1fr 40px;gap:8px;align-items:center;font-size:13px}.cs-bar i{display:block;height:12px;border-radius:6px;background:linear-gradient(90deg,#3AB1DB,#005499)}`;
   if (!document.getElementById('app60css')) { const s = document.createElement('style'); s.id = 'app60css'; s.textContent = css; document.head.appendChild(s); }
 
+  // ============ طباعة الإحالات بهوية دينا (استوديو التقارير A.printDoc) ============
+  const refRows = r => [['الجهة المُحال إليها', TO[toOf(r)][0]], ['نوع الإحالة', TYPES[typeOf(r)][0]], ['السبب', r.category], ['الأولوية', PR[r.priority || 'normal'][0]], ['التاريخ', dt(r.day) + (r.period ? ' · الحصة ' + AR(r.period) : '')], ['المُحيل', nm(r.by_staff) + ' — ' + role(r.by_staff)], ['الإجراء قبل الإحالة', r.prior_action || '—'], ['حالة الإحالة', BST[r.status || 'open'][0]]];
+  function printRef(r, s) {
+    if (!A.printDoc || !r) return;
+    const body = `<h3>بيانات الطالب</h3><table><tr><th>الطالب</th><th>الفصل</th><th>رقم الطالب</th></tr><tr><td><b>${esc(s.full_name || '')}</b></td><td>${esc(cName(r.class_id))}</td><td>${esc(s.student_no || '—')}</td></tr></table>
+      <h3>بيانات الإحالة</h3><table>${refRows(r).map(([k, v]) => `<tr><th style="width:32%">${k}</th><td>${esc(v || '—')}</td></tr>`).join('')}</table>
+      <h3>وصف الحالة</h3><p style="white-space:pre-wrap;line-height:1.9">${esc(r.note || '—')}</p>
+      ${r.reply ? `<h3>ردّ ${TO[toOf(r)][0]}</h3><p style="white-space:pre-wrap;line-height:1.9">${esc(r.reply)}${r.replied_at ? ` <span style="color:#5B7090">(${dt(r.replied_at)})</span>` : ''}</p>` : ''}
+      <table style="margin-top:28px"><tr><th>المُحيل</th><th>${TO[toOf(r)][0]}</th><th>مدير المدرسة</th></tr><tr><td style="height:56px">${esc(nm(r.by_staff))}</td><td></td><td></td></tr></table>`;
+    A.printDoc('نموذج إحالة طالب إلى ' + TO[toOf(r)][0], `${s.full_name || ''} · ${cName(r.class_id)} · ${dt(r.day)}`, body);
+  }
+  function printRefList(L, sOf, title, sub) {
+    if (!A.printDoc) return;
+    const cnt = (f) => { const m = {}; L.forEach(r => { const k = f(r); m[k] = (m[k] || 0) + 1; }); return Object.entries(m).sort((a, b) => b[1] - a[1]); };
+    const sumT = (h, E) => `<table><tr><th>${h}</th><th>العدد</th></tr>${E.map(([k, n]) => `<tr><td>${esc(k)}</td><td>${AR(n)}</td></tr>`).join('')}</table>`;
+    const body = `<h3>ملخص</h3><table><tr><th>إجمالي الإحالات</th><th>جديدة</th><th>قيد المتابعة</th><th>مغلقة</th></tr><tr><td><b>${AR(L.length)}</b></td><td>${AR(L.filter(r => (r.status || 'open') === 'open').length)}</td><td>${AR(L.filter(r => r.status === 'in_progress').length)}</td><td>${AR(L.filter(r => r.status === 'closed').length)}</td></tr></table>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div><h3>حسب السبب</h3>${sumT('السبب', cnt(r => r.category))}</div><div><h3>حسب الجهة</h3>${sumT('الجهة', cnt(r => TO[toOf(r)][0]))}</div></div>
+      <h3>تفاصيل الإحالات</h3><table><tr><th>#</th><th>التاريخ</th><th>الطالب</th><th>الفصل</th><th>إلى</th><th>السبب</th><th>الأولوية</th><th>المُحيل</th><th>الحالة</th><th>الردّ</th></tr>${L.map((r, i) => `<tr><td>${AR(i + 1)}</td><td>${dt(r.day)}</td><td><b>${esc(sOf(r.student_id).full_name || '')}</b></td><td>${esc(cName(r.class_id))}</td><td>${TO[toOf(r)][0]}</td><td>${esc(r.category)}</td><td>${PR[r.priority || 'normal'][0]}</td><td>${esc(nm(r.by_staff))}</td><td>${BST[r.status || 'open'][0]}</td><td>${esc(r.reply || '')}</td></tr>`).join('')}</table>`;
+    A.printDoc(title, sub, body, true);
+  }
+
+  // ============ مساحة الوكيل: إحالات الطلاب الموجّهة إليه ============
+  const dst = { tab: 'inbox', s: '', q: '' };
+  V.deputy = async function (root) {
+    if (!isD()) { root.innerHTML = `<div class="card">${A.emptyBox('هذه الصفحة للوكيل والمالك', 'يمنحها المالك من «المسميات والصلاحيات» ← وحدة الوكيل')}</div>`; return; }
+    root.innerHTML = '<div class="spinner"></div>';
+    const [stu, , all] = await Promise.all([A.studentsAll ? A.studentsAll() : api.list('students', { school_id: S.school.id }), allCls(),
+      api.list('behaviors', { school_id: S.school.id, referred: true, target: 'deputy' }, { order: 'created_at', desc: true }).catch(() => [])]);
+    const sOf = id => (stu || []).find(x => x.id === id) || {};
+    const rank = r => ({ urgent: 0, high: 1, normal: 2 }[r.priority || 'normal']);
+    const inbox = all.filter(r => (r.status || 'open') !== 'closed').sort((a, b) => rank(a) - rank(b) || String(b.created_at).localeCompare(String(a.created_at)));
+    const reload = () => V.deputy(root);
+    root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>إحالات الوكيل</h2><p class="sub" style="margin:2px 0 0">الطلاب المُحالون إليك من المعلمين ومراقبي الأدوار — عالج الإحالة وردّ على المُحيل، واطبع الإحالة أو التقرير بهوية دينا.</p></div></div>
+      <div class="grid g4" style="margin:8px 0">${[['جديدة', all.filter(r => (r.status || 'open') === 'open').length, all.some(r => (r.status || 'open') === 'open' && r.priority === 'urgent') ? 'var(--bad)' : ''], ['قيد المتابعة', all.filter(r => r.status === 'in_progress').length, ''], ['مغلقة', all.filter(r => r.status === 'closed').length, ''], ['هذا الشهر', all.filter(r => String(r.created_at || r.day).slice(0, 7) === today().slice(0, 7)).length, '']].map(([l, n, c]) => `<div class="kpi"><b style="${c ? 'color:' + c : ''}">${AR(n)}</b><span>${l}</span></div>`).join('')}</div>
+      <div class="fm-tabs" role="tablist">${[['inbox', 'الوارد', inbox.length], ['all', 'كل الإحالات', 0]].map(([k, l, n]) => `<button role="tab" data-tb="${k}" class="${dst.tab === k ? 'on' : ''}" aria-selected="${dst.tab === k}">${l}${n ? `<span class="n">${AR(n)}</span>` : ''}</button>`).join('')}</div>
+      <div class="row" style="gap:8px;flex-wrap:wrap;margin:10px 0"><select class="in" id="dpS" style="max-width:170px" aria-label="الحالة"><option value="">كل الحالات</option>${Object.entries(BST).map(([k, v]) => `<option value="${k}" ${dst.s === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select><input class="in" id="dpQ" placeholder="بحث باسم الطالب أو المُحيل" style="max-width:260px" value="${esc(dst.q)}"><span class="grow"></span><button class="btn ghost sm" id="dpPr" type="button">${A.I.print || ''} طباعة التقرير</button></div>
+      <div id="dpL"></div></div>`;
+    $$('[data-tb]', root).forEach(b => b.onclick = () => { dst.tab = b.dataset.tb; reload(); });
+    const list = () => { const base = dst.tab === 'inbox' ? inbox : all, q = A.normKey ? A.normKey(dst.q) : dst.q;
+      return base.filter(r => (!dst.s || (r.status || 'open') === dst.s) && (!q || (A.normKey ? A.normKey(sOf(r.student_id).full_name + ' ' + nm(r.by_staff)) : '').includes(q))); };
+    const card = r => { const s = sOf(r.student_id); return `<div class="cs-card pr-${r.priority || 'normal'}"><div class="cs-hd"><b>${esc(s.full_name || '')}</b><span class="small muted">${esc(cName(r.class_id))}</span>${pill(PR, r.priority || 'normal')}${pill(BST, r.status || 'open')}<span class="pill">${esc(TYPES[typeOf(r)][0])}</span></div>
+      <div class="meta"><span><b>${esc(r.category)}</b></span><span>من ${esc(nm(r.by_staff))} · ${esc(role(r.by_staff))}</span><span>${dt(r.day)}${r.period ? ' · الحصة ' + AR(r.period) : ''}</span></div>
+      ${r.note ? `<div style="white-space:pre-wrap">${esc(r.note)}</div>` : ''}${r.prior_action && r.prior_action !== 'لا شيء' ? `<div class="small muted">الإجراء قبل الإحالة: ${esc(r.prior_action)}</div>` : ''}${r.reply ? `<div class="rep"><b>ردّك:</b> ${esc(r.reply)}</div>` : ''}
+      <div class="acts">${(r.status || 'open') === 'open' ? `<button class="btn ghost sm" data-ip="${r.id}">بدء المتابعة</button>` : ''}${r.status !== 'closed' ? `<button class="btn sm" data-cl="${r.id}">ردّ وإغلاق</button>` : `<button class="btn ghost sm" data-ro="${r.id}">إعادة فتح</button>`}<button class="btn ghost sm" data-rp="${r.id}">ردّ على المُحيل</button><button class="btn ghost sm" data-pr="${r.id}">${A.I.print || ''} طباعة</button></div></div>`; };
+    const draw = () => { const L = list(); $('#dpL', root).innerHTML = L.length ? `<div class="cs-list">${L.slice(0, 300).map(card).join('')}</div>` : A.emptyBox(dst.tab === 'inbox' ? 'لا إحالات بانتظار المعالجة' : 'لا إحالات');
+      const by = id => all.find(x => x.id === id);
+      const upd = async (r, patch, msg) => { await api.upd('behaviors', r.id, patch); if (msg) notify([r.by_staff], 'ردّ الوكيل على إحالتك: ' + (sOf(r.student_id).full_name || ''), msg); A.toast('حُفظ', 'ok'); reload(); };
+      $$('[data-ip]', root).forEach(b => b.onclick = () => A.run(b, () => upd(by(b.dataset.ip), { status: 'in_progress' })));
+      $$('[data-ro]', root).forEach(b => b.onclick = () => A.run(b, () => upd(by(b.dataset.ro), { status: 'in_progress' })));
+      $$('[data-cl]', root).forEach(b => b.onclick = async () => { const r = by(b.dataset.cl); const v = await ask('ردّك على المُحيل (يظهر له في «إحالاتي»)', r.reply || 'اطّلعت على الحالة وتمت معالجتها'); if (v == null) return; A.run(b, () => upd(r, { status: 'closed', reply: v, replied_at: new Date().toISOString() }, v)); });
+      $$('[data-rp]', root).forEach(b => b.onclick = async () => { const r = by(b.dataset.rp); const v = await ask('ردّك على المُحيل', r.reply || ''); if (v == null) return; A.run(b, () => upd(r, { reply: v, replied_at: new Date().toISOString(), status: (r.status || 'open') === 'open' ? 'in_progress' : r.status }, v)); });
+      $$('[data-pr]', root).forEach(b => b.onclick = () => { const r = by(b.dataset.pr); printRef(r, sOf(r.student_id)); }); };
+    $('#dpS', root).onchange = e => { dst.s = e.target.value; draw(); };
+    $('#dpQ', root).oninput = e => { dst.q = e.target.value; draw(); };
+    $('#dpPr', root).onclick = () => printRefList(list(), sOf, 'تقرير إحالات الوكيل', `${(S.school || {}).name || ''} · ${dst.tab === 'inbox' ? 'الوارد' : 'كل الإحالات'}${dst.s ? ' · ' + BST[dst.s][0] : ''}`);
+    draw();
+  };
+
   // ============ صفحة الإحالة (لكل المعلمين ومراقبي الأدوار) ============
-  const rf = { type: 'behavior', pr: 'normal', cls: '', sid: '' };
+  const rf = { type: 'behavior', pr: 'normal', cls: '', sid: '', to: 'counselor' };
   V.refer = async function (root) {
     root.innerHTML = '<div class="spinner"></div>';
     const [stu, cl] = await Promise.all([A.studentsAll ? A.studentsAll() : api.list('students', { school_id: S.school.id }), allCls()]);
     const myCls = new Set((S.allEntries || S.entries || []).filter(e => e.teacher_id === S.me.id).map(e => e.class_id));
     const classes = cl.filter(c => c.active !== false && !c.is_test && (stu || []).some(s => s.class_id === c.id && s.active !== false)).sort((a, b) => (myCls.has(b.id) - myCls.has(a.id)) || (a.sort || 0) - (b.sort || 0) || String(a.name).localeCompare(b.name, 'ar'));
     if (!classes.some(c => c.id === rf.cls)) rf.cls = (classes[0] || {}).id || '';
-    root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>إحالة إلى الموجه الطلابي</h2><p class="sub" style="margin:2px 0 0">أحِل طالباً يحتاج متابعة سلوكية أو دراسية أو نفسية. يصل للموجه تنبيه فوري، وتتابع الحالة وردّه من «إحالاتي».</p></div></div>
+    root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>إحالة طالب</h2><p class="sub" style="margin:2px 0 0">أحِل طالباً إلى <b>الموجه الطلابي</b> أو <b>الوكيل</b> مع السبب. يصل لهم تنبيه فوري، وتتابع الحالة والردّ من «إحالاتي»، ويمكنك طباعة الإحالة والتقرير بهوية دينا.</p></div></div>
       <div class="cs-form" style="margin-top:8px">
         <div class="field"><label for="rfC">الفصل</label><select class="in" id="rfC">${classes.map(c => `<option value="${c.id}" ${c.id === rf.cls ? 'selected' : ''}>${esc(c.name)}${myCls.has(c.id) ? ' ★' : ''}</option>`).join('')}</select></div>
         <div class="field"><label for="rfQ">بحث عن طالب</label><input class="in" id="rfQ" placeholder="اكتب جزءاً من الاسم (يبحث في كل الفصول)"></div></div>
       <div class="field"><label>الطالب <span class="small muted" id="rfSel"></span></label><div class="cs-stu" id="rfS" role="listbox" aria-label="الطلاب"></div></div>
+      <div class="field"><label>إحالة إلى</label><div class="cs-chips" id="rfTo">${Object.entries(TO).map(([k, v]) => `<button type="button" data-to="${k}" class="${rf.to === k ? 'on' : ''}" aria-pressed="${rf.to === k}">${v[1]} ${v[0]}</button>`).join('')}</div></div>
       <div class="field"><label>نوع الإحالة</label><div class="cs-chips" id="rfT">${Object.entries(TYPES).map(([k, v]) => `<button type="button" data-t="${k}" class="${rf.type === k ? 'on' : ''}" aria-pressed="${rf.type === k}">${v[0]}</button>`).join('')}</div></div>
       <div class="cs-form">
         <div class="field"><label for="rfCat">السبب</label><select class="in" id="rfCat"></select></div>
         <div class="field"><label>الأولوية</label><div class="cs-chips" id="rfP">${Object.entries(PR).map(([k, v]) => `<button type="button" data-p="${k}" class="pr-${k} ${rf.pr === k ? 'on' : ''}" aria-pressed="${rf.pr === k}">${v[0]}</button>`).join('')}</div></div>
         <div class="field"><label for="rfD">التاريخ</label><input class="in" type="date" id="rfD" value="${today()}"></div>
         <div class="field"><label for="rfPe">الحصة (اختياري)</label><select class="in" id="rfPe"><option value="">—</option>${Array.from({ length: 8 }, (_, i) => `<option value="${i + 1}">${A.ORD ? A.ORD[i] || AR(i + 1) : AR(i + 1)}</option>`).join('')}</select></div></div>
-      <div class="field"><label for="rfN">وصف الحالة</label><textarea class="in" id="rfN" rows="3" placeholder="ماذا حدث؟ متى؟ هل تكرر؟ (يراه الموجه فقط)"></textarea></div>
+      <div class="field"><label for="rfN">وصف الحالة</label><textarea class="in" id="rfN" rows="3" placeholder="ماذا حدث؟ متى؟ هل تكرر؟"></textarea></div>
       <div class="field"><label for="rfPa">الإجراء المتخذ قبل الإحالة</label><select class="in" id="rfPa">${PRIOR.map(x => `<option>${x}</option>`).join('')}</select></div>
-      <div class="row" style="gap:8px;margin-top:6px"><button class="btn" id="rfGo">إرسال الإحالة</button><span class="small muted">الإحالة سرية: لا يراها إلا الموجه الطلابي والمالك وأنت.</span></div></div>
-      <div class="card"><div class="head"><h2 style="margin:0">إحالاتي</h2></div><div id="rfMine"><div class="spinner"></div></div></div>
+      <div class="row" style="gap:8px;margin-top:6px"><button class="btn" id="rfGo">إرسال الإحالة</button><span class="small muted" id="rfPriv">الإحالة سرية: لا يراها إلا ${TO[rf.to][0]} والمالك وأنت.</span></div></div>
+      <div class="card"><div class="head"><h2 style="margin:0" class="grow">إحالاتي</h2><button class="btn ghost sm" id="rfPrAll" type="button">${A.I.print || ''} طباعة تقرير إحالاتي</button></div><div id="rfMine"><div class="spinner"></div></div></div>
       <div class="card" id="rfGc"><div class="head"><h2 style="margin:0">توجيهات الموجه <span class="pill" id="rfGn" hidden></span></h2></div><div id="rfG"><div class="spinner"></div></div></div>`;
     myGuides($('#rfG', root)).then(n => { const p = $('#rfGn', root); if (n) { p.hidden = false; p.className = 'pill st-submitted'; p.textContent = AR(n) + ' بانتظار اطلاعك'; const c = $('#rfGc', root); c.parentNode.insertBefore(c, c.parentNode.firstChild); } });
     const drawStu = () => { const q = A.normKey ? A.normKey($('#rfQ', root).value) : $('#rfQ', root).value;
@@ -102,21 +167,24 @@
     $('#rfC', root).onchange = e => { rf.cls = e.target.value; rf.sid = ''; $('#rfSel', root).textContent = ''; drawStu(); };
     $('#rfQ', root).oninput = drawStu;
     $$('[data-t]', root).forEach(b => b.onclick = () => { rf.type = b.dataset.t; $$('[data-t]', root).forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); }); drawCat(); });
+    $$('[data-to]', root).forEach(b => b.onclick = () => { rf.to = b.dataset.to; $$('[data-to]', root).forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); }); $('#rfPriv', root).textContent = `الإحالة سرية: لا يراها إلا ${TO[rf.to][0]} والمالك وأنت.`; });
     $$('[data-p]', root).forEach(b => b.onclick = () => { rf.pr = b.dataset.p; $$('[data-p]', root).forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); }); });
     drawStu(); drawCat();
     $('#rfGo', root).onclick = ev => A.run(ev.currentTarget, async () => {
       const s = (stu || []).find(x => x.id === rf.sid); if (!s) throw new Error('اختر الطالب');
       const note = $('#rfN', root).value.trim(); if (note.length < 5) throw new Error('اكتب وصفاً مختصراً للحالة');
       const pe = $('#rfPe', root).value;
-      await api.ins('behaviors', { school_id: S.school.id, student_id: s.id, class_id: s.class_id, day: $('#rfD', root).value || today(), kind: rf.type === 'behavior' ? 'negative' : 'referral', category: $('#rfCat', root).value, points: 0, note, referred: true, status: 'open', priority: rf.pr, prior_action: $('#rfPa', root).value, period: pe ? +pe : null, by_staff: S.me.id, ...(A.DEMO || /[?&]demo=1/.test(location.search) ? { created_at: new Date().toISOString(), reply: '' } : {}) });
-      try { const ids = await api.rpc('counselor_ids', {}); notify((ids || []).map(x => x.counselor_ids || x), `إحالة ${PR[rf.pr][0]}: ${s.full_name}`, `أحال ${S.me.full_name} (${role(S.me.id)}) الطالب ${s.full_name} — ${cName(s.class_id)}: ${$('#rfCat', root).value}.`); } catch (_) { }
-      A.toast('أُرسلت الإحالة للموجه الطلابي', 'ok'); rf.sid = ''; $('#rfN', root).value = ''; $('#rfSel', root).textContent = ''; drawStu(); mine();
+      await api.ins('behaviors', { school_id: S.school.id, student_id: s.id, class_id: s.class_id, day: $('#rfD', root).value || today(), kind: rf.type === 'behavior' ? 'negative' : 'referral', category: $('#rfCat', root).value, points: 0, note, referred: true, status: 'open', priority: rf.pr, prior_action: $('#rfPa', root).value, period: pe ? +pe : null, target: rf.to, by_staff: S.me.id, ...(A.DEMO || /[?&]demo=1/.test(location.search) ? { created_at: new Date().toISOString(), reply: '' } : {}) });
+      try { const fn = rf.to === 'deputy' ? 'deputy_ids' : 'counselor_ids', ids = await api.rpc(fn, {}); notify((ids || []).map(x => x[fn] || x), `إحالة ${PR[rf.pr][0]} إلى ${TO[rf.to][0]}: ${s.full_name}`, `أحال ${S.me.full_name} (${role(S.me.id)}) الطالب ${s.full_name} — ${cName(s.class_id)}: ${$('#rfCat', root).value}.`); } catch (_) { }
+      A.toast('أُرسلت الإحالة إلى ' + TO[rf.to][0], 'ok'); rf.sid = ''; $('#rfN', root).value = ''; $('#rfSel', root).textContent = ''; drawStu(); mine();
     });
     async function mine() {
       const L = await api.list('behaviors', { school_id: S.school.id, by_staff: S.me.id, referred: true }, { order: 'created_at', desc: true }).catch(() => []);
       $('#rfMine', root).innerHTML = L.length ? `<div class="cs-list">${L.map(r => { const s = (stu || []).find(x => x.id === r.student_id) || {};
-        return `<div class="cs-card pr-${r.priority || 'normal'}"><div class="cs-hd"><b>${esc(s.full_name || '')}</b><span class="small muted">${esc(cName(r.class_id))}</span>${pill(BST, r.status || 'open')}${pill(PR, r.priority || 'normal')}</div>
-          <div class="meta"><span>${esc(r.category)}</span><span>${dt(r.day)}</span></div>${r.reply ? `<div class="rep"><b>آخر ردّ للموجه:</b> ${esc(r.reply)}${r.replied_at ? ` <span class="small muted">· ${dt(r.replied_at)}</span>` : ''}</div>` : '<div class="small muted">بانتظار اطلاع الموجه</div>'}<div class="acts"><button class="btn ghost sm" data-th="${r.id}">💬 المحادثة مع الموجه</button></div></div>`; }).join('')}</div>` : A.emptyBox('لم تُرسل إحالات بعد');
+        return `<div class="cs-card pr-${r.priority || 'normal'}"><div class="cs-hd"><b>${esc(s.full_name || '')}</b><span class="small muted">${esc(cName(r.class_id))}</span><span class="pill">${TO[toOf(r)][1]} ${TO[toOf(r)][0]}</span>${pill(BST, r.status || 'open')}${pill(PR, r.priority || 'normal')}</div>
+          <div class="meta"><span>${esc(r.category)}</span><span>${dt(r.day)}</span></div>${r.reply ? `<div class="rep"><b>آخر ردّ ${toOf(r) === 'deputy' ? 'للوكيل' : 'للموجه'}:</b> ${esc(r.reply)}${r.replied_at ? ` <span class="small muted">· ${dt(r.replied_at)}</span>` : ''}</div>` : `<div class="small muted">بانتظار اطلاع ${TO[toOf(r)][0]}</div>`}<div class="acts">${toOf(r) === 'counselor' ? `<button class="btn ghost sm" data-th="${r.id}">💬 المحادثة مع الموجه</button>` : ''}<button class="btn ghost sm" data-prr="${r.id}">${A.I.print || ''} طباعة الإحالة</button></div></div>`; }).join('')}</div>` : A.emptyBox('لم تُرسل إحالات بعد');
+      $$('[data-prr]', root).forEach(b => b.onclick = () => { const r = L.find(x => x.id === b.dataset.prr); printRef(r, (stu || []).find(x => x.id === r.student_id) || {}); });
+      $('#rfPrAll', root).onclick = () => printRefList(L, id => (stu || []).find(x => x.id === id) || {}, 'تقرير إحالاتي', S.me.full_name || '');
       $$('[data-th]', root).forEach(b => b.onclick = () => { const r = L.find(x => x.id === b.dataset.th); thread(r, ((stu || []).find(x => x.id === r.student_id) || {}).full_name, mine); });
     }
     mine();
@@ -128,7 +196,7 @@
     if (!isC()) { root.innerHTML = `<div class="card">${A.emptyBox('هذه الصفحة للموجه الطلابي والمالك', 'يمنحها المالك من «المسميات والصلاحيات» ← وحدة المرشد الطلابي')}</div>`; return; }
     root.innerHTML = '<div class="spinner"></div>';
     const [stu, , refs, cases] = await Promise.all([A.studentsAll ? A.studentsAll() : api.list('students', { school_id: S.school.id }), allCls(),
-      api.list('behaviors', { school_id: S.school.id, referred: true }, { order: 'created_at', desc: true }).catch(() => []), api.list('counsel_cases', { school_id: S.school.id }, { order: 'updated_at', desc: true }).catch(() => [])]);
+      api.list('behaviors', { school_id: S.school.id, referred: true }, { order: 'created_at', desc: true }).then(L => (L || []).filter(r => toOf(r) === 'counselor')).catch(() => []), api.list('counsel_cases', { school_id: S.school.id }, { order: 'updated_at', desc: true }).catch(() => [])]);
     const sOf = id => (stu || []).find(x => x.id === id) || {};
     const inbox = refs.filter(r => (r.status || 'open') !== 'closed' && !r.case_id).sort((a, b) => ({ urgent: 0, high: 1, normal: 2 }[a.priority || 'normal'] - { urgent: 0, high: 1, normal: 2 }[b.priority || 'normal']) || String(b.created_at).localeCompare(String(a.created_at)));
     const due = cases.filter(c => c.status !== 'closed' && c.follow_date && c.follow_date <= today());

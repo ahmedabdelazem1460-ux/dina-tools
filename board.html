@@ -39,11 +39,13 @@ footer .lb{background:var(--s);color:var(--n);font-weight:800;font-size:2.6vh;pa
 .dots{position:absolute;bottom:1.4vh;left:50%;transform:translateX(-50%);display:flex;gap:.8vh}.dots i{width:1.2vh;height:1.2vh;border-radius:50%;background:rgba(255,255,255,.3)}.dots i.on{background:var(--s)}
 .err{display:grid;place-items:center;height:100vh;font-size:3vh;text-align:center;padding:4vw}
 @media (prefers-reduced-motion:reduce){.slide{transition:none}.tk span{animation:none;padding:0}}
+h2 .src{font-size:.5em;font-weight:400;opacity:.75;margin-inline-start:.6em}
 </style>
 </head>
 <body>
 <div id="app"><div class="err">جارٍ التحميل…</div></div>
 <script src="config.js"></script>
+<script src="bellcore.js?v=1794208130"></script>
 <script>
 (function () {
   const C = window.APP_CONFIG, app = document.getElementById('app');
@@ -54,10 +56,11 @@ footer .lb{background:var(--s);color:var(--n);font-weight:800;font-size:2.6vh;pa
   const toMin = t => { const [h, m] = String(t || '0:0').split(':').map(Number); return h * 60 + m; };
   const t12 = m => { const h = Math.floor(m / 60) % 24, mm = String(m % 60).padStart(2, '0'); return `${h % 12 || 12}:${mm}`; };
   let D = null, idx = 0, slides = [];
-  function sched(b, day) { if (!b || !b.schedules || !b.schedules.length) return null; const a = (b.acts || []).find(x => x.from <= day && day <= (x.to || x.from)); return b.schedules.find(s => s.id === (a && a.sched)) || b.schedules.find(s => s.id === b.def) || b.schedules[0]; }
-  function timeline(s, P) { const out = []; let t = toMin(s.start); for (let p = 0; p < P; p++) { const d = +(s.perDur || {})[p] || +s.dur || 45; out.push({ k: 'p', i: p, from: t, to: t + d }); t += d; if (p === P - 1) break; const br = (s.breaks || []).filter(b => +b.after === p + 1); if (br.length) br.forEach(b => { out.push({ k: 'b', label: b.label || 'الفسحة', from: t, to: t + (+b.dur || 0) }); t += +b.dur || 0; }); else if (+s.pass > 0) t += +s.pass; } return out; }
-  const tl = () => { const s = D && sched(D.bell, D.day); if (!s) return []; const P = Math.min(+s.np || D.periods || 7, D.periods || 7); return timeline(s, P); };
-  const nowItem = () => { const d = new Date(), n = d.getHours() * 60 + d.getMinutes(); return tl().find(x => n >= x.from && n < x.to); };
+  // التوقيت من النواة الموحّدة (bellcore.js) — نفس حساب المنصة: إجازة/استثنائي منشور/تفعيل بتاريخ/أساسي
+  let PLc = null, PLd = null;
+  const plan = () => { if (!D || !window.DinaBell) return null; if (PLc && PLd === D) return PLc; PLd = D; PLc = window.DinaBell.dayPlan({ bell: D.bell, periods: D.periods, days: D.days }, D.day, D.disp || [], null); return PLc; };
+  const tl = () => { const p = plan(); return p ? p.items : []; };
+  const nowItem = () => { const L = tl(); if (!L.length) return null; const d = new Date(); let n = d.getHours() * 60 + d.getMinutes(); if (n < L[0].from - 720) n += 1440; return L.find(x => n >= x.from && n < x.to); };
   async function fetchData() { const r = await fetch(`${C.supabaseUrl}/rest/v1/rpc/board_view`, { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ p_token: token }) }); if (!r.ok) throw new Error('الرابط غير صالح أو أُوقف'); return r.json(); }
   function build() {
     const B = D.board || {}, S = [], hide = new Set(B.hide || []), at = D.att || {}, cur = nowItem();
@@ -73,7 +76,7 @@ footer .lb{background:var(--s);color:var(--n);font-weight:800;font-size:2.6vh;pa
     if (off.length) add('off', `<section class="slide"><h2>غياب المنسوبين اليوم</h2><div class="grid">${off.map(n => `<div class="card" style="font-size:3vh">${esc(n)}</div>`).join('')}</div></section>`);
     if ((B.events || []).length) add('events', `<section class="slide"><h2>فعاليات اليوم</h2><table><tbody>${B.events.map(e => `<tr><td style="width:18vw;direction:ltr;text-align:center">${esc(e.time || '')}</td><td><b>${esc(e.title || '')}</b>${e.place ? ` — <span style="color:#BFD9F2">${esc(e.place)}</span>` : ''}</td></tr>`).join('')}</tbody></table></section>`);
     if ((B.ann || '').trim()) add('ann', `<section class="slide"><h2>إعلان</h2><div class="big"><div class="q" style="font-size:5vh">${esc(B.ann)}</div></div></section>`);
-    const T = tl().filter(x => x.k === 'p'); if (T.length) add('times', `<section class="slide"><h2>مواعيد الحصص</h2><table><tbody>${tl().map(x => `<tr class="${cur && cur.from === x.from ? 'cur' : ''}"><td>${x.k === 'p' ? 'الحصة ' + (PER[x.i] || AR(x.i + 1)) : '☕ ' + esc(x.label)}</td><td style="direction:ltr;text-align:center">${AR(t12(x.from))} – ${AR(t12(x.to))}</td></tr>`).join('')}</tbody></table></section>`);
+    const T = tl().filter(x => x.k === 'p'), PL = plan() || {}; if (T.length) add('times', `<section class="slide"><h2>مواعيد الحصص <small class="src">${esc(PL.name || '')}${PL.src === 'disp' ? ' · جدول استثنائي' : PL.src === 'act' ? ' · مفعّل لهذه الفترة' : ''}</small></h2><table><tbody>${tl().filter(x => x.k !== 't').map(x => `<tr class="${cur && cur.from === x.from ? 'cur' : ''}"><td>${x.k === 'p' ? 'الحصة ' + (PER[x.i] || AR(x.i + 1)) : '☕ ' + esc(x.label || 'الفسحة')}</td><td style="direction:ltr;text-align:center">${AR(t12(x.from))} – ${AR(t12(x.to))} <small>${Math.floor(x.from / 60) % 24 < 12 ? 'ص' : 'م'}</small></td></tr>`).join('')}</tbody></table></section>`);
     return S;
   }
   function render() {
@@ -89,7 +92,7 @@ footer .lb{background:var(--s);color:var(--n);font-weight:800;font-size:2.6vh;pa
   }
   function show() { const ss = app.querySelectorAll('.slide'), ds = app.querySelectorAll('.dots i'); ss.forEach((s, i) => s.classList.toggle('on', i === idx)); ds.forEach((s, i) => s.classList.toggle('on', i === idx)); }
   function tick() { const d = new Date(); const c = document.getElementById('clk'); if (!c) return; c.textContent = AR(t12(d.getHours() * 60 + d.getMinutes())) + (d.getHours() < 12 ? ' ص' : ' م'); document.getElementById('clkS').textContent = AR(String(d.getSeconds()).padStart(2, '0')) + ' ث';
-    const it = nowItem(), n = document.getElementById('now'); n.innerHTML = it ? (it.k === 'p' ? `<b>الحصة ${PER[it.i] || AR(it.i + 1)}</b><span>${AR(t12(it.from))} – ${AR(t12(it.to))}</span>` : `<b>☕ ${esc(it.label)}</b><span>${AR(t12(it.from))} – ${AR(t12(it.to))}</span>`) : '<b>خارج وقت الحصص</b>'; }
+    const it = nowItem(), n = document.getElementById('now'); n.innerHTML = it ? (it.k === 'p' ? `<b>الحصة ${PER[it.i] || AR(it.i + 1)}</b><span>${AR(t12(it.from))} – ${AR(t12(it.to))}</span>` : it.k === 't' ? `<b>انتقال بين الحصص</b>` : `<b>☕ ${esc(it.label || 'الفسحة')}</b><span>${AR(t12(it.from))} – ${AR(t12(it.to))}</span>`) : (() => { const p = plan(); return p && p.src === 'holiday' ? `<b>إجازة: ${esc(p.name)}</b>` : p && p.src === 'off' ? '<b>لا دراسة اليوم</b>' : '<b>خارج وقت الحصص</b>'; })(); }
   async function boot() {
     if (!token) { app.innerHTML = '<div class="err">الرابط غير مكتمل — افتح رابط الشاشة كما نسخته من المنصة</div>'; return; }
     try { D = await fetchData(); render(); } catch (e) { app.innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }

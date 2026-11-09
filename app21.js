@@ -42,6 +42,11 @@
   const schedP = (s, sec, d) => { const P = (sec || A.section()).periods || 7, base = Math.min(P, +s.np || P); return d == null ? base : Math.min(P, +(s.perDay || {})[d] || base); };
   const maxP = (s, sec) => Math.max(1, ...actDays(s, sec).map(d => schedP(s, sec, d)));
   A.bell = { norm, bellOf, activeSched, timeline, fmt, actDays, schedP, maxP, posterHTML: (...a) => posterHTML(...a), printPoster: (...a) => printPoster(...a), pngPoster: (...a) => pngPoster(...a) };
+  // توقيت اليوم الموحّد مع شاشة اللوحة (bellcore.js): إجازة ← استثنائي منشور ← تفعيل بتاريخ ← أساسي
+  const DISP = {}, DISPT = {};
+  A.bell.loadDisp = async (sid, force) => { sid = sid || S.sectionId; if (!sid) return []; if (!force && DISP[sid] && Date.now() - DISPT[sid] < 120000) return DISP[sid]; try { DISP[sid] = (await api.list('display_schedules', { section_id: sid })) || []; } catch (_) { DISP[sid] = DISP[sid] || []; } DISPT[sid] = Date.now(); return DISP[sid]; };
+  A.bell.dispOf = sid => DISP[sid || S.sectionId];
+  A.bell.dayPlan = (sec, iso, cid) => { sec = sec || A.section(); if (!window.DinaBell || !sec) return null; if (!DISP[sec.id]) A.bell.loadDisp(sec.id); return window.DinaBell.dayPlan(sec, iso || isoToday(), DISP[sec.id] || [], cid); };
   // وقت الحصة في رؤوس الجداول (إن كان الإظهار مفعّلاً في الجدول الساري اليوم)
   A.ptime = (p, cid) => { try { const sec = A.section(); if (!sec || !sec.bell || !sec.bell.schedules) return ''; const b = bellOf(sec), s = activeSched(b); if (!s.show) return ''; const it = timeline(s, maxP(s, sec), cid).items.find(x => x.k === 'p' && x.i === p); return it ? `<small class="ptm" dir="rtl">${fmt(it.from, s)} – ${fmt(it.to, s)}</small>` : ''; } catch (_) { return ''; } };
 
@@ -126,12 +131,14 @@
       const st = $('#blSt', root); if (st) { st.textContent = 'محفوظ · ' + A.fmtDT(new Date().toISOString()); st.className = 'rec-st ok'; }
       if (!quiet) A.toast('حُفظت الإعدادات', 'ok');
     };
-    const later = () => { dirty = true; const st = $('#blSt', root); if (st) { st.textContent = 'تعديلات غير محفوظة…'; st.className = 'rec-st'; } clearTimeout(saving); saving = setTimeout(() => save(true).catch(e => { const st2 = $('#blSt', root); if (st2) { st2.textContent = 'تعذّر الحفظ: ' + e.message; st2.className = 'rec-st bad'; } }), 900); };
+    let later = () => { dirty = true; const st = $('#blSt', root); if (st) { st.textContent = 'تعديلات غير محفوظة…'; st.className = 'rec-st'; } clearTimeout(saving); saving = setTimeout(() => save(true).catch(e => { const st2 = $('#blSt', root); if (st2) { st2.textContent = 'تعذّر الحفظ: ' + e.message; st2.className = 'rec-st bad'; } }), 900); };
     const today = isoToday(), act = actOn(b, today), live = activeSched(b, today);
 
     root.innerHTML = `<div class="card bl">
       <div class="head"><div class="grow"><h2>اليوم الدراسي والجدول الزمني — ${esc(sec.name)}</h2><p class="sub" style="margin:2px 0 0">حدد أيام الدراسة وعدد الحصص، وأنشئ جداول زمنية مسمّاة، وفعّل أيّها لفترة محددة ثم يعود الجدول الأساسي تلقائياً.</p></div><span class="rec-st ok" id="blSt" role="status" aria-live="polite">${sec.bell && sec.bell.schedules ? 'محفوظ' : 'لم يُحفظ بعد'}</span></div>
       <div class="bl-now ${act ? 'tmp' : ''}"><b>الساري اليوم:</b> ${esc(live.name)}${act ? ` <span class="small">(مؤقت${act.label ? ' — ' + esc(act.label) : ''} حتى ${dAR(act.to)}، ثم يعود «${esc((b.schedules.find(s => s.id === b.def) || {}).name)}»)</span>` : ' <span class="small muted">(الأساسي)</span>'}</div>
+
+      <section class="bl-sec bl-chk" id="blChk" aria-live="polite"><h3>فحص التوقيت وما ستعرضه اللوحة اليومية</h3><div class="small muted">جارٍ الفحص…</div></section>
 
       <section class="bl-sec"><h3>أيام الدراسة والحصص</h3>
         <div class="grid g3"><div class="field"><label for="blDays">أيام الدراسة في الأسبوع</label><select class="in" id="blDays">${[4, 5, 6].map(n => `<option value="${n}" ${sec.days === n ? 'selected' : ''}>${AR(n)} أيام (${DAYS[0]} – ${DAYS[n - 1]})</option>`).join('')}</select></div>
@@ -259,6 +266,35 @@
     $('#blPng', root).onclick = ev => A.run(ev.currentTarget, () => pngPoster(posterHTML(sec, S0(), pvCls), `الجدول الزمني — ${sec.name} — ${S0().name}`));
     const off = () => { if (!document.body.contains(root) || !$('#blEd', root)) { ro.disconnect(); window.removeEventListener('hashchange', off); if (dirty) save(true).catch(() => {}); } };
     window.addEventListener('hashchange', off);
+    // ---- فحص التعارضات + توقيت الأيام القادمة (نفس حساب شاشة اللوحة) ----
+    let chkT = null, showAll = false;
+    const SRCC = { holiday: 'st-empty', off: 'st-empty', disp: 'st-sub', act: 'st-warn', def: 'st-ok', none: 'st-bad' };
+    const drawChk = async () => {
+      const box = $('#blChk', root); if (!box || !window.DinaBell) return;
+      const DB = window.DinaBell, disp = await A.bell.loadDisp(sec.id), sx = { bell: b, periods: sec.periods, days: sec.days };
+      const iss = DB.check(sx, disp, today, 14), nb = iss.filter(x => x.lv === 'bad').length, nw = iss.filter(x => x.lv === 'warn').length;
+      const days = []; for (let k = 0, iso = today; days.length < 10 && k < 21; k++, iso = DB.addDays(today, k)) { const pl = DB.dayPlan(sx, iso, disp, null); if (pl.src === 'off' && pl.name === 'يوم غير دراسي') continue; days.push(pl); }
+      const tp = DB.dayPlan(sx, today, disp, null), f = m => fmt(m, tp.sched || {});
+      const strip = tp.items.length ? `<div class="bl-strip" role="list" aria-label="توقيت اليوم">${tp.items.map(x => `<div role="listitem" class="bl-it ${x.k}" style="flex:${Math.max(1, x.dur)}" title="${x.k === 'p' ? 'الحصة ' + (x.i + 1) : esc(x.label || 'انتقال')} ${f(x.from)} – ${f(x.to)}">${x.k === 'p' ? `<b>${AR(x.i + 1)}</b><small>${f(x.from)}</small>` : x.k === 'b' ? `<b>☕</b><small>${esc(x.label || 'الفسحة')}</small>` : ''}</div>`).join('')}</div>` : `<div class="small muted">${esc(DB.SRC[tp.src] || '')}${tp.name ? ' — ' + esc(tp.name) : ''}</div>`;
+      const nonRem = b.schedules.filter(s => !/بعد/.test(s.name + ' ' + (s.tag || '')));
+      const defS = b.schedules.find(s => s.id === b.def) || {};
+      const fixDef = /بعد/.test((defS.name || '') + ' ' + (defS.tag || '')) && nonRem.length ? `<div class="bl-fix"><label for="blFxD">الجدول الأساسي الصحيح:</label><select class="in" id="blFxD" style="width:auto">${nonRem.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select><button class="btn sm" id="blFxDo">اعتماده أساسياً</button><span class="small muted">يبقى «${esc((defS.name || '').trim())}» محفوظاً ويمكن تفعيله لفترة محددة.</span></div>` : '';
+      const unclear = b.schedules.filter(s => /^جدول\s*[٠-٩0-9]+$/.test((s.name || '').trim()));
+      const fixNm = unclear.map(s => `<div class="bl-fix"><label for="blFxN${s.id}">تسمية «${esc(s.name)}»:</label><input class="in" id="blFxN${s.id}" data-fxn="${s.id}" placeholder="مثل: الحضوري — يبدأ ${esc(s.start || '')}" style="width:auto;min-width:220px"><button class="btn ghost sm" data-fxs="${s.id}">حفظ الاسم</button></div>`).join('');
+      const L = showAll ? iss : iss.slice(0, 6);
+      box.innerHTML = `<h3>فحص التوقيت وما ستعرضه اللوحة اليومية <span class="pill ${nb ? 'st-bad' : nw ? 'st-warn' : 'st-ok'}">${nb ? AR(nb) + ' تعارض' : nw ? AR(nw) + ' ملاحظة' : 'مرتّب ✓'}</span></h3>
+        <div class="bl-today"><div class="small"><b>اللوحة اليوم:</b> <span class="pill ${SRCC[tp.src]}">${esc(DB.SRC[tp.src])}</span> ${esc(tp.name || '')}${tp.items.length ? ` · من <b>${f(tp.start)}</b> إلى <b>${f(tp.end)}</b> · ${AR(tp.items.filter(x => x.k === 'p').length)} حصص` : ''}</div>${strip}</div>
+        ${iss.length ? `<ul class="bl-iss">${L.map(x => `<li class="${x.lv}">${AR(esc(x.t))}</li>`).join('')}</ul>${iss.length > 6 ? `<button class="btn ghost sm" id="blChkMore">${showAll ? 'عرض أقل' : 'عرض الكل (' + AR(iss.length) + ')'}</button>` : ''}` : '<p class="small" style="color:#2E8B57;margin:6px 0">لا تعارض ولا تداخل — التوقيت مرتّب.</p>'}
+        ${fixDef}${fixNm}
+        <details class="bl-next"><summary>توقيت الأيام الدراسية القادمة كما سيظهر في اللوحة</summary><div class="scroll"><table class="tbl"><thead><tr><th>اليوم</th><th>التاريخ</th><th>المصدر</th><th>الجدول</th><th>البداية</th><th>النهاية</th><th>الحصص</th><th>الفسحة</th></tr></thead><tbody>${days.map(d => { const ps = d.items.filter(x => x.k === 'p'), br = d.items.filter(x => x.k === 'b'), g = m => fmt(m, d.sched || {}); return `<tr class="${d.iso === today ? 'cur' : ''}"><td>${DAYS[d.dow] || ''}</td><td>${dAR(d.iso)}</td><td><span class="pill ${SRCC[d.src]}">${esc(DB.SRC[d.src])}</span></td><td>${esc(d.name || '')}</td><td>${ps.length ? g(d.start) : '—'}</td><td>${ps.length ? g(d.end) : '—'}</td><td>${ps.length ? AR(ps.length) : '—'}</td><td>${br.length ? br.map(x => g(x.from)).join('، ') : '—'}</td></tr>`; }).join('')}</tbody></table></div>
+        <p class="small muted" style="margin:6px 0 0">الأولوية في اللوحة والحضور: الإجازة ← الجدول الاستثنائي المنشور (من «جداول العرض الاستثنائية») ← الجدول المفعّل لفترة ← الجدول الأساسي.</p></details>`;
+      const mo = $('#blChkMore', box); if (mo) mo.onclick = () => { showAll = !showAll; drawChk(); };
+      const fd = $('#blFxDo', box); if (fd) fd.onclick = ev => A.run(ev.currentTarget, async () => { const id = $('#blFxD', box).value, s = b.schedules.find(x => x.id === id); if (!(await A.confirmBox(`اعتماد «${esc(s.name)}» جدولاً أساسياً لـ${esc(sec.name)}؟<br><span class="small muted">لا يُحذف أي جدول، ويمكن التراجع من شارة «أساسي».</span>`, 'اعتماد'))) return; b.def = id; await save(true); A.toast('اعتُمد الجدول الأساسي', 'ok'); V.bell(root); });
+      $$('[data-fxs]', box).forEach(bt => bt.onclick = ev => A.run(ev.currentTarget, async () => { const id = bt.dataset.fxs, v = ($(`[data-fxn="${id}"]`, box).value || '').trim(); if (!v) throw new Error('اكتب اسماً واضحاً'); const s = b.schedules.find(x => x.id === id); s.name = v; await save(true); A.toast('حُفظ الاسم', 'ok'); V.bell(root); }));
+    };
+    const chkLater = () => { clearTimeout(chkT); chkT = setTimeout(drawChk, 500); };
+    { const _l = later; later = () => { _l(); chkLater(); }; }
+    drawChk();
     drawEd(); drawActs(); drawHol(); drawPv();
   };
 })();

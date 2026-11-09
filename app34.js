@@ -16,8 +16,15 @@
     if (!can()) { root.innerHTML = `<div class="card">${A.emptyBox('غير متاح لحسابك')}</div>`; return; }
     let tab = A.LS.get('bd_t') || 'today'; if (tab === 'live' && A.liveOK && !A.liveOK()) tab = 'today';
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2 style="margin:0">اللوحة اليومية — ${esc((A.section() || {}).name || '')}</h2><p class="sub" style="margin:2px 0 0">أدخل بيانات اليوم مرة واحدة فتظهر على شاشة المدرسة تلقائياً، ويُطبع منها تقرير اليوم.</p></div></div>
+      <div id="bdTm" class="bd-tm" aria-live="polite"></div>
       <div class="kpick" id="bdT"><button data-t="today">بيانات اليوم</button><button data-t="screen">شاشة العرض</button>${A.liveOK && !A.liveOK() ? '' : '<button data-t="live">المتابعة اللحظية</button>'}</div><div id="bdB" style="margin-top:10px"></div></div>`;
     $$('#bdT button', root).forEach(b => { b.classList.toggle('on', b.dataset.t === tab); b.onclick = () => { A.LS.set('bd_t', b.dataset.t); V.board(root); }; });
+    (async () => { const el = $('#bdTm', root), sec = A.section(); if (!el || !A.bell || !A.bell.dayPlan || !window.DinaBell) return;
+      const disp = await A.bell.loadDisp(sec.id), pl = window.DinaBell.dayPlan(sec, today(), disp, null), ps = pl.items.filter(x => x.k === 'p'), br = pl.items.filter(x => x.k === 'b'), f = m => A.bell.fmt(m, pl.sched || {});
+      const iss = window.DinaBell.check(sec, disp, today(), 14), nb = iss.filter(x => x.lv === 'bad').length, nw = iss.filter(x => x.lv === 'warn').length;
+      el.innerHTML = `<span>⏱ <b>توقيت الشاشة اليوم:</b> ${esc(window.DinaBell.SRC[pl.src] || '')}${pl.name ? ' — ' + esc(pl.name) : ''}${ps.length ? ` · ${f(pl.start)} – ${f(pl.end)} · ${AR(ps.length)} حصص${br.length ? ' · فسحة ' + br.map(x => f(x.from)).join('، ') : ''}` : ''}</span>${nb || nw ? `<span class="pill ${nb ? 'st-bad' : 'st-warn'}">${nb ? AR(nb) + ' تعارض' : AR(nw) + ' ملاحظة'} في التوقيت</span>` : '<span class="pill st-ok">التوقيت مرتّب</span>'}${S.me.is_owner ? '<button class="btn ghost sm" id="bdTmGo">مراجعة التوقيت</button>' : ''}`;
+      const g = $('#bdTmGo', el); if (g) g.onclick = () => { A.LS.set('studio_t', 'bell'); location.hash = '#/studio'; };
+    })().catch(() => {});
     const B = $('#bdB', root);
     ({ today: tToday, screen: tScreen, live: tLive })[tab](B);
   };

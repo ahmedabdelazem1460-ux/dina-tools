@@ -42,16 +42,62 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:20px}
 
 html.lang-en body,html.lang-en input,html.lang-en select,html.lang-en textarea,html.lang-en button{font-family:'Myriad Pro','GE SS Two',Tahoma,sans-serif}
 .blk{line-height:2.4;margin-top:8px}.bl{display:inline-block;width:auto;min-width:110px;max-width:220px;margin:0 4px;padding:4px 8px;border:0;border-bottom:2px dashed #3AB1DB;border-radius:6px;background:#F5F9FD}.bank{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}.bank button{border:1px solid #84B7E3;background:#fff;border-radius:999px;padding:4px 12px;font:inherit;cursor:pointer;color:#082B5A}.mt{display:grid;gap:6px;margin-top:8px}.mr{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;border:1px solid #D5E1F0;border-radius:12px;padding:6px 10px}.or{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:6px}.or li{display:flex;align-items:center;gap:8px;border:1px solid #D5E1F0;border-radius:12px;padding:6px 10px;background:#fff}.or li span{width:26px;height:26px;border-radius:50%;background:#E4EBF5;display:grid;place-items:center;font-weight:800;font-size:13px}.or li b{flex:1}.or li button{border:1px solid #D5E1F0;background:#fff;border-radius:8px;width:36px;height:36px;cursor:pointer}.or li button:disabled{opacity:.3}
+/* ===== واجهة الاختبار التفاعلية ===== */
+.qz-hero{position:relative;overflow:hidden;border-radius:24px;padding:22px 20px 20px;color:#fff;background:radial-gradient(circle at 85% 0%,#3AB1DB 0,rgba(58,177,219,0) 45%),linear-gradient(135deg,#082B5A,#005499);box-shadow:0 18px 40px -18px rgba(8,43,90,.6);margin-bottom:14px}
+.qz-hero:after{content:'';position:absolute;inset:auto -40px -60px auto;width:180px;height:180px;border-radius:50%;background:rgba(255,255,255,.06)}
+.qz-hero .k{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:99px;padding:3px 12px;font-size:13px;font-weight:700}
+.qz-hero h1{font-size:clamp(22px,5vw,30px);margin:10px 0 4px;line-height:1.35}.qz-hero p{margin:0;color:#CFE3F5;font-size:14px}
+.qz-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:14px;position:relative;z-index:1}
+.qz-meta div{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:8px 10px}.qz-meta b{display:block;font-size:20px}.qz-meta span{font-size:12px;color:#CFE3F5}
+.qz-top{position:sticky;top:0;z-index:6;background:rgba(242,246,252,.96);backdrop-filter:blur(8px);padding:10px 0 8px;margin:-6px 0 10px}
+.qz-row{display:flex;align-items:center;gap:10px}
+.qz-step{font-weight:800;font-size:14px;white-space:nowrap}
+.qz-seg{flex:1;display:flex;gap:3px;height:8px}.qz-seg i{flex:1;border-radius:99px;background:#D5E1F0;transition:background .25s}.qz-seg i.a{background:#3AB1DB}.qz-seg i.f{background:#E0A33A}.qz-seg i.c{background:#082B5A}
+.qz-ring{position:relative;width:54px;height:54px;flex:none}.qz-ring svg{transform:rotate(-90deg)}.qz-ring b{position:absolute;inset:0;display:grid;place-items:center;font-size:12.5px;font-weight:800;font-variant-numeric:tabular-nums}
+.qz-ring.low b{color:#c62d22}.qz-ring.low circle.v{stroke:#c62d22}.qz-ring.low{animation:qzp 1s infinite}
+@keyframes qzp{50%{transform:scale(1.06)}}
+.qz-nav-b{border:1.5px solid var(--line);background:#fff;border-radius:12px;width:44px;height:44px;display:grid;place-items:center;cursor:pointer;color:var(--navy);flex:none}
+.q.slide{display:none;border:0;border-radius:22px;padding:20px 18px;box-shadow:0 2px 3px rgba(8,43,90,.06),0 16px 34px -14px rgba(8,43,90,.28);animation:qzin .28s ease}
+.q.slide.cur{display:block}
+@keyframes qzin{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:none}}
+.q.slide .qh{display:flex;align-items:flex-start;gap:10px;margin-bottom:6px}
+.q.slide .n{width:38px;height:38px;border-radius:12px;font-size:16px;flex:none;background:linear-gradient(135deg,#005499,#3AB1DB)}
+.q.slide .qt{font-size:clamp(17px,4.2vw,20px);font-weight:800;line-height:1.7}
+.q.slide .pts{display:inline-block;margin-top:2px;background:#EAF3FC;border-radius:99px;padding:1px 10px;font-weight:700}
+.q.slide .opt{min-height:56px;border-radius:16px;padding:10px 14px;font-size:16px;transition:border-color .15s,background .15s,transform .1s}
+.q.slide .opt:hover{border-color:#84B7E3}.q.slide .opt:active{transform:scale(.99)}
+.q.slide .opt input{position:absolute;opacity:0;width:1px;height:1px}
+.q.slide .opt .lt{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:#E4EBF5;color:var(--navy);font-weight:800;flex:none;transition:background .15s,color .15s}
+.q.slide .opt.on{border-color:var(--blue);background:#EAF3FC;box-shadow:0 0 0 3px rgba(0,84,153,.12)}.q.slide .opt.on .lt{background:var(--blue);color:#fff}
+.q.slide .opt:focus-within{outline:3px solid #3AB1DB;outline-offset:2px}
+.qz-flag{border:1.5px solid var(--line);background:#fff;border-radius:99px;padding:6px 12px;font:inherit;font-weight:700;font-size:13px;color:var(--muted);cursor:pointer;margin-inline-start:auto}
+.qz-flag[aria-pressed=true]{border-color:#E0A33A;background:#FFF4DE;color:#8A5600}
+.qz-foot{display:flex;gap:10px;margin:14px 0 6px}.qz-foot .btn{flex:1}
+.qz-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:8px}
+.qz-grid button{height:46px;border-radius:12px;border:1.5px solid var(--line);background:#fff;font:inherit;font-weight:800;color:var(--navy);cursor:pointer;position:relative}
+.qz-grid button.a{background:#E8F4FB;border-color:#3AB1DB}.qz-grid button.f:after{content:'';position:absolute;top:4px;inset-inline-end:4px;width:8px;height:8px;border-radius:50%;background:#E0A33A}.qz-grid button.c{outline:3px solid #082B5A;outline-offset:1px}
+.qz-legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12.5px;color:var(--muted);margin:10px 0 0}.qz-legend i{display:inline-block;width:12px;height:12px;border-radius:4px;margin-inline-end:4px;vertical-align:middle;border:1.5px solid var(--line)}
+.qz-sheet{position:fixed;inset:0;z-index:20;background:rgba(8,43,90,.45);display:flex;align-items:flex-end;justify-content:center}
+.qz-sheet>div{background:#fff;width:min(760px,100%);border-radius:24px 24px 0 0;padding:18px 18px 22px;max-height:86vh;overflow:auto;animation:qzup .25s ease}
+@keyframes qzup{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+.qz-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}.qz-sum div{border-radius:14px;padding:10px;text-align:center;background:#F3F7FC}.qz-sum b{display:block;font-size:22px}
+.qz-res{position:relative;overflow:hidden;text-align:center;border-radius:24px;padding:24px 18px;background:#fff;box-shadow:0 18px 40px -18px rgba(8,43,90,.4);margin-bottom:14px}
+.qz-score{--p:0;width:180px;height:180px;border-radius:50%;margin:10px auto;display:grid;place-items:center;background:conic-gradient(var(--c,#2E8B57) calc(var(--p)*1%),#E4EBF5 0);transition:--p 1s}
+.qz-score>div{width:144px;height:144px;border-radius:50%;background:#fff;display:grid;place-items:center;align-content:center}.qz-score b{font-size:44px;line-height:1}.qz-score span{font-size:13px;color:var(--muted)}
+.qz-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:12px}.qz-stats div{border-radius:14px;padding:10px;background:#F3F7FC}.qz-stats b{display:block;font-size:22px}
+.qz-conf{position:absolute;inset:0;pointer-events:none;overflow:hidden}.qz-conf i{position:absolute;top:-12px;width:8px;height:14px;border-radius:2px;animation:qzf 2.4s ease-in forwards}
+@keyframes qzf{to{transform:translateY(420px) rotate(540deg);opacity:0}}
+@media (prefers-reduced-motion:reduce){.q.slide,.qz-sheet>div{animation:none}.qz-conf{display:none}.qz-ring.low{animation:none}}
 </style>
-<script src="i18n_en.js?v=1794155533"></script>
-<script src="i18n.js?v=1794155533"></script>
-<script src="digits.js?v=1794155533"></script>
+<script src="i18n_en.js?v=1794197246"></script>
+<script src="i18n.js?v=1794197246"></script>
+<script src="digits.js?v=1794197246"></script>
 </head>
 <body>
 <header><img src="assets/logo_white.svg" alt="مدارس دينا العالمية"><div><div class="t" id="ht">بوابة الطالب</div><div class="s" id="hs">مدارس دينا العالمية</div></div></header>
 <main id="m"><div class="card">جارٍ التحميل…</div></main>
 <footer>مدارس دينا العالمية · Dinaaedu · 920035881</footer>
-<script src="config.js?v=1794155533"></script>
+<script src="config.js?v=1794197246"></script>
 <script>
 (function () {
   const C = window.APP_CONFIG, m = document.getElementById('m');
@@ -62,35 +108,50 @@ html.lang-en body,html.lang-en input,html.lang-en select,html.lang-en textarea,h
   const P = new URLSearchParams(location.search), code = P.get('q'), tok = P.get('r'), prt = P.get('pr');
   const LS = { get: k => { try { return localStorage.getItem(k); } catch (_) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (_) { } } };
 
+  const ICO = { q: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6M12 17h.01"/></svg>',
+    grid: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>' };
+  const LET = ['أ', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح', 'ط', 'ي'];
   async function quiz() {
     let Q; try { Q = await rpc('quiz_public', { p_code: code }); } catch (e) { m.innerHTML = `<div class="card">${esc(e.message)}</div>`; return; }
     if (Q.error) { m.innerHTML = `<div class="card"><h2>${esc(Q.error)}</h2><p class="muted">تأكد من الرابط الذي أرسله معلمك.</p></div>`; return; }
     document.getElementById('ht').textContent = Q.title; document.getElementById('hs').textContent = [Q.subject, Q.teacher, Q.school].filter(Boolean).join(' · ');
     if (Q.state !== 'open') { m.innerHTML = `<div class="card"><h2>${Q.state === 'closed' ? 'انتهى وقت هذا الاختبار' : 'لم يبدأ الاختبار بعد'}</h2></div>`; return; }
     const st = Q.settings || {}; const saved = JSON.parse(LS.get('dina_stu') || '{}');
-    m.innerHTML = `<div class="card"><h1>${esc(Q.title)}</h1><p class="muted small">${AR(Q.questions.length)} سؤالاً${st.time ? ` · الوقت ${AR(st.time)} دقيقة` : ''}${st.attempts ? ` · ${st.attempts == 1 ? 'محاولة واحدة' : AR(st.attempts) + ' محاولات'}` : ''}</p>
+    const KIND = { homework: 'واجب إلكتروني', quiz: 'اختبار قصير', worksheet: 'ورقة عمل', remedial: 'ورقة دعم' };
+    m.innerHTML = `<section class="qz-hero"><span class="k">${ICO.q} ${esc(KIND[Q.kind] || 'اختبار إلكتروني')}</span><h1>${esc(Q.title)}</h1><p>${esc([Q.subject, Q.teacher].filter(Boolean).join(' · '))}</p>
+      <div class="qz-meta"><div><b>${AR(Q.questions.length)}</b><span>سؤال</span></div><div><b>${st.time ? AR(st.time) : '∞'}</b><span>${st.time ? 'دقيقة' : 'بلا وقت محدد'}</span></div><div><b>${st.attempts == 0 ? '∞' : AR(st.attempts || 1)}</b><span>${st.attempts == 1 || !st.attempts ? 'محاولة' : 'محاولات'}</span></div><div><b>${st.show === 'never' ? '—' : '✓'}</b><span>${st.show === 'never' ? 'الإجابات لا تُعرض' : 'تظهر الإجابات بعد التسليم'}</span></div></div></section>
+      <div class="card"><h2>بياناتك</h2>
       <label for="nm">اسمك الكامل</label><input id="nm" autocomplete="name" value="${esc(saved.name || '')}" placeholder="الاسم الثلاثي">
       <label for="cl">الفصل</label><select id="cl">${Q.classes.map(c => `<option value="${c.id}" ${saved.cls === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
       <label for="no">رقم الطالب (اختياري)</label><input id="no" inputmode="numeric" value="${esc(saved.no || '')}">
-      <div style="margin-top:14px"><button class="btn" id="go">ابدأ</button></div><p class="small muted" id="er" role="alert"></p></div>`;
-    document.getElementById('go').onclick = () => { const name = document.getElementById('nm').value.trim().replace(/\s+/g, ' '); if (name.split(' ').length < 2) { document.getElementById('er').textContent = 'اكتب اسمك الكامل (الاسم الأول واسم العائلة على الأقل)'; return; } const who = { name, cls: document.getElementById('cl').value, no: document.getElementById('no').value.trim() }; LS.set('dina_stu', JSON.stringify(who)); take(Q, who); };
+      <div style="margin-top:16px"><button class="btn" id="go" style="width:100%">ابدأ ${st.time ? '— يبدأ المؤقت فوراً' : ''}</button></div><p class="small muted" id="er" role="alert" style="margin:8px 0 0"></p>
+      <p class="small muted" style="margin:6px 0 0">تُحفظ إجاباتك تلقائياً على هذا الجهاز حتى التسليم.</p></div>`;
+    document.getElementById('go').onclick = () => { const name = document.getElementById('nm').value.trim().replace(/\s+/g, ' '); if (name.split(' ').length < 2) { document.getElementById('er').textContent = 'اكتب اسمك الكامل (الاسم الأول واسم العائلة على الأقل)'; document.getElementById('nm').focus(); return; } const who = { name, cls: document.getElementById('cl').value, no: document.getElementById('no').value.trim() }; LS.set('dina_stu', JSON.stringify(who)); take(Q, who); };
   }
   function take(Q, who) {
     const st = Q.settings || {}; let qs = Q.questions.slice(); if (st.shuffle) qs.sort(() => Math.random() - .5);
     const ans = {}; const key = 'dina_q_' + code; try { Object.assign(ans, JSON.parse(LS.get(key) || '{}')); } catch (_) { }
+    const flags = new Set(); const t0 = Date.now(); let cur = 0, done = false;
     const arr = id => { try { const v = JSON.parse(ans[id] || '[]'); return Array.isArray(v) ? v : []; } catch (_) { return []; } };
-    m.innerHTML = `<div class="top"><div class="bar" style="flex:1"><i id="pb" style="width:0"></i></div><span class="small" id="pc"></span>${st.time ? '<span class="timer" id="tm"></span>' : ''}</div>` +
-      qs.map((q, i) => `<div class="q" data-q="${q.id}"><div><span class="n">${AR(i + 1)}</span><b>${esc(q.type === 'blank' ? 'أكمل الفراغات:' : q.body)}</b> <span class="pts">(${AR(q.points)} درجة)</span></div>${q.image ? `<img src="${esc(q.image)}" alt="">` : ''}
-        ${q.type === 'mcq' ? q.options.map((o, k) => `<label class="opt"><input type="radio" name="q${q.id}" value="${k}" ${ans[q.id] == k ? 'checked' : ''}> ${esc(o)}</label>`).join('')
-        : q.type === 'multi' ? `<p class="small muted" style="margin:6px 0 0">اختر كل الإجابات الصحيحة</p>` + q.options.map((o, k) => `<label class="opt ${arr(q.id).includes(String(k)) ? 'on' : ''}"><input type="checkbox" data-mu="${q.id}|${k}" ${arr(q.id).includes(String(k)) ? 'checked' : ''}> ${esc(o)}</label>`).join('')
-        : q.type === 'tf' ? ['صواب', 'خطأ'].map(o => `<label class="opt"><input type="radio" name="q${q.id}" value="${o}" ${ans[q.id] === o ? 'checked' : ''}> ${o}</label>`).join('')
+    const isAns = q => ans[q.id] !== undefined && ans[q.id] !== '';
+    const ring = st.time ? `<div class="qz-ring" id="rg" role="timer" aria-label="الوقت المتبقي"><svg width="54" height="54" viewBox="0 0 54 54"><circle cx="27" cy="27" r="23" fill="none" stroke="#E4EBF5" stroke-width="5"/><circle class="v" id="rgc" cx="27" cy="27" r="23" fill="none" stroke="#005499" stroke-width="5" stroke-linecap="round" stroke-dasharray="144.5" stroke-dashoffset="0"/></svg><b id="tm"></b></div>` : '';
+    const opt = (q, o, k, type) => { const on = type === 'multi' ? arr(q.id).includes(String(k)) : String(ans[q.id]) === String(type === 'tf' ? o : k);
+      return `<label class="opt ${on ? 'on' : ''}">${type === 'multi' ? `<input type="checkbox" data-mu="${q.id}|${k}" ${on ? 'checked' : ''}>` : `<input type="radio" name="q${q.id}" value="${type === 'tf' ? o : k}" ${on ? 'checked' : ''}>`}<span class="lt" aria-hidden="true">${type === 'tf' ? (k ? '✗' : '✓') : LET[k] || AR(k + 1)}</span><span>${esc(o)}</span></label>`; };
+    m.innerHTML = `<div class="qz-top"><div class="qz-row"><span class="qz-step" id="qsp" aria-live="polite"></span><div class="qz-seg" id="seg" aria-hidden="true">${qs.map(() => '<i></i>').join('')}</div>${ring}<button class="qz-nav-b" id="nav" type="button" aria-label="خريطة الأسئلة">${ICO.grid}</button></div></div>` +
+      qs.map((q, i) => `<div class="q slide" data-q="${q.id}" data-i="${i}"><div class="qh"><span class="n">${AR(i + 1)}</span><div style="flex:1"><div class="qt" tabindex="-1">${esc(q.type === 'blank' ? 'أكمل الفراغات:' : q.body)}</div><span class="pts small">${AR(q.points)} ${q.points == 1 ? 'درجة' : 'درجات'}</span></div><button type="button" class="qz-flag" data-fl="${q.id}" aria-pressed="false">⚑ للمراجعة</button></div>${q.image ? `<img src="${esc(q.image)}" alt="">` : ''}
+        ${q.type === 'mcq' ? q.options.map((o, k) => opt(q, o, k, 'mcq')).join('')
+        : q.type === 'multi' ? `<p class="small muted" style="margin:6px 0 0">اختر كل الإجابات الصحيحة</p>` + q.options.map((o, k) => opt(q, o, k, 'multi')).join('')
+        : q.type === 'tf' ? ['صواب', 'خطأ'].map((o, k) => opt(q, o, k, 'tf')).join('')
         : q.type === 'blank' ? blankHTML(q, ans[q.id]) : q.type === 'match' ? matchHTML(q, ans[q.id]) : q.type === 'order' ? orderHTML(q, ans[q.id])
-        : q.type === 'short' ? `<input data-t="${q.id}" value="${esc(ans[q.id] || '')}" placeholder="إجابتك" style="margin-top:8px">` : `<textarea data-t="${q.id}" rows="4" placeholder="اكتب إجابتك" style="margin-top:8px">${esc(ans[q.id] || '')}</textarea>`}</div>`).join('') +
-      `<div class="card" style="text-align:center"><button class="btn" id="sub">تسليم الإجابات</button><p class="small muted" id="er" role="alert"></p></div>`;
-    const prog = () => { const n = qs.filter(q => ans[q.id] !== undefined && ans[q.id] !== '').length; document.getElementById('pb').style.width = (n / qs.length * 100) + '%'; document.getElementById('pc').textContent = `${AR(n)} / ${AR(qs.length)}`; LS.set(key, JSON.stringify(ans)); };
-    m.querySelectorAll('input[type=radio]').forEach(r => r.onchange = () => { ans[r.name.slice(1)] = r.value; r.closest('.q').querySelectorAll('.opt').forEach(o => o.classList.toggle('on', o.contains(r))); prog(); });
+        : q.type === 'short' ? `<input data-t="${q.id}" value="${esc(ans[q.id] || '')}" placeholder="إجابتك" style="margin-top:8px" aria-label="إجابتك">` : `<textarea data-t="${q.id}" rows="5" placeholder="اكتب إجابتك" style="margin-top:8px" aria-label="إجابتك">${esc(ans[q.id] || '')}</textarea>`}</div>`).join('') +
+      `<div class="qz-foot"><button class="btn ghost" id="prev" type="button">→ السابق</button><button class="btn" id="next" type="button">التالي ←</button></div><p class="small muted" id="er" role="alert"></p>`;
+    const cards = [...m.querySelectorAll('.q.slide')], segs = [...m.querySelectorAll('#seg i')];
+    const paint = () => { segs.forEach((s, i) => { s.className = i === cur ? 'c' : flags.has(qs[i].id) ? 'f' : isAns(qs[i]) ? 'a' : ''; }); const n = qs.filter(isAns).length; document.getElementById('qsp').textContent = `السؤال ${AR(cur + 1)} من ${AR(qs.length)} · أجبت ${AR(n)}`; };
+    const prog = () => { LS.set(key, JSON.stringify(ans)); paint(); };
+    const show = (i, focus) => { cur = Math.max(0, Math.min(qs.length - 1, i)); cards.forEach((c, k) => c.classList.toggle('cur', k === cur)); document.getElementById('prev').disabled = !cur; document.getElementById('next').textContent = cur === qs.length - 1 ? 'مراجعة وتسليم ✓' : 'التالي ←'; paint(); if (focus !== false) { const h = cards[cur].querySelector('.qt'); h && h.focus({ preventScroll: true }); } window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    // معالجات الإجابة (كما هي) + انتقال تلقائي عند أول اختيار
+    m.querySelectorAll('input[type=radio]').forEach(r => r.onchange = () => { const first = !isAns(qs[cur]); ans[r.name.slice(1)] = r.value; r.closest('.q').querySelectorAll('.opt').forEach(o => o.classList.toggle('on', o.contains(r))); prog(); if (first && cur < qs.length - 1) setTimeout(() => { if (!done) show(cur + 1); }, 450); });
     m.querySelectorAll('[data-t]').forEach(t => t.oninput = () => { ans[t.dataset.t] = t.value; prog(); });
-    // أنواع تفاعلية: الإجابة مصفوفة نصوص (JSON)
     const setArr = (id, a) => { ans[id] = a.some(x => String(x || '').trim()) ? JSON.stringify(a) : ''; prog(); };
     m.querySelectorAll('[data-bl]').forEach(i => i.oninput = () => { const [id, k] = i.dataset.bl.split('|'); const a = arr(id); const n = +i.dataset.n; while (a.length < n) a.push(''); a[+k] = i.value; setArr(id, a); });
     m.querySelectorAll('[data-bk]').forEach(b => b.onclick = () => { const q = b.closest('.q'); const empty = [...q.querySelectorAll('[data-bl]')].find(i => !i.value.trim()); if (empty) { empty.value = b.dataset.bk; empty.dispatchEvent(new Event('input')); empty.focus(); } });
@@ -98,17 +159,40 @@ html.lang-en body,html.lang-en input,html.lang-en select,html.lang-en textarea,h
     m.querySelectorAll('[data-mt]').forEach(s => s.onchange = () => { const [id, k] = s.dataset.mt.split('|'); const a = arr(id); const n = +s.dataset.n; while (a.length < n) a.push(''); a[+k] = s.value; setArr(id, a); });
     m.querySelectorAll('[data-or]').forEach(box => { const id = box.dataset.or; const draw = () => { const a = arr(id).length ? arr(id) : JSON.parse(box.dataset.items); box.innerHTML = a.map((t, k) => `<li><span>${AR(k + 1)}</span><b>${esc(t)}</b><button type="button" data-up="${k}" aria-label="تحريك لأعلى" ${k ? '' : 'disabled'}>▲</button><button type="button" data-dn="${k}" aria-label="تحريك لأسفل" ${k < a.length - 1 ? '' : 'disabled'}>▼</button></li>`).join('');
         box.querySelectorAll('[data-up],[data-dn]').forEach(b => b.onclick = () => { const a2 = a.slice(), k = +(b.dataset.up ?? b.dataset.dn), j = b.dataset.up != null ? k - 1 : k + 1; [a2[k], a2[j]] = [a2[j], a2[k]]; setArr(id, a2); draw(); }); }; draw(); });
-    m.querySelectorAll('input[type=radio]:checked').forEach(r => r.closest('.opt').classList.add('on')); prog();
+    m.querySelectorAll('[data-fl]').forEach(b => b.onclick = () => { const id = b.dataset.fl; flags.has(id) ? flags.delete(id) : flags.add(id); b.setAttribute('aria-pressed', flags.has(id)); paint(); });
+    // ورقة المراجعة / خريطة الأسئلة
+    let sheet = null;
+    const closeSheet = () => { if (sheet) { sheet.remove(); sheet = null; } };
+    const openSheet = review => { closeSheet(); const n = qs.filter(isAns).length, left = qs.length - n;
+      sheet = document.createElement('div'); sheet.className = 'qz-sheet'; sheet.setAttribute('role', 'dialog'); sheet.setAttribute('aria-modal', 'true'); sheet.setAttribute('aria-label', review ? 'مراجعة قبل التسليم' : 'خريطة الأسئلة');
+      sheet.innerHTML = `<div><h2 style="margin:0">${review ? 'مراجعة قبل التسليم' : 'خريطة الأسئلة'}</h2>
+        <div class="qz-sum"><div><b style="color:#17814a">${AR(n)}</b><span class="small">مُجاب</span></div><div><b style="color:${left ? '#c62d22' : '#17814a'}">${AR(left)}</b><span class="small">بلا إجابة</span></div><div><b style="color:#a85d00">${AR(flags.size)}</b><span class="small">للمراجعة</span></div></div>
+        <div class="qz-grid">${qs.map((q, i) => `<button type="button" data-go="${i}" class="${isAns(q) ? 'a' : ''} ${flags.has(q.id) ? 'f' : ''} ${i === cur ? 'c' : ''}" aria-label="السؤال ${AR(i + 1)}${isAns(q) ? ' مُجاب' : ' بلا إجابة'}${flags.has(q.id) ? ' للمراجعة' : ''}">${AR(i + 1)}</button>`).join('')}</div>
+        <div class="qz-legend"><span><i style="background:#E8F4FB;border-color:#3AB1DB"></i>مُجاب</span><span><i></i>بلا إجابة</span><span><i style="background:#FFF4DE;border-color:#E0A33A"></i>للمراجعة</span></div>
+        ${review && left ? `<p class="small" style="color:#a85d00;margin:12px 0 0">لم تُجب عن ${AR(left)} ${left === 1 ? 'سؤال' : 'أسئلة'}. اضغط رقم السؤال للعودة إليه.</p>` : ''}
+        <div class="qz-foot"><button class="btn ghost" type="button" id="shC">متابعة الحل</button>${review ? '<button class="btn" type="button" id="sub">تسليم الإجابات</button>' : ''}</div><p class="small muted" id="er2" role="alert"></p></div>`;
+      document.body.appendChild(sheet);
+      sheet.addEventListener('click', e => { if (e.target === sheet) closeSheet(); });
+      sheet.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { closeSheet(); show(+b.dataset.go); });
+      sheet.querySelector('#shC').onclick = closeSheet; const sb = sheet.querySelector('#sub'); if (sb) { sb.onclick = () => submit(false); sb.focus(); } else sheet.querySelector('#shC').focus(); };
+    document.getElementById('prev').onclick = () => show(cur - 1);
+    document.getElementById('next').onclick = () => cur === qs.length - 1 ? openSheet(true) : show(cur + 1);
+    document.getElementById('nav').onclick = () => openSheet(false);
+    // لوحة المفاتيح واللمس
+    const onKey = e => { if (done) return; if (e.key === 'Escape') return closeSheet(); if (sheet) return; const tg = e.target; if (tg && (tg.matches('input[type=text],input:not([type]),textarea,select') || tg.isContentEditable)) return;
+      if (e.key === 'ArrowLeft') { e.preventDefault(); document.getElementById('next').click(); } else if (e.key === 'ArrowRight') { e.preventDefault(); if (cur) show(cur - 1); }
+      else if (/^[1-9]$/.test(e.key)) { const o = cards[cur].querySelectorAll('.opt input')[+e.key - 1]; if (o) { o.checked = o.type === 'checkbox' ? !o.checked : true; o.dispatchEvent(new Event('change')); } } };
+    document.addEventListener('keydown', onKey);
+    let tx = null; m.addEventListener('touchstart', e => { tx = e.target.closest('input,textarea,select,.or') ? null : [e.touches[0].clientX, e.touches[0].clientY]; }, { passive: true });
+    m.addEventListener('touchend', e => { if (!tx || sheet) return; const dx = e.changedTouches[0].clientX - tx[0], dy = e.changedTouches[0].clientY - tx[1]; tx = null; if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) { if (dx < 0) document.getElementById('next').click(); else if (cur) show(cur - 1); } }, { passive: true });
     let timer;
     const submit = async (auto) => {
-      const left = qs.filter(q => ans[q.id] === undefined || ans[q.id] === '').length;
-      if (!auto && left && !confirm(`لم تُجب عن ${left} سؤال. هل تسلّم الآن؟`)) return;
-      const b = document.getElementById('sub'); b.disabled = true; b.textContent = 'جارٍ التسليم…'; clearInterval(timer);
-      try { const r = await rpc('quiz_submit', { p_code: code, p_name: who.name, p_class: who.cls, p_no: who.no, p_answers: ans }); LS.set(key, '{}'); result(Q, qs, ans, r); }
-      catch (e) { b.disabled = false; b.textContent = 'تسليم الإجابات'; document.getElementById('er').textContent = e.message; }
+      const b = sheet && sheet.querySelector('#sub'); if (b) { b.disabled = true; b.textContent = 'جارٍ التسليم…'; } clearInterval(timer);
+      try { const r = await rpc('quiz_submit', { p_code: code, p_name: who.name, p_class: who.cls, p_no: who.no, p_answers: ans }); done = true; document.removeEventListener('keydown', onKey); LS.set(key, '{}'); closeSheet(); result(Q, qs, ans, r, { secs: Math.round((Date.now() - t0) / 1000), auto }); }
+      catch (e) { if (b) { b.disabled = false; b.textContent = 'تسليم الإجابات'; } const er = (sheet && sheet.querySelector('#er2')) || document.getElementById('er'); er.textContent = e.message; if (auto) openSheet(true); }
     };
-    document.getElementById('sub').onclick = () => submit(false);
-    if (st.time) { const end = Date.now() + st.time * 60000; const tick = () => { const s = Math.max(0, Math.round((end - Date.now()) / 1000)); document.getElementById('tm').textContent = AR(`${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`); if (!s) submit(true); }; tick(); timer = setInterval(tick, 1000); }
+    if (st.time) { const end = Date.now() + st.time * 60000, tot = st.time * 60, C = 144.5; const tick = () => { const s = Math.max(0, Math.round((end - Date.now()) / 1000)); document.getElementById('tm').textContent = AR(`${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`); document.getElementById('rgc').setAttribute('stroke-dashoffset', String(C * (1 - s / tot))); document.getElementById('rg').classList.toggle('low', s <= 60); if (!s) { clearInterval(timer); submit(true); } }; tick(); timer = setInterval(tick, 1000); }
+    show(0, false);
   }
   function blankHTML(q, v) { let a = []; try { a = JSON.parse(v || '[]'); } catch (_) { } const n = q.blanks || 1; let k = 0; const RE = /\.{3,}|…+|_{3,}/g;
     const inp = i => `<input class="bl" data-bl="${q.id}|${i}" data-n="${n}" value="${esc(a[i] || '')}" aria-label="الفراغ ${AR(i + 1)}">`;
@@ -117,15 +201,30 @@ html.lang-en body,html.lang-en input,html.lang-en select,html.lang-en textarea,h
   function matchHTML(q, v) { let a = []; try { a = JSON.parse(v || '[]'); } catch (_) { } const n = (q.left || []).length;
     return `<div class="mt">${(q.left || []).map((l, i) => `<div class="mr"><b>${esc(l)}</b><span>←</span><select data-mt="${q.id}|${i}" data-n="${n}" aria-label="ما يقابل ${esc(l)}"><option value="">اختر</option>${(q.right || []).map(r => `<option ${a[i] === r ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select></div>`).join('')}</div>`; }
   function orderHTML(q, v) { return `<ol class="or" data-or="${q.id}" data-items="${esc(JSON.stringify(q.items || []))}"></ol>`; }
-  function result(Q, qs, ans, r) {
-    const p = r.max ? Math.round(r.score / r.max * 100) : 0; const [l, c] = p >= 80 ? ['ممتاز — متمكن', 'ok'] : p >= 50 ? ['جيد — واصل التدريب', 'warn'] : ['تحتاج إلى مراجعة', 'bad'];
+  function result(Q, qs, ans, r, info) {
+    info = info || {};
+    const p = r.max ? Math.round(r.score / r.max * 100) : 0; const [l, c, col] = p >= 80 ? ['ممتاز — متمكن', 'ok', '#2E8B57'] : p >= 50 ? ['جيد — واصل التدريب', 'warn', '#D99A2B'] : ['تحتاج إلى مراجعة', 'bad', '#c62d22'];
     const R = Object.fromEntries((r.review || []).map(x => [x.id, x]));
-    m.innerHTML = `<div class="card res"><p class="muted">تم تسليم إجاباتك يا ${esc(JSON.parse(LS.get('dina_stu') || '{}').name || '')}</p><div class="big">${AR(r.score)} / ${AR(r.max)}</div><p><span class="tag ${c}">${l}</span> ${AR(p)}٪</p>${r.pending ? '<p class="small muted">الأسئلة المقالية سيصححها معلمك.</p>' : ''}${r.left > 0 ? `<p class="small muted">بقي لك ${AR(r.left)} محاولة</p>` : ''}${LS.get('dina_me') ? '<p><a class="btn ghost" href="me.html">العودة إلى حسابي</a></p>' : ''}</div>` +
-      (r.review ? qs.map((q, i) => { const x = R[q.id] || {}; const mine = ans[q.id];
+    const nOk = (r.review || []).filter(x => x.ok === true).length, nBad = (r.review || []).filter(x => x.ok === false).length, nMan = (r.review || []).filter(x => x.ok !== true && x.ok !== false).length;
+    const mm = Math.floor((info.secs || 0) / 60), ss = (info.secs || 0) % 60;
+    const name = JSON.parse(LS.get('dina_stu') || '{}').name || '';
+    m.innerHTML = `<section class="qz-res">${p >= 80 ? `<div class="qz-conf" aria-hidden="true">${Array.from({ length: 36 }, (_, i) => `<i style="left:${(i * 37) % 100}%;background:${['#3AB1DB', '#2E8B57', '#BADF93', '#005499', '#E0A33A'][i % 5]};animation-delay:${(i % 9) * 0.12}s"></i>`).join('')}</div>` : ''}
+      <p class="muted" style="margin:0">${info.auto ? 'انتهى الوقت وسُلّمت إجاباتك تلقائياً' : 'تم تسليم إجاباتك'}${name ? ' يا ' + esc(name) : ''}</p>
+      <div class="qz-score" id="scr" style="--c:${col}" role="img" aria-label="النتيجة ${AR(p)} بالمئة"><div><b id="scn">٠٪</b><span>${AR(r.score)} من ${AR(r.max)}</span></div></div>
+      <p style="margin:4px 0 0"><span class="tag ${c}">${l}</span></p>
+      <div class="qz-stats">${r.review ? `<div><b style="color:#17814a">${AR(nOk)}</b><span class="small">صحيحة</span></div><div><b style="color:#c62d22">${AR(nBad)}</b><span class="small">خاطئة</span></div>${nMan ? `<div><b style="color:#a85d00">${AR(nMan)}</b><span class="small">يصححها المعلم</span></div>` : ''}` : ''}<div><b>${AR(mm)}:${AR(String(ss).padStart(2, '0'))}</b><span class="small">الوقت المستغرق</span></div></div>
+      ${r.pending ? '<p class="small muted">الأسئلة المقالية سيصححها معلمك.</p>' : ''}${!r.review ? '<p class="small muted">سيعرض معلمك الإجابات الصحيحة لاحقاً.</p>' : ''}
+      <div class="qz-foot" style="justify-content:center">${r.left > 0 ? `<button class="btn" type="button" id="again">محاولة أخرى (بقي ${AR(r.left)})</button>` : ''}${LS.get('dina_me') ? '<a class="btn ghost" href="me.html">العودة إلى حسابي</a>' : ''}</div></section>` +
+      (r.review ? `<h2 style="margin:6px 4px 10px">مراجعة الإجابات</h2>` + qs.map((q, i) => { const x = R[q.id] || {}; const mine = ans[q.id];
         const fmt = v => { try { const a = JSON.parse(v); return Array.isArray(a) ? a.filter(Boolean).join(' · ') : v; } catch (_) { return v; } };
-        const body = ['blank', 'match', 'order'].includes(q.type) ? `<div class="small">إجابتك: <b>${esc(fmt(mine) || '—')}</b><br>الصحيح: <b>${esc(x.answer || '')}</b>${x.pts != null ? ` · درجتك ${AR(x.pts)} من ${AR(q.points)}` : ''}</div>` : q.type === 'multi' ? (() => { const R2 = String(x.answer || '').split(',').filter(Boolean), M = (() => { try { return JSON.parse(mine || '[]'); } catch (_) { return []; } })(); return q.options.map((o, k) => `<div class="opt ${R2.includes(String(k)) ? 'right' : M.includes(String(k)) ? 'wrong' : ''}">${esc(o)}${R2.includes(String(k)) ? ' ✓' : ''}${M.includes(String(k)) ? ' <small>(اخترتها)</small>' : ''}</div>`).join('') + (x.pts != null ? `<div class="small">درجتك ${AR(x.pts)} من ${AR(q.points)}</div>` : ''); })() : q.type === 'mcq' ? q.options.map((o, k) => `<div class="opt ${String(k) === String(x.answer) ? 'right' : String(k) === String(mine) ? 'wrong' : ''}">${esc(o)}${String(k) === String(x.answer) ? ' ✓' : ''}</div>`).join('') : `<div class="small">إجابتك: <b>${esc(mine || '—')}</b>${q.type !== 'essay' ? ` · الصحيح: <b>${esc(String(x.answer || '').split('|')[0])}</b>` : ''}</div>`;
+        const body = ['blank', 'match', 'order'].includes(q.type) ? `<div class="small">إجابتك: <b>${esc(fmt(mine) || '—')}</b><br>الصحيح: <b>${esc(x.answer || '')}</b>${x.pts != null ? ` · درجتك ${AR(x.pts)} من ${AR(q.points)}` : ''}</div>` : q.type === 'multi' ? (() => { const R2 = String(x.answer || '').split(',').filter(Boolean), M = (() => { try { return JSON.parse(mine || '[]'); } catch (_) { return []; } })(); return q.options.map((o, k) => `<div class="opt ${R2.includes(String(k)) ? 'right' : M.includes(String(k)) ? 'wrong' : ''}">${esc(o)}${R2.includes(String(k)) ? ' ✓' : ''}${M.includes(String(k)) ? ' <small>(اخترتها)</small>' : ''}</div>`).join('') + (x.pts != null ? `<div class="small">درجتك ${AR(x.pts)} من ${AR(q.points)}</div>` : ''); })() : q.type === 'mcq' ? q.options.map((o, k) => `<div class="opt ${String(k) === String(x.answer) ? 'right' : String(k) === String(mine) ? 'wrong' : ''}">${esc(o)}${String(k) === String(x.answer) ? ' ✓' : String(k) === String(mine) ? ' ✗' : ''}</div>`).join('') : `<div class="small">إجابتك: <b>${esc(mine || '—')}</b>${q.type !== 'essay' ? ` · الصحيح: <b>${esc(String(x.answer || '').split('|')[0])}</b>` : ''}</div>`;
         return `<div class="q"><div><span class="n">${AR(i + 1)}</span><b>${esc(q.body)}</b> ${x.ok === true ? '<span class="tag ok">صحيح</span>' : x.ok === false ? (x.pts > 0 ? '<span class="tag warn">صحيح جزئياً</span>' : '<span class="tag bad">خطأ</span>') : '<span class="tag warn">يُصحَّح يدوياً</span>'}</div>${body}${x.explanation ? `<div class="exp">${esc(x.explanation)}</div>` : ''}</div>`; }).join('') : '');
+    const ag = document.getElementById('again'); if (ag) ag.onclick = () => quiz();
     window.scrollTo(0, 0);
+    // عدّاد النتيجة
+    const el = document.getElementById('scr'), n = document.getElementById('scn'), reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) { el.style.setProperty('--p', p); n.textContent = AR(p) + '٪'; return; }
+    const t0 = performance.now(); const step = t => { const k = Math.min(1, (t - t0) / 1100), v = Math.round(p * (1 - Math.pow(1 - k, 3))); el.style.setProperty('--p', v); n.textContent = AR(v) + '٪'; if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step);
   }
   async function plan() {
     let R; try { R = await rpc('remedial_public', { p_token: tok }); } catch (e) { m.innerHTML = `<div class="card">${esc(e.message)}</div>`; return; }

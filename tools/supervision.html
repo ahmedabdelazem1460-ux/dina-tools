@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><script src="../digits.js?v=1794155533"></script>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><script src="../digits.js?v=1794197246"></script>
 </head><body>
 
 <title>نماذج الإشراف التربوي</title>
@@ -1299,14 +1299,14 @@ function rAnalysis(b,ctx){
 }
 /* ---- notes ---- */
 var ORD=['الأول','الثاني','الثالث','الرابع','الخامس','السادس'];
-function sigTable(roles,d,withSign,ctx){
+function sigTable(roles,d,withSign,ctx,bid){
   var tb=h('table',{class:'sig-t'}),hr=h('tr'),br=h('tr');
   roles.forEach(function(r,i){
     hr.appendChild(h('th',{text:r.label}));if(withSign)hr.appendChild(h('th',{text:'التوقيع'}));
-    var nm=resolveName(r.name);
-    if(nm)br.appendChild(h('td',{text:nm}));
-    else br.appendChild(h('td',null,h('input',{type:'text','aria-label':r.label,value:d[r.id]||'',oninput:function(e){d[r.id]=e.target.value;ctx.touch();}})));
-    if(withSign)br.appendChild(h('td'));
+    var nm=resolveName(r.name),ntd;
+    if(nm)br.appendChild(ntd=h('td',{text:nm}));
+    else br.appendChild(ntd=h('td',null,h('input',{type:'text','aria-label':r.label,value:d[r.id]||'',oninput:function(e){d[r.id]=e.target.value;ctx.touch();}})));
+    if(withSign)br.appendChild(FE&&bid?feSigCell(bid,r,i,(FE.sigs||{})[bid+'|'+r.id]&&!nm?ntd:null):h('td'));
   });
   tb.appendChild(h('thead',null,hr));tb.appendChild(h('tbody',null,br));return tb;
 }
@@ -1333,7 +1333,7 @@ function rNotes(b,ctx){
   })(i);
   return wrap;
 }
-function rSignatures(b,ctx){var d=dataFor(b,ctx);return h('div',{class:'bk'},sigTable(b.roles||[],d,b.withSign!==false,ctx));}
+function rSignatures(b,ctx){var d=dataFor(b,ctx);return h('div',{class:'bk'},sigTable(b.roles||[],d,b.withSign!==false,ctx,b.id));}
 /* ---- matrix ---- */
 function rMatrix(b,ctx){
   var d=dataFor(b,ctx),subs=b.subs||[],wrap=h('div',{class:'bk'},b.title?h('div',{class:'bk-t',text:b.title}):null);
@@ -2929,7 +2929,69 @@ function init(){
   });
 }
 
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+/* ================= وضع التضمين في المنصة: تعبئة نموذج واحد وتوقيعه (formEmbed=1) =================
+   المنصة ترسل القالب وبياناته وحالة التوقيعات، وهذه الصفحة ترسم الورقة بهوية دينا كما هي،
+   وتعيد التغييرات للمنصة. لا تكتب شيئاً في تخزين هذه الأداة. */
+var FE=null;
+function feSigCell(bid,r,i,nameTd){
+  var key=bid+'|'+r.id,s=(FE.sigs||{})[key],st=(FE.slots||{})[key]||{};
+  var td=h('td',{class:'fe-sg'});
+  if(s&&s.img){td.appendChild(h('img',{src:s.img,alt:'توقيع '+(s.name||''),class:'fe-img'}));if(nameTd){clear(nameTd);nameTd.appendChild(document.createTextNode(s.name||''));}
+    if(st.mine&&!FE.ro)td.appendChild(h('button',{class:'fe-b fe-x noprint',type:'button',title:'حذف توقيعي',onclick:function(){feSend({type:'dina-form-sign',key:key,label:r.label,remove:true});}},'×'));}
+  else if(st.wait)td.appendChild(h('span',{class:'fe-w',text:'بانتظار توقيع '+(st.wait||'')}));
+  else if(st.can)td.appendChild(h('button',{class:'fe-b noprint',type:'button',onclick:function(){feSend({type:'dina-form-sign',key:key,label:r.label});}},'✍ توقيع'));
+  return td;
+}
+function feSend(o){try{parent.postMessage(o,location.origin);}catch(e){}}
+var feSendData=debounce(function(){feSend({type:'dina-form-change',d:FE.rec.d});},400);
+function feMount(){
+  var host=$('#feHost');clear(host);
+  var tpl=FE.tpl,rec=FE.rec;
+  var ctx=buildCtx(tpl,rec,false,feMount);
+  var t0=ctx.touch;ctx.touch=function(){t0();if(!FE.ro)feSendData();};
+  host.appendChild(renderPaper(tpl,ctx));ctx.ups.forEach(function(f){f();});
+  $$('textarea',host).forEach(grow);setTimeout(function(){$$('textarea',host).forEach(grow);},250);
+  if(FE.ro){$$('input,textarea,select',host).forEach(function(e){e.readOnly=true;if(e.tagName==='SELECT'||e.type==='checkbox'||e.type==='radio')e.disabled=true;});$$('.addb,.ib,.cl-tools,.noprint:not(.fe-b)',host).forEach(function(e){if(!e.closest('.fe-sg'))e.style.display='none';});host.classList.add('fe-ro');}
+  feFit();feSend({type:'dina-form-size',h:document.documentElement.scrollHeight});
+}
+// الجوال: تُعرض الورقة بعرضها الحقيقي مصغّرة لتناسب الشاشة (مع إمكانية التمرير)
+function feFit(){var host=$('#feHost');if(!host)return;var w=window.innerWidth;if(w>=820){host.style.zoom='';host.style.minWidth='';return;}var z=Math.max(0.6,Math.min(1,(w-8)/800));host.style.minWidth='800px';host.style.zoom=z;}
+window.addEventListener('resize',debounce(function(){if(FE)feFit();},150));
+function feStart(){
+  var st=h('style',{text:'body>*:not(#feHost):not(style):not(script){display:none!important}#feHost{padding:10px 0 30px}.fe-sg{position:relative}.fe-img{max-height:2.4rem;max-width:100%;display:block;margin:auto}.fe-b{font:inherit;font-size:.8rem;font-weight:800;border:1px dashed #3AB1DB;background:#F1F8FD;color:#005499;border-radius:8px;padding:.15rem .55rem;cursor:pointer}.fe-b:hover{background:#E1F1FB}.fe-x{position:absolute;top:2px;inset-inline-start:2px;border:0;background:#fff;color:#D2463F;padding:0 .35rem;font-size:.9rem}.fe-w{font-size:.72rem;color:#B07A12;font-weight:700}.fe-ro .addb,#feHost .cl-bar{display:none!important}@media print{.fe-b{display:none!important}#feHost{padding:0}}'});
+  document.head.appendChild(st);
+  document.body.appendChild(h('div',{id:'feHost'}));
+  markDirty=function(){};flush=function(){};
+  window.addEventListener('message',function(e){
+    if(e.origin!==location.origin||!e.data)return;var m=e.data;
+    if(m.type==='dina-form-init'){
+      var tpl=clone(m.tpl);tpl.id='fe-'+(tpl.id||'x');
+      if(m.cfg&&m.cfg.school)S.cfg.school=Object.assign({},S.cfg.school,m.cfg.school);
+      if(m.cfg&&m.cfg.logos)S.logos=m.cfg.logos;
+      S.tpls[tpl.id]=tpl;
+      FE={tpl:tpl,rec:{id:'fe',tid:tpl.id,d:clone(m.data||{}),transient:true,nosig:true,sigs:null},sigs:m.sigs||{},slots:m.slots||{},ro:!!m.ro};
+      feMount();
+    }
+    if(m.type==='dina-form-sigs'&&FE){FE.sigs=m.sigs||{};FE.slots=m.slots||{};if('ro' in m)FE.ro=!!m.ro;feMount();}
+    if(m.type==='dina-form-get'&&FE)feSend({type:'dina-form-data',d:FE.rec.d,req:m.req});
+    if(m.type==='dina-form-print')try{window.print();}catch(_){}
+    if(m.type==='dina-form-lib'){
+      var list=tplList().map(function(t){return {id:t.id,name:t.name,cat:t.cat,desc:t.desc||'',tpl:clone(t),slots:feSlots(t)};});
+      feSend({type:'dina-form-lib',req:m.req,list:list,cats:CATS,cfg:{school:S.cfg.school,logos:S.logos&&Object.keys(S.logos).length?S.logos:null}});
+    }
+  });
+  var go2=function(){S.ready=true;feSend({type:'dina-form-ready'});};
+  store.loadAll().then(function(o){
+    if(o.cfg.main){S.cfg=o.cfg.main.cfg;S.teachers=o.cfg.main.teachers||[];S.tpls=o.tpl||{};}else seedAll();
+    if(o.cfg.logos)S.logos=o.cfg.logos;
+    if(!Object.keys(S.tpls).length)buildTemplates().forEach(function(t){S.tpls[t.id]=t;});
+  }).catch(function(){seedAll();}).then(function(){dirty={};try{normalizeCfg();}catch(_){}applyTheme&&applyTheme();go2();});
+}
+// خانات التوقيع في القالب (لكل كتلة توقيعات)
+function feSlots(t){var out=[];(t.blocks||[]).forEach(function(b){if(b.type!=='signatures')return;(b.roles||[]).forEach(function(r){out.push({key:b.id+'|'+r.id,label:r.label,auto:String(r.name||'').charAt(0)==='@',name:resolveName(r.name)});});});return out;}
+
+var __initFn=/[?&]formEmbed=1/.test(location.search)?feStart:init;
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',__initFn);else __initFn();
 })();
 </script>
 </body></html>

@@ -10,15 +10,21 @@
   const fmt = (m, b) => { const h24 = Math.floor(m / 60) % 24, mm = String(m % 60).padStart(2, '0'); if (b && b.h24) return AR(String(h24).padStart(2, '0') + ':' + mm); const h = h24 % 12 || 12; return `${AR(h + ':' + mm)} ${h24 < 12 ? 'ص' : 'م'}`; };
   const isoToday = () => A.isoDate(new Date());
   const dAR = iso => { const [y, m, d] = String(iso || '').split('-'); return d ? AR(`${+d}/${+m}/${y}`) : ''; };
-  const allCls = () => (S.allClasses && S.allClasses.length ? S.allClasses : S.classes) || [];
-  // شريط توقيت اليوم — وعند وجود فسحات/صلاة خاصة ببعض الصفوف: شريط لكل فئة (نفس أرقام الملصق)
+  // نفس فصول شاشة اللوحة: النشطة فقط، بلا الفصل التجريبي، بترتيبها
+  const allCls = () => ((S.allClasses && S.allClasses.length ? S.allClasses : S.classes) || []).filter(c => c.active !== false && !c.is_test).sort((a, b) => (a.sort || 0) - (b.sort || 0));
+  // توقيت اليوم: عند وجود فسحات/صلاة خاصة ببعض الصفوف يُعرض جدول «الحصة × الفئة» بنفس حساب الملصق وترتيب فئاته
   const brIco = x => /صلا/.test(x.label || '') ? '🕌' : '☕';
   const stripOne = (items, f) => `<div class="bl-strip" role="list">${items.map(x => `<div role="listitem" class="bl-it ${x.k}" style="flex:${Math.max(1, x.dur)}" title="${x.k === 'p' ? 'الحصة ' + (x.i + 1) : esc(x.label || 'انتقال')} ${f(x.from)} – ${f(x.to)}">${x.k === 'p' ? `<b>${AR(x.i + 1)}</b><small>${f(x.from)}</small>` : x.k === 'b' ? `<b>${brIco(x)}</b><small>${esc(x.label || 'الفسحة')}</small>` : ''}</div>`).join('')}</div>`;
-  const dayGroups = pl => (window.DinaBell && window.DinaBell.planGroups) ? window.DinaBell.planGroups(pl, allCls()) : null;
-  const dayEnd = (pl, G) => G ? Math.max(...G.map(g => g.end)) : pl.end;
-  const brTxt = (br, f) => br.map(x => `${esc(x.label || 'الفسحة')} ${f(x.from)} – ${f(x.to)}`).join('، ');
-  const dayBreaks = (pl, G, f) => G ? G.map(g => `<b>الفئة ${AR(g.n)}:</b> ${brTxt(g.breaks, f) || 'بلا فسحة'}`).join(' · ') : (brTxt(pl.items.filter(x => x.k === 'b'), f) || 'بلا فسحة');
-  const dayStrips = (pl, f) => { const G = dayGroups(pl); return G ? G.map(g => `<div class="small" style="margin-top:6px"><b>الفئة ${AR(g.n)}</b> <span class="muted">${esc(g.name)}</span> · ينتهي <b>${f(g.end)}</b></div>${stripOne(g.items, f)}`).join('') : stripOne(pl.items, f); };
+  const dayMx = pl => { const DB = window.DinaBell; if (!DB || !DB.matrix || !pl || !pl.sched) return null; const P = pl.items.filter(x => x.k === 'p').length; return P ? DB.matrix(pl.sched, P, allCls()) : null; };
+  const dayEnd = (pl, M) => M ? Math.max(...M.cols.map(c => c.end)) : pl.end;
+  const rng = (c, f) => `<span style="white-space:nowrap">${f(c.from)} – ${f(c.to)}</span>`;
+  const dayBreaks = (pl, M, f) => {
+    if (!M) { const br = pl.items.filter(x => x.k === 'b'); return br.length ? br.map(x => `${esc((x.label || 'الفسحة').trim())} ${rng(x, f)}`).join('، ') : 'بلا فسحة'; }
+    return M.rows.filter(r => r.k === 'b').map(r => { const on = r.cells.map((c, k) => c ? [k, c] : null).filter(Boolean), same = on.length === M.cols.length && on.every(([, c]) => c.from === on[0][1].from && c.to === on[0][1].to);
+      return `${brIco(r)} ${esc(r.label.trim())} ${same ? rng(on[0][1], f) + ' (للجميع)' : on.map(([k, c]) => `الفئة ${AR(k + 1)} ${rng(c, f)}`).join('، ')}`; }).join(' · ');
+  };
+  const mxTable = (M, f) => `<div class="scroll" style="margin-top:6px"><table class="tbl bl-mx" style="font-size:13px"><thead><tr><th>الحصة</th>${M.cols.map((c, k) => `<th class="cat">الفئة ${AR(k + 1)}<div class="small" style="font-weight:400;opacity:.85">${esc(shortCls(c.classes))}</div></th>`).join('')}</tr></thead><tbody>${M.rows.map(r => `<tr${r.k === 'b' ? ' style="background:#EEF7E6"' : ''}><th style="white-space:nowrap">${r.k === 'p' ? 'الحصة ' + (PER[r.i] || AR(r.i + 1)) : `${brIco(r)} ${esc(r.label.trim())}`}</th>${r.cells.map(c => `<td style="white-space:nowrap;text-align:center">${c ? rng(c, f) : '<span class="muted">—</span>'}</td>`).join('')}</tr>`).join('')}<tr style="font-weight:800"><th>✓ نهاية اليوم</th>${M.cols.map(c => `<td style="text-align:center">${f(c.end)}</td>`).join('')}</tr></tbody></table></div>`;
+  const dayView = (pl, f) => { const M = dayMx(pl); return M ? mxTable(M, f) : stripOne(pl.items, f); };
   const DEF_FOOT = 'رحلتهم الكبرى... تبدأ من هنا', DEF_TITLE = 'الجدول الزمني لليوم الدراسي';
   const defSched = (name) => ({ id: uid(), name: name || 'الجدول الأساسي', tag: '', title: DEF_TITLE, foot: DEF_FOOT, start: '07:00', dur: 45, pass: 0, show: true, h24: false, perDur: {}, breaks: [{ id: uid(), after: 3, dur: 20, label: 'الفسحة', classes: [] }] });
   const norm = raw => {
@@ -111,8 +117,8 @@
       const dsO = g('#pcR').querySelector('[value="ds"]'); dsO.disabled = !isD; if (!isD && g('#pcR').value === 'ds') g('#pcR').value = 'ever';
       const nb = JSON.parse(JSON.stringify(b)); const np = build(); if (np) nb.pin = np; else delete nb.pin;
       const day = np && np.from && np.from > td ? np.from : td, pl = DB.dayPlan({ bell: nb, periods: sec.periods, days: sec.days }, day, disp, null), ps = pl.items.filter(x => x.k === 'p'), f = m => fmt(m, pl.sched || {});
-      const G = dayGroups(pl);
-      g('#pcPv').innerHTML = `<span class="small muted">${day === td ? 'سيظهر اليوم' : 'سيظهر يوم ' + dAR(day)}:</span> <b>${esc(pl.name || DB.SRC[pl.src] || '')}</b> ${ps.length ? `· ${f(pl.start)} – ${f(dayEnd(pl, G))} · ${AR(ps.length)} حصص · ${dayBreaks(pl, G, f)}` : `· ${esc(DB.SRC[pl.src] || '')}`}${pl.warn.length ? `<div class="small" style="color:#C0392B">${esc(pl.warn.join(' — '))}</div>` : ''}${ps.length ? `<div style="margin-top:6px">${dayStrips(pl, f)}</div>` : ''}`;
+      const M = dayMx(pl), same = o.hasToday && day === td && JSON.stringify(pl.items) === JSON.stringify(cur.items) && pl.name === cur.name;
+      g('#pcPv').innerHTML = `<span class="small muted">${day === td ? 'سيظهر اليوم' : 'سيظهر يوم ' + dAR(day)}:</span> <b>${esc(pl.name || DB.SRC[pl.src] || '')}</b> ${ps.length ? `· ${f(pl.start)} – ${f(dayEnd(pl, M))} · ${AR(ps.length)} حصص · ${dayBreaks(pl, M, f)}` : `· ${esc(DB.SRC[pl.src] || '')}`}${pl.warn.length ? `<div class="small" style="color:#C0392B">${esc(pl.warn.join(' — '))}</div>` : ''}${ps.length ? (same ? '<div class="small muted" style="margin-top:4px">التوقيت التفصيلي في «اللوحة اليوم» أدناه.</div>' : dayView(pl, f)) : ''}`;
     };
     ['#pcS', '#pcR', '#pcF', '#pcT'].forEach(id => g(id).onchange = pv); pv();
     g('#pcGo').onclick = ev => A.run(ev.currentTarget, async () => {
@@ -367,7 +373,7 @@
       const iss = DB.check(sx, disp, today, 14), nb = iss.filter(x => x.lv === 'bad').length, nw = iss.filter(x => x.lv === 'warn').length;
       const days = []; for (let k = 0, iso = today; days.length < 10 && k < 21; k++, iso = DB.addDays(today, k)) { const pl = DB.dayPlan(sx, iso, disp, null); if (pl.src === 'off' && pl.name === 'يوم غير دراسي') continue; days.push(pl); }
       const tp = DB.dayPlan(sx, today, disp, null), f = m => fmt(m, tp.sched || {});
-      const tG = dayGroups(tp), strip = tp.items.length ? dayStrips(tp, f) : `<div class="small muted">${esc(DB.SRC[tp.src] || '')}${tp.name ? ' — ' + esc(tp.name) : ''}</div>`;
+      const tM = dayMx(tp), strip = tp.items.length ? dayView(tp, f) : `<div class="small muted">${esc(DB.SRC[tp.src] || '')}${tp.name ? ' — ' + esc(tp.name) : ''}</div>`;
       const nonRem = b.schedules.filter(s => !/بعد/.test(s.name + ' ' + (s.tag || '')));
       const defS = b.schedules.find(s => s.id === b.def) || {};
       const fixDef = /بعد/.test((defS.name || '') + ' ' + (defS.tag || '')) && nonRem.length ? `<div class="bl-fix"><label for="blFxD">الجدول الأساسي الصحيح:</label><select class="in" id="blFxD" style="width:auto">${nonRem.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select><button class="btn sm" id="blFxDo">اعتماده أساسياً</button><span class="small muted">يبقى «${esc((defS.name || '').trim())}» محفوظاً ويمكن تفعيله لفترة محددة.</span></div>` : '';
@@ -376,12 +382,12 @@
       const L = showAll ? iss : iss.slice(0, 6);
       box.innerHTML = `<h3>فحص التوقيت وما ستعرضه اللوحة اليومية <span class="pill ${nb ? 'st-bad' : nw ? 'st-warn' : 'st-ok'}">${nb ? AR(nb) + ' تعارض' : nw ? AR(nw) + ' ملاحظة' : 'مرتّب ✓'}</span></h3>
         <div id="blPin"></div>
-        <div class="bl-today"><div class="small"><b>اللوحة اليوم:</b> <span class="pill ${SRCC[tp.src]}">${esc(DB.SRC[tp.src])}</span> ${esc(tp.name || '')}${tp.items.length ? ` · من <b>${f(tp.start)}</b> إلى <b>${f(dayEnd(tp, tG))}</b> · ${AR(tp.items.filter(x => x.k === 'p').length)} حصص${tG ? ' · توقيت مختلف لكل فئة كما في الملصق' : ''}` : ''}</div>${strip}</div>
+        <div class="bl-today"><div class="small"><b>اللوحة اليوم:</b> <span class="pill ${SRCC[tp.src]}">${esc(DB.SRC[tp.src])}</span> ${esc(tp.name || '')}${tp.items.length ? ` · من <b>${f(tp.start)}</b> إلى <b>${f(dayEnd(tp, tM))}</b> · ${AR(tp.items.filter(x => x.k === 'p').length)} حصص${tM ? ' · لكل فئة توقيتها — مطابق للملصق' : ''}` : ''}</div>${strip}</div>
         ${iss.length ? `<ul class="bl-iss">${L.map(x => `<li class="${x.lv}">${AR(esc(x.t))}</li>`).join('')}</ul>${iss.length > 6 ? `<button class="btn ghost sm" id="blChkMore">${showAll ? 'عرض أقل' : 'عرض الكل (' + AR(iss.length) + ')'}</button>` : ''}` : '<p class="small" style="color:#2E8B57;margin:6px 0">لا تعارض ولا تداخل — التوقيت مرتّب.</p>'}
         ${fixDef}${fixNm}
-        <details class="bl-next"><summary>توقيت الأيام الدراسية القادمة كما سيظهر في اللوحة</summary><div class="scroll"><table class="tbl"><thead><tr><th>اليوم</th><th>التاريخ</th><th>المصدر</th><th>الجدول</th><th>البداية</th><th>النهاية</th><th>الحصص</th><th>الفسحة</th></tr></thead><tbody>${days.map(d => { const ps = d.items.filter(x => x.k === 'p'), dG = dayGroups(d), g = m => fmt(m, d.sched || {}); return `<tr class="${d.iso === today ? 'cur' : ''}"><td>${DAYS[d.dow] || ''}</td><td>${dAR(d.iso)}</td><td><span class="pill ${SRCC[d.src]}">${esc(DB.SRC[d.src])}</span></td><td>${esc(d.name || '')}</td><td>${ps.length ? g(d.start) : '—'}</td><td>${ps.length ? g(dayEnd(d, dG)) : '—'}</td><td>${ps.length ? AR(ps.length) : '—'}</td><td class="small">${ps.length ? dayBreaks(d, dG, g) : '—'}</td></tr>`; }).join('')}</tbody></table></div>
+        <details class="bl-next"><summary>توقيت الأيام الدراسية القادمة كما سيظهر في اللوحة</summary><div class="scroll"><table class="tbl"><thead><tr><th>اليوم</th><th>التاريخ</th><th>المصدر</th><th>الجدول</th><th>البداية</th><th>النهاية</th><th>الحصص</th><th>الفسحة</th></tr></thead><tbody>${days.map(d => { const ps = d.items.filter(x => x.k === 'p'), dM = dayMx(d), g = m => fmt(m, d.sched || {}); return `<tr class="${d.iso === today ? 'cur' : ''}"><td>${DAYS[d.dow] || ''}</td><td>${dAR(d.iso)}</td><td><span class="pill ${SRCC[d.src]}">${esc(DB.SRC[d.src])}</span></td><td>${esc(d.name || '')}</td><td>${ps.length ? g(d.start) : '—'}</td><td>${ps.length ? g(dayEnd(d, dM)) : '—'}</td><td>${ps.length ? AR(ps.length) : '—'}</td><td class="small">${ps.length ? dayBreaks(d, dM, g) : '—'}</td></tr>`; }).join('')}</tbody></table></div>
         <p class="small muted" style="margin:6px 0 0">الأولوية في اللوحة والحضور: الإجازة ← الجدول الاستثنائي المنشور (من «جداول العرض الاستثنائية») ← الجدول المفعّل لفترة ← الجدول الأساسي.</p></details>`;
-      if (S.me.is_owner) A.bell.pinCtl($('#blPin', box), sec, { bell: b, save: async () => { await save(true); }, done: () => V.bell(root) });
+      if (S.me.is_owner) A.bell.pinCtl($('#blPin', box), sec, { bell: b, hasToday: true, save: async () => { await save(true); }, done: () => V.bell(root) });
       const mo = $('#blChkMore', box); if (mo) mo.onclick = () => { showAll = !showAll; drawChk(); };
       const fd = $('#blFxDo', box); if (fd) fd.onclick = ev => A.run(ev.currentTarget, async () => { const id = $('#blFxD', box).value, s = b.schedules.find(x => x.id === id); if (!(await A.confirmBox(`اعتماد «${esc(s.name)}» جدولاً أساسياً لـ${esc(sec.name)}؟<br><span class="small muted">لا يُحذف أي جدول، ويمكن التراجع من شارة «أساسي».</span>`, 'اعتماد'))) return; b.def = id; await save(true); A.toast('اعتُمد الجدول الأساسي', 'ok'); V.bell(root); });
       $$('[data-fxs]', box).forEach(bt => bt.onclick = ev => A.run(ev.currentTarget, async () => { const id = bt.dataset.fxs, v = ($(`[data-fxn="${id}"]`, box).value || '').trim(); if (!v) throw new Error('اكتب اسماً واضحاً'); const s = b.schedules.find(x => x.id === id); s.name = v; await save(true); A.toast('حُفظ الاسم', 'ok'); V.bell(root); }));

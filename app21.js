@@ -30,7 +30,7 @@
     const out = []; let t = toMin(s.start);
     for (let p = 0; p < P; p++) {
       const d = +s.perDur[p] || +s.dur || 45; out.push({ k: 'p', i: p, from: t, to: t + d, dur: d }); t += d;
-      if (p === P - 1) break;
+      if (p === P - 1) { (s.breaks || []).filter(b => +b.after === P && applies(b, cid)).forEach(b => { const bd = +b.dur || 0; out.push({ k: 'b', label: b.label || 'الصلاة', from: t, to: t + bd, dur: bd, end: true }); t += bd; }); break; }
       const brs = s.breaks.filter(b => +b.after === p + 1 && applies(b, cid));
       if (brs.length) brs.forEach(b => { const bd = +b.dur || 0; out.push({ k: 'b', label: b.label || 'الفسحة', from: t, to: t + bd, dur: bd }); t += bd; });
       else if (+s.pass > 0) { out.push({ k: 't', from: t, to: t + +s.pass, dur: +s.pass }); t += +s.pass; }
@@ -112,7 +112,7 @@
       if (it.k === 't') return `<div class="bp-row bp-pass"><span class="bp-tm">${fmt(it.from, s)}</span><span class="bp-dot"></span><span class="bp-lb">انتقال · ${AR(it.dur)} د</span></div>`;
       const cl = it.k === 'b' ? 'bp-brk' : '';
       const lb = it.k === 'b' ? esc(it.label) : `الحصة ${PER[it.i] || AR(it.i + 1)}`;
-      return `<div class="bp-row ${cl}"><span class="bp-tm"><b>${fmt(it.from, s)}</b><i>إلى</i><b>${fmt(it.to, s)}</b></span><span class="bp-dot">${it.k === 'b' ? '☕' : AR(it.i + 1)}</span><span class="bp-lb"><b>${lb}</b><i>${AR(it.dur)} دقيقة</i></span></div>`;
+      return `<div class="bp-row ${cl}"><span class="bp-tm"><b>${fmt(it.from, s)}</b><i>إلى</i><b>${fmt(it.to, s)}</b></span><span class="bp-dot">${it.k === 'b' ? (/صلا/.test(it.label || '') ? '🕌' : '☕') : AR(it.i + 1)}</span><span class="bp-lb"><b>${lb}</b><i>${AR(it.dur)} دقيقة</i></span></div>`;
     };
     const n = tl.items.length + 1, dense = n > 14 ? (n > 18 ? ' bp-xdense' : ' bp-dense') : '';
     return `<div class="bposter${dense}" dir="rtl">
@@ -229,11 +229,11 @@
         <h4 style="margin:14px 0 6px">الفسحات والصلاة <span class="small muted">— يمكن أن تختلف حسب الصفوف</span></h4>
         <div class="bl-brs">${s.breaks.map(br => `<div class="bl-br" data-br="${br.id}">
             <input class="in" data-k="label" value="${esc(br.label || '')}" aria-label="الاسم" placeholder="الفسحة">
-            <label>بعد الحصة <select class="in" data-k="after">${Array.from({ length: P - 1 }, (_, p) => `<option value="${p + 1}" ${+br.after === p + 1 ? 'selected' : ''}>${PER[p] || AR(p + 1)}</option>`).join('')}</select></label>
+            <label>بعد الحصة <select class="in" data-k="after">${Array.from({ length: P }, (_, p) => `<option value="${p + 1}" ${+br.after === p + 1 ? 'selected' : ''}>${PER[p] || AR(p + 1)}${p === P - 1 ? ' (آخر حصة)' : ''}</option>`).join('')}${+br.after > P ? `<option value="${br.after}" selected>${PER[br.after - 1] || AR(br.after)} — غير موجودة في هذا الجدول</option>` : ''}</select></label>
             <label>المدة <input class="in" type="number" min="5" max="90" data-k="dur" value="${+br.dur || 20}" style="width:76px"> د</label>
             <button class="btn ghost sm" data-bc>${(br.classes || []).length ? `لـ ${AR(br.classes.length)} فصل` : 'لجميع الصفوف'}</button>
             <button class="btn bad sm" data-bx aria-label="حذف">×</button></div>`).join('') || '<p class="small muted">لا توجد فسحات.</p>'}</div>
-        <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn ghost sm" id="eAddB">+ فسحة / صلاة</button><span class="grow"></span>
+        <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn ghost sm" id="eAddB">+ فسحة / صلاة</button><button class="btn ghost sm" id="eAddPr">+ صلاة بعد ${PER[P - 1] ? 'الحصة ' + PER[P - 1] : 'آخر حصة'}</button>${P < SP ? `<span class="small muted">هذا الجدول ${AR(P)} حصص — لإظهار الحصة ${PER[SP - 1] || AR(SP)} وما بعدها اختر «${AR(SP)} حصص» من «عدد الحصص في هذا الجدول».</span>` : ''}<span class="grow"></span>
           ${s.id !== b.def ? '<button class="btn ok sm" id="eDef">اجعله الأساسي</button><button class="btn bad sm" id="eDel">حذف الجدول</button>' : ''}</div>
         <div class="bl-sum small">اليوم: من <b>${fmt(tl.start, s)}</b> إلى <b>${fmt(tl.end, s)}</b> · ${AR(Math.round((tl.end - tl.start) / 6) / 10)} ساعة${pvCls ? ` · محسوب لـ ${esc((allCls().find(c => c.id === pvCls) || {}).name || '')}` : ''}</div>`;
       const bind = (id, k, num) => { const i = $('#' + id, ed); i.oninput = () => { s[k] = i.type === 'checkbox' ? i.checked : num ? +i.value : i.value; if (k === 'name') { const ch = $(`[data-sc="${s.id}"]`, root); if (ch) ch.firstChild.textContent = i.value; } later(); drawPv(); if (num || k === 'start') sumOnly(); }; };
@@ -246,6 +246,7 @@
         $$('[data-k]', row).forEach(i => i.oninput = i.onchange = () => { br[i.dataset.k] = i.dataset.k === 'label' ? i.value : +i.value; later(); drawPv(); sumOnly(); });
         $('[data-bx]', row).onclick = () => { s.breaks.splice(s.breaks.indexOf(br), 1); later(); drawEd(); drawPv(); };
         $('[data-bc]', row).onclick = () => pickClasses(br, () => { later(); drawEd(); drawPv(); }); });
+      $('#eAddPr', ed).onclick = () => { if (s.breaks.some(x => +x.after === P && /صلا/.test(x.label || ''))) return A.toast('الصلاة مضافة بعد آخر حصة مسبقاً', 'err'); s.breaks.push({ id: uid(), after: P, dur: 20, label: 'صلاة الظهر', classes: [] }); later(); drawEd(); drawPv(); };
       $('#eAddB', ed).onclick = () => { s.breaks.push({ id: uid(), after: Math.min(P - 1, 4), dur: 15, label: s.breaks.length ? 'الصلاة' : 'الفسحة', classes: [] }); later(); drawEd(); drawPv(); };
       const df = $('#eDef', ed); if (df) df.onclick = () => { b.def = s.id; later(); V.bell(root); };
       const dl = $('#eDel', ed); if (dl) dl.onclick = async () => { if (!(await A.confirmBox(`حذف الجدول «${esc(s.name)}»؟ تُلغى فترات التفعيل المرتبطة به.`, 'حذف', true))) return; b.schedules = b.schedules.filter(x => x !== s); b.acts = b.acts.filter(a => a.sid !== s.id); cur = b.def; A.LS.set('bell_s_' + sec.id, cur); await save(); V.bell(root); };
@@ -304,7 +305,7 @@
       if (periods < (sec.periods || 7) && !(await A.confirmBox(`تقليل الحصص من ${AR(sec.periods)} إلى ${AR(periods)}؟<br><span class="small muted">لا تُحذف أي خطة، لكن الحصص بعد ${AR(periods)} لن تظهر.</span>`, 'تأكيد'))) return;
       if (days < (sec.days || 5) && !(await A.confirmBox(`تقليل أيام الدراسة إلى ${AR(days)}؟<br><span class="small muted">لا تُحذف أي خطة، لكن الأيام الزائدة لن تظهر.</span>`, 'تأكيد'))) return;
       const r = await api.updateSection(sec.id, { days, periods }); Object.assign(sec, r);
-      b.schedules.forEach(s => s.breaks.forEach(br => { if (+br.after > periods - 1) br.after = periods - 1; }));
+      b.schedules.forEach(s => s.breaks.forEach(br => { if (+br.after > periods) br.after = periods; }));
       A.toast('حُفظت الأيام والحصص', 'ok'); V.bell(root);
     });
     $('#blPvC', root).onchange = e => { pvCls = e.target.value; drawPv(); sumOnly(); };

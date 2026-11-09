@@ -24,7 +24,7 @@
     const out = []; let t = toMin(s.start);
     for (let p = 0; p < P; p++) {
       const d = +(s.perDur || {})[p] || +s.dur || 45; out.push({ k: 'p', i: p, from: t, to: t + d, dur: d }); t += d;
-      if (p === P - 1) break;
+      if (p === P - 1) { (s.breaks || []).filter(b => +b.after === P && applies(b, cid)).forEach(b => { const bd = +b.dur || 0; out.push({ k: 'b', label: b.label || 'الصلاة', from: t, to: t + bd, dur: bd, end: true }); t += bd; }); break; }
       const brs = (s.breaks || []).filter(b => +b.after === p + 1 && applies(b, cid));
       if (brs.length) brs.forEach(b => { const bd = +b.dur || 0; out.push({ k: 'b', label: b.label || 'الفسحة', from: t, to: t + bd, dur: bd }); t += bd; });
       else if (+s.pass > 0) { out.push({ k: 't', from: t, to: t + +s.pass, dur: +s.pass }); t += +s.pass; }
@@ -56,7 +56,7 @@
     const T = (M.times || []).filter(t => t && t[0] && t[1]);
     const P = Math.min(T.length, +(M.perDay || {})[dow] || +M.periods || T.length);
     const out = T.slice(0, P).map((t, i) => ({ k: 'p', i, from: toMin(t[0]), to: toMin(t[1]) }));
-    (M.breaks || []).forEach(b => { if (+b.after >= 1 && +b.after < P && b.from && b.to) out.push({ k: 'b', label: b.label || 'الفسحة', from: toMin(b.from), to: toMin(b.to) }); });
+    (M.breaks || []).forEach(b => { if (+b.after >= 1 && +b.after <= P && b.from && b.to) out.push({ k: 'b', label: b.label || 'الفسحة', from: toMin(b.from), to: toMin(b.to) }); });
     const L = tidy(out, warn), R = [];
     L.forEach((x, i) => { if (i && x.from > L[i - 1].to && L[i - 1].k === 'p' && x.k === 'p') R.push({ k: 't', from: L[i - 1].to, to: x.from, dur: x.from - L[i - 1].to }); R.push(x); });
     return R;
@@ -118,7 +118,7 @@
       if (tl.end > 1440) add('warn', `«${nm}» ينتهي بعد منتصف الليل (${hhmm(tl.end)}).`);
       if (!isRemote(s) && P >= 5 && !(s.breaks || []).length) add('warn', `«${nm}» لا يحتوي على فسحة مع ${P} حصص — أضف الفسحة حتى تظهر في اللوحة والملصق.`);
       if (+s.np > nPer) add('info', `«${nm}» مضبوط على ${s.np} حصص بينما عدد حصص القسم ${nPer} — يُعرض ${nPer} فقط.`);
-      (s.breaks || []).forEach(br => { if (+br.after >= P) add('warn', `في «${nm}» فسحة «${br.label || 'الفسحة'}» بعد الحصة ${br.after} ولا توجد حصة بعدها، فلن تظهر.`); if (!(+br.dur > 0)) add('warn', `في «${nm}» فسحة بلا مدة.`); });
+      (s.breaks || []).forEach(br => { if (+br.after > P) add('warn', `في «${nm}» «${br.label || 'الفسحة'}» بعد الحصة ${br.after} لكن الجدول ${P} حصص فقط — زِد عدد حصص الجدول أو اختر حصة أخرى.`); if (!(+br.dur > 0)) add('warn', `في «${nm}» فسحة بلا مدة.`); });
       const byAfter = {}; (s.breaks || []).filter(x => !(x.classes || []).length).forEach(x => { byAfter[x.after] = (byAfter[x.after] || 0) + 1; });
       Object.entries(byAfter).filter(([, n]) => n > 1).forEach(([a]) => add('warn', `في «${nm}» أكثر من فسحة عامة بعد الحصة ${a} — تُجمع مدتها وتؤخر باقي الحصص.`));
       if ((s.breaks || []).some(x => (x.classes || []).length)) add('info', `«${nm}» فيه فسحات خاصة ببعض الصفوف — اللوحة العامة تعرض التوقيت العام، وتوقيت تلك الصفوف يختلف.`);

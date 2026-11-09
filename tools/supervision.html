@@ -822,7 +822,7 @@ function buildTemplates(){
     B('fields',{title:'',cols:6,fields:[F('المعلم المنفذ','teacher',{w:2,key:'teacher'}),F('الصف','text',{key:'class'}),F('الحصة'),F('المادة','text',{src:'subject',key:'subject'}),F('تاريخ الزيارة','date',{key:'date'}),F('الموضوع','text',{w:6})]}),
     NUM('الضيوف',4,{two:true}),NUM('أهداف تنفيذ الدرس',4),NUM('الإيجابيات',4),NUM('التوصيات',4),
     TBL('',[{name:'المعلم المنفذ',w:2},'التوقيع'],1,{fixed:true}),
-    SIG([R_SUP,R_AC,R_PR])]));
+    SIG([R_AC,R_PR])]));
   bn=0;F.n=0;
   var mutItems=['تحقق أهداف الدرس / المهارة','التسلسل المنطقي لعرض الدرس / أجزاء المهارة','تنوع طرق التدريس ومناسبتها','تقديم ثقافة علمية مناسبة للدرس / التقويم القبلي','إدارة الصف','استثمار زمن الحصة','استخدام الوسائل المناسبة للدرس','استخدام السبورة وتنظيمها','جذب انتباه الطلاب وإثارة تفكيرهم','توزيع الأسئلة على الطلاب','إجادة النقاش والحوار مع الطلاب ومعالجة إجاباتهم','استخدام عبارات التشجيع والتعزيز للطلاب','تقويم الدرس في نهاية الحصة','تحديد أدوات التقويم','استخدام السجل المتابع'];
   out.push(T('f-mutual','تبادل الزيارات','forms','نموذج زيارة متبادلة بين المعلمين مع عناصر التقويم.','تبادل الزيارات','',[
@@ -1329,7 +1329,7 @@ function rNotes(b,ctx){
       g.appendChild(h('div',{class:'nbox'},h('b',{text:p[1]||''}),t));
     });
     card.appendChild(g);wrap.appendChild(card);
-    if(b.sigs){var roles=(b.sigRoles||[]).map(function(r,j){return {id:'r'+j,label:r[0],name:r[1]};});wrap.appendChild(h('div',{style:'margin-top:4px'},sigTable(roles,rep.sig,true,ctx)));}
+    if(b.sigs){var roles=notesRoles(b);wrap.appendChild(h('div',{style:'margin-top:4px'},sigTable(roles,rep.sig,true,ctx)));}
   })(i);
   return wrap;
 }
@@ -1383,6 +1383,8 @@ function nin(val,on,o){var i=h('input',Object.assign({type:'number',value:val==n
 function sel(val,opts,on){var s=h('select',null,opts.map(function(o){return h('option',{value:o[0],text:o[1]});}));s.value=val==null?'':val;s.addEventListener('change',function(){on(s.value);});return s;}
 function chk(label,val,on){var i=h('input',{type:'checkbox'});i.checked=!!val;i.addEventListener('change',function(){on(i.checked);});return h('label',{style:'display:inline-flex;gap:6px;align-items:center;font-weight:700'},i,label);}
 function ibtn(icon,label,fn,cls){return h('button',{class:'ib '+(cls||''),type:'button','aria-label':label,title:label,onclick:fn},ico(icon));}
+/* توقيعات تقارير «الملاحظات والتوجيهات»: تقبل الصيغة القديمة [صفة، اسم] والجديدة {id,label,name} */
+function notesRoles(b){return (b.sigRoles||[]).map(function(r,j){return Array.isArray(r)?{id:'r'+j,label:r[0],name:r[1]||''}:{id:r.id||('r'+j),label:r.label||'',name:r.name||''};});}
 function listEditor(arr,cols,mkNew,change,o){
   o=o||{};var box=h('div',{class:'le'});
   arr.forEach(function(item,i){
@@ -1479,6 +1481,9 @@ function settingsFor(b,ctx){
     row.appendChild(fld('عنوان العمود الثاني',tin((b.heads||[])[1],function(v){b.heads[1]=v;ch(true);})));
     row.appendChild(fld('ارتفاع المربع (أسطر)',nin(b.rowsEach,function(v){b.rowsEach=clamp(v||3,2,14);ch(true);})));
     row.appendChild(chk('توقيعات تحت كل تقرير',b.sigs,function(v){b.sigs=v;ch(true);}));
+    if(b.sigs){b.sigRoles=notesRoles(b);
+      p.appendChild(h('span',{class:'sm',text:'الموقّعون تحت كل تقرير — احذف أو أضف أو غيّر الترتيب. الاسم: فارغ ليُكتب عند التعبئة، أو @academic / @principal / @supervisor.'}));
+      p.appendChild(listEditor(b.sigRoles,[{k:'label',l:'الصفة',re:true},{k:'name',l:'الاسم أو @رمز',re:true}],function(){return {id:uid('r'),label:'صفة',name:''};},function(re){ch(re!==false);}));}
     break;
   case 'signatures':
     row.appendChild(chk('عمود «التوقيع» بجوار كل اسم',b.withSign!==false,function(v){b.withSign=v;ch(true);}));
@@ -2922,6 +2927,8 @@ function init(){
     if(o.cfg.logos)S.logos=o.cfg.logos;
     if(o.cfg.main&&!Object.keys(S.tpls).length){buildTemplates().forEach(function(t){S.tpls[t.id]=t;markDirty('tpl',t.id);});}
     if(window.__DINA_EMBED){try{window.__DINA_EMBED.S.staff.filter(function(p){return p.active&&!p.is_owner;}).forEach(function(p){if(!S.teachers.some(function(t){return t.name===p.full_name;})){S.teachers.push({id:uid('t'),name:p.full_name,subject:p.specialty||'',qual:'',nat:'',hours:'',staff_id:p.id});markDirty('cfg','main');}});}catch(e){}}normalizeCfg();ensureNew();refreshTeachers();S.ready=true;render();flush();
+    /* فتح قالب مباشرة للتعديل من المنصة: ?edit=<معرّف القالب> */
+    var _ed=(location.search.match(/[?&]edit=([^&]+)/)||[])[1];if(_ed){_ed=decodeURIComponent(_ed);if(S.tpls[_ed]&&!S.tpls[_ed].deleted)go('editor',{rid:null,tid:_ed,design:true});}
   }).catch(function(e){
     console.error(e);
     /* storage failed: continue in memory so the forms still work */

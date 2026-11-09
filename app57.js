@@ -209,6 +209,14 @@
   function askNote(label, val) { return new Promise(res => { const m = A.modal(`<h3>${esc(label)}</h3><textarea class="in" id="anT" rows="4" style="width:100%">${esc(val || '')}</textarea><div class="row" style="gap:8px;margin-top:10px"><button class="btn" id="anOk">متابعة</button></div>`); let done = false; $('#anOk', m.el).onclick = () => { const v = $('#anT', m.el).value.trim(); if (!v) return A.toast('اكتب الملاحظة', 'warn'); done = true; m.close(); res(v); }; const o = new MutationObserver(() => { if (!document.body.contains(m.el)) { o.disconnect(); if (!done) res(null); } }); o.observe(document.body, { childList: true, subtree: true }); }); }
 
   // ---------- إرسال نماذج (المالك/المشرف) ----------
+  // تعديل قالب من «خطة ونماذج الإشراف» مباشرة (التذييل، التوقيعات، الحقول، العناوين) — يُحفظ في المكتبة ويُستخدم في كل إرسال جديد
+  function editTpl(id, after) {
+    const m = A.modal(`<h3 style="margin:0">تعديل النموذج</h3><p class="sub" style="margin:4px 0 0">عدّل ما تريد (التذييل والتوقيعات، الحقول، العناوين، الأقسام) — يُحفظ تلقائياً. النماذج المرسلة سابقاً لا تتغير.</p>
+      <iframe class="fm-frame" id="feT" src="tools/supervision.html?edit=${encodeURIComponent(id)}&v=${FRAME.split('v=')[1] || ''}" title="تعديل النموذج"></iframe>
+      <div class="acts"><button class="btn ok" id="feDone" type="button">حفظ وإغلاق</button></div>`, { cls: 'wide fm-modal', sticky: true });
+    const done = async ev => { if (ev && ev.currentTarget) ev.currentTarget.disabled = true; try { const w = m.el.querySelector('#feT').contentWindow; if (w && typeof w.flush === 'function') await w.flush(); } catch (_) { } m.close(); LIB = null; if (after) after(); };
+    m.el.querySelector('#feDone').onclick = done; m.el.querySelector('.x').onclick = done;
+  }
   function preview(item) { openTask({ id: 'preview', title: item.name + ' (معاينة)', tpl: withSig(item.tpl), cfg: LIB.cfg, data: {}, sigs: {}, cosign: [], status: 'approved', assignee: null }); }
   async function sendModal(after) {
     const m = A.modal(`<h3>إرسال نماذج للمعلمين</h3><p class="sub">اختر نموذجاً أو أكثر من «خطة ونماذج الإشراف»، ثم المعلمين. يصل لكل معلم إشعار، ويعبّئ النموذج ويوقّعه ويرسله لاعتمادك.</p><div id="smB"><div class="spinner"></div></div>`, { cls: 'wide' });
@@ -234,9 +242,10 @@
     const drawG = () => { const q = A.normKey ? A.normKey($('#smQ', m.el).value) : $('#smQ', m.el).value;
       const L = lib.list.filter(t => q ? (A.normKey ? A.normKey(t.name + ' ' + t.desc) : t.name).includes(q) : t.cat === cat);
       $$('[data-c]', m.el).forEach(b => { b.classList.toggle('on', !q && b.dataset.c === cat); b.setAttribute('aria-selected', !q && b.dataset.c === cat); });
-      $('#smG', m.el).innerHTML = L.map(t => `<div class="sm-card ${pick.has(t.id) ? 'on' : ''}" data-t="${esc(t.id)}" role="checkbox" aria-checked="${pick.has(t.id)}" tabindex="0"><span class="sm-ck" aria-hidden="true">✓</span><b>${esc(t.name)}</b><span class="small muted">${esc(t.desc || '')}</span><span class="small sm-sl">${slotsOf(t.tpl).length ? '✍ ' + slotsOf(t.tpl).map(s => esc(s.label)).join(' · ') : '✍ المعلم · الاعتماد'}</span><button type="button" class="btn ghost sm" data-pv="${esc(t.id)}">معاينة</button></div>`).join('') || `<p class="small muted">لا نماذج</p>`;
-      $$('[data-t]', m.el).forEach(c => { const tg = () => { pick.has(c.dataset.t) ? pick.delete(c.dataset.t) : pick.add(c.dataset.t); c.classList.toggle('on'); c.setAttribute('aria-checked', pick.has(c.dataset.t)); sum(); }; c.onclick = e => { if (e.target.closest('[data-pv]')) return; tg(); }; c.onkeydown = e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); tg(); } }; });
-      $$('[data-pv]', m.el).forEach(b => b.onclick = () => preview(lib.list.find(t => t.id === b.dataset.pv))); };
+      $('#smG', m.el).innerHTML = L.map(t => `<div class="sm-card ${pick.has(t.id) ? 'on' : ''}" data-t="${esc(t.id)}" role="checkbox" aria-checked="${pick.has(t.id)}" tabindex="0"><span class="sm-ck" aria-hidden="true">✓</span><b>${esc(t.name)}</b><span class="small muted">${esc(t.desc || '')}</span><span class="small sm-sl">${slotsOf(t.tpl).length ? '✍ ' + slotsOf(t.tpl).map(s => esc(s.label)).join(' · ') : '✍ المعلم · الاعتماد'}</span><span class="row" style="gap:4px"><button type="button" class="btn ghost sm" data-pv="${esc(t.id)}">معاينة</button><button type="button" class="btn ghost sm" data-ed="${esc(t.id)}" title="تعديل التذييل والتوقيعات والحقول">✎ تعديل</button></span></div>`).join('') || `<p class="small muted">لا نماذج</p>`;
+      $$('[data-t]', m.el).forEach(c => { const tg = () => { pick.has(c.dataset.t) ? pick.delete(c.dataset.t) : pick.add(c.dataset.t); c.classList.toggle('on'); c.setAttribute('aria-checked', pick.has(c.dataset.t)); sum(); }; c.onclick = e => { if (e.target.closest('[data-pv],[data-ed]')) return; tg(); }; c.onkeydown = e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); tg(); } }; });
+      $$('[data-pv]', m.el).forEach(b => b.onclick = () => preview(lib.list.find(t => t.id === b.dataset.pv)));
+      $$('[data-ed]', m.el).forEach(b => b.onclick = () => editTpl(b.dataset.ed, async () => { try { lib = await loadLib(); drawG(); A.toast('حُفظ تعديل النموذج — يُستخدم في كل إرسال جديد', 'ok'); } catch (e) { A.toast(e.message, 'err'); } })); };
     $$('[data-c]', m.el).forEach(b => b.onclick = () => { cat = b.dataset.c; $('#smQ', m.el).value = ''; drawG(); });
     $('#smQ', m.el).oninput = drawG; drawG();
     $('#smPQ', m.el).oninput = e => { const v = A.normKey ? A.normKey(e.target.value) : e.target.value; $$('#smP label', m.el).forEach(l => l.hidden = !!v && !l.dataset.nm.includes(v)); };

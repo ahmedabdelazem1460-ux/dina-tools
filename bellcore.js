@@ -121,7 +121,7 @@
       (s.breaks || []).forEach(br => { if (+br.after > P) add('warn', `في «${nm}» «${br.label || 'الفسحة'}» بعد الحصة ${br.after} لكن الجدول ${P} حصص فقط — زِد عدد حصص الجدول أو اختر حصة أخرى.`); if (!(+br.dur > 0)) add('warn', `في «${nm}» فسحة بلا مدة.`); });
       const byAfter = {}; (s.breaks || []).filter(x => !(x.classes || []).length).forEach(x => { byAfter[x.after] = (byAfter[x.after] || 0) + 1; });
       Object.entries(byAfter).filter(([, n]) => n > 1).forEach(([a]) => add('warn', `في «${nm}» أكثر من فسحة عامة بعد الحصة ${a} — تُجمع مدتها وتؤخر باقي الحصص.`));
-      if ((s.breaks || []).some(x => (x.classes || []).length)) add('info', `«${nm}» فيه فسحات خاصة ببعض الصفوف — اللوحة العامة تعرض التوقيت العام، وتوقيت تلك الصفوف يختلف.`);
+      if ((s.breaks || []).some(x => (x.classes || []).length)) add('info', `«${nm}» فيه فسحات خاصة ببعض الصفوف — يُعرض التوقيت لكل فئة (كما في الملصق) في الفحص واللوحة.`);
       Object.entries(s.perDur || {}).forEach(([p, v]) => { if (+v > 0 && (+v < 20 || +v > 90)) add('warn', `في «${nm}» مدة الحصة ${+p + 1} = ${v} دقيقة (غير معتادة).`); });
     });
     Object.entries(names).filter(([, n]) => n > 1).forEach(([n]) => add('warn', `يوجد أكثر من جدول بالاسم «${n}».`));
@@ -161,5 +161,12 @@
     }
     return { cols: G.map((g, k) => ({ name: g.name, classes: g.classes, end: per[k].end })), rows };
   }
-  window.DinaBell = { matrix, groups, pinOn, toMin, hhmm, norm, activeSched, actOn, timeline, actDays, schedP, dowOf, addDays, holidayOn, tidy, fromMeta, dispOn, dayPlan, check, SRC };
+  /* توقيت اليوم لكل فئة (مطابق للملصق) — يعيد null إن لم تكن هناك فسحات/صلاة خاصة ببعض الصفوف
+     pl = ناتج dayPlan ، يعيد [{n, name, classes, items, start, end, breaks}] */
+  function planGroups(pl, classes) {
+    if (!pl || !pl.sched) return null; const P = pl.items.filter(x => x.k === 'p').length; if (!P) return null;
+    const G = groups(pl.sched, P, classes); if (G.length < 2) return null;
+    return G.map((g, k) => { const items = tidy(timeline(pl.sched, P, g.classes[0].id).items); return { n: k + 1, name: g.name, classes: g.classes, items, start: items.length ? items[0].from : pl.start, end: items.length ? items[items.length - 1].to : pl.end, breaks: items.filter(x => x.k === 'b') }; });
+  }
+  window.DinaBell = { planGroups, matrix, groups, pinOn, toMin, hhmm, norm, activeSched, actOn, timeline, actDays, schedP, dowOf, addDays, holidayOn, tidy, fromMeta, dispOn, dayPlan, check, SRC };
 })();

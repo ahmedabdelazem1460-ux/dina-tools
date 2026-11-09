@@ -46,7 +46,7 @@ table.mx th small{display:block;font-size:.55em;font-weight:400;opacity:.8;line-
 <body>
 <div id="app"><div class="err">جارٍ التحميل…</div></div>
 <script src="config.js"></script>
-<script src="bellcore.js?v=1794209257"></script>
+<script src="bellcore.js?v=1794300000"></script>
 <script>
 (function () {
   const C = window.APP_CONFIG, app = document.getElementById('app');
@@ -61,7 +61,7 @@ table.mx th small{display:block;font-size:.55em;font-weight:400;opacity:.8;line-
   let PLc = null, PLd = null;
   const plan = () => { if (!D || !window.DinaBell) return null; if (PLc && PLd === D) return PLc; PLd = D; PLc = window.DinaBell.dayPlan({ bell: D.bell, periods: D.periods, days: D.days }, D.day, D.disp || [], null); return PLc; };
   const tl = () => { const p = plan(); return p ? p.items : []; };
-  const nowItem = () => { const L = tl(); if (!L.length) return null; const d = new Date(); let n = d.getHours() * 60 + d.getMinutes(); if (n < L[0].from - 720) n += 1440; return L.find(x => n >= x.from && n < x.to); };
+  const nowItem = () => { const G = window.DinaBell && window.DinaBell.planGroups ? window.DinaBell.planGroups(plan(), D.classes || []) : null; if (G) { const d = new Date(), n = d.getHours() * 60 + d.getMinutes(), all = G.flatMap(g => g.items); return all.find(x => x.k === 'p' && n >= x.from && n < x.to) || all.find(x => n >= x.from && n < x.to); } const L = tl(); if (!L.length) return null; const d = new Date(); let n = d.getHours() * 60 + d.getMinutes(); if (n < L[0].from - 720) n += 1440; return L.find(x => n >= x.from && n < x.to); };
   async function fetchData() { const r = await fetch(`${C.supabaseUrl}/rest/v1/rpc/board_view`, { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ p_token: token }) }); if (!r.ok) throw new Error('الرابط غير صالح أو أُوقف'); return r.json(); }
   function build() {
     const B = D.board || {}, S = [], hide = new Set(B.hide || []), at = D.att || {}, cur = nowItem();

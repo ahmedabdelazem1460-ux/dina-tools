@@ -46,6 +46,12 @@
     ({ record: b => A.attRecord(b), live: b => A.attLive(b), periods: b => A.attPeriods(b), take: tTake, behavior: tBehavior, refer: tRefer, reports: b => (A.attReports ? A.attReports(b, { STU, stu }) : tReports(b)), students: tStudents })[tab](box);
   };
 
+  // من رصد الغياب/التأخر ومن عدّله (يُسجَّل تلقائياً في قاعدة البيانات — 087)
+  A.attWho = r => {
+    if (!r || (!r.created_by && !r.edited_by)) return '';
+    const nm = id => esc(A.personName(id) || 'مستخدم'), tm = t => t ? `<span dir="ltr">${A.fmtDT(t)}</span>` : '';
+    return `<small class="att-who">${r.created_by ? `رصده: <b>${nm(r.created_by)}</b> ${tm(r.created_at)}` : ''}${r.edited_by ? `${r.created_by ? ' · ' : ''}<span class="att-ed">✎ عدّله: <b>${nm(r.edited_by)}</b> ${tm(r.edited_at)}</span>` : ''}</small>`;
+  };
   async function tTake(box) {
     let day = A.LS.get('attday') || today(), cid = A.LS.get('attcls') || (classesOf()[0] || {}).id;
     const draw = async () => {
@@ -59,7 +65,7 @@
         <div class="row" style="gap:6px;margin-bottom:10px">${classesOf().map(c => `<button class="btn sm ${c.id === cid ? '' : 'ghost'}" data-c="${c.id}">${esc(c.name)} ${takenCls.has(c.id) ? '✓' : ''}</button>`).join('')}</div>
         ${list.length ? `<div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="small muted">الافتراضي «حاضر» — اضغط على حالة الطالب لتغييرها</span><span class="row"><button class="btn ghost sm" id="atAllP">الكل حاضر</button><button class="btn ok" id="atSave">${I.check} حفظ الحضور</button></span></div>
         <div class="scroll"><table class="tbl att"><thead><tr><th>#</th><th>الطالب</th><th>الحالة</th><th>دقائق التأخر</th><th>ملاحظة</th><th>إحالة للمرشد</th></tr></thead><tbody>
-        ${list.map((s, i) => `<tr data-s="${s.id}"><td>${AR(i + 1)}</td><td><b>${esc(s.full_name)}</b></td><td><div class="seg" role="radiogroup" aria-label="حالة ${esc(s.full_name)}">${ST.map(([k, l, c]) => `<button type="button" role="radio" class="sg ${c} ${state[s.id].status === k ? 'on' : ''}" data-st="${k}" aria-checked="${state[s.id].status === k}">${l}</button>`).join('')}</div></td>
+        ${list.map((s, i) => `<tr data-s="${s.id}"><td>${AR(i + 1)}</td><td><b>${esc(s.full_name)}</b>${byS[s.id] ? A.attWho(byS[s.id]) : ''}</td><td><div class="seg" role="radiogroup" aria-label="حالة ${esc(s.full_name)}">${ST.map(([k, l, c]) => `<button type="button" role="radio" class="sg ${c} ${state[s.id].status === k ? 'on' : ''}" data-st="${k}" aria-checked="${state[s.id].status === k}">${l}</button>`).join('')}</div></td>
           <td><input class="in" type="number" min="1" max="240" data-m value="${state[s.id].minutes || ''}" style="width:80px;padding:6px" aria-label="دقائق التأخر"></td><td><input class="in" data-n value="${esc(state[s.id].note || '')}" style="padding:6px" aria-label="ملاحظة"></td><td><input type="checkbox" data-r ${state[s.id].referred ? 'checked' : ''} aria-label="إحالة للمرشد"></td></tr>`).join('')}
         </tbody></table></div>` : A.emptyBox('لا يوجد طلاب في هذا الفصل')}`;
       $('#atD', box).onchange = e => { day = e.target.value; A.LS.set('attday', day); draw(); };

@@ -16,7 +16,12 @@
     const pl = A.bell.dayPlan && A.bell.dayPlan(sec, null, cid); if (pl && pl.ref && (pl.src === 'disp' || pl.src === 'pin') && pl.items.length) return pl.items.filter(x => x.k === 'p').map(x => ({ i: x.i, from: x.from, to: x.to, f: A.bell.fmt(x.from, s), t: A.bell.fmt(x.to, s) }));
     return A.bell.timeline(s, A.bell.maxP(s, sec), cid).items.filter(x => x.k === 'p').map(x => ({ i: x.i, from: x.from, to: x.to, f: A.bell.fmt(x.from, s), t: A.bell.fmt(x.to, s) })); } catch (_) { return []; } }
   A.attTimes = cid => times(cid); A.attPassed = (cid, day, p) => passed(cid, day, p); A.attEntryOf = (cid, day, p) => entryOf(cid, day, p);
-  A.curPeriod = cid => { const n = nowMin(), t = times(cid).find(x => n >= x.from && n < x.to); return t ? t.i : -1; };
+  A.curPeriod = cid => { const n = nowMin(), hit = c => { const t = times(c).find(x => n >= x.from && n < x.to); return t ? t.i : -1; };
+    if (cid) return hit(cid);
+    // على مستوى القسم: عند وجود فسحة/صلاة خاصة ببعض الصفوف تختلف الأوقات بين الفئات — الحصة الجارية لأي فئة (كما في الملصق)
+    const cl = ((S.allClasses && S.allClasses.length ? S.allClasses : S.classes) || []).filter(c => c.active !== false && !c.is_test);
+    if (!cl.length) return hit(null);
+    for (const c of cl) { const i = hit(c.id); if (i >= 0) return i; } return -1; };
   var passed = (cid, day, p) => { if (day < today()) return true; if (day > today()) return false; const t = times(cid).find(x => x.i === p); return t ? nowMin() >= t.from : false; };
   // الحصة في ذلك اليوم: من خطة الأسبوع المحمّل إن كان اليوم داخله
   var entryOf = (cid, day, p) => { const w = A.week(); if (!w) return null; const i = Math.round((A.parseDate(day) - A.parseDate(w.start_date)) / 864e5); if (i < 0 || i > 6) return null; return (S.allEntries || S.entries).find(e => e.class_id === cid && e.day === i && e.period === p) || null; };
@@ -40,7 +45,7 @@
     const done = mine.length > 0;
     const sum = () => PST.map(([k, l, c]) => `<span class="pa-k ${c}"><b>${AR(stu.filter(s => st[s.id].st === k).length)}</b>${l}</span>`).join('');
     B.innerHTML = `<div class="pa-top"><div class="pa-sum" id="paS">${sum()}</div><div class="row" style="gap:6px"><button class="btn ghost sm" id="paAll" type="button">الكل حاضر</button>${done ? '<span class="pill st-approved">مرصودة سابقاً — يمكنك التعديل</span>' : ''}</div></div>
-      <div class="pa-list">${stu.map((s, i) => `<div class="pa-r" data-s="${s.id}"><span class="pa-i">${AR(i + 1)}</span><div class="pa-nm"><b>${esc(s.full_name)}</b>${st[s.id].src ? `<small>${esc(st[s.id].src)}</small>` : ''}</div>
+      <div class="pa-list">${stu.map((s, i) => `<div class="pa-r" data-s="${s.id}"><span class="pa-i">${AR(i + 1)}</span><div class="pa-nm"><b>${esc(s.full_name)}</b>${st[s.id].src ? `<small>${esc(st[s.id].src)}</small>` : ''}${A.attWho ? A.attWho(mine.find(x => x.student_id === s.id)) : ''}</div>
         <div class="pa-seg" role="radiogroup" aria-label="حالة ${esc(s.full_name)}">${PST.map(([k, l, c]) => `<button type="button" role="radio" class="${c} ${st[s.id].st === k ? 'on' : ''}" data-st="${k}" aria-checked="${st[s.id].st === k}">${l}</button>`).join('')}</div>
         <input class="in pa-m" type="number" min="1" max="120" placeholder="دقائق" data-m value="${st[s.id].m || ''}" aria-label="دقائق التأخر" ${st[s.id].st === 'late' ? '' : 'hidden'}>
         <input class="in pa-n" data-n value="${esc(st[s.id].n)}" placeholder="ملاحظة" aria-label="ملاحظة"></div>`).join('')}</div>

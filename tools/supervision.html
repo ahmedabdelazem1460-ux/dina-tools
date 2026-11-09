@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><script src="../digits.js?v=1794197246"></script>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><script src="../digits.js?v=1794198644"></script>
 </head><body>
 
 <title>نماذج الإشراف التربوي</title>
@@ -2929,6 +2929,55 @@ function init(){
   });
 }
 
+/* ================= أنماط الورقة بهوية دينا + احتواء النص =================
+   النمط نفسه المختار في «استوديو التقارير» بالمنصة (الكلاسيكي/العصري/الرسمي الموفّر للحبر/المميز)،
+   ونص الحقول لا يُقص أبداً: يصغر تلقائياً ليتسع، ويُطبع ملتفاً كاملاً. */
+var PS_CSS=[
+'html[data-ps=modern] .pt th,html[data-ps=modern] .fl,html[data-ps=modern] .srow.hd,html[data-ps=modern] .nn{background:#EAF3FC!important;color:var(--p-ink)!important;border-bottom:2px solid var(--p-sky)}',
+'html[data-ps=modern] .pt tr.grand td,html[data-ps=modern] .srow.gd{background:#EAF3FC!important;color:var(--p-ink)!important}html[data-ps=modern] .idx{background:var(--p-sky)!important}',
+'html[data-ps=modern] .pt,html[data-ps=modern] .fg{border-radius:10px;overflow:hidden}html[data-ps=modern] .ttl .o{border-color:var(--p-sky)!important}',
+'html[data-ps=ink] .pt th,html[data-ps=ink] .fl,html[data-ps=ink] .srow.hd,html[data-ps=ink] .nn,html[data-ps=ink] .pt tr.grand td,html[data-ps=ink] .srow.gd{background:#fff!important;color:var(--p-ink)!important;border:1px solid var(--p-ink)!important}',
+'html[data-ps=ink] .idx{background:#fff!important;color:var(--p-ink)!important;border:1px solid var(--p-ink)}html[data-ps=ink] .wave{visibility:hidden;height:6mm!important}html[data-ps=ink] .ttl .o,html[data-ps=ink] .ttl .i{background:#fff!important;color:var(--p-ink)!important;box-shadow:none!important}',
+'html[data-ps=premium] .pt th,html[data-ps=premium] .fl,html[data-ps=premium] .srow.hd,html[data-ps=premium] .nn{background:linear-gradient(180deg,var(--p-head),#0B4C8C)!important}',
+'html[data-ps=premium] .idx{background:linear-gradient(135deg,var(--p-head),var(--p-sky))!important}html[data-ps=premium] .ttl .o{box-shadow:0 0 0 3px rgba(186,223,147,.6)}',
+'html[data-ps=premium] .bk-t,html[data-ps=premium] .t-h{border-inline-start:4px solid var(--p-sky);padding-inline-start:6px}',
+'.pw input.fitx{transition:font-size .1s}',
+'.pv-pr{display:none}.pv-ro{display:block!important;white-space:pre-wrap;overflow-wrap:anywhere;min-height:1.2em;padding:.12rem .25rem;line-height:1.5}.pv-ro.sc{text-align:center}@media print{.pv-hide{display:none!important}.pv-pr{display:block;white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal;min-height:1.2em;padding:.12rem .2rem;line-height:1.45}.pv-pr.sc{text-align:center}}'
+].join('\n');
+function psApply(st){
+  try{st=st||JSON.parse(localStorage.getItem('dina-print-style')||'null');}catch(e){st=null;}
+  var r=document.documentElement;r.dataset.ps=(st&&st.theme)||'classic';
+  var a=st&&st.accent;r.style.setProperty('--p-head',a&&a!=='#082B5A'?a:'#005499');
+  if(!document.getElementById('psCss')){var s=document.createElement('style');s.id='psCss';s.textContent=PS_CSS;document.head.appendChild(s);}
+}
+// تصغير نص الحقل حتى يتسع (حتى ٧٠٪) دون قصّ
+function fitIn(el){
+  if(!el||el.tagName!=='INPUT'||/checkbox|radio|date|time|color/.test(el.type))return;
+  el.style.fontSize='';if(!el.value||el.clientWidth<20)return;
+  var base=parseFloat(getComputedStyle(el).fontSize),f=base,n=0;
+  while(el.scrollWidth>el.clientWidth+1&&f>base*0.7&&n<12){f-=base*0.03;n++;el.style.fontSize=f+'px';}
+  el.classList.toggle('fitx',n>0);
+  if(el.scrollWidth>el.clientWidth+1)el.title=el.value;else if(el.title===el.value)el.removeAttribute('title');
+}
+function fitAll(root){$$('.pw input',root||document).forEach(fitIn);}
+document.addEventListener('input',function(e){if(e.target&&e.target.closest&&e.target.closest('.pw'))fitIn(e.target);},true);
+var fitSoon=debounce(function(){fitAll();},150);
+new MutationObserver(function(ms){for(var i=0;i<ms.length;i++){if(ms[i].addedNodes.length){fitSoon();return;}}}).observe(document.documentElement,{childList:true,subtree:true});
+window.addEventListener('resize',fitSoon);
+// الطباعة: النص كاملاً ملتفاً بدل الحقل
+window.addEventListener('beforeprint',function(){
+  $$('.pw input,.pw textarea').forEach(function(el){
+    if(/checkbox|radio|hidden/.test(el.type)||el.closest('.noprint'))return;
+    var v=el.value;if(el.tagName==='INPUT'&&el.type==='date'&&v){try{v=new Date(v+'T00:00:00').toLocaleDateString('ar-SA-u-ca-gregory',{day:'numeric',month:'long',year:'numeric'});}catch(e){}}
+    var sp=document.createElement('div');sp.className='pv-pr'+(el.classList.contains('sc')?' sc':'');sp.textContent=v;
+    if(el.style.fontSize)sp.style.fontSize=el.style.fontSize;
+    el.classList.add('pv-hide');el.parentNode.insertBefore(sp,el.nextSibling);
+  });
+});
+window.addEventListener('afterprint',function(){$$('.pv-pr').forEach(function(s){s.remove();});$$('.pv-hide').forEach(function(e){e.classList.remove('pv-hide');});});
+window.addEventListener('storage',function(e){if(e.key==='dina-print-style')psApply();});
+psApply();
+
 /* ================= وضع التضمين في المنصة: تعبئة نموذج واحد وتوقيعه (formEmbed=1) =================
    المنصة ترسل القالب وبياناته وحالة التوقيعات، وهذه الصفحة ترسم الورقة بهوية دينا كما هي،
    وتعيد التغييرات للمنصة. لا تكتب شيئاً في تخزين هذه الأداة. */
@@ -2951,7 +3000,8 @@ function feMount(){
   var t0=ctx.touch;ctx.touch=function(){t0();if(!FE.ro)feSendData();};
   host.appendChild(renderPaper(tpl,ctx));ctx.ups.forEach(function(f){f();});
   $$('textarea',host).forEach(grow);setTimeout(function(){$$('textarea',host).forEach(grow);},250);
-  if(FE.ro){$$('input,textarea,select',host).forEach(function(e){e.readOnly=true;if(e.tagName==='SELECT'||e.type==='checkbox'||e.type==='radio')e.disabled=true;});$$('.addb,.ib,.cl-tools,.noprint:not(.fe-b)',host).forEach(function(e){if(!e.closest('.fe-sg'))e.style.display='none';});host.classList.add('fe-ro');}
+  if(FE.ro){$$('input,textarea,select',host).forEach(function(e){e.readOnly=true;if(e.tagName==='SELECT'||e.type==='checkbox'||e.type==='radio')e.disabled=true;});$$('.addb,.ib,.cl-tools,.noprint:not(.fe-b)',host).forEach(function(e){if(!e.closest('.fe-sg'))e.style.display='none';});host.classList.add('fe-ro');
+    $$('input,textarea',host).forEach(function(el){if(/checkbox|radio|hidden/.test(el.type)||!el.value)return;var v=el.value;if(el.type==='date'){try{v=new Date(v+'T00:00:00').toLocaleDateString('ar-SA-u-ca-gregory',{day:'numeric',month:'long',year:'numeric'});}catch(e){}}var d=h('div',{class:'pv-ro'+(el.classList.contains('sc')?' sc':''),text:v});el.style.display='none';el.parentNode.insertBefore(d,el.nextSibling);});}
   feFit();feSend({type:'dina-form-size',h:document.documentElement.scrollHeight});
 }
 // الجوال: تُعرض الورقة بعرضها الحقيقي مصغّرة لتناسب الشاشة (مع إمكانية التمرير)
@@ -2965,6 +3015,7 @@ function feStart(){
   window.addEventListener('message',function(e){
     if(e.origin!==location.origin||!e.data)return;var m=e.data;
     if(m.type==='dina-form-init'){
+      if(m.style)psApply(m.style);
       var tpl=clone(m.tpl);tpl.id='fe-'+(tpl.id||'x');
       if(m.cfg&&m.cfg.school)S.cfg.school=Object.assign({},S.cfg.school,m.cfg.school);
       if(m.cfg&&m.cfg.logos)S.logos=m.cfg.logos;

@@ -7,6 +7,7 @@
   const xlsx = (name, sheets) => { const wb = XLSX.utils.book_new(); sheets.forEach(([n, rows]) => { const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{}]); ws['!views'] = [{ RTL: true }]; Object.keys(ws).forEach(k => { const c = ws[k]; if (k[0] !== '!' && c && typeof c.v === 'string') { const u = c.v.match(/https?:\/\/[^\s،]+/); if (u) c.l = { Target: u[0], Tooltip: 'فتح الرابط' }; } }); XLSX.utils.book_append_sheet(wb, ws, n.slice(0, 31)); }); wb.Workbook = { Views: [{ RTL: true }] }; XLSX.writeFile(wb, name + '.xlsx'); };
   // طباعة وPDF بهوية دينا: شريط عنوان كحلي بالشعار الأبيض، بطاقات ومؤشرات ملوّنة كما في الشاشة، رؤوس جداول تتكرر، وشريط سفلي في كل صفحة
   function printDoc(title, sub, bodyHtml, land) {
+    if (A.printDoc && A.printDoc !== printDoc) return A.printDoc(title, sub, bodyHtml, land); // استوديو التقارير
     const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;left:-9999px;width:1100px;height:800px;border:0'; document.body.appendChild(f);
     const base = location.href.replace(/[^/]*$/, '').split('#')[0];
     const now = new Date(), dt = now.toLocaleDateString('ar-SA-u-ca-gregory', { day: 'numeric', month: 'long', year: 'numeric' });

@@ -89,15 +89,15 @@ html.lang-en body,html.lang-en input,html.lang-en select,html.lang-en textarea,h
 @keyframes qzf{to{transform:translateY(420px) rotate(540deg);opacity:0}}
 @media (prefers-reduced-motion:reduce){.q.slide,.qz-sheet>div{animation:none}.qz-conf{display:none}.qz-ring.low{animation:none}}
 </style>
-<script src="i18n_en.js?v=1794197246"></script>
-<script src="i18n.js?v=1794197246"></script>
-<script src="digits.js?v=1794197246"></script>
+<script src="i18n_en.js?v=1794198644"></script>
+<script src="i18n.js?v=1794198644"></script>
+<script src="digits.js?v=1794198644"></script>
 </head>
 <body>
 <header><img src="assets/logo_white.svg" alt="مدارس دينا العالمية"><div><div class="t" id="ht">بوابة الطالب</div><div class="s" id="hs">مدارس دينا العالمية</div></div></header>
 <main id="m"><div class="card">جارٍ التحميل…</div></main>
 <footer>مدارس دينا العالمية · Dinaaedu · 920035881</footer>
-<script src="config.js?v=1794197246"></script>
+<script src="config.js?v=1794198644"></script>
 <script>
 (function () {
   const C = window.APP_CONFIG, m = document.getElementById('m');
@@ -110,7 +110,11 @@ html.lang-en body,html.lang-en input,html.lang-en select,html.lang-en textarea,h
 
   const ICO = { q: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6M12 17h.01"/></svg>',
     grid: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>' };
-  const LET = ['أ', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح', 'ط', 'ي'];
+  const LBLS = { ar: ['أ', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح', 'ط', 'ي'], en: 'abcdefghij'.split(''), EN: 'ABCDEFGHIJ'.split(''), num: '١٢٣٤٥٦٧٨٩'.split('').concat(['١٠']), num_en: '1 2 3 4 5 6 7 8 9 10'.split(' '), none: [] };
+  let LET = LBLS.ar, EN = false;
+  // ترميز الخيارات من إعداد المعلم، و«تلقائي»: إنجليزي لمواد اللغات أو الأسئلة المكتوبة بالإنجليزية
+  const setLabels = Q => { const txt = (Q.questions || []).map(q => q.body || '').join(' '); const lat = (txt.match(/[A-Za-z]/g) || []).length, arb = (txt.match(/[\u0600-\u06FF]/g) || []).length;
+    EN = /english|إنجليزي|انجليزي|french|فرنسي/i.test(Q.subject || '') || lat > arb * 1.5; const k = (Q.settings || {}).labels || 'auto'; LET = LBLS[k === 'auto' ? (EN ? 'en' : 'ar') : k] || LBLS.ar; };
   async function quiz() {
     let Q; try { Q = await rpc('quiz_public', { p_code: code }); } catch (e) { m.innerHTML = `<div class="card">${esc(e.message)}</div>`; return; }
     if (Q.error) { m.innerHTML = `<div class="card"><h2>${esc(Q.error)}</h2><p class="muted">تأكد من الرابط الذي أرسله معلمك.</p></div>`; return; }
@@ -129,16 +133,16 @@ html.lang-en body,html.lang-en input,html.lang-en select,html.lang-en textarea,h
     document.getElementById('go').onclick = () => { const name = document.getElementById('nm').value.trim().replace(/\s+/g, ' '); if (name.split(' ').length < 2) { document.getElementById('er').textContent = 'اكتب اسمك الكامل (الاسم الأول واسم العائلة على الأقل)'; document.getElementById('nm').focus(); return; } const who = { name, cls: document.getElementById('cl').value, no: document.getElementById('no').value.trim() }; LS.set('dina_stu', JSON.stringify(who)); take(Q, who); };
   }
   function take(Q, who) {
-    const st = Q.settings || {}; let qs = Q.questions.slice(); if (st.shuffle) qs.sort(() => Math.random() - .5);
+    const st = Q.settings || {}; let qs = Q.questions.slice(); if (st.shuffle) qs.sort(() => Math.random() - .5); setLabels(Q);
     const ans = {}; const key = 'dina_q_' + code; try { Object.assign(ans, JSON.parse(LS.get(key) || '{}')); } catch (_) { }
     const flags = new Set(); const t0 = Date.now(); let cur = 0, done = false;
     const arr = id => { try { const v = JSON.parse(ans[id] || '[]'); return Array.isArray(v) ? v : []; } catch (_) { return []; } };
     const isAns = q => ans[q.id] !== undefined && ans[q.id] !== '';
     const ring = st.time ? `<div class="qz-ring" id="rg" role="timer" aria-label="الوقت المتبقي"><svg width="54" height="54" viewBox="0 0 54 54"><circle cx="27" cy="27" r="23" fill="none" stroke="#E4EBF5" stroke-width="5"/><circle class="v" id="rgc" cx="27" cy="27" r="23" fill="none" stroke="#005499" stroke-width="5" stroke-linecap="round" stroke-dasharray="144.5" stroke-dashoffset="0"/></svg><b id="tm"></b></div>` : '';
     const opt = (q, o, k, type) => { const on = type === 'multi' ? arr(q.id).includes(String(k)) : String(ans[q.id]) === String(type === 'tf' ? o : k);
-      return `<label class="opt ${on ? 'on' : ''}">${type === 'multi' ? `<input type="checkbox" data-mu="${q.id}|${k}" ${on ? 'checked' : ''}>` : `<input type="radio" name="q${q.id}" value="${type === 'tf' ? o : k}" ${on ? 'checked' : ''}>`}<span class="lt" aria-hidden="true">${type === 'tf' ? (k ? '✗' : '✓') : LET[k] || AR(k + 1)}</span><span>${esc(o)}</span></label>`; };
+      return `<label class="opt ${on ? 'on' : ''}">${type === 'multi' ? `<input type="checkbox" data-mu="${q.id}|${k}" ${on ? 'checked' : ''}>` : `<input type="radio" name="q${q.id}" value="${type === 'tf' ? o : k}" ${on ? 'checked' : ''}>`}${type === 'tf' || LET.length ? `<span class="lt" aria-hidden="true">${type === 'tf' ? (k ? '✗' : '✓') : esc(LET[k] || String(k + 1))}</span>` : ''}<span dir="auto">${esc(type === 'tf' && EN ? (k ? 'False' : 'True') : o)}</span></label>`; };
     m.innerHTML = `<div class="qz-top"><div class="qz-row"><span class="qz-step" id="qsp" aria-live="polite"></span><div class="qz-seg" id="seg" aria-hidden="true">${qs.map(() => '<i></i>').join('')}</div>${ring}<button class="qz-nav-b" id="nav" type="button" aria-label="خريطة الأسئلة">${ICO.grid}</button></div></div>` +
-      qs.map((q, i) => `<div class="q slide" data-q="${q.id}" data-i="${i}"><div class="qh"><span class="n">${AR(i + 1)}</span><div style="flex:1"><div class="qt" tabindex="-1">${esc(q.type === 'blank' ? 'أكمل الفراغات:' : q.body)}</div><span class="pts small">${AR(q.points)} ${q.points == 1 ? 'درجة' : 'درجات'}</span></div><button type="button" class="qz-flag" data-fl="${q.id}" aria-pressed="false">⚑ للمراجعة</button></div>${q.image ? `<img src="${esc(q.image)}" alt="">` : ''}
+      qs.map((q, i) => `<div class="q slide" data-q="${q.id}" data-i="${i}"><div class="qh"><span class="n">${AR(i + 1)}</span><div style="flex:1"><div class="qt" tabindex="-1" dir="auto">${esc(q.type === 'blank' ? 'أكمل الفراغات:' : q.body)}</div><span class="pts small">${AR(q.points)} ${q.points == 1 ? 'درجة' : 'درجات'}</span></div><button type="button" class="qz-flag" data-fl="${q.id}" aria-pressed="false">⚑ للمراجعة</button></div>${q.image ? `<img src="${esc(q.image)}" alt="">` : ''}
         ${q.type === 'mcq' ? q.options.map((o, k) => opt(q, o, k, 'mcq')).join('')
         : q.type === 'multi' ? `<p class="small muted" style="margin:6px 0 0">اختر كل الإجابات الصحيحة</p>` + q.options.map((o, k) => opt(q, o, k, 'multi')).join('')
         : q.type === 'tf' ? ['صواب', 'خطأ'].map((o, k) => opt(q, o, k, 'tf')).join('')
@@ -217,7 +221,7 @@ html.lang-en body,html.lang-en input,html.lang-en select,html.lang-en textarea,h
       <div class="qz-foot" style="justify-content:center">${r.left > 0 ? `<button class="btn" type="button" id="again">محاولة أخرى (بقي ${AR(r.left)})</button>` : ''}${LS.get('dina_me') ? '<a class="btn ghost" href="me.html">العودة إلى حسابي</a>' : ''}</div></section>` +
       (r.review ? `<h2 style="margin:6px 4px 10px">مراجعة الإجابات</h2>` + qs.map((q, i) => { const x = R[q.id] || {}; const mine = ans[q.id];
         const fmt = v => { try { const a = JSON.parse(v); return Array.isArray(a) ? a.filter(Boolean).join(' · ') : v; } catch (_) { return v; } };
-        const body = ['blank', 'match', 'order'].includes(q.type) ? `<div class="small">إجابتك: <b>${esc(fmt(mine) || '—')}</b><br>الصحيح: <b>${esc(x.answer || '')}</b>${x.pts != null ? ` · درجتك ${AR(x.pts)} من ${AR(q.points)}` : ''}</div>` : q.type === 'multi' ? (() => { const R2 = String(x.answer || '').split(',').filter(Boolean), M = (() => { try { return JSON.parse(mine || '[]'); } catch (_) { return []; } })(); return q.options.map((o, k) => `<div class="opt ${R2.includes(String(k)) ? 'right' : M.includes(String(k)) ? 'wrong' : ''}">${esc(o)}${R2.includes(String(k)) ? ' ✓' : ''}${M.includes(String(k)) ? ' <small>(اخترتها)</small>' : ''}</div>`).join('') + (x.pts != null ? `<div class="small">درجتك ${AR(x.pts)} من ${AR(q.points)}</div>` : ''); })() : q.type === 'mcq' ? q.options.map((o, k) => `<div class="opt ${String(k) === String(x.answer) ? 'right' : String(k) === String(mine) ? 'wrong' : ''}">${esc(o)}${String(k) === String(x.answer) ? ' ✓' : String(k) === String(mine) ? ' ✗' : ''}</div>`).join('') : `<div class="small">إجابتك: <b>${esc(mine || '—')}</b>${q.type !== 'essay' ? ` · الصحيح: <b>${esc(String(x.answer || '').split('|')[0])}</b>` : ''}</div>`;
+        const body = ['blank', 'match', 'order'].includes(q.type) ? `<div class="small">إجابتك: <b>${esc(fmt(mine) || '—')}</b><br>الصحيح: <b>${esc(x.answer || '')}</b>${x.pts != null ? ` · درجتك ${AR(x.pts)} من ${AR(q.points)}` : ''}</div>` : q.type === 'multi' ? (() => { const R2 = String(x.answer || '').split(',').filter(Boolean), M = (() => { try { return JSON.parse(mine || '[]'); } catch (_) { return []; } })(); return q.options.map((o, k) => `<div class="opt ${R2.includes(String(k)) ? 'right' : M.includes(String(k)) ? 'wrong' : ''}">${esc(o)}${R2.includes(String(k)) ? ' ✓' : ''}${M.includes(String(k)) ? ' <small>(اخترتها)</small>' : ''}</div>`).join('') + (x.pts != null ? `<div class="small">درجتك ${AR(x.pts)} من ${AR(q.points)}</div>` : ''); })() : q.type === 'mcq' ? q.options.map((o, k) => `<div class="opt ${String(k) === String(x.answer) ? 'right' : String(k) === String(mine) ? 'wrong' : ''}" dir="auto">${LET[k] ? `<b>${esc(LET[k])})</b>&nbsp;` : ''}${esc(o)}${String(k) === String(x.answer) ? ' ✓' : String(k) === String(mine) ? ' ✗' : ''}</div>`).join('') : `<div class="small">إجابتك: <b>${esc(mine || '—')}</b>${q.type !== 'essay' ? ` · الصحيح: <b>${esc(String(x.answer || '').split('|')[0])}</b>` : ''}</div>`;
         return `<div class="q"><div><span class="n">${AR(i + 1)}</span><b>${esc(q.body)}</b> ${x.ok === true ? '<span class="tag ok">صحيح</span>' : x.ok === false ? (x.pts > 0 ? '<span class="tag warn">صحيح جزئياً</span>' : '<span class="tag bad">خطأ</span>') : '<span class="tag warn">يُصحَّح يدوياً</span>'}</div>${body}${x.explanation ? `<div class="exp">${esc(x.explanation)}</div>` : ''}</div>`; }).join('') : '');
     const ag = document.getElementById('again'); if (ag) ag.onclick = () => quiz();
     window.scrollTo(0, 0);

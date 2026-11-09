@@ -12,7 +12,13 @@
   const isAdmin = () => !!(S.me && (S.me.is_owner || (A.hasModule && A.hasModule('supervision'))));
   const canEditAdmin = t => !!(S.me && (S.me.is_owner || t.created_by === S.me.id));
   const STS = { assigned: ['جديد', ''], draft: ['قيد التعبئة', 'st-submitted'], submitted: ['بانتظار الاعتماد', 'st-submitted'], returned: ['مُعاد للتعديل', 'st-returned'], approved: ['معتمد', 'st-approved'] };
-  const pill = s => `<span class="pill ${STS[s] ? STS[s][1] : ''}">${STS[s] ? STS[s][0] : esc(s)}</span>`;
+  const STE = { assigned: ['مسودة لدى المقيّم', ''], draft: ['مسودة لدى المقيّم', ''], submitted: ['بانتظار توقيع المعلم', 'st-submitted'], returned: ['مسودة لدى المقيّم', ''], approved: ['موقّعة ومكتملة', 'st-approved'] };
+  const isEval = t => t && t.mode === 'sign';
+  const pill = (s, ev) => { const M = ev ? STE : STS; return `<span class="pill ${M[s] ? M[s][1] : ''}">${M[s] ? M[s][0] : esc(s)}</span>`; };
+  const pillT = t => pill(t.status, isEval(t)) + (isEval(t) ? ' <span class="pill fm-ev">استمارة تقييم</span>' : '');
+  // خانة توقيع المعلم في استمارة التقييم
+  const teacherSlot = tpl => { const L = slotsOf(tpl); return L.find(s => /المعلم|المعلمة|الموظف|المقيَّم|المُقيَّم|صاحب العلاقة/.test(s.label) && !/الزائر|المزور|المقيِّم|المشرف|المدير/.test(s.label) && !s.auto) || L.find(s => !s.auto) || L[0]; };
+  const EVAL_RE = /تقييم|تقويم|بطاقة|زيارة صفية|ملاحظة صفية|مساءلة|لفت نظر|تنبيه/;
   const today = () => new Date(Date.now() + 3 * 36e5).toISOString().slice(0, 10);
   const overdue = t => t.due_date && t.due_date < today() && !['submitted', 'approved'].includes(t.status);
   const dt = d => d ? (A.arDate ? A.arDate(String(d).slice(0, 10)) : String(d).slice(0, 10)) : '—';
@@ -28,9 +34,10 @@
     if (!DEMO) return api.rpc(n, a);
     const [t] = await api.list('form_tasks', { id: a.p_id }); if (!t) throw new Error('النموذج غير موجود');
     const me = S.me.id, adm = isAdmin(), cos = t.cosign || [];
-    if (n === 'form_save') { if (t.assignee !== me && !canEditAdmin(t)) throw new Error('لا تملك تعبئة هذا النموذج'); const p = { data: a.p_data || t.data, status: a.p_submit ? 'submitted' : t.status === 'assigned' ? 'draft' : t.status, updated_at: new Date().toISOString() }; if (a.p_submit) p.submitted_at = p.updated_at; return api.upd('form_tasks', t.id, p).then(() => Object.assign(t, p)); }
+    if (n === 'form_teacher_note') { if (t.assignee !== me) throw new Error('الملاحظة للمعلم صاحب الاستمارة'); await api.upd('form_tasks', t.id, { teacher_note: a.p_note }); return Object.assign(t, { teacher_note: a.p_note }); }
+    if (n === 'form_save') { if (isEval(t) && !canEditAdmin(t)) throw new Error('هذه الاستمارة يعبّئها المقيّم، ويكتفي المعلم بالاطلاع والتوقيع'); if (t.assignee !== me && !canEditAdmin(t)) throw new Error('لا تملك تعبئة هذا النموذج'); const p = { data: a.p_data || t.data, status: a.p_submit ? 'submitted' : (t.status === 'assigned' && !isEval(t)) ? 'draft' : t.status, updated_at: new Date().toISOString() }; if (a.p_submit) p.submitted_at = p.updated_at; return api.upd('form_tasks', t.id, p).then(() => Object.assign(t, p)); }
     if (n === 'form_sign') { const sigs = { ...(t.sigs || {}) }; if (a.p_remove) delete sigs[a.p_key]; else sigs[a.p_key] = { img: a.p_img, name: a.p_name, label: a.p_label, staff_id: me, at: new Date().toISOString() };
-      const c2 = cos.map(c => c.key === a.p_key ? { ...c, status: a.p_remove ? 'pending' : (c.staff_id === me ? 'signed' : c.status) } : c); const p = { sigs, cosign: c2 }; await api.upd('form_tasks', t.id, p); return Object.assign(t, p); }
+      const c2 = cos.map(c => c.key === a.p_key ? { ...c, status: a.p_remove ? 'pending' : (c.staff_id === me ? 'signed' : c.status) } : c); const p = { sigs, cosign: c2 }; if (isEval(t) && !a.p_remove && t.status === 'submitted' && c2.every(c => c.status === 'signed')) Object.assign(p, { status: 'approved', decided_at: new Date().toISOString(), decided_by: me }); await api.upd('form_tasks', t.id, p); return Object.assign(t, p); }
     if (n === 'form_share') { const c2 = cos.filter(c => c.key !== a.p_key).concat([{ staff_id: a.p_staff, key: a.p_key, label: a.p_label, status: 'pending', by: me, requested_at: new Date().toISOString() }]); await api.upd('form_tasks', t.id, { cosign: c2 }); return Object.assign(t, { cosign: c2 }); }
     if (n === 'form_decide') { if (!adm) throw new Error('الاعتماد للمالك أو المشرف'); const p = { status: a.p_approve ? 'approved' : 'returned', review_note: a.p_note || '', decided_at: new Date().toISOString(), decided_by: me }; await api.upd('form_tasks', t.id, p); return Object.assign(t, p); }
   }
@@ -89,11 +96,11 @@
       const sg = (t.sigs || {})[s.key], co = (t.cosign || []).find(c => c.key === s.key);
       if (sg) out[s.key] = { mine: !app && (sg.staff_id === me || adm) };
       else if (co && co.status !== 'signed') out[s.key] = co.staff_id === me ? { can: !app } : { wait: nm(co.staff_id), can: !app && adm };
-      else out[s.key] = { can: !app && (adm || (t.assignee === me && !s.auto && !['submitted'].includes(t.status))) };
+      else out[s.key] = { can: !app && (adm || (!isEval(t) && t.assignee === me && !s.auto && !['submitted'].includes(t.status))) };
     });
     return out;
   }
-  const editable = t => t.status !== 'approved' && ((t.assignee === S.me.id && ['assigned', 'draft', 'returned'].includes(t.status)) || (canEditAdmin(t) && t.status !== 'approved'));
+  const editable = t => t.status !== 'approved' && (isEval(t) ? canEditAdmin(t) : (t.assignee === S.me.id && ['assigned', 'draft', 'returned'].includes(t.status)) || (canEditAdmin(t) && t.status !== 'approved'));
 
   function openTask(t, after) {
     const me = S.me.id, adm = isAdmin(), mineTask = t.assignee === me;
@@ -103,24 +110,33 @@
         <div class="fm-acts" id="fmA"></div></div>
       ${t.note ? `<div class="notice info" style="display:block;margin:6px 0">ملاحظة المرسل: ${esc(t.note)}</div>` : ''}
       ${t.status === 'returned' && t.review_note ? `<div class="notice warn" style="display:block;margin:6px 0">ملاحظة الإعادة: ${esc(t.review_note)}</div>` : ''}
-      ${myCo ? `<div class="notice info" style="display:block;margin:6px 0">مطلوب توقيعك في خانة «${esc(myCo.label)}» — اضغط «✍ توقيع» داخل النموذج.</div>` : ''}
+      ${isEval(t) && mineTask && t.status === 'submitted' ? `<div class="notice info fm-evb" style="display:block;margin:6px 0"><b>استمارة تقييمك من ${esc(nm(t.created_by))}</b><br>اطّلع على التقييم، ثم اضغط «✍ توقيع» في خانة «${esc((myCo || {}).label || 'المعلم')}» داخل الاستمارة للعلم. يمكنك إضافة ملاحظتك قبل التوقيع أو بعده.</div>` : myCo ? `<div class="notice info" style="display:block;margin:6px 0">مطلوب توقيعك في خانة «${esc(myCo.label)}» — اضغط «✍ توقيع» داخل النموذج.</div>` : ''}
+      <div id="fmTn"></div>
       <div class="fm-co" id="fmCo"></div>
       <iframe class="fm-frame" id="fmF" src="${FRAME}" title="${esc(t.title)}"></iframe>`, { cls: 'wide fm-modal' });
     const f = $('#fmF', m.el); let D = t.data || {}, dirty = false, timer = null;
     const post = o => f.contentWindow && f.contentWindow.postMessage(o, location.origin);
     const setSv = s => { const e = $('#fmSv', m.el); if (e) e.textContent = s; };
-    const initMsg = () => ({ type: 'dina-form-init', tpl: t.tpl, cfg: t.cfg, data: D, sigs: t.sigs || {}, slots: slotState(t), ro: !editable(t) });
+    const initMsg = () => ({ type: 'dina-form-init', style: A.printStyle ? A.printStyle() : null, tpl: t.tpl, cfg: t.cfg, data: D, sigs: t.sigs || {}, slots: slotState(t), ro: !editable(t) });
     const resend = () => post({ type: 'dina-form-sigs', sigs: t.sigs || {}, slots: slotState(t), ro: !editable(t) });
     const save = async (submit) => { const r = await rpc('form_save', { p_id: t.id, p_data: D, p_submit: !!submit }); Object.assign(t, r || {}); dirty = false; setSv('· حُفظ'); return r; };
-    const drawCo = () => { const el = $('#fmCo', m.el); const L = t.cosign || []; el.innerHTML = L.length ? `<span class="small muted">توقيعات الزملاء:</span> ${L.map(c => `<span class="pill ${c.status === 'signed' ? 'st-approved' : 'st-submitted'}">${esc(nm(c.staff_id))} · ${esc(c.label)} · ${c.status === 'signed' ? 'وقّع' : 'بانتظار التوقيع'}</span>`).join(' ')}` : ''; };
+    const drawTn = () => { const el = $('#fmTn', m.el); if (el) el.innerHTML = isEval(t) && t.teacher_note ? `<div class="notice" style="display:block;margin:6px 0;background:#F4F8FC;border:1px solid #DCE7F3"><b>ملاحظة المعلم:</b> ${esc(t.teacher_note)}</div>` : ''; };
+    const drawCo = () => { drawTn(); const el = $('#fmCo', m.el); const L = isEval(t) ? (t.cosign || []).filter(c => c.staff_id !== t.assignee) : (t.cosign || []); el.innerHTML = L.length ? `<span class="small muted">توقيعات الزملاء:</span> ${L.map(c => `<span class="pill ${c.status === 'signed' ? 'st-approved' : 'st-submitted'}">${esc(nm(c.staff_id))} · ${esc(c.label)} · ${c.status === 'signed' ? 'وقّع' : 'بانتظار التوقيع'}</span>`).join(' ')}` : ''; };
     function drawActs() {
-      const a = $('#fmA', m.el); const ed = editable(t), b = []; const ps = $('#fmSt', m.el); if (ps) ps.innerHTML = pill(t.status);
+      const a = $('#fmA', m.el); const ed = editable(t), b = []; const ps = $('#fmSt', m.el); if (ps) ps.innerHTML = pillT(t);
       if (t.id === 'preview') { a.innerHTML = `<button class="btn ghost sm" data-a="print">${A.I.print || ''} طباعة / PDF</button>`; $$('[data-a]', a).forEach(x => x.onclick = ev => act(x.dataset.a, ev.currentTarget)); return; }
       if (ed) b.push(`<button class="btn ghost sm" data-a="save">حفظ</button>`);
+      if (isEval(t)) {
+        if (canEditAdmin(t) && t.status !== 'approved') b.push(`<button class="btn ghost sm" data-a="share">إضافة موقّع</button>`);
+        if (canEditAdmin(t) && ['assigned', 'draft', 'returned'].includes(t.status)) b.push(`<button class="btn sm" data-a="sendEval">إرسال للمعلم للتوقيع</button>`);
+        if (adm && t.status === 'submitted') b.push(`<button class="btn ghost sm" data-a="remind">تذكير المعلم</button>`);
+        if (mineTask && t.status !== 'assigned') b.push(`<button class="btn ghost sm" data-a="tnote">${t.teacher_note ? 'تعديل ملاحظتي' : 'إضافة ملاحظتي'}</button>`);
+      } else {
       if (t.status !== 'approved' && (mineTask || adm)) b.push(`<button class="btn ghost sm" data-a="share">طلب توقيع زميل</button>`);
       if (mineTask && ['assigned', 'draft', 'returned'].includes(t.status)) b.push(`<button class="btn sm" data-a="submit">إرسال للاعتماد</button>`);
-      if (adm && t.status === 'submitted') b.push(`<button class="btn ok sm" data-a="approve">اعتماد</button><button class="btn ghost sm" data-a="return">إعادة للمعلم</button>`);
-      if (adm && t.status === 'approved') b.push(`<button class="btn ghost sm" data-a="reopen">إلغاء الاعتماد</button>`);
+      }
+      if (!isEval(t) && adm && t.status === 'submitted') b.push(`<button class="btn ok sm" data-a="approve">اعتماد</button><button class="btn ghost sm" data-a="return">إعادة للمعلم</button>`);
+      if (!isEval(t) && adm && t.status === 'approved') b.push(`<button class="btn ghost sm" data-a="reopen">إلغاء الاعتماد</button>`);
       b.push(`<button class="btn ghost sm" data-a="print">${A.I.print || ''} طباعة / PDF</button><button class="btn ghost sm" data-a="mysig">توقيعي</button>`);
       a.innerHTML = b.join('');
       $$('[data-a]', a).forEach(x => x.onclick = ev => act(x.dataset.a, ev.currentTarget));
@@ -128,6 +144,13 @@
     async function act(k, btn) {
       if (k === 'print') { if (dirty && editable(t)) await save(false).catch(() => { }); return post({ type: 'dina-form-print' }); }
       if (k === 'mysig') return sigModal();
+      if (k === 'sendEval') return A.run(btn, async () => {
+        const ts = (t.cosign || []).find(c => c.staff_id === t.assignee);
+        if (!Object.keys(t.sigs || {}).some(k2 => !ts || k2 !== ts.key) && !(await A.confirmBox('لم توقّع على الاستمارة بعد (يمكنك التوقيع في خانة المقيّم داخلها). هل ترسلها للمعلم الآن؟', 'إرسال'))) return;
+        await save(true); notify([t.assignee], 'استمارة تقييم بانتظار توقيعك: ' + t.title, `أرسل لك ${S.me.full_name} «${t.title}». اطّلع عليها ووقّع بالعلم من صفحة «النماذج والاستمارات» ← «بانتظار توقيعي».`);
+        A.toast('أُرسلت للمعلم للتوقيع', 'ok'); drawActs(); resend(); after && after(); });
+      if (k === 'remind') { notify([t.assignee], 'تذكير: استمارة تقييم بانتظار توقيعك', `«${t.title}» بانتظار اطلاعك وتوقيعك في صفحة «النماذج والاستمارات».`); return A.toast('أُرسل التذكير', 'ok'); }
+      if (k === 'tnote') { const v = await askNote('ملاحظتك على التقييم (تظهر للمقيّم وفي الاستمارة)', t.teacher_note); if (v == null) return; return A.run(btn, async () => { const r2 = await rpc('form_teacher_note', { p_id: t.id, p_note: v }); Object.assign(t, r2 || {}); notify([t.created_by], 'ملاحظة معلم على تقييمه: ' + t.title, `${S.me.full_name}: ${v}`); A.toast('حُفظت ملاحظتك', 'ok'); drawActs(); drawTn(); after && after(); }); }
       if (k === 'save') return A.run(btn, async () => { await save(false); A.toast('حُفظ', 'ok'); });
       if (k === 'submit') return A.run(btn, async () => {
         const st = slotState(t), pend = (t.cosign || []).filter(c => c.status !== 'signed');
@@ -172,7 +195,7 @@
           if (!d.remove) { const img = await ensureSig(); if (!img) return; if (dirty && editable(t)) await save(false);
             const r = await rpc('form_sign', { p_id: t.id, p_key: d.key, p_label: d.label, p_img: img, p_name: S.me.full_name, p_remove: false }); Object.assign(t, r || {});
             const co = (t.cosign || []).find(c => c.key === d.key && c.staff_id === S.me.id); if (co) notify([t.assignee], 'وقّع زميلك: ' + t.title, `وقّع ${S.me.full_name} في خانة «${co.label}» بنموذج «${t.title}».`);
-            A.toast('تم التوقيع', 'ok'); }
+            if (isEval(t) && t.status === 'approved' && t.assignee === S.me.id) { notify([t.created_by], 'وقّع المعلم على استمارة التقييم: ' + t.title, `اطّلع ${S.me.full_name} على «${t.title}» ووقّع بالعلم.${t.teacher_note ? ' ملاحظته: ' + t.teacher_note : ''}`); A.toast('تم توقيعك واكتملت الاستمارة', 'ok'); drawActs(); } else A.toast('تم التوقيع', 'ok'); }
           else { const r = await rpc('form_sign', { p_id: t.id, p_key: d.key, p_label: d.label || '', p_img: '', p_name: '', p_remove: true }); Object.assign(t, r || {}); A.toast('حُذف التوقيع', 'ok'); }
           drawCo(); resend(); after && after();
         } catch (err) { A.toast(err.message || 'تعذّر التوقيع', 'bad'); }
@@ -183,7 +206,7 @@
     obs.observe(document.body, { childList: true, subtree: true });
     drawActs(); drawCo();
   }
-  function askNote(label) { return new Promise(res => { const m = A.modal(`<h3>${esc(label)}</h3><textarea class="in" id="anT" rows="4" style="width:100%"></textarea><div class="row" style="gap:8px;margin-top:10px"><button class="btn" id="anOk">متابعة</button></div>`); let done = false; $('#anOk', m.el).onclick = () => { const v = $('#anT', m.el).value.trim(); if (!v) return A.toast('اكتب الملاحظة', 'warn'); done = true; m.close(); res(v); }; const o = new MutationObserver(() => { if (!document.body.contains(m.el)) { o.disconnect(); if (!done) res(null); } }); o.observe(document.body, { childList: true, subtree: true }); }); }
+  function askNote(label, val) { return new Promise(res => { const m = A.modal(`<h3>${esc(label)}</h3><textarea class="in" id="anT" rows="4" style="width:100%">${esc(val || '')}</textarea><div class="row" style="gap:8px;margin-top:10px"><button class="btn" id="anOk">متابعة</button></div>`); let done = false; $('#anOk', m.el).onclick = () => { const v = $('#anT', m.el).value.trim(); if (!v) return A.toast('اكتب الملاحظة', 'warn'); done = true; m.close(); res(v); }; const o = new MutationObserver(() => { if (!document.body.contains(m.el)) { o.disconnect(); if (!done) res(null); } }); o.observe(document.body, { childList: true, subtree: true }); }); }
 
   // ---------- إرسال نماذج (المالك/المشرف) ----------
   function preview(item) { openTask({ id: 'preview', title: item.name + ' (معاينة)', tpl: withSig(item.tpl), cfg: LIB.cfg, data: {}, sigs: {}, cosign: [], status: 'approved', assignee: null }); }
@@ -201,10 +224,13 @@
       <div class="sm-step" style="margin-top:14px"><b>٢</b> المعلمون <span class="pill" id="smN2">لا أحد</span></div>
       <div class="row" style="gap:6px;flex-wrap:wrap;margin:6px 0"><input class="in" id="smPQ" placeholder="بحث بالاسم أو المسمى" style="max-width:240px" aria-label="بحث في المعلمين"><button class="btn ghost sm" id="smAll">تحديد الظاهرين</button><button class="btn ghost sm" id="smNone">إلغاء التحديد</button></div>
       <div class="sm-ppl" id="smP">${people.map(p => `<label class="chk" data-nm="${esc(A.normKey ? A.normKey(p.full_name + ' ' + (p.title || '')) : p.full_name)}"><input type="checkbox" value="${p.id}"> ${esc(p.full_name)}${p.title ? ` <span class="small muted">· ${esc(p.title)}</span>` : ''}</label>`).join('')}</div>
-      <div class="sm-step" style="margin-top:14px"><b>٣</b> الإرسال</div>
+      <div class="sm-step" style="margin-top:14px"><b>٣</b> طريقة النموذج</div>
+      <div class="sm-modes" role="radiogroup" aria-label="طريقة النموذج"><label class="sm-mode"><input type="radio" name="smMd" value="fill" checked><b>يعبّئه المعلم</b><span class="small muted">مثل تبادل الزيارات والدرس التطبيقي: يعبّئه ويوقّعه ويرسله لاعتمادك.</span></label><label class="sm-mode"><input type="radio" name="smMd" value="sign"><b>أعبّئه أنا ويوقّع المعلم</b><span class="small muted">استمارة تقييم أو زيارة صفية: تعبّئها وتوقّعها، ثم تصل للمعلم للاطلاع والتوقيع بالعلم مع ملاحظته، دون تعديل.</span></label></div>
+      <div class="sm-step" style="margin-top:14px"><b>٤</b> الإرسال</div>
       <div class="nr-meta" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px"><div class="field"><label for="smD">موعد التسليم (اختياري)</label><input class="in" type="date" id="smD"></div><div class="field" style="grid-column:span 2"><label for="smNt">ملاحظة للمعلمين (اختياري)</label><input class="in" id="smNt" placeholder="مثال: تبادل زيارة مع زميل من نفس التخصص هذا الأسبوع"></div></div>
       <div class="row" style="gap:8px;margin-top:10px"><button class="btn" id="smGo">إرسال</button><span class="small muted" id="smSum"></span></div>`;
-    const sum = () => { $('#smN1', m.el).textContent = pick.size ? AR(pick.size) + ' نموذج' : 'لا شيء'; $('#smN2', m.el).textContent = ppl.size ? AR(ppl.size) + ' معلم' : 'لا أحد'; $('#smSum', m.el).textContent = pick.size && ppl.size ? `سيُرسل ${AR(pick.size * ppl.size)} نموذج` : ''; };
+    let mdTouched = false; const autoMode = () => { if (mdTouched) return; const ev = [...pick].some(id => { const it = lib.list.find(t => t.id === id); return it && (it.cat === 'cards' || EVAL_RE.test(it.name)); }); const rb = $(`[name=smMd][value=${ev ? 'sign' : 'fill'}]`, m.el); if (rb) rb.checked = true; };
+    const sum = () => { autoMode(); $('#smN1', m.el).textContent = pick.size ? AR(pick.size) + ' نموذج' : 'لا شيء'; $('#smN2', m.el).textContent = ppl.size ? AR(ppl.size) + ' معلم' : 'لا أحد'; $('#smSum', m.el).textContent = pick.size && ppl.size ? `سيُرسل ${AR(pick.size * ppl.size)} نموذج` : ''; };
     const drawG = () => { const q = A.normKey ? A.normKey($('#smQ', m.el).value) : $('#smQ', m.el).value;
       const L = lib.list.filter(t => q ? (A.normKey ? A.normKey(t.name + ' ' + t.desc) : t.name).includes(q) : t.cat === cat);
       $$('[data-c]', m.el).forEach(b => { b.classList.toggle('on', !q && b.dataset.c === cat); b.setAttribute('aria-selected', !q && b.dataset.c === cat); });
@@ -217,12 +243,18 @@
     $$('#smP input', m.el).forEach(i => i.onchange = () => { i.checked ? ppl.add(i.value) : ppl.delete(i.value); sum(); });
     $('#smAll', m.el).onclick = () => { $$('#smP label:not([hidden]) input', m.el).forEach(i => { i.checked = true; ppl.add(i.value); }); sum(); };
     $('#smNone', m.el).onclick = () => { $$('#smP input', m.el).forEach(i => { i.checked = false; }); ppl.clear(); sum(); };
+    $$('[name=smMd]', m.el).forEach(x => x.onchange = () => { mdTouched = true; });
     $('#smGo', m.el).onclick = ev => A.run(ev.currentTarget, async () => {
+      const mode = ($('[name=smMd]:checked', m.el) || {}).value || 'fill';
       if (!pick.size) throw new Error('اختر نموذجاً واحداً على الأقل'); if (!ppl.size) throw new Error('اختر معلماً واحداً على الأقل');
       const batch = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()), due = $('#smD', m.el).value || null, note = $('#smNt', m.el).value.trim();
-      const rows = []; [...pick].forEach(id => { const it = lib.list.find(t => t.id === id); [...ppl].forEach(sid => rows.push({ school_id: S.school.id, batch_id: batch, tid: it.id, title: it.name, cat: it.cat, tpl: withSig(it.tpl), cfg: lib.cfg || {}, assignee: sid, due_date: due, note, ...(DEMO ? { created_by: S.me.id, status: 'assigned', data: {}, sigs: {}, cosign: [], created_at: new Date().toISOString() } : {}) })); });
+      const rows = []; [...pick].forEach(id => { const it = lib.list.find(t => t.id === id); [...ppl].forEach(sid => { const tp = withSig(it.tpl), ts = teacherSlot(tp), who = (S.staff || []).find(p => p.id === sid) || {};
+        // تعبئة اسم المعلم تلقائياً في حقل «المعلم» إن وُجد
+        const d0 = {}; if (mode === 'sign') (tp.blocks || []).forEach(b => { if (b.type !== 'fields') return; (b.fields || []).forEach(f => { if ((f.key === 'teacher' || f.type === 'teacher') && /المعلم|اسم/.test(f.label || '') && !/الزائر/.test(f.label || '')) { (d0[b.id] = d0[b.id] || {})[f.id] = who.full_name || ''; } }); });
+        rows.push({ school_id: S.school.id, batch_id: batch, tid: it.id, title: it.name, cat: it.cat, tpl: tp, cfg: lib.cfg || {}, assignee: sid, due_date: due, note, mode, data: d0, cosign: mode === 'sign' && ts ? [{ staff_id: sid, key: ts.key, label: ts.label, status: 'pending', by: S.me.id }] : [], ...(DEMO ? { created_by: S.me.id, status: 'assigned', sigs: {}, teacher_note: '', created_at: new Date().toISOString() } : {}) }); }); });
       for (let k = 0; k < rows.length; k += 50) await api.ins('form_tasks', rows.slice(k, k + 50));
       const names = [...pick].map(id => lib.list.find(t => t.id === id).name).join('، ');
+      if (mode === 'sign') { m.close(); A.toast(`أُنشئت ${AR(rows.length)} استمارة تقييم — عبّئها ووقّعها من تبويب «استمارات التقييم» ثم أرسلها للمعلم`, 'ok'); st.tab = 'evals'; after && after(); return; }
       notify([...ppl], 'نموذج جديد للتعبئة: ' + names, `أرسل لك ${S.me.full_name} ${pick.size > 1 ? 'نماذج' : 'نموذج'} «${names}»${due ? ' — الموعد ' + due : ''}. افتح «النماذج والاستمارات».${note ? '\n' + note : ''}`);
       m.close(); A.toast(`أُرسل ${AR(rows.length)} نموذج`, 'ok'); after && after();
     });
@@ -245,6 +277,11 @@
   .sg-wrap{position:relative;border:2px dashed #9CC4E4;border-radius:16px;background:linear-gradient(180deg,#fff,#F5F9FD);touch-action:none}
   .sg-wrap canvas{display:block;width:100%;height:auto;aspect-ratio:3/1;cursor:crosshair;touch-action:none}
   .sg-line{position:absolute;inset-inline:8%;bottom:26%;border-bottom:1.5px solid #CFE0F2;pointer-events:none}.sg-ph{position:absolute;inset:0;display:grid;place-items:center;color:#9AAAC2;font-size:22px;pointer-events:none}
+  .fm-ev{background:#EEF3FB;color:#005499}.fm-gh{margin:14px 0 8px;font-size:15px;color:#082B5A}.fm-gh:first-child{margin-top:4px}
+  .sm-modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin:6px 0}
+  .sm-mode{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;align-items:start;border:1.5px solid #DCE7F3;border-radius:14px;padding:10px 12px;cursor:pointer;background:#fff}
+  .sm-mode input{grid-row:span 2;width:20px;height:20px;margin-top:2px;accent-color:#005499}.sm-mode:has(input:checked){border-color:#005499;background:#F1F7FD;box-shadow:0 0 0 3px rgba(0,84,153,.1)}
+  .fm-evb{border-inline-start:4px solid #3AB1DB}
   .fm-list{display:grid;gap:8px}.fm-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;border:1px solid #DCE7F3;border-radius:14px;padding:10px 12px;background:#fff;cursor:pointer;transition:box-shadow .15s,transform .15s}
   .fm-row:hover,.fm-row:focus-visible{box-shadow:0 6px 18px rgba(8,43,90,.1);transform:translateY(-1px);outline:none}.fm-row b{color:#082B5A}
   .fm-row .meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:3px;font-size:12.5px;color:#43597A}
@@ -260,13 +297,14 @@
     root.innerHTML = '<div class="spinner"></div>';
     const adm = isAdmin(), me = S.me.id;
     let all;
-    try { all = await api.list('form_tasks', { school_id: S.school.id }, { order: 'created_at', desc: true, select: 'id,school_id,batch_id,tid,title,cat,assignee,created_by,status,cosign,sigs,due_date,note,review_note,submitted_at,decided_at,created_at,updated_at' }); }
+    try { all = await api.list('form_tasks', { school_id: S.school.id }, { order: 'created_at', desc: true, select: 'id,school_id,batch_id,tid,title,cat,assignee,created_by,status,cosign,sigs,due_date,note,review_note,mode,teacher_note,submitted_at,decided_at,created_at,updated_at' }); }
     catch (e) { root.innerHTML = `<div class="card">${A.emptyBox('تعذّر التحميل', e.message)}</div>`; return; }
     await mySig();
-    const mine = all.filter(t => t.assignee === me), toSign = all.filter(t => (t.cosign || []).some(c => c.staff_id === me && c.status !== 'signed') && t.status !== 'approved');
-    const pendApp = all.filter(t => t.status === 'submitted');
+    const mine = all.filter(t => t.assignee === me && !isEval(t)), toSign = all.filter(t => (t.cosign || []).some(c => c.staff_id === me && c.status !== 'signed') && t.status !== 'approved' && !(isEval(t) && t.status === 'assigned'));
+    const pendApp = all.filter(t => t.status === 'submitted' && !isEval(t));
+    const evals = all.filter(isEval), evDraft = evals.filter(t => ['assigned', 'draft', 'returned'].includes(t.status) && canEditAdmin(t)), myEvals = evals.filter(t => t.assignee === me && t.status !== 'assigned');
     const myOpen = mine.filter(t => ['assigned', 'draft', 'returned'].includes(t.status));
-    const tabs = [adm && ['inbox', 'بانتظار الاعتماد', pendApp.length], adm && ['track', 'المتابعة', 0], adm && ['rep', 'التقارير', 0], (mine.length || !adm) && ['mine', 'نماذجي', myOpen.length], (toSign.length || !adm) && ['sign', 'بانتظار توقيعي', toSign.length]].filter(Boolean);
+    const tabs = [adm && ['inbox', 'بانتظار الاعتماد', pendApp.length], adm && ['evals', 'استمارات التقييم', evDraft.length], adm && ['track', 'المتابعة', 0], adm && ['rep', 'التقارير', 0], (mine.length || !adm) && ['mine', 'نماذجي', myOpen.length], (toSign.length || !adm) && ['sign', 'بانتظار توقيعي', toSign.length], myEvals.length && ['myevals', 'تقييماتي', 0]].filter(Boolean);
     if (st.user !== me) { st.user = me; st.tab = null; }
     if (!st.tab || !tabs.some(t => t[0] === st.tab)) st.tab = (toSign.length && 'sign') || (myOpen.length && 'mine') || tabs[0][0];
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>النماذج والاستمارات</h2><p class="sub" style="margin:2px 0 0">${adm ? 'أرسل نماذج «خطة ونماذج الإشراف» للمعلمين، وتابع التعبئة والتوقيعات، واعتمدها بتوقيعك.' : 'النماذج المرسلة إليك للتعبئة والتوقيع، وطلبات توقيع الزملاء.'}</p></div>
@@ -280,11 +318,14 @@
     const open = async id => { const [t] = await api.list('form_tasks', { id }); if (t) openTask(t, () => { clearTimeout(open._r); open._r = setTimeout(reload, 400); }); };
     const rowHtml = (t, sub) => { const co = t.cosign || [], sg = Object.keys(t.sigs || {}).length;
       return `<div class="fm-row" data-id="${t.id}" tabindex="0" role="button" aria-label="${esc(t.title)}"><div style="display:flex;gap:10px;align-items:center;min-width:0"><span class="fm-ic">${A.I.forms}</span><div style="min-width:0"><b>${esc(t.title)}</b>
-        <div class="meta">${sub}${pill(t.status)}${t.due_date ? `<span>الموعد ${dt(t.due_date)}</span>` : ''}${overdue(t) ? '<span class="pill st-returned">متأخر</span>' : ''}<span>✍ ${AR(sg)} توقيع</span>${co.length ? `<span>${co.filter(c => c.status === 'signed').length === co.length ? '✓ ' : '⌛ '}زملاء ${AR(co.filter(c => c.status === 'signed').length)}/${AR(co.length)}</span>` : ''}</div></div></div>
+        <div class="meta">${sub}${pillT(t)}${t.due_date ? `<span>الموعد ${dt(t.due_date)}</span>` : ''}${overdue(t) ? '<span class="pill st-returned">متأخر</span>' : ''}<span>✍ ${AR(sg)} توقيع</span>${co.length ? `<span>${co.filter(c => c.status === 'signed').length === co.length ? '✓ ' : '⌛ '}زملاء ${AR(co.filter(c => c.status === 'signed').length)}/${AR(co.length)}</span>` : ''}</div></div></div>
         <span class="small muted">${dt(t.updated_at || t.created_at)}</span></div>`; };
     const bindRows = () => $$('[data-id]', O).forEach(r => { r.onclick = () => open(r.dataset.id); r.onkeydown = e => { if (e.key === 'Enter') open(r.dataset.id); }; });
     if (st.tab === 'mine') { O.innerHTML = mine.length ? `<div class="fm-list">${mine.map(t => rowHtml(t, `<span>من ${esc(nm(t.created_by))}</span>`)).join('')}</div>` : A.emptyBox('لا نماذج مرسلة إليك', 'تظهر هنا النماذج التي يرسلها لك المالك أو المشرف'); bindRows(); }
     if (st.tab === 'sign') { O.innerHTML = toSign.length ? `<div class="fm-list">${toSign.map(t => rowHtml(t, `<span>${esc(nm(t.assignee))} يطلب توقيعك في «${esc((t.cosign.find(c => c.staff_id === me) || {}).label || '')}»</span>`)).join('')}</div>` : A.emptyBox('لا طلبات توقيع', 'عندما يطلب زميل توقيعك على نموذج يظهر هنا'); bindRows(); }
+    if (st.tab === 'evals') { const grp = [['مسودات لديك — عبّئها ووقّعها ثم أرسلها', evals.filter(t => ['assigned', 'draft', 'returned'].includes(t.status))], ['بانتظار توقيع المعلم', evals.filter(t => t.status === 'submitted')], ['موقّعة ومكتملة', evals.filter(t => t.status === 'approved')]];
+      O.innerHTML = evals.length ? grp.filter(g => g[1].length).map(([h, L]) => `<h3 class="fm-gh">${h} <span class="pill">${AR(L.length)}</span></h3><div class="fm-list">${L.map(t => rowHtml(t, `<span>${esc(nm(t.assignee))}</span>${t.teacher_note ? '<span>💬 ملاحظة المعلم</span>' : ''}`)).join('')}</div>`).join('') : A.emptyBox('لا استمارات تقييم بعد', 'من «إرسال نموذج» اختر بطاقة تقييم أو زيارة صفية، واختر «أعبّئه أنا ويوقّع المعلم».'); bindRows(); }
+    if (st.tab === 'myevals') { O.innerHTML = `<div class="fm-list">${myEvals.map(t => rowHtml(t, `<span>من ${esc(nm(t.created_by))}</span>`)).join('')}</div>`; bindRows(); }
     if (st.tab === 'inbox') { O.innerHTML = pendApp.length ? `<div class="fm-list">${pendApp.map(t => rowHtml(t, `<span>${esc(nm(t.assignee))}</span><span>أُرسل ${dt(t.submitted_at)}</span>`)).join('')}</div>` : A.emptyBox('لا نماذج بانتظار الاعتماد'); bindRows(); }
     if (st.tab === 'track') track(O, all, open, reload);
     if (st.tab === 'rep') report(O, all);
@@ -297,11 +338,11 @@
       <input class="in" id="tkQ" placeholder="بحث باسم المعلم" style="max-width:220px" aria-label="بحث باسم المعلم"><button class="btn ghost sm" id="tkX">${A.I.down || ''} Excel</button></div>
       <div class="scroll"><table class="tbl"><thead><tr><th>النموذج</th><th>المعلم</th><th>الحالة</th><th>الموعد</th><th>التوقيعات</th><th>الزملاء</th><th>آخر تحديث</th><th></th></tr></thead><tbody id="tkB"></tbody></table></div>`;
     const list = () => { const T = $('#tkT', O).value, s = $('#tkS', O).value, q = A.normKey ? A.normKey($('#tkQ', O).value) : $('#tkQ', O).value; return all.filter(t => (!T || t.title === T) && (!s || (s === 'late' ? overdue(t) : t.status === s)) && (!q || (A.normKey ? A.normKey(nm(t.assignee)) : nm(t.assignee)).includes(q))); };
-    const draw = () => { $('#tkB', O).innerHTML = list().map(t => `<tr class="click" data-id="${t.id}"><td><b>${esc(t.title)}</b></td><td>${esc(nm(t.assignee))}</td><td>${pill(t.status)}${overdue(t) ? ' <span class="pill st-returned">متأخر</span>' : ''}</td><td>${dt(t.due_date)}</td><td>${AR(Object.keys(t.sigs || {}).length)}</td><td>${(t.cosign || []).map(c => `<span class="small">${esc(nm(c.staff_id))} ${c.status === 'signed' ? '✓' : '⌛'}</span>`).join('<br>') || '—'}</td><td class="small">${dt(t.updated_at)}</td><td><button class="btn ghost sm" data-del="${t.id}" aria-label="حذف">حذف</button></td></tr>`).join('') || `<tr><td colspan="8">${A.emptyBox('لا نتائج')}</td></tr>`;
+    const draw = () => { $('#tkB', O).innerHTML = list().map(t => `<tr class="click" data-id="${t.id}"><td><b>${esc(t.title)}</b></td><td>${esc(nm(t.assignee))}</td><td>${pillT(t)}${overdue(t) ? ' <span class="pill st-returned">متأخر</span>' : ''}</td><td>${dt(t.due_date)}</td><td>${AR(Object.keys(t.sigs || {}).length)}</td><td>${(t.cosign || []).map(c => `<span class="small">${esc(nm(c.staff_id))} ${c.status === 'signed' ? '✓' : '⌛'}</span>`).join('<br>') || '—'}</td><td class="small">${dt(t.updated_at)}</td><td><button class="btn ghost sm" data-del="${t.id}" aria-label="حذف">حذف</button></td></tr>`).join('') || `<tr><td colspan="8">${A.emptyBox('لا نتائج')}</td></tr>`;
       $$('tr[data-id]', O).forEach(r => r.onclick = e => { if (e.target.closest('[data-del]')) return; open(r.dataset.id); });
       $$('[data-del]', O).forEach(b => b.onclick = async () => { if (!(await A.confirmBox('حذف هذا النموذج وما فيه من بيانات وتوقيعات؟', 'حذف', true))) return; A.run(b, async () => { await api.del('form_tasks', b.dataset.del); A.toast('حُذف', 'ok'); reload(); }); }); };
     ['#tkT', '#tkS'].forEach(s => $(s, O).onchange = draw); $('#tkQ', O).oninput = draw; draw();
-    $('#tkX', O).onclick = () => { const wb = XLSX.utils.book_new(); wb.Workbook = { Views: [{ RTL: true }] }; const ws = XLSX.utils.json_to_sheet(list().map(t => ({ النموذج: t.title, المعلم: nm(t.assignee), الحالة: STS[t.status][0], متأخر: overdue(t) ? 'نعم' : '', الموعد: t.due_date || '', 'عدد التوقيعات': Object.keys(t.sigs || {}).length, الزملاء: (t.cosign || []).map(c => nm(c.staff_id) + (c.status === 'signed' ? ' ✓' : ' ⌛')).join('، '), 'أُرسل للاعتماد': t.submitted_at ? String(t.submitted_at).slice(0, 10) : '', 'اعتُمد': t.status === 'approved' ? String(t.decided_at || '').slice(0, 10) : '' }))); ws['!views'] = [{ RTL: true }]; XLSX.utils.book_append_sheet(wb, ws, 'متابعة النماذج'); XLSX.writeFile(wb, 'متابعة النماذج والاستمارات.xlsx'); };
+    $('#tkX', O).onclick = () => { const wb = XLSX.utils.book_new(); wb.Workbook = { Views: [{ RTL: true }] }; const ws = XLSX.utils.json_to_sheet(list().map(t => ({ النموذج: t.title, المعلم: nm(t.assignee), النوع: isEval(t) ? 'استمارة تقييم' : 'يعبّئه المعلم', الحالة: (isEval(t) ? STE : STS)[t.status][0], 'ملاحظة المعلم': t.teacher_note || '', متأخر: overdue(t) ? 'نعم' : '', الموعد: t.due_date || '', 'عدد التوقيعات': Object.keys(t.sigs || {}).length, الزملاء: (t.cosign || []).map(c => nm(c.staff_id) + (c.status === 'signed' ? ' ✓' : ' ⌛')).join('، '), 'أُرسل للاعتماد': t.submitted_at ? String(t.submitted_at).slice(0, 10) : '', 'اعتُمد': t.status === 'approved' ? String(t.decided_at || '').slice(0, 10) : '' }))); ws['!views'] = [{ RTL: true }]; XLSX.utils.book_append_sheet(wb, ws, 'متابعة النماذج'); XLSX.writeFile(wb, 'متابعة النماذج والاستمارات.xlsx'); };
   }
 
   function report(O, all) {
@@ -315,7 +356,7 @@
       <div class="row" style="justify-content:flex-end;margin-bottom:6px"><button class="btn ghost sm" id="rpX">${A.I.down || ''} Excel</button><button class="btn ghost sm" id="rpP">${A.I.print || ''} طباعة</button></div>
       <div id="rpBody"><h3>حسب النموذج</h3><div class="scroll"><table class="tbl"><thead><tr><th>النموذج</th><th>المُرسلة</th><th>سُلِّمت</th><th>اعتُمدت</th><th>نسبة الاعتماد</th><th>متأخرة</th></tr></thead><tbody>${T.map(o => `<tr><td><b>${esc(o.k)}</b></td><td>${AR(o.n)}</td><td>${AR(o.sub)}</td><td>${AR(o.app)}</td><td>${AR(pc(o.app, o.n))}٪${bar(pc(o.app, o.n))}</td><td>${o.late ? `<span class="pill st-returned">${AR(o.late)}</span>` : '—'}</td></tr>`).join('') || `<tr><td colspan="6">${A.emptyBox('لا نماذج مرسلة بعد')}</td></tr>`}</tbody></table></div>
       <h3 style="margin-top:14px">حسب المعلم</h3><div class="scroll"><table class="tbl"><thead><tr><th>المعلم</th><th>المُرسلة إليه</th><th>سلّم</th><th>اعتُمد</th><th>الإنجاز</th><th>متأخر</th></tr></thead><tbody>${P.map(o => `<tr><td><b>${esc(o.k)}</b></td><td>${AR(o.n)}</td><td>${AR(o.sub)}</td><td>${AR(o.app)}</td><td>${AR(pc(o.sub, o.n))}٪${bar(pc(o.sub, o.n))}</td><td>${o.late ? `<span class="pill st-returned">${AR(o.late)}</span>` : '—'}</td></tr>`).join('') || `<tr><td colspan="6">—</td></tr>`}</tbody></table></div></div>`;
-    $$('[data-k]', O).forEach(b => b.onclick = () => { const k = K.find(x => x[0] === b.dataset.k); A.attDrill && A.attDrill({ title: 'النماذج — ' + k[1], cols: ['النموذج', 'المعلم', 'الحالة', 'الموعد', 'آخر تحديث'], rows: all.filter(k[3]).map(t => ({ q: t.title + ' ' + nm(t.assignee), cells: [`<b>${esc(t.title)}</b>`, esc(nm(t.assignee)), pill(t.status), dt(t.due_date), dt(t.updated_at)] })) }); });
+    $$('[data-k]', O).forEach(b => b.onclick = () => { const k = K.find(x => x[0] === b.dataset.k); A.attDrill && A.attDrill({ title: 'النماذج — ' + k[1], cols: ['النموذج', 'المعلم', 'الحالة', 'الموعد', 'آخر تحديث'], rows: all.filter(k[3]).map(t => ({ q: t.title + ' ' + nm(t.assignee), cells: [`<b>${esc(t.title)}</b>`, esc(nm(t.assignee)), pillT(t), dt(t.due_date), dt(t.updated_at)] })) }); });
     $('#rpP', O).onclick = () => A.printDoc('تقرير النماذج والاستمارات', S.school.name || '', K.map(([, l, v]) => `<span class="k">${l}<b>${AR(v)}</b></span>`).join('') + $('#rpBody', O).innerHTML);
     $('#rpX', O).onclick = () => { const wb = XLSX.utils.book_new(); wb.Workbook = { Views: [{ RTL: true }] }; const add = (nmS, rows) => { const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{ '': 'لا بيانات' }]); ws['!views'] = [{ RTL: true }]; XLSX.utils.book_append_sheet(wb, ws, nmS); };
       add('حسب النموذج', T.map(o => ({ النموذج: o.k, المرسلة: o.n, سلمت: o.sub, اعتمدت: o.app, 'نسبة الاعتماد %': pc(o.app, o.n), متأخرة: o.late }))); add('حسب المعلم', P.map(o => ({ المعلم: o.k, المرسلة: o.n, سلم: o.sub, اعتمد: o.app, 'الإنجاز %': pc(o.sub, o.n), متأخر: o.late })));

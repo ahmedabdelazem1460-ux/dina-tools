@@ -1,4 +1,4 @@
-/* منصة دينا — الحضور والغياب والسلوك (مشرفو الأدوار والمرشد الطلابي) + الإشراف التربوي (تقارير، إقرار بتوقيع، خطط علاجية) */
+/* منصة دينا — الحضور والغياب والسلوك (مشرفو الأدوار والموجه الطلابي) + الإشراف التربوي (تقارير، إقرار بتوقيع، خطط علاجية) */
 (function () {
   const A = window.APP, V = window.VIEWS;
   const { api, S, $, $$, esc, AR, I } = A;
@@ -14,13 +14,13 @@
   const stu = id => STU.find(s => s.id === id) || {};
   const classesOf = () => S.classes.filter(c => c.active);
 
-  // تنبيه لحظي للمرشد عند وصول إحالة جديدة
+  // تنبيه لحظي للموجه عند وصول إحالة جديدة
   const prevAfter = window.APP_AFTER_WEEK;
   window.APP_AFTER_WEEK = async function () {
     if (prevAfter) await prevAfter.apply(this, arguments);
     if (S._attSub === S.me.id || !api.subscribe) return; S._attSub = S.me.id;
     try {
-      if (mod('counselor') || mod('deputy')) api.subscribe('bh-' + sch(), 'behaviors', null, p => { const r = p && p.new, o = p && p.old; const fresh = r && r.referred && r.by_staff !== S.me.id && (p.eventType ? p.eventType === 'INSERT' : !(o && o.id)); const tg = r && r.target === 'deputy' ? 'deputy' : 'counselor'; if (fresh && mod(tg)) A.toast((tg === 'deputy' ? 'إحالة جديدة للوكيل: ' : 'إحالة جديدة للمرشد الطلابي: ') + (stu(r.student_id).full_name || 'طالب'), 'ok'); if (A._attRefresh) A._attRefresh(); });
+      if (mod('counselor') || mod('deputy')) api.subscribe('bh-' + sch(), 'behaviors', null, p => { const r = p && p.new, o = p && p.old; const fresh = r && r.referred && r.by_staff !== S.me.id && (p.eventType ? p.eventType === 'INSERT' : !(o && o.id)); const tg = r && r.target === 'deputy' ? 'deputy' : 'counselor'; if (fresh && mod(tg)) A.toast((tg === 'deputy' ? 'إحالة جديدة للوكيل: ' : 'إحالة جديدة للموجه الطلابي: ') + (stu(r.student_id).full_name || 'طالب'), 'ok'); if (A._attRefresh) A._attRefresh(); });
       // إحالات الغياب والتأخر تصل للموجه الطلابي لحظياً (تُجمع في تنبيه واحد)
       let refQ = [], refT = null;
       if (mod('attendance') || mod('counselor')) api.subscribe('att-' + sch(), 'attendance', null, p => { const r = p && p.new; if (mod('counselor') && r && r.referred && r.by_staff !== S.me.id && r.day === today()) { refQ.push(stu(r.student_id).full_name || 'طالب'); clearTimeout(refT); refT = setTimeout(() => { const u = [...new Set(refQ)]; refQ = []; A.toast(`إحالة غياب/تأخر للموجه: ${u.slice(0, 3).join('، ')}${u.length > 3 ? ' و' + AR(u.length - 3) + ' آخرين' : ''}`, 'ok'); }, 1500); } if (A._attRefresh) A._attRefresh(); });
@@ -33,12 +33,12 @@
   //  الحضور والسلوك
   // =====================================================================
   V.attendance = async function (root) {
-    if (!(mod('attendance') || mod('counselor') || mod('supervision'))) { root.innerHTML = `<div class="card">${A.emptyBox('غير متاح لحسابك', 'يمنحه مالك النظام لمشرفي الأدوار والمرشد الطلابي من «المسميات والصلاحيات».')}</div>`; return; }
+    if (!(mod('attendance') || mod('counselor') || mod('supervision'))) { root.innerHTML = `<div class="card">${A.emptyBox('غير متاح لحسابك', 'يمنحه مالك النظام لمشرفي الأدوار والموجه الطلابي من «المسميات والصلاحيات».')}</div>`; return; }
     root.innerHTML = '<div class="spinner"></div>';
     await loadStudents(true);
     const tabs = [mod('attendance') && A.attRecord && ['record', 'رصد الحضور'], (A.liveOK ? A.liveOK() : (mod('attendance') || mod('counselor') || mod('supervision'))) && A.attLive && ['live', 'لوحة الحضور اللحظية'], mod('attendance') && A.attPeriods && ['periods', 'حضور الحصص'], mod('attendance') && ['take', 'الحضور الصباحي'], (mod('attendance') || mod('counselor')) && ['behavior', 'السلوك'], (mod('counselor') || S.me.is_owner) && ['refer', 'الإحالات'], ['reports', 'التقارير'], S.me.is_owner && ['students', 'الطلاب']].filter(Boolean);
     let tab = A.LS.get('atttab'); if (!tabs.some(t => t[0] === tab)) tab = tabs[0][0];
-    root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>الحضور والغياب والسلوك</h2><p class="sub" style="margin:2px 0 0">${AR(STU.length)} طالب في قاعدة البيانات · المزامنة لحظية بين المشرفين والمرشد الطلابي.</p></div></div>
+    root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>الحضور والغياب والسلوك</h2><p class="sub" style="margin:2px 0 0">${AR(STU.length)} طالب في قاعدة البيانات · المزامنة لحظية بين المشرفين والموجه الطلابي.</p></div></div>
       <div class="tabs">${tabs.map(([k, l]) => `<button data-t="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div><div id="atb"></div></div>`;
     $$('.tabs button', root).forEach(b => b.onclick = () => { A.LS.set('atttab', b.dataset.t); V.attendance(root); });
     const box = $('#atb', root);
@@ -64,9 +64,9 @@
         <span class="small muted">${AR(takenCls.size)} من ${AR(classesOf().length)} فصل أُخذ حضوره في هذا اليوم</span></div>
         <div class="row" style="gap:6px;margin-bottom:10px">${classesOf().map(c => `<button class="btn sm ${c.id === cid ? '' : 'ghost'}" data-c="${c.id}">${esc(c.name)} ${takenCls.has(c.id) ? '✓' : ''}</button>`).join('')}</div>
         ${list.length ? `<div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="small muted">الافتراضي «حاضر» — اضغط على حالة الطالب لتغييرها</span><span class="row"><button class="btn ghost sm" id="atAllP">الكل حاضر</button><button class="btn ok" id="atSave">${I.check} حفظ الحضور</button></span></div>
-        <div class="scroll"><table class="tbl att"><thead><tr><th>#</th><th>الطالب</th><th>الحالة</th><th>دقائق التأخر</th><th>ملاحظة</th><th>إحالة للمرشد</th></tr></thead><tbody>
+        <div class="scroll"><table class="tbl att"><thead><tr><th>#</th><th>الطالب</th><th>الحالة</th><th>دقائق التأخر</th><th>ملاحظة</th><th>إحالة للموجه</th></tr></thead><tbody>
         ${list.map((s, i) => `<tr data-s="${s.id}"><td>${AR(i + 1)}</td><td><b>${esc(s.full_name)}</b>${byS[s.id] ? A.attWho(byS[s.id]) : ''}</td><td><div class="seg" role="radiogroup" aria-label="حالة ${esc(s.full_name)}">${ST.map(([k, l, c]) => `<button type="button" role="radio" class="sg ${c} ${state[s.id].status === k ? 'on' : ''}" data-st="${k}" aria-checked="${state[s.id].status === k}">${l}</button>`).join('')}</div></td>
-          <td><input class="in" type="number" min="1" max="240" data-m value="${state[s.id].minutes || ''}" style="width:80px;padding:6px" aria-label="دقائق التأخر"></td><td><input class="in" data-n value="${esc(state[s.id].note || '')}" style="padding:6px" aria-label="ملاحظة"></td><td><input type="checkbox" data-r ${state[s.id].referred ? 'checked' : ''} aria-label="إحالة للمرشد"></td></tr>`).join('')}
+          <td><input class="in" type="number" min="1" max="240" data-m value="${state[s.id].minutes || ''}" style="width:80px;padding:6px" aria-label="دقائق التأخر"></td><td><input class="in" data-n value="${esc(state[s.id].note || '')}" style="padding:6px" aria-label="ملاحظة"></td><td><input type="checkbox" data-r ${state[s.id].referred ? 'checked' : ''} aria-label="إحالة للموجه"></td></tr>`).join('')}
         </tbody></table></div>` : A.emptyBox('لا يوجد طلاب في هذا الفصل')}`;
       $('#atD', box).onchange = e => { day = e.target.value; A.LS.set('attday', day); draw(); };
       $$('[data-c]', box).forEach(b => b.onclick = () => { cid = b.dataset.c; A.LS.set('attcls', cid); draw(); });
@@ -99,16 +99,16 @@
         <div class="field"><label for="bCat">التصنيف</label><select class="in" id="bCat">${NEG.map(x => `<option>${x}</option>`).join('')}</select></div>
         <div class="grid g2"><div class="field"><label for="bP">النقاط</label><input class="in" id="bP" type="number" value="1" min="0" max="20"></div><div class="field"><label for="bD">التاريخ</label><input class="in" id="bD" type="date" value="${today()}"></div></div>
         <div class="field"><label for="bN">ملاحظة</label><textarea class="in" id="bN" rows="2"></textarea></div>
-        <label class="chk"><input type="checkbox" id="bR"> إحالة للمرشد الطلابي (يصله تنبيه فوري)</label>
+        <label class="chk"><input type="checkbox" id="bR"> إحالة للموجه الطلابي (يصله تنبيه فوري)</label>
         <div class="acts"><button class="btn" id="bGo">تسجيل</button></div></div>
-        <div class="sec-box"><b>آخر السلوكيات المسجلة</b><div style="margin-top:8px;max-height:520px;overflow:auto">${recent.slice(0, 60).map(r => `<div class="bh ${r.kind}"><b>${esc(stu(r.student_id).full_name || '')}</b> <span class="small muted">· ${esc((A.cls(r.class_id) || {}).name || '')} · ${AR(r.day)}</span><div class="small">${esc(r.category)}${r.points ? ` (${AR(r.points)})` : ''}${r.note ? ' — ' + esc(r.note) : ''}</div>${r.referred ? `<span class="pill ${r.status === 'closed' ? 'st-approved' : 'st-submitted'}">محال للمرشد · ${r.status === 'closed' ? 'مغلق' : r.status === 'in_progress' ? 'قيد المتابعة' : 'جديد'}</span>` : ''}</div>`).join('') || '<p class="muted small">لا يوجد</p>'}</div></div></div>`;
+        <div class="sec-box"><b>آخر السلوكيات المسجلة</b><div style="margin-top:8px;max-height:520px;overflow:auto">${recent.slice(0, 60).map(r => `<div class="bh ${r.kind}"><b>${esc(stu(r.student_id).full_name || '')}</b> <span class="small muted">· ${esc((A.cls(r.class_id) || {}).name || '')} · ${AR(r.day)}</span><div class="small">${esc(r.category)}${r.points ? ` (${AR(r.points)})` : ''}${r.note ? ' — ' + esc(r.note) : ''}</div>${r.referred ? `<span class="pill ${r.status === 'closed' ? 'st-approved' : 'st-submitted'}">محال للموجه · ${r.status === 'closed' ? 'مغلق' : r.status === 'in_progress' ? 'قيد المتابعة' : 'جديد'}</span>` : ''}</div>`).join('') || '<p class="muted small">لا يوجد</p>'}</div></div></div>`;
       let kind = 'negative';
       $('#bC', box).onchange = e => { cid = e.target.value; A.LS.set('attcls', cid); draw(); };
       $$('#bK button', box).forEach(b => b.onclick = () => { kind = b.dataset.k; $$('#bK button', box).forEach(x => x.classList.toggle('on', x === b)); $('#bCat', box).innerHTML = (kind === 'positive' ? POS : NEG).map(x => `<option>${x}</option>`).join(''); });
       $('#bGo', box).onclick = e => A.run(e.currentTarget, async () => {
         const sid = $('#bS', box).value; if (!sid) throw new Error('اختر الطالب');
         await api.ins('behaviors', { school_id: sch(), student_id: sid, class_id: cid, day: $('#bD', box).value || today(), kind, category: $('#bCat', box).value, points: +$('#bP', box).value || 0, note: $('#bN', box).value.trim(), referred: $('#bR', box).checked, by_staff: S.me.id });
-        A.toast('سُجِّل السلوك' + ($('#bR', box).checked ? ' وأُحيل للمرشد' : ''), 'ok'); draw();
+        A.toast('سُجِّل السلوك' + ($('#bR', box).checked ? ' وأُحيل للموجه' : ''), 'ok'); draw();
       });
     };
     A._attRefresh = () => { if (box.isConnected && !box.contains(document.activeElement)) draw(); };
@@ -120,7 +120,7 @@
       const [bh, ab] = await Promise.all([api.list('behaviors', { school_id: sch(), referred: true }, { order: 'created_at', desc: true }), api.list('attendance', { school_id: sch(), referred: true }, { order: 'day', desc: true })]);
       const open = bh.filter(r => r.status !== 'closed');
       box.innerHTML = `<div id="atAl"></div><div class="grid g3" style="margin:12px 0"><button type="button" class="kpi btnlike" data-rf="open"><div class="k">إحالات سلوكية مفتوحة</div><div class="v">${AR(open.length)}</div></button><button type="button" class="kpi btnlike" data-rf="ab"><div class="k">إحالات غياب وتأخر</div><div class="v">${AR(ab.length)}</div></button><button type="button" class="kpi btnlike" data-rf="closed"><div class="k">أُغلقت</div><div class="v">${AR(bh.length - open.length)}</div></button></div>
-        <div class="scroll"><table class="tbl"><thead><tr><th>الطالب</th><th>الفصل</th><th>التاريخ</th><th>السبب</th><th>من أحال</th><th>الحالة</th><th style="width:28%">إجراء المرشد</th></tr></thead><tbody>
+        <div class="scroll"><table class="tbl"><thead><tr><th>الطالب</th><th>الفصل</th><th>التاريخ</th><th>السبب</th><th>من أحال</th><th>الحالة</th><th style="width:28%">إجراء الموجه</th></tr></thead><tbody>
         ${bh.map(r => `<tr><td><b>${esc(stu(r.student_id).full_name || '')}</b></td><td>${esc((A.cls(r.class_id) || {}).name || '')}</td><td>${AR(r.day)}</td><td class="small">${esc(r.category)}${r.note ? ' — ' + esc(r.note) : ''}</td><td class="small">${esc(A.personName(r.by_staff) || '')}</td>
           <td><select class="in" data-bs="${r.id}" style="padding:6px">${[['open', 'جديد'], ['in_progress', 'قيد المتابعة'], ['closed', 'مغلق']].map(([k, l]) => `<option value="${k}" ${r.status === k ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
           <td><input class="in" data-bn="${r.id}" value="${esc(r.counselor_note)}" placeholder="الإجراء المتخذ" style="padding:6px"></td></tr>`).join('')}
@@ -131,7 +131,7 @@
       $$('[data-rf]', box).forEach(b => b.onclick = () => { if (!A.attDrill) return; const k = b.dataset.rf, cn = r => esc((A.cls(r.class_id) || {}).name || ''), dt = r => A.arDate ? A.arDate(r.day) : AR(r.day);
         if (k === 'ab') return A.attDrill({ title: 'إحالات الغياب والتأخر', cols: ['الطالب', 'الفصل', 'التاريخ', 'الحالة', 'ملاحظة'], rows: ab.map(r => ({ q: stu(r.student_id).full_name || '', cells: ['<b>' + esc(stu(r.student_id).full_name || '') + '</b>', cn(r), dt(r), stName(r.status), esc(r.note || '—')] })) });
         const L = k === 'open' ? open : bh.filter(r => r.status === 'closed');
-        A.attDrill({ title: k === 'open' ? 'الإحالات السلوكية المفتوحة' : 'الإحالات المغلقة', cols: ['الطالب', 'الفصل', 'التاريخ', 'السبب', 'من أحال', 'الحالة', 'إجراء المرشد'], rows: L.map(r => ({ q: (stu(r.student_id).full_name || '') + ' ' + (r.category || ''), cells: ['<b>' + esc(stu(r.student_id).full_name || '') + '</b>', cn(r), dt(r), esc(r.category || '') + (r.note ? ' — ' + esc(r.note) : ''), esc(A.personName(r.by_staff) || ''), BST[r.status] || esc(r.status || ''), esc(r.counselor_note || '—')] })) }); });
+        A.attDrill({ title: k === 'open' ? 'الإحالات السلوكية المفتوحة' : 'الإحالات المغلقة', cols: ['الطالب', 'الفصل', 'التاريخ', 'السبب', 'من أحال', 'الحالة', 'إجراء الموجه'], rows: L.map(r => ({ q: (stu(r.student_id).full_name || '') + ' ' + (r.category || ''), cells: ['<b>' + esc(stu(r.student_id).full_name || '') + '</b>', cn(r), dt(r), esc(r.category || '') + (r.note ? ' — ' + esc(r.note) : ''), esc(A.personName(r.by_staff) || ''), BST[r.status] || esc(r.status || ''), esc(r.counselor_note || '—')] })) }); });
       const can = mod('counselor') || S.me.is_owner;
       $$('[data-bs]', box).forEach(s => { s.disabled = !can; s.onchange = () => A.run(null, async () => { await api.upd('behaviors', s.dataset.bs, { status: s.value }); A.toast('حُدِّثت الحالة', 'ok'); }); });
       $$('[data-bn]', box).forEach(i => { i.readOnly = !can; i.onchange = () => A.run(null, async () => { await api.upd('behaviors', i.dataset.bn, { counselor_note: i.value.trim() }); A.toast('حُفظ الإجراء', 'ok'); }); });
@@ -169,7 +169,7 @@
     const cnt = k => att.filter(a => a.status === k).length;
     const body = `<div><span class="k"><b>${AR(att.length)}</b>أيام مرصودة</span><span class="k"><b>${AR(cnt('absent'))}</b>غياب</span><span class="k"><b>${AR(cnt('late'))}</b>تأخر</span><span class="k"><b>${AR(cnt('excused'))}</b>مستأذن</span><span class="k"><b>${AR(bh.filter(b => b.kind === 'positive').length)}</b>سلوك إيجابي</span><span class="k"><b>${AR(bh.filter(b => b.kind === 'negative').length)}</b>يحتاج متابعة</span></div>
       <h3>سجل الحضور (غير الحضور فقط)</h3><table><tr><th>التاريخ</th><th>الحالة</th><th>ملاحظة</th></tr>${att.filter(a => a.status !== 'present').sort((a, b) => a.day.localeCompare(b.day)).map(a => `<tr><td>${esc(a.day)}</td><td>${stName(a.status)}${a.minutes ? ` (${a.minutes} د)` : ''}</td><td>${esc(a.note)}</td></tr>`).join('') || '<tr><td colspan="3">منتظم في الحضور</td></tr>'}</table>
-      <h3>السلوك</h3><table><tr><th>التاريخ</th><th>النوع</th><th>التصنيف</th><th>ملاحظة</th><th>إجراء المرشد</th></tr>${bh.map(b => `<tr><td>${esc(b.day)}</td><td>${b.kind === 'positive' ? 'إيجابي' : 'يحتاج متابعة'}</td><td>${esc(b.category)}</td><td>${esc(b.note)}</td><td>${esc(b.counselor_note)}</td></tr>`).join('') || '<tr><td colspan="5">لا يوجد</td></tr>'}</table>`;
+      <h3>السلوك</h3><table><tr><th>التاريخ</th><th>النوع</th><th>التصنيف</th><th>ملاحظة</th><th>إجراء الموجه</th></tr>${bh.map(b => `<tr><td>${esc(b.day)}</td><td>${b.kind === 'positive' ? 'إيجابي' : 'يحتاج متابعة'}</td><td>${esc(b.category)}</td><td>${esc(b.note)}</td><td>${esc(b.counselor_note)}</td></tr>`).join('') || '<tr><td colspan="5">لا يوجد</td></tr>'}</table>`;
     A.printDoc(`التقرير الشامل للطالب: ${s.full_name}`, `${(A.cls(s.class_id) || {}).name || ''} · ${from} إلى ${to}`, body, false);
   }
 

@@ -24,7 +24,9 @@
   const TOOL_KEYS = ['nisab', 'tt_builder', 'exec_confirm'];
   // صلاحيات اطلاع فقط (محددة لا عامة) — يمنحها المالك، ولا تتيح أي تعديل
   const VIEW_PERMS = [['progress', 'الاطلاع على نسب الإدخال ولوحة المتابعة'], ['plans', 'الاطلاع على خطط الفصول'], ['reports', 'الاطلاع على التقارير'], ['records', 'الاطلاع على سجلات متابعة المعلمين'], ['timetable', 'الاطلاع على الجدول الدراسي']];
-  const TITLE_SUGG = ['معلم', 'معلمة', 'منسق', 'منسقة', 'منسق مادة', 'منسقة مادة', 'مشرف تربوي', 'مشرفة تربوية', 'مدير القسم', 'مديرة القسم', 'وكيل', 'وكيلة', 'مرشد طلابي', 'مرشدة طلابية', 'رائد نشاط', 'رائدة نشاط', 'أمين مصادر', 'أمينة مصادر', 'إداري', 'إدارية'];
+  const TITLE_SUGG = ['معلم', 'معلمة', 'منسق', 'منسقة', 'منسق مادة', 'منسقة مادة', 'مشرف تربوي', 'مشرفة تربوية', 'مدير المدرسة', 'مديرة المدرسة', 'المدير الأكاديمي', 'المديرة الأكاديمية', 'مدير القسم', 'مديرة القسم', 'وكيل', 'وكيلة', 'وكيل شؤون الطلاب', 'وكيلة شؤون الطلاب', 'وكيل الشؤون التعليمية', 'وكيلة الشؤون التعليمية', 'موجه طلابي', 'موجهة طلابية', 'موجه صحي', 'موجهة صحية', 'مراقب دور', 'مراقبة دور', 'رائد نشاط', 'رائدة نشاط', 'أمين مصادر', 'أمينة مصادر', 'محضر مختبر', 'محضرة مختبر', 'أخصائي تقنية', 'أخصائية تقنية', 'سكرتير', 'سكرتيرة', 'إداري', 'إدارية'];
+  // كل المسميات: القائمة الثابتة + حزم الصلاحيات (الجاهزة والمخصصة) + المسميات المستخدمة فعلاً للموظفين
+  const allTitles = () => { const out = []; const add = t => { t = String(t || '').trim(); if (t && !out.includes(t)) out.push(t); }; TITLE_SUGG.forEach(add); (((S.school || {}).settings || {}).perm_sets || []).forEach(x => add(x.name)); (S.staff || []).forEach(p => add(p.title)); return out; };
   const ROLE_DEFAULTS = { admin: {}, supervisor: { can_review_plans: true, can_export: true }, teacher: {} };
 
   const parseDate = s => { const [y, m, d] = String(s).slice(0, 10).split('-').map(Number); return new Date(y, m - 1, d); };
@@ -838,7 +840,7 @@
   }
 
   // ---------- مشترك مع الملفات الأخرى ----------
-  window.APP = { gradeName, coordOnly, NAV, navOK, ownerStamp, VIEW_PERMS, TITLE_SUGG, viewOK, stageOf, featMode, featGate, FEAT_DEF, PERF, perfName, start: () => start(), TOOL_PERMS, TOOL_KEYS, cnt, api, S, $, $$, esc, AR, DAYS, PER, ORD, STATUS, WSTATUS, ROLES, PERMS, ROLE_DEFAULTS, I, parseDate, isoDate, dmy, weekDates, fmtDT, pct, norm, normKey, genPass, toast, modal, confirmBox, run, pill, bar, emptyBox, download, section, week, subj, subjName, person, personName, cls, myMem, perm, anyPerm, holidayOf, required, filled, stats, loadSection, loadWeek, refreshPeople, refreshMyCards, delegOf, shell, route, renderNav, LS, DEMO };
+  window.APP = { gradeName, coordOnly, NAV, navOK, ownerStamp, VIEW_PERMS, TITLE_SUGG, allTitles, viewOK, stageOf, featMode, featGate, FEAT_DEF, PERF, perfName, start: () => start(), TOOL_PERMS, TOOL_KEYS, cnt, api, S, $, $$, esc, AR, DAYS, PER, ORD, STATUS, WSTATUS, ROLES, PERMS, ROLE_DEFAULTS, I, parseDate, isoDate, dmy, weekDates, fmtDT, pct, norm, normKey, genPass, toast, modal, confirmBox, run, pill, bar, emptyBox, download, section, week, subj, subjName, person, personName, cls, myMem, perm, anyPerm, holidayOf, required, filled, stats, loadSection, loadWeek, refreshPeople, refreshMyCards, delegOf, shell, route, renderNav, LS, DEMO };
 
   // ---------- تشغيل ----------
   window.addEventListener('DOMContentLoaded', async () => {

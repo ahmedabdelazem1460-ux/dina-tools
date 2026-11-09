@@ -6,7 +6,7 @@
   // ---------- صلاحيات الأنظمة الخاصة (تحليل النتائج، سجلاتي…) ----------
   const FOPT = { all: 'لكل المعلمين', granted: 'لمن أمنحه فقط', off: 'مخفي (للمالك فقط)' };
   const FEATS = [['assess', 'التقويم والاختبارات', ['all', 'granted', 'off']], ['records', 'سجل المتابعة', ['all', 'granted', 'off']], ['resources', 'المصادر', ['all', 'granted', 'off']], ['analysis', 'تحليل النتائج', ['granted', 'off']], ['attendance', 'الحضور والسلوك والإرشاد', ['granted', 'off']], ['supervision', 'الإشراف التربوي وتقاريري', ['granted', 'off']]];
-  const MODULES = [['assess', 'التقويم والاختبارات (عند تفعيله «لمن أمنحه»)', 'التقويم'], ['analysis', 'تحليل النتائج والاختبارات التشخيصية', 'التحليل'], ['supervision', 'الإشراف التربوي', 'الإشراف'], ['attendance', 'الحضور والسلوك — مشرف دور', 'الحضور'], ['counselor', 'الإرشاد الطلابي — الإحالات', 'المرشد'], ['deputy', 'الوكيل — استقبال إحالات الطلاب', 'الوكيل'], ['records', 'سجل المتابعة (عند تفعيله «لمن أمنحه»)', 'السجل'], ['resources', 'المصادر (عند تفعيلها «لمن أمنحه»)', 'المصادر'], ['noor', 'تحليل درجات نور', 'نور']];
+  const MODULES = [['assess', 'التقويم والاختبارات (عند تفعيله «لمن أمنحه»)', 'التقويم'], ['analysis', 'تحليل النتائج والاختبارات التشخيصية', 'التحليل'], ['supervision', 'الإشراف التربوي', 'الإشراف'], ['attendance', 'الحضور والسلوك — مشرف دور', 'الحضور'], ['counselor', 'الإرشاد الطلابي — الإحالات', 'الموجه'], ['deputy', 'الوكيل — استقبال إحالات الطلاب', 'الوكيل'], ['records', 'سجل المتابعة (عند تفعيله «لمن أمنحه»)', 'السجل'], ['resources', 'المصادر (عند تفعيلها «لمن أمنحه»)', 'المصادر'], ['noor', 'تحليل درجات نور', 'نور']];
   A.hasModule = m => !!S.me && (S.me.is_owner || (S.grants || []).some(g => g.module === m && g.staff_id === S.me.id));
   async function loadGrants() { try { S.grants = await api.moduleGrants(); } catch (_) { S.grants = []; } }
   const prevAfter = window.APP_AFTER_WEEK;
@@ -110,7 +110,7 @@
     { id: 'coord', name: 'منسق مادة', role: 'supervisor', perms: { can_review_plans: true, can_export: true } },
     { id: 'coordv', name: 'منسق / منسقة — اطلاع على نسب الإدخال', role: 'teacher', perms: {}, view: ['progress'] },
     { id: 'sup', name: 'مشرف تربوي', role: 'supervisor', perms: { can_review_plans: true, can_export: true } },
-    { id: 'counselor', name: 'مرشد طلابي', role: 'supervisor', perms: { can_export: true } },
+    { id: 'counselor', name: 'موجه طلابي', role: 'supervisor', perms: { can_export: true } },
     { id: 'deputy', name: 'وكيل', role: 'supervisor', perms: { can_review_plans: true, can_export: true, can_manage_structure: true, can_edit_timetable: true } },
     { id: 'head', name: 'مدير القسم', role: 'admin', perms: { can_manage_users: true, can_manage_structure: true, can_edit_timetable: true, can_approve_timetable: true, can_review_plans: true, can_export: true } },
   ];
@@ -131,7 +131,7 @@
         <select class="in" id="rsec" style="max-width:170px"><option value="all">كل الأقسام</option>${secs.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select>
         <label class="chk"><input type="checkbox" id="rtitle" checked> اجعل اسم الحزمة مسمى وظيفياً</label>
         <button class="btn sm" id="rgo">تطبيق على المحددين</button></div>
-      <datalist id="ttlSugg">${A.TITLE_SUGG.map(t => `<option value="${esc(t)}">`).join('')}</datalist><div class="scroll"><table class="tbl"><thead><tr><th style="width:34px"><input type="checkbox" id="rall" aria-label="تحديد الكل"></th><th>الموظف</th><th style="width:22%">المسمى الوظيفي</th>${secs.map(s => `<th>${esc(s.short_name || s.name)}</th>`).join('')}${S.me.is_owner ? '<th>أنظمة خاصة</th>' : ''}</tr></thead><tbody id="rb"></tbody></table></div></div>`;
+      <datalist id="ttlSugg">${(A.allTitles ? A.allTitles() : A.TITLE_SUGG).map(t => `<option value="${esc(t)}">`).join('')}</datalist><div class="scroll"><table class="tbl"><thead><tr><th style="width:34px"><input type="checkbox" id="rall" aria-label="تحديد الكل"></th><th>الموظف</th><th style="width:22%">المسمى الوظيفي</th>${secs.map(s => `<th>${esc(s.short_name || s.name)}</th>`).join('')}${S.me.is_owner ? '<th>أنظمة خاصة</th>' : ''}</tr></thead><tbody id="rb"></tbody></table></div></div>`;
     const drawSets = () => {
       $('#psL', root).innerHTML = sets().map(p => `<span class="ldc" title="${esc(ALLP.filter(([k]) => p.perms[k]).map(([, l]) => l).join('، ') || 'بلا صلاحيات إضافية')}"><b style="background:var(--blue)">${A.ROLES[p.role] || p.role}</b> ${esc(p.name)}${S.me.is_owner && !BUILTIN.some(b => b.id === p.id && !((S.school.settings || {}).perm_sets || []).some(x => x.id === p.id)) ? `<button class="ldx" data-pe="${p.id}" aria-label="تعديل">✎</button>` : S.me.is_owner ? `<button class="ldx" data-pe="${p.id}" aria-label="تخصيص">✎</button>` : ''}</span>`).join('');
       $('#rset', root).innerHTML = '<option value="">— حزمة للمحددين —</option>' + sets().map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');

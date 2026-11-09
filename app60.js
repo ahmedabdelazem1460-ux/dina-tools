@@ -193,7 +193,7 @@
   // ============ مساحة الموجه الطلابي ============
   const cst = { tab: 'inbox' };
   V.counsel = async function (root) {
-    if (!isC()) { root.innerHTML = `<div class="card">${A.emptyBox('هذه الصفحة للموجه الطلابي والمالك', 'يمنحها المالك من «المسميات والصلاحيات» ← وحدة المرشد الطلابي')}</div>`; return; }
+    if (!isC()) { root.innerHTML = `<div class="card">${A.emptyBox('هذه الصفحة للموجه الطلابي والمالك', 'يمنحها المالك من «المسميات والصلاحيات» ← وحدة الموجه الطلابي')}</div>`; return; }
     root.innerHTML = '<div class="spinner"></div>';
     const [stu, , refs, cases] = await Promise.all([A.studentsAll ? A.studentsAll() : api.list('students', { school_id: S.school.id }), allCls(),
       api.list('behaviors', { school_id: S.school.id, referred: true }, { order: 'created_at', desc: true }).then(L => (L || []).filter(r => toOf(r) === 'counselor')).catch(() => []), api.list('counsel_cases', { school_id: S.school.id }, { order: 'updated_at', desc: true }).catch(() => [])]);

@@ -188,7 +188,6 @@
     m.el.querySelectorAll('[data-ek]').forEach(b => b.onclick = () => A.run(b, async () => {
       X.ctx.subj = e.subject_id; X.ctx.grade = X.gk(c); await X.loadCtx();
       m.close();
-      if (!(X.QB || []).length) return A.toast('لا توجد أسئلة في بنك هذه المادة والصف بعد. أضف أسئلة من «التقويم ← بنك الأسئلة» ثم أنشئ التكليف.', 'warn');
       const kind = b.dataset.ek, lbl = ({ homework: 'واجب إلكتروني', quiz: 'اختبار قصير', worksheet: 'ورقة عمل' })[kind];
       X.quizEditor({ kind, title: `${lbl} — ${A.subjName(e.subject_id)}`, week_id: S.weekId, day: e.day, class_ids: [e.class_id] }, () => { });
       // الفصل نفسه فقط محدَّد افتراضياً

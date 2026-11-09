@@ -109,10 +109,11 @@
     const reload = () => V.deputy(root);
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>إحالات الوكيل</h2><p class="sub" style="margin:2px 0 0">الطلاب المُحالون إليك من المعلمين ومراقبي الأدوار — عالج الإحالة وردّ على المُحيل، واطبع الإحالة أو التقرير بهوية دينا.</p></div></div>
       <div class="grid g4" style="margin:8px 0">${[['جديدة', all.filter(r => (r.status || 'open') === 'open').length, all.some(r => (r.status || 'open') === 'open' && r.priority === 'urgent') ? 'var(--bad)' : ''], ['قيد المتابعة', all.filter(r => r.status === 'in_progress').length, ''], ['مغلقة', all.filter(r => r.status === 'closed').length, ''], ['هذا الشهر', all.filter(r => String(r.created_at || r.day).slice(0, 7) === today().slice(0, 7)).length, '']].map(([l, n, c]) => `<div class="kpi"><b style="${c ? 'color:' + c : ''}">${AR(n)}</b><span>${l}</span></div>`).join('')}</div>
-      <div class="fm-tabs" role="tablist">${[['inbox', 'الوارد', inbox.length], ['all', 'كل الإحالات', 0]].map(([k, l, n]) => `<button role="tab" data-tb="${k}" class="${dst.tab === k ? 'on' : ''}" aria-selected="${dst.tab === k}">${l}${n ? `<span class="n">${AR(n)}</span>` : ''}</button>`).join('')}</div>
+      <div class="fm-tabs" role="tablist">${[['inbox', 'الوارد', inbox.length], ['all', 'كل الإحالات', 0], ['stats', 'التقرير الإحصائي', 0]].map(([k, l, n]) => `<button role="tab" data-tb="${k}" class="${dst.tab === k ? 'on' : ''}" aria-selected="${dst.tab === k}">${l}${n ? `<span class="n">${AR(n)}</span>` : ''}</button>`).join('')}</div>
       <div class="row" style="gap:8px;flex-wrap:wrap;margin:10px 0"><select class="in" id="dpS" style="max-width:170px" aria-label="الحالة"><option value="">كل الحالات</option>${Object.entries(BST).map(([k, v]) => `<option value="${k}" ${dst.s === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select><input class="in" id="dpQ" placeholder="بحث باسم الطالب أو المُحيل" style="max-width:260px" value="${esc(dst.q)}"><span class="grow"></span><button class="btn ghost sm" id="dpPr" type="button">${A.I.print || ''} طباعة التقرير</button></div>
       <div id="dpL"></div></div>`;
     $$('[data-tb]', root).forEach(b => b.onclick = () => { dst.tab = b.dataset.tb; reload(); });
+    if (dst.tab === 'stats') { const tb = $('#dpS', root).closest('.row'); tb.hidden = true; refStats($('#dpL', root), 'deputy'); return; }
     const list = () => { const base = dst.tab === 'inbox' ? inbox : all, q = A.normKey ? A.normKey(dst.q) : dst.q;
       return base.filter(r => (!dst.s || (r.status || 'open') === dst.s) && (!q || (A.normKey ? A.normKey(sOf(r.student_id).full_name + ' ' + nm(r.by_staff)) : '').includes(q))); };
     const card = r => { const s = sOf(r.student_id); return `<div class="cs-card pr-${r.priority || 'normal'}"><div class="cs-hd"><b>${esc(s.full_name || '')}</b><span class="small muted">${esc(cName(r.class_id))}</span>${pill(PR, r.priority || 'normal')}${pill(BST, r.status || 'open')}<span class="pill">${esc(TYPES[typeOf(r)][0])}</span></div>
@@ -242,7 +243,7 @@
         $$('[data-gc]', O).forEach(b => b.onclick = () => { const c = cases.find(x => x.id === b.dataset.gc); if (c) openCase(c, { student: sOf(c.student_id) }, reload); }); };
       ['#alS', '#alT'].forEach(x => $(x, O).onchange = draw); $('#alQ', O).oninput = draw; draw();
     }
-    if (cst.tab === 'rep') report(O, refs, cases, sOf);
+    if (cst.tab === 'rep') refStats(O, 'counselor');
     if (cst.tab === 'msgs') { O.innerHTML = '<div class="spinner"></div>'; const M = (await api.list('counsel_msgs', { school_id: S.school.id }, { order: 'created_at', desc: true }).catch(() => [])).filter(x => x.from_staff !== S.me.id && x.kind === 'msg').slice(0, 150);
       const G = (await api.list('counsel_msgs', { school_id: S.school.id }, { order: 'created_at', desc: true }).catch(() => [])).filter(x => x.kind === 'guide' && x.from_staff === S.me.id).slice(0, 60);
       O.innerHTML = `<h3 style="margin:4px 0 8px">الردود الواردة</h3>${M.length ? `<div class="cs-list">${M.map(x => `<div class="cs-card pr-normal"><div class="cs-hd"><b>${esc(nm(x.from_staff))}</b><span class="small muted">${esc(role(x.from_staff))} · ${dt(x.created_at)}</span>${x.student_id ? `<span class="pill">${esc(sOf(x.student_id).full_name || '')}</span>` : ''}</div><div style="white-space:pre-wrap">${esc(x.body)}</div><div class="acts">${x.ref_id ? `<button class="btn ghost sm" data-mth="${x.ref_id}">💬 فتح المحادثة</button>` : ''}${x.student_id ? `<button class="btn ghost sm" data-msp="${x.student_id}">ملف الطالب</button>` : ''}</div></div>`).join('')}</div>` : A.emptyBox('لا ردود بعد')}
@@ -419,4 +420,108 @@
     try { api.subscribe('cmsg-' + S.me.id, 'counsel_msgs', null, p => { const n = p && p.new; if (!n || p.eventType !== 'INSERT' || n.from_staff === S.me.id || !(n.recipients || []).includes(S.me.id)) return; A.toast(n.kind === 'guide' ? 'وصلك توجيه من الموجه الطلابي' : 'رسالة جديدة: ' + String(n.body || '').slice(0, 60), 'info'); }); } catch (_) { }
   };
   A._counsel = { openCase, profile, thread, guideModal };
+
+  // ================= تصنيف الإحالات والإجراءات + التقارير الإحصائية + الأرقام التفاعلية =================
+  // تصنيف الإجراءات إلى مجموعات
+  const ACT_GRP = { session: 'إرشادية', group: 'إرشادية', parent_call: 'تواصل أسري', parent_meet: 'تواصل أسري', pledge: 'انضباطية', plan: 'علاجية وتعديل سلوك', reinforce: 'علاجية وتعديل سلوك', teacher: 'تنسيقية', admin: 'تنسيقية', external: 'تحويل لجهة مختصة', follow: 'متابعة', note: 'متابعة', reply: 'ردّ على المُحيل' };
+  const actGrp = k => ACT_GRP[k] || 'أخرى';
+  const srcOf = r => /^من رصد الحضور/.test(r.note || '') ? 'رصد الحضور' : 'إحالة مباشرة';
+  const stgOf = id => { const c = (CLS || []).find(x => x.id === id) || (A.cls && A.cls(id)); return c ? (A.stageOf ? A.stageOf(c) : c.stage || '') : ''; };
+  const dIso = d => String(d || '').slice(0, 10);
+  // تحميل الإحالات والحالات والإجراءات (حسب صلاحية الحساب)
+  async function refData(from, to) {
+    const q = from ? { gte: { day: from }, lte: { day: to } } : {};
+    const [stu, , refs, cases, acts] = await Promise.all([A.studentsAll ? A.studentsAll() : api.list('students', { school_id: S.school.id }), allCls(),
+      api.list('behaviors', { school_id: S.school.id, referred: true }, { order: 'created_at', desc: true, ...q }).catch(() => []),
+      api.list('counsel_cases', { school_id: S.school.id }).catch(() => []),
+      api.list('counsel_actions', { school_id: S.school.id }, { order: 'day', ...q }).catch(() => [])]);
+    const sOf = id => (stu || []).find(x => x.id === id) || {};
+    // إجراءات كل إحالة: إجراءات ملف حالتها + ردّها على المُحيل
+    const actsOf = r => { const L = (acts || []).filter(a => r.case_id && a.case_id === r.case_id).map(a => ({ kind: a.kind, name: actName(a.kind), grp: actGrp(a.kind), day: a.day, note: a.note, by: a.by_staff, priv: a.private, next: a.next_date }));
+      if (r.reply) L.push({ kind: 'reply', name: 'ردّ على المُحيل', grp: actGrp('reply'), day: dIso(r.replied_at), note: r.reply, by: null }); return L.sort((a, b) => String(a.day).localeCompare(String(b.day))); };
+    const allActs = []; (acts || []).forEach(a => { const c = (cases || []).find(x => x.id === a.case_id) || {}; allActs.push({ kind: a.kind, name: actName(a.kind), grp: actGrp(a.kind), day: a.day, by: a.by_staff, student_id: c.student_id, note: a.note, priv: a.private }); });
+    (refs || []).filter(r => r.reply && r.replied_at && (!from || (dIso(r.replied_at) >= from && dIso(r.replied_at) <= to))).forEach(r => allActs.push({ kind: 'reply', name: 'ردّ على المُحيل', grp: actGrp('reply'), day: dIso(r.replied_at), by: null, student_id: r.student_id, note: r.reply, target: toOf(r) }));
+    return { refs: refs || [], cases: cases || [], acts: allActs, sOf, actsOf };
+  }
+  // نافذة تفاعلية: قائمة الإحالات مع إجراءات كل منها
+  function refDrill(title, L, D, sub) {
+    const card = r => { const s = D.sOf(r.student_id), A2 = D.actsOf(r); return `<div class="cs-card pr-${r.priority || 'normal'}"><div class="cs-hd"><b>${esc(s.full_name || '')}</b><span class="small muted">${esc(cName(r.class_id))}</span><span class="pill">${TO[toOf(r)][1]} ${TO[toOf(r)][0]}</span>${pill(PR, r.priority || 'normal')}${pill(BST, r.status || 'open')}<span class="pill">${esc(TYPES[typeOf(r)][0])}</span></div>
+      <div class="meta"><span><b>${esc(r.category)}</b></span><span>${srcOf(r)}</span><span>من ${esc(nm(r.by_staff))}</span><span>${dt(r.day)}</span></div>${r.note ? `<div class="small" style="white-space:pre-wrap">${esc(r.note)}</div>` : ''}
+      <div class="rf-acts"><b class="small">الإجراءات (${AR(A2.length)})</b>${A2.length ? `<ol>${A2.map(a => `<li><span class="pill">${esc(a.grp)}</span> <b>${esc(a.name)}</b> <span class="small muted">${dt(a.day)}${a.by ? ' · ' + esc(nm(a.by)) : ''}</span>${a.priv ? ' <span class="pill">🔒 سري</span>' : ''}${a.note ? `<div class="small">${esc(a.note)}</div>` : ''}${a.next ? `<div class="small muted">المتابعة: ${dt(a.next)}</div>` : ''}</li>`).join('')}</ol>` : '<div class="small muted">لم يُتخذ إجراء بعد</div>'}</div></div>`; };
+    const m = A.modal(`<h3 style="margin:0">${esc(title)} <span class="pill">${AR(L.length)}</span></h3>${sub ? `<p class="sub" style="margin:4px 0 0">${sub}</p>` : ''}<div class="row" style="gap:6px;margin:8px 0;justify-content:flex-end"><button class="btn ghost sm" id="rdP">${A.I.print || ''} طباعة</button></div><div class="cs-list" style="max-height:62vh;overflow:auto">${L.map(card).join('') || A.emptyBox('لا إحالات')}</div>`, { cls: 'wide' });
+    m.el.querySelector('#rdP').onclick = () => A.printDoc(title, (sub || '').replace(/<[^>]+>/g, ''), `<table><tr><th>#</th><th>التاريخ</th><th>الطالب</th><th>الفصل</th><th>إلى</th><th>النوع</th><th>السبب</th><th>الحالة</th><th>المُحيل</th><th>الإجراءات المتخذة</th></tr>${L.map((r, i) => `<tr><td>${AR(i + 1)}</td><td>${dt(r.day)}</td><td><b>${esc(D.sOf(r.student_id).full_name || '')}</b></td><td>${esc(cName(r.class_id))}</td><td>${TO[toOf(r)][0]}</td><td>${esc(TYPES[typeOf(r)][0])}</td><td>${esc(r.category)}</td><td>${BST[r.status || 'open'][0]}</td><td>${esc(nm(r.by_staff))}</td><td>${D.actsOf(r).map(a => esc(a.name) + (a.note ? ': ' + esc(a.note) : '')).join('<br>') || '—'}</td></tr>`).join('')}</table>`, true);
+  }
+  A.refDrill = refDrill; A.refData = refData;
+
+  // التقرير الإحصائي (للموجه والمالك، وللوكيل على إحالاته)
+  const rst = { pre: 'term', f: '', t: '', tg: '' };
+  async function refStats(O, only) {
+    const t0 = today(), wk = (() => { const d = new Date(t0 + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - d.getUTCDay()); return d.toISOString().slice(0, 10); })();
+    const PRE = [['today', 'اليوم'], ['week', 'هذا الأسبوع'], ['month', 'هذا الشهر'], ['term', 'الفصل الدراسي'], ['all', 'كل الفترات'], ['custom', 'فترة مخصصة']];
+    const rng = () => rst.pre === 'today' ? [t0, t0] : rst.pre === 'week' ? [wk, t0] : rst.pre === 'month' ? [t0.slice(0, 8) + '01', t0] : rst.pre === 'term' ? [((S.weeks || []).map(w => w.start_date).sort()[0]) || t0.slice(0, 8) + '01', t0] : rst.pre === 'custom' ? [rst.f || t0, rst.t || t0] : ['', ''];
+    O.innerHTML = `<div class="row" style="gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px"><div class="field" style="margin:0"><label for="rsP">الفترة</label><select class="in" id="rsP">${PRE.map(([k, l]) => `<option value="${k}" ${rst.pre === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+      <div class="field rs-c" style="margin:0;${rst.pre === 'custom' ? '' : 'display:none'}"><label for="rsF">من</label><input type="date" class="in" id="rsF" value="${rst.f || t0}"></div><div class="field rs-c" style="margin:0;${rst.pre === 'custom' ? '' : 'display:none'}"><label for="rsT">إلى</label><input type="date" class="in" id="rsT" value="${rst.t || t0}"></div>
+      ${only ? '' : `<div class="field" style="margin:0"><label for="rsG">الجهة</label><select class="in" id="rsG"><option value="">الكل</option><option value="counselor" ${rst.tg === 'counselor' ? 'selected' : ''}>الموجه الطلابي</option><option value="deputy" ${rst.tg === 'deputy' ? 'selected' : ''}>الوكيل</option></select></div>`}
+      <span class="grow"></span><button class="btn ghost sm" id="rsX">${A.I.down || ''} Excel</button><button class="btn ghost sm" id="rsPr">${A.I.print || ''} طباعة</button></div><div id="rsO"><div class="spinner"></div></div>`;
+    const re = () => refStats(O, only);
+    $('#rsP', O).onchange = e => { rst.pre = e.target.value; re(); }; if ($('#rsG', O)) $('#rsG', O).onchange = e => { rst.tg = e.target.value; re(); };
+    if ($('#rsF', O)) { $('#rsF', O).onchange = e => { rst.f = e.target.value; re(); }; $('#rsT', O).onchange = e => { rst.t = e.target.value; re(); }; }
+    const [f, t] = rng(), D = await refData(f, t), tg = only || rst.tg;
+    const R = D.refs.filter(r => !tg || toOf(r) === tg), ids = new Set(R.map(r => r.student_id));
+    const ACTS = D.acts.filter(a => !tg || (a.kind === 'reply' ? a.target === tg : tg === 'counselor'));
+    const grpBy = (L, f) => { const mp = new Map(); L.forEach(x => { const k = f(x) || '—'; if (!mp.has(k)) mp.set(k, []); mp.get(k).push(x); }); return [...mp.entries()].sort((a, b) => b[1].length - a[1].length); };
+    const KEYS = {}; let kn = 0; const key = L => { const k = 'k' + (kn++); KEYS[k] = L; return k; };
+    const bars = (G, isAct) => { const mx = Math.max(1, ...G.map(x => x[1].length)), tot = G.reduce((a, x) => a + x[1].length, 0) || 1; return `<div class="cs-bars">${G.slice(0, 14).map(([k, L]) => `<button type="button" class="cs-bar rs-b" data-rk="${isAct ? 'a' : 'r'}:${key(L)}" data-rt="${esc(k)}"><span>${esc(k)}</span><i style="width:${Math.round(L.length / mx * 100)}%"></i><b>${AR(L.length)} <small>(${AR(Math.round(L.length / tot * 100))}٪)</small></b></button>`).join('') || '<p class="small muted">—</p>'}</div>`; };
+    const closed = R.filter(r => r.status === 'closed'), withAct = R.filter(r => D.actsOf(r).length), rep = R.filter(r => r.replied_at && r.created_at);
+    const avgH = rep.length ? Math.round(rep.reduce((a, r) => a + (new Date(r.replied_at) - new Date(r.created_at)), 0) / rep.length / 36e5) : null;
+    const multi = [...ids].map(id => [D.sOf(id).full_name || '—', R.filter(r => r.student_id === id)]).filter(x => x[1].length >= 2).sort((a, b) => b[1].length - a[1].length);
+    const kpi = (l, L, c) => `<button type="button" class="rk" data-rk="r:${key(L)}" data-rt="${esc(l)}"><b style="${c ? 'color:' + c : ''}">${AR(L.length)}</b><span>${l}</span></button>`;
+    const html = (forPrint) => `<div class="rs-kp">${kpi('إجمالي الإحالات', R)}${kpi('جديدة', R.filter(r => (r.status || 'open') === 'open'), '#C0392B')}${kpi('قيد المتابعة', R.filter(r => r.status === 'in_progress'), '#B7791F')}${kpi('مغلقة', closed, '#2E8B57')}${kpi('اتُّخذ لها إجراء', withAct)}${kpi('بلا إجراء بعد', R.filter(r => !D.actsOf(r).length), '#C0392B')}
+        <div class="rk"><b>${AR(ACTS.length)}</b><span>إجمالي الإجراءات</span></div><div class="rk"><b>${R.length ? AR(Math.round(closed.length / R.length * 100)) + '٪' : '—'}</b><span>نسبة الإغلاق</span></div><div class="rk"><b>${avgH == null ? '—' : AR(avgH)}</b><span>متوسط زمن الردّ (ساعة)</span></div><div class="rk"><b>${AR(ids.size)}</b><span>طالب مُحال</span></div></div>
+      <h3 class="rs-h">تصنيف الإحالات</h3><div class="rs-g">
+        <div class="sec-box"><b>حسب النوع</b>${bars(grpBy(R, r => TYPES[typeOf(r)][0]))}</div><div class="sec-box"><b>حسب السبب</b>${bars(grpBy(R, r => r.category))}</div>
+        <div class="sec-box"><b>حسب الحالة</b>${bars(grpBy(R, r => BST[r.status || 'open'][0]))}</div><div class="sec-box"><b>حسب الأولوية</b>${bars(grpBy(R, r => PR[r.priority || 'normal'][0]))}</div>
+        ${only ? '' : `<div class="sec-box"><b>حسب الجهة</b>${bars(grpBy(R, r => TO[toOf(r)][0]))}</div>`}<div class="sec-box"><b>حسب المصدر</b>${bars(grpBy(R, srcOf))}</div>
+        <div class="sec-box"><b>حسب المرحلة</b>${bars(grpBy(R, r => stgOf(r.class_id)))}</div><div class="sec-box"><b>حسب الفصل</b>${bars(grpBy(R, r => cName(r.class_id)))}</div>
+        <div class="sec-box"><b>حسب المُحيل</b>${bars(grpBy(R, r => nm(r.by_staff)))}</div><div class="sec-box"><b>حسب الشهر</b>${bars(grpBy(R, r => String(r.day || '').slice(0, 7)).sort((a, b) => a[0].localeCompare(b[0])))}</div></div>
+      <h3 class="rs-h">تصنيف الإجراءات</h3><div class="rs-g">
+        <div class="sec-box"><b>حسب التصنيف</b>${bars(grpBy(ACTS, a => a.grp), true)}</div><div class="sec-box"><b>حسب الإجراء</b>${bars(grpBy(ACTS, a => a.name), true)}</div>
+        <div class="sec-box"><b>حسب المنفّذ</b>${bars(grpBy(ACTS.filter(a => a.by), a => nm(a.by)), true)}</div><div class="sec-box"><b>حسب الشهر</b>${bars(grpBy(ACTS, a => String(a.day || '').slice(0, 7)).sort((a, b) => a[0].localeCompare(b[0])), true)}</div></div>
+      <h3 class="rs-h">الطلاب متكررو الإحالة</h3><table class="tbl"><thead><tr><th>الطالب</th><th>الفصل</th><th>عدد الإحالات</th><th>الأسباب</th></tr></thead><tbody>${multi.map(([n, L]) => `<tr><td><button type="button" class="linkish" data-rk="r:${key(L)}" data-rt="${esc(n)}"><b>${esc(n)}</b></button></td><td>${esc(cName(L[0].class_id))}</td><td>${AR(L.length)}</td><td class="small">${esc([...new Set(L.map(r => r.category))].join('، '))}</td></tr>`).join('') || '<tr><td colspan="4">—</td></tr>'}</tbody></table>`;
+    const sub = `${PRE.find(x => x[0] === rst.pre)[1]}${f ? ` (${dt(f)} – ${dt(t)})` : ''}${tg ? ' · ' + TO[tg][0] : ''}`;
+    $('#rsO', O).innerHTML = html();
+    $$('[data-rk]', O).forEach(b => b.onclick = () => { const [ty, k] = b.dataset.rk.split(':'), L = KEYS[k] || [];
+      if (ty === 'r') return refDrill(b.dataset.rt, L, D, sub);
+      // إجراءات: تُعرض إحالات طلابها مع إجراءاتها، أو قائمة الإجراءات نفسها
+      const st = new Set(L.map(a => a.student_id)); refDrill('إجراءات: ' + b.dataset.rt, R.filter(r => st.has(r.student_id) && D.actsOf(r).some(a => L.some(x => x.kind === a.kind))), D, sub); });
+    $('#rsPr', O).onclick = () => A.printDoc('التقرير الإحصائي للإحالات والإجراءات', sub, html(true).replace(/<button[^>]*>/g, '<span>').replace(/<\/button>/g, '</span>'), false);
+    $('#rsX', O).onclick = () => { if (!window.XLSX) return A.toast('مكتبة Excel غير متاحة', 'err'); const wb = XLSX.utils.book_new(); wb.Workbook = { Views: [{ RTL: true }] };
+      const w1 = XLSX.utils.json_to_sheet(R.map(r => ({ التاريخ: r.day, الطالب: D.sOf(r.student_id).full_name || '', الفصل: cName(r.class_id), المرحلة: stgOf(r.class_id), الجهة: TO[toOf(r)][0], النوع: TYPES[typeOf(r)][0], السبب: r.category, المصدر: srcOf(r), الأولوية: PR[r.priority || 'normal'][0], الحالة: BST[r.status || 'open'][0], المحيل: nm(r.by_staff), 'عدد الإجراءات': D.actsOf(r).length, الإجراءات: D.actsOf(r).map(a => a.name).join('، '), الردّ: r.reply || '' })));
+      const w2 = XLSX.utils.json_to_sheet(ACTS.map(a => ({ التاريخ: a.day, الطالب: D.sOf(a.student_id).full_name || '', التصنيف: a.grp, الإجراء: a.name, المنفذ: a.by ? nm(a.by) : '', التفاصيل: a.priv ? '(سري)' : (a.note || '') })));
+      [w1, w2].forEach(w => w['!views'] = [{ RTL: true }]); XLSX.utils.book_append_sheet(wb, w1, 'الإحالات'); XLSX.utils.book_append_sheet(wb, w2, 'الإجراءات'); XLSX.writeFile(wb, 'إحصائيات الإحالات والإجراءات.xlsx'); };
+  }
+  A.refStats = refStats;
+
+  // الأرقام التفاعلية في شاشة المتابعة اليومية (للمالك والموجه والوكيل)
+  A.refLive = async function (el) {
+    if (!el || !(isC() || isD())) return;
+    const t0 = today(), D = await refData('', '');
+    const vis = D.refs.filter(r => isC() || toOf(r) === 'deputy');
+    const todayR = vis.filter(r => r.day === t0), open = vis.filter(r => (r.status || 'open') === 'open'), prog = vis.filter(r => r.status === 'in_progress');
+    const closedT = vis.filter(r => r.status === 'closed' && dIso(r.replied_at) === t0), actsT = D.acts.filter(a => a.day === t0), noAct = vis.filter(r => r.status !== 'closed' && !D.actsOf(r).length);
+    const urgent = vis.filter(r => r.status !== 'closed' && r.priority === 'urgent');
+    const L = [['إحالات اليوم', todayR, ''], ['جديدة بانتظار المعالجة', open, open.length ? 'bad' : 'ok'], ['قيد المتابعة', prog, 'warn'], ['عاجلة مفتوحة', urgent, urgent.length ? 'bad' : ''], ['بلا إجراء بعد', noAct, noAct.length ? 'warn' : 'ok'], ['أُغلقت اليوم', closedT, 'ok']];
+    el.innerHTML = `<div class="sec-box" style="margin-top:12px"><div class="row" style="justify-content:space-between;align-items:center"><b>الإحالات والإجراءات</b><span class="row" style="gap:6px"><button class="btn ghost sm" id="rlAct">إجراءات اليوم (${AR(actsT.length)})</button><button class="btn ghost sm" id="rlRep">التقرير الإحصائي</button></span></div>
+      <div class="pal-k" style="margin-top:8px">${L.map(([l, X, c], i) => `<button type="button" class="k ${c}" data-rl="${i}" style="font:inherit;cursor:pointer;text-align:start"><b>${AR(X.length)}</b>${l}</button>`).join('')}</div></div>`;
+    $$('[data-rl]', el).forEach(b => b.onclick = () => { const [l, X] = L[+b.dataset.rl]; refDrill(l, X, D, DAYS_AR()); });
+    $('#rlAct', el).onclick = () => { const st = new Set(actsT.map(a => a.student_id)); refDrill('إجراءات اليوم', vis.filter(r => st.has(r.student_id)), D, DAYS_AR()); };
+    $('#rlRep', el).onclick = () => { const m = A.modal(`<h3 style="margin:0">التقرير الإحصائي للإحالات والإجراءات</h3><div id="rlS" style="margin-top:8px"></div>`, { cls: 'wide' }); refStats(m.el.querySelector('#rlS'), isC() ? '' : 'deputy'); };
+  };
+  const DAYS_AR = () => dt(today());
+
+  const css3 = `.rs-kp{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:10px}.rs-kp .rk{display:grid;gap:2px;text-align:start;font:inherit;background:#fff;border:1px solid #DCE7F3;border-radius:14px;padding:10px 12px;color:#5B7090;font-size:12.5px}.rs-kp .rk b{font-size:22px;color:#082B5A;line-height:1.2}.rs-kp button.rk{cursor:pointer}
+  .rs-kp button.rk:hover,.rs-b:hover{box-shadow:0 6px 16px -10px rgba(8,43,90,.5)}.rs-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px}.rs-h{margin:14px 0 8px;color:#082B5A}
+  .rs-b{width:100%;border:0;background:transparent;font:inherit;cursor:pointer;padding:3px 4px;border-radius:8px;text-align:start}.rs-b:focus-visible{outline:2px solid #3AB1DB}.rs-b b small{font-weight:400;color:#5B7090}
+  .rf-acts{background:#F4F8FC;border-radius:10px;padding:6px 10px}.rf-acts ol{margin:4px 0 0;padding-inline-start:18px;display:grid;gap:4px}.linkish{border:0;background:none;font:inherit;color:#005499;cursor:pointer;padding:0}`;
+  if (!document.getElementById('app60css3')) { const st3 = document.createElement('style'); st3.id = 'app60css3'; st3.textContent = css3; document.head.appendChild(st3); }
 })();

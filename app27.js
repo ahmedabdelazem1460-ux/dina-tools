@@ -36,6 +36,23 @@
   }
   const toMin = t => { const [h, m] = String(t || '0:0').split(':').map(Number); return h * 60 + m; };
   const customFrom = M => { if (M.custom) return JSON.parse(JSON.stringify(M.custom)); const t = M.times || []; const d0 = t[0] ? toMin(t[0][1]) - toMin(t[0][0]) : 40; return { start: (t[0] || ['08:00'])[0], dur: d0, pass: t[1] && !(M.breaks || []).some(b => b.after === 1) ? Math.max(0, toMin(t[1][0]) - toMin(t[0][1])) : 0, np: M.periods || 6, days: M.days || [0, 1, 2, 3, 4], perDay: M.perDay || {}, perDur: Object.fromEntries(t.map((x, p) => [p, toMin(x[1]) - toMin(x[0])]).filter(([, v]) => v > 0 && v !== d0)), breaks: (M.breaks || []).map(b => ({ after: b.after, dur: toMin(b.to) - toMin(b.from), label: b.label })) }; };
+  /* توقيت التعليم عن بعد واحد في كل الأدوات: إذا نُسخ توقيت هذا الجدول الاستثنائي من جدول زمني «عن بعد» في «اليوم الدراسي والجدول الزمني»
+     ثم عُدِّل هنا، يُحدَّث ذلك الجدول الزمني بنفس التوقيت فوراً (لا يمسّ الجدول الأساسي/الحضوري أبداً) */
+  async function syncBellRemote(n) {
+    try {
+      if (!n || !n.custom || !n.copiedFrom) return;
+      const sec = A.section(); if (!sec || !sec.bell || !Array.isArray(sec.bell.schedules)) return;
+      const b = JSON.parse(JSON.stringify(sec.bell)), pin = b.pin && b.pin.kind === 'sched' ? b.pin.id : null;
+      const t = b.schedules.find(x => (x.name || '').trim() === String(n.copiedFrom).trim() && x.id !== b.def && x.id !== pin && /بعد|remote/i.test((x.name || '') + ' ' + (x.tag || '')));
+      if (!t) return;
+      const cs = n.custom, nb = (cs.breaks || []).map((x, i) => ({ id: ((t.breaks || [])[i] || {}).id || Math.random().toString(36).slice(2, 9), after: +x.after, dur: +x.dur || 0, label: x.label || 'الفسحة', classes: [] }));
+      const nx = { start: cs.start, dur: +cs.dur, pass: +cs.pass || 0, np: +cs.np, perDur: cs.perDur || {}, breaks: nb, days: cs.days || t.days, perDay: cs.perDay || t.perDay };
+      if (['start', 'dur', 'pass', 'np', 'perDur', 'breaks', 'days', 'perDay'].every(k => JSON.stringify(t[k] ?? null) === JSON.stringify(nx[k] ?? null))) return;
+      Object.assign(t, nx);
+      const r = await api.updateSection(sec.id, { bell: b }); Object.assign(sec, r);
+      A.toast(`حُدِّث أيضاً الجدول الزمني «${t.name}» بنفس التوقيت — يبدأ ${cs.start}`, 'ok');
+    } catch (e) { A.toast('تعذّر تحديث الجدول الزمني «' + (n.copiedFrom || '') + '»: ' + e.message, 'warn'); }
+  }
   // عند تعديل «اليوم الدراسي والجدول الزمني»: تُحدَّث الجداول الاستثنائية المرتبطة تلقائياً
   // توقيت التعليم عن بعد مستقل تماماً عن توقيت الحضوري: يُنسخ مرة واحدة ثم لا يتأثر أحدهما بالآخر
   const detach = (M0) => { const M = { ...(M0 || {}) }; if (M.linked === false) return M; const cs = customFrom(M); const n = { ...M, linked: false, custom: cs, copiedFrom: M.schedName || '', sched: null, schedName: 'توقيت التعليم عن بعد' }; return n; };
@@ -185,7 +202,7 @@
             <div class="field"><label>الفسح والصلاة</label><div class="bl-brs">${(cs.breaks || []).map((b, i) => `<div class="bl-br"><input class="in" data-tb="${i}" data-k="label" value="${esc(b.label || '')}" placeholder="استراحة"><label>بعد الحصة <select class="in" data-tb="${i}" data-k="after">${Array.from({ length: Math.max(1, +cs.np - 1) }, (_, p) => `<option value="${p + 1}" ${+b.after === p + 1 ? 'selected' : ''}>${PER[p] || AR(p + 1)}</option>`).join('')}</select></label><label>المدة <input class="in" type="number" min="5" max="90" style="width:76px" data-tb="${i}" data-k="dur" value="${+b.dur || 15}"> د</label><button class="btn bad sm" data-tbx="${i}" aria-label="حذف">×</button></div>`).join('') || '<p class="small muted">لا توجد فسح.</p>'}</div><button class="btn ghost sm" id="tmAddB" style="margin-top:6px">+ فسحة / صلاة</button></div>
             <details class="bl-det"><summary>مدة مختلفة لحصة معينة</summary><div class="bl-pd">${Array.from({ length: +cs.np }, (_, p) => `<label><span>${PER[p] || AR(p + 1)}</span><input class="in" type="number" min="10" max="120" data-tpd="${p}" value="${(cs.perDur || {})[p] || ''}" placeholder="${cs.dur}"></label>`).join('')}</div></details>`}
           <div class="lv-tsum">${tsum()}</div>`;
-        const saveMeta = async n => { if (M.vis && !n.vis) n.vis = M.vis; if (M.fill && !n.fill) n.fill = M.fill; if (M.copiedFrom && n.copiedFrom == null) n.copiedFrom = M.copiedFrom; if (M.lim && !n.lim) n.lim = M.lim; setM(n); const r = await api.upd('display_schedules', ds.id, { meta: n }); ds.meta = n; { const nf = A._liveFit ? A._liveFit(ds) : 0; if (nf) { await api.upd('display_schedules', ds.id, { slots: ds.slots, pool: ds.pool }); A.toast(`نُقلت ${AR(nf)} حصة لا تتسع في التوقيت الجديد إلى خانة الحصص أسفل الجدول`, 'warn'); } } const st0 = $('#lvSt', box); if (st0) { st0.textContent = 'حُفظ التوقيت'; st0.className = 'rec-st ok'; } drawPrev(); };
+        const saveMeta = async n => { if (M.vis && !n.vis) n.vis = M.vis; if (M.fill && !n.fill) n.fill = M.fill; if (M.copiedFrom && n.copiedFrom == null) n.copiedFrom = M.copiedFrom; if (M.lim && !n.lim) n.lim = M.lim; setM(n); const r = await api.upd('display_schedules', ds.id, { meta: n }); ds.meta = n; { const nf = A._liveFit ? A._liveFit(ds) : 0; if (nf) { await api.upd('display_schedules', ds.id, { slots: ds.slots, pool: ds.pool }); A.toast(`نُقلت ${AR(nf)} حصة لا تتسع في التوقيت الجديد إلى خانة الحصص أسفل الجدول`, 'warn'); } } await syncBellRemote(n); const st0 = $('#lvSt', box); if (st0) { st0.textContent = 'حُفظ التوقيت'; st0.className = 'rec-st ok'; } drawPrev(); };
         let tt; const own = structural => { clearTimeout(tt); setM(Object.assign(metaCustom(cs), M.copiedFrom ? { copiedFrom: M.copiedFrom } : {}, M.lim ? { lim: M.lim } : {})); drawPrev(); const sm = $('.lv-tsum', B); if (sm) sm.innerHTML = tsum(); if (structural) drawBody(); tt = setTimeout(() => saveMeta(metaCustom(cs)).catch(e => A.toast(e.message, 'err')), 700); };
         const cpG = $('#tmCpGo', B); if (cpG) cpG.onclick = ev => A.run(ev.currentTarget, async () => { const id = $('#tmCp', B).value; if (!id) throw new Error('اختر توقيتاً للنسخ منه'); if (!(await A.confirmBox('سيُستبدل توقيت هذا الجدول بنسخة من التوقيت المختار. توقيت الحضوري لا يتغير. متابعة؟', 'نسخ'))) return; const src = metaFrom(id, M.lim), n = detach(src); n.copiedFrom = src.schedName; await saveMeta(n); drawBody(); });
         const tS = $('#tmS', B); if (tS) tS.onchange = () => A.run(null, async () => { await ensureBell(); await saveMeta(metaFrom(tS.value, M.lim)); drawBody(); });

@@ -22,6 +22,14 @@
     const cl = ((S.allClasses && S.allClasses.length ? S.allClasses : S.classes) || []).filter(c => c.active !== false && !c.is_test);
     if (!cl.length) return hit(null);
     for (const c of cl) { const i = hit(c.id); if (i >= 0) return i; } return -1; };
+  // الفسحة/الصلاة الجارية الآن (حسب الجدول المعتمد اليوم، ولكل فئة فسحتها) — [{label, from, to, f, t, cls:[أسماء]}]
+  A.curBreaks = () => { try {
+    const sec = A.section(), n = nowMin(), out = new Map(); if (!A.bell || !A.bell.dayPlan || !sec) return [];
+    const cl = ((S.allClasses && S.allClasses.length ? S.allClasses : S.classes) || []).filter(c => c.active !== false && !c.is_test);
+    (cl.length ? cl : [{ id: null, name: '' }]).forEach(c => { const pl = A.bell.dayPlan(sec, null, c.id); if (!pl) return; const x = pl.items.find(y => y.k === 'b' && n >= y.from && n < y.to); if (!x) return;
+      const k = (x.label || '').trim() + '|' + x.from + '|' + x.to; if (!out.has(k)) out.set(k, { label: (x.label || 'الفسحة').trim(), from: x.from, to: x.to, f: A.bell.fmt(x.from, pl.sched || {}), t: A.bell.fmt(x.to, pl.sched || {}), cls: [] }); if (c.name) out.get(k).cls.push(c.name); });
+    const all = cl.length; return [...out.values()].map(b => ({ ...b, all: !all || b.cls.length === all }));
+  } catch (_) { return []; } };
   var passed = (cid, day, p) => { if (day < today()) return true; if (day > today()) return false; const t = times(cid).find(x => x.i === p); return t ? nowMin() >= t.from : false; };
   // الحصة في ذلك اليوم: من خطة الأسبوع المحمّل إن كان اليوم داخله
   var entryOf = (cid, day, p) => { const w = A.week(); if (!w) return null; const i = Math.round((A.parseDate(day) - A.parseDate(w.start_date)) / 864e5); if (i < 0 || i > 6) return null; return (S.allEntries || S.entries).find(e => e.class_id === cid && e.day === i && e.period === p) || null; };

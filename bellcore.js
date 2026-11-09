@@ -142,5 +142,24 @@
     for (let k = 0; k < (days || 14); k++) { const iso = addDays(F, k), p = dayPlan(sec, iso, disp, null); p.warn.forEach(w => add('bad', `${iso}: ${w}`)); }
     const seen = new Set(); return out.filter(x => !seen.has(x.t) && seen.add(x.t));
   }
-  window.DinaBell = { pinOn, toMin, hhmm, norm, activeSched, actOn, timeline, actDays, schedP, dowOf, addDays, holidayOn, tidy, fromMeta, dispOn, dayPlan, check, SRC };
+  /* الفئات: تجميع الفصول التي تتطابق فسحاتها (العامة + الخاصة بها) — لعرض الفسحة والصلاة لكل فئة
+     classes = [{id, name}] ، يعيد [{key, classes:[...], name, breaks:[{label, from, to}]}] */
+  function groups(s, P, classes) {
+    if (!s || !(s.breaks || []).some(b => (b.classes || []).length) || !(classes || []).length) return [];
+    const M = new Map();
+    classes.forEach(c => { const key = (s.breaks || []).filter(b => applies(b, c.id)).map(b => b.id || (b.after + b.label)).sort().join('|'); if (!M.has(key)) M.set(key, []); M.get(key).push(c); });
+    return [...M.entries()].map(([key, cl]) => { const tl = timeline(s, P, cl[0].id); return { key, classes: cl, name: cl.map(c => c.name).join('، '), breaks: tl.items.filter(x => x.k === 'b').map(x => ({ label: x.label, from: x.from, to: x.to, dur: x.dur })), end: tl.end }; });
+  }
+  // مصفوفة التوقيت حسب الفئات: صف لكل حصة، وصف للفسحة/الصلاة بعدها، وعمود لكل فئة
+  function matrix(s, P, classes) {
+    const G = groups(s, P, classes); if (G.length < 2) return null;
+    const per = G.map(g => { const it = timeline(s, P, g.classes[0].id).items, ps = [], after = {}; let cur = 0; it.forEach(x => { if (x.k === 'p') { ps[x.i] = x; cur = x.i + 1; } else if (x.k === 'b') (after[cur] = after[cur] || []).push(x); }); return { ps, after, end: it.length ? it[it.length - 1].to : 0 }; });
+    const rows = [];
+    for (let p = 0; p < P; p++) {
+      rows.push({ k: 'p', i: p, cells: per.map(x => x.ps[p] || null) });
+      if (per.some(x => (x.after[p + 1] || []).length)) rows.push({ k: 'b', after: p + 1, label: [...new Set(per.flatMap(x => (x.after[p + 1] || []).map(b => b.label)))].join(' / '), cells: per.map(x => (x.after[p + 1] || [])[0] ? { from: x.after[p + 1][0].from, to: x.after[p + 1][x.after[p + 1].length - 1].to, label: x.after[p + 1].map(b => b.label).join(' + ') } : null) });
+    }
+    return { cols: G.map((g, k) => ({ name: g.name, classes: g.classes, end: per[k].end })), rows };
+  }
+  window.DinaBell = { matrix, groups, pinOn, toMin, hhmm, norm, activeSched, actOn, timeline, actDays, schedP, dowOf, addDays, holidayOn, tidy, fromMeta, dispOn, dayPlan, check, SRC };
 })();

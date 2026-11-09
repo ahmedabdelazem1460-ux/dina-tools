@@ -47,6 +47,27 @@
   A.bell.loadDisp = async (sid, force) => { sid = sid || S.sectionId; if (!sid) return []; if (!force && DISP[sid] && Date.now() - DISPT[sid] < 120000) return DISP[sid]; try { DISP[sid] = (await api.list('display_schedules', { section_id: sid })) || []; } catch (_) { DISP[sid] = DISP[sid] || []; } DISPT[sid] = Date.now(); return DISP[sid]; };
   A.bell.dispOf = sid => DISP[sid || S.sectionId];
   A.bell.dayPlan = (sec, iso, cid) => { sec = sec || A.section(); if (!window.DinaBell || !sec) return null; if (!DISP[sec.id]) A.bell.loadDisp(sec.id); return window.DinaBell.dayPlan(sec, iso || isoToday(), DISP[sec.id] || [], cid); };
+  // تكامل لحظي: أي تعديل على التوقيت أو الجداول الاستثنائية يصل لكل الأجهزة المفتوحة فوراً
+  const bellChanged = (sid, why) => {
+    try { window.dispatchEvent(new CustomEvent('dina-bell', { detail: { sid, why } })); } catch (_) { }
+    if (A._syncLiveTimes && why === 'sec') { try { A._syncLiveTimes(); } catch (_) { } }
+    if (sid && sid !== S.sectionId) return;
+    const v = S.view, inBell = v === 'studio' && A.LS.get('studio_t') === 'bell';
+    if (inBell) { if (!document.querySelector('.bl-sv-st.wait') && !document.querySelector('.ovl')) A.route(); return; }
+    if (v === 'board' || v === 'attendance') { if (!document.querySelector('.ovl') && !(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) A.route(); A.toast('تحدّث التوقيت المعتمد للقسم', 'ok'); }
+  };
+  A.bell.changed = bellChanged;
+  { const prevAW = window.APP_AFTER_WEEK;
+    window.APP_AFTER_WEEK = async function () {
+      if (prevAW) await prevAW.apply(this, arguments);
+      if (S._bellSub || !api.subscribe || !S.school) return; S._bellSub = 1;
+      try {
+        let tm = null; const soon = (sid, why) => { clearTimeout(tm); tm = setTimeout(() => bellChanged(sid, why), 700); };
+        api.subscribe('bell-sec-' + S.school.id, 'sections', 'school_id=eq.' + S.school.id, p => { const r = p && p.new; if (!r || !r.id) return; const sec = (S.sections || []).find(x => x.id === r.id); if (!sec) return; if (JSON.stringify(sec.bell || null) === JSON.stringify(r.bell || null) && sec.periods === r.periods && sec.days === r.days) return; Object.assign(sec, { bell: r.bell, periods: r.periods, days: r.days }); soon(r.id, 'sec'); });
+        api.subscribe('bell-ds-' + S.school.id, 'display_schedules', 'school_id=eq.' + S.school.id, p => { const r = (p && (p.new && p.new.id ? p.new : p.old)) || {}; Object.keys(DISP).forEach(k => { if (!r.section_id || k === r.section_id) delete DISP[k]; }); soon(r.section_id || null, 'ds'); });
+      } catch (_) { }
+    };
+  }
   /* التحكم في التوقيت المعتمد للعرض (اللوحة اليومية + حضور الحصص + رؤوس الجداول)
      o = { bell: كائن الجدول الزمني (يُعدَّل), save: async bell => حفظ, done: () => بعد الحفظ } — لحساب المالك */
   A.bell.pinCtl = async (el, sec, o) => {
@@ -105,6 +126,14 @@
     time: '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#005499" stroke-width="2" stroke-linecap="round"><path d="M6 2h12M6 22h12M7 2c0 6 10 6 10 10S7 16 7 22M17 2c0 3-2 4-5 6"/></svg>',
   };
   const ic = svg => `background:#E4EBF5 url(&quot;data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" '))}&quot;) center/26px 26px no-repeat`;
+  // الملصق حسب الفئات (عند وجود فسحات أو صلاة خاصة ببعض الصفوف)
+  const shortCls = l => { const by = {}; l.forEach(c => { const g = A.stageOf ? A.stageOf(c) : ''; (by[g] = by[g] || []).push(c.name); }); return Object.entries(by).map(([g, n]) => n.join('، ')).join(' · '); };
+  function mxHTML(M, s) {
+    const f = m => fmt(m, s), cell = c => c ? `<b>${f(c.from)}</b><i>–</i><b>${f(c.to)}</b>` : '<span class="bp-na">—</span>';
+    return `<div class="bp-mx"><table><thead><tr><th class="bp-mh">الحصة</th>${M.cols.map((c, k) => `<th><span class="bp-cat">الفئة ${AR(k + 1)}</span><small>${esc(shortCls(c.classes))}</small></th>`).join('')}</tr></thead>
+      <tbody>${M.rows.map(r => `<tr class="${r.k === 'b' ? 'bp-mb' : ''}"><th>${r.k === 'p' ? `<span class="bp-n">${AR(r.i + 1)}</span> الحصة ${PER[r.i] || AR(r.i + 1)}` : `${/صلا/.test(r.label) ? '🕌' : '☕'} ${esc(r.label)}`}</th>${r.cells.map(c => `<td>${r.k === 'b' && c && c.label !== r.label ? `<em>${esc(c.label)}</em>` : ''}${cell(c)}</td>`).join('')}</tr>`).join('')}
+      <tr class="bp-me"><th>✓ نهاية اليوم</th>${M.cols.map(c => `<td><b>${f(c.end)}</b></td>`).join('')}</tr></tbody></table></div>`;
+  }
   function posterHTML(sec, s, cid) {
     const P = maxP(s, sec), dd = actDays(s, sec), tl = timeline(s, P, cid), durs = tl.items.filter(x => x.k === 'p').map(x => x.dur), same = durs.every(d => d === durs[0]);
     const cls = cid ? (allCls().find(c => c.id === cid) || {}).name : '';
@@ -114,6 +143,7 @@
       const lb = it.k === 'b' ? esc(it.label) : `الحصة ${PER[it.i] || AR(it.i + 1)}`;
       return `<div class="bp-row ${cl}"><span class="bp-tm"><b>${fmt(it.from, s)}</b><i>إلى</i><b>${fmt(it.to, s)}</b></span><span class="bp-dot">${it.k === 'b' ? (/صلا/.test(it.label || '') ? '🕌' : '☕') : AR(it.i + 1)}</span><span class="bp-lb"><b>${lb}</b><i>${AR(it.dur)} دقيقة</i></span></div>`;
     };
+    const MX = !cid && window.DinaBell ? window.DinaBell.matrix(s, P, allCls()) : null;
     const n = tl.items.length + 1, dense = n > 14 ? (n > 18 ? ' bp-xdense' : ' bp-dense') : '';
     return `<div class="bposter${dense}" dir="rtl">
       <div class="bp-top"><img src="assets/logo.svg" alt="مدارس دينا العالمية">${s.tag ? `<span class="bp-tag">${esc(s.tag)}</span>` : ''}</div>
@@ -121,11 +151,11 @@
       <p class="bp-sub">${esc(sec.name)}${cls ? ' · ' + esc(cls) : ''}${s.name && s.name !== 'الجدول الأساسي' ? ' · ' + esc(s.name) : ''}<br><span class="bp-days">أيام الدراسة: ${dd.length === (sec.days || 5) ? `${DAYS[dd[0]]} – ${DAYS[dd[dd.length - 1]]}` : dd.map(d => DAYS[d]).join('، ')}${dd.some(d => schedP(s, sec, d) !== P) ? ' · ' + dd.filter(d => schedP(s, sec, d) !== P).map(d => `${DAYS[d]} ${AR(schedP(s, sec, d))} حصص`).join('، ') : ''}</span></p>
       <div class="bp-stats">
         <div><span style="${ic(ICO.sun)}"></span><i>بداية اليوم</i><b>${fmt(tl.start, s)}</b></div>
-        <div><span style="${ic(ICO.flag)}"></span><i>نهاية اليوم</i><b>${fmt(tl.end, s)}</b></div>
+        <div><span style="${ic(ICO.flag)}"></span><i>نهاية اليوم</i><b>${fmt(MX ? Math.max(...MX.cols.map(c => c.end)) : tl.end, s)}</b></div>
         <div><span style="${ic(ICO.book)}"></span><i>عدد الحصص</i><b>${AR(P)} حصص</b></div>
         <div><span style="${ic(ICO.time)}"></span><i>مدة الحصة</i><b>${same ? AR(durs[0]) + ' دقيقة' : 'متفاوتة'}</b></div></div>
-      <div class="bp-line">${tl.items.map(row).join('')}
-        <div class="bp-row bp-end"><span class="bp-tm"><b>${fmt(tl.end, s)}</b></span><span class="bp-dot">✓</span><span class="bp-lb"><b>نهاية اليوم الدراسي</b></span></div></div>
+      ${MX ? mxHTML(MX, s) : `<div class="bp-line">${tl.items.map(row).join('')}
+        <div class="bp-row bp-end"><span class="bp-tm"><b>${fmt(tl.end, s)}</b></span><span class="bp-dot">✓</span><span class="bp-lb"><b>نهاية اليوم الدراسي</b></span></div></div>`}
       <div class="bp-foot"><svg viewBox="0 0 800 120" preserveAspectRatio="none" aria-hidden="true"><path d="M0 40 C 160 0 300 70 460 38 C 600 10 700 30 800 18 L800 120 L0 120 Z" fill="#3AB1DB" opacity=".55"/><path d="M0 60 C 170 18 320 92 480 56 C 620 26 720 52 800 36 L800 120 L0 120 Z" fill="#082B5A"/></svg><p>${esc(s.foot || '')}</p></div>
     </div>`;
   }
@@ -144,6 +174,9 @@
     .bp-end .bp-tm{background:#082B5A;color:#fff}.bp-end .bp-dot{background:#082B5A;border-color:#082B5A;color:#fff}
     .bp-dense .bp-row{margin:4px 0}.bp-dense .bp-dot{width:40px;height:40px;font-size:17px}.bp-dense .bp-tm{padding:6px 16px;font-size:17px}.bp-dense .bp-lb b{font-size:19px}
     .bp-xdense .bp-row{margin:2px 0}.bp-xdense .bp-dot{width:34px;height:34px;font-size:15px}.bp-xdense .bp-tm{padding:4px 14px;font-size:15px}.bp-xdense .bp-lb b{font-size:17px}.bp-xdense .bp-lb i{font-size:12px}
+    .bp-mx{margin:4px 0 0}.bp-mx table{width:100%;border-collapse:separate;border-spacing:0 5px;font-size:15px}.bp-mx th,.bp-mx td{padding:7px 8px;text-align:center;background:#F2F7FC}.bp-mx thead th{background:#082B5A;color:#fff;border-radius:10px;vertical-align:top}.bp-mx thead small{display:block;font-weight:400;font-size:11px;line-height:1.5;color:#CFE6F7;margin-top:2px}.bp-cat{font-weight:800;font-size:15px}
+    .bp-mx tbody th{text-align:right;color:#082B5A;font-weight:800;border-radius:0 10px 10px 0;white-space:nowrap}.bp-mx tbody td:last-child{border-radius:10px 0 0 10px}.bp-mx td b{color:#005499}.bp-mx td i{font-style:normal;color:#8AA3BF;margin:0 4px}.bp-n{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#005499;color:#fff;font-size:13px;margin-inline-end:6px}
+    .bp-mx tr.bp-mb th,.bp-mx tr.bp-mb td{background:#EAF6DF}.bp-mx tr.bp-mb th{color:#2E8B57}.bp-mx em{display:block;font-style:normal;font-size:11px;color:#2E8B57}.bp-na{color:#B7C6D6}.bp-mx tr.bp-me th,.bp-mx tr.bp-me td{background:#082B5A;color:#fff}.bp-mx tr.bp-me td b{color:#fff}
     .bp-foot{position:absolute;left:0;right:0;bottom:0;height:130px}.bp-foot svg{position:absolute;inset:0;width:100%;height:100%}.bp-foot p{position:absolute;left:0;right:0;bottom:22px;margin:0;text-align:center;color:#fff;font-size:26px;font-weight:800}`;
   const FONT_CSS = `@font-face{font-family:'GE SS Two';font-weight:400 500;src:url(fonts/gess-two-medium.woff2)}@font-face{font-family:'GE SS Two';font-weight:600 900;src:url(fonts/gess-two-bold.woff2)}`;
   if (!document.getElementById('bpCss')) { const st = document.createElement('style'); st.id = 'bpCss'; st.textContent = POSTER_CSS; document.head.appendChild(st); }
@@ -174,10 +207,11 @@
     const S0 = () => b.schedules.find(s => s.id === cur);
     const save = async (quiet) => {
       const r = await api.updateSection(sec.id, { bell: b }); Object.assign(sec, r); dirty = false; if (A._syncLiveTimes) A._syncLiveTimes();
-      const st = $('#blSt', root); if (st) { st.textContent = 'محفوظ · ' + A.fmtDT(new Date().toISOString()); st.className = 'rec-st ok'; }
+      setSt('✓ حُفظ واعتُمد · ' + A.fmtDT(new Date().toISOString()) + ' — يظهر الآن في اللوحة والجداول والحضور', 'ok');
       if (!quiet) A.toast('حُفظت الإعدادات', 'ok');
     };
-    let later = () => { dirty = true; const st = $('#blSt', root); if (st) { st.textContent = 'تعديلات غير محفوظة…'; st.className = 'rec-st'; } clearTimeout(saving); saving = setTimeout(() => save(true).catch(e => { const st2 = $('#blSt', root); if (st2) { st2.textContent = 'تعذّر الحفظ: ' + e.message; st2.className = 'rec-st bad'; } }), 900); };
+    const setSt = (t, c) => { $$('#blSt, .bl-sv-st', root).forEach(x => { x.textContent = t; x.className = (x.id === 'blSt' ? 'rec-st ' : 'bl-sv-st ') + (c || ''); }); };
+    let later = () => { dirty = true; setSt('تعديلات غير محفوظة — تُحفظ تلقائياً…', 'wait'); clearTimeout(saving); saving = setTimeout(() => save(true).catch(e => setSt('تعذّر الحفظ: ' + e.message, 'bad')), 1200); };
     const today = isoToday(), act = actOn(b, today), live = activeSched(b, today);
 
     root.innerHTML = `<div class="card bl">
@@ -202,7 +236,7 @@
       <section class="bl-sec"><h3>الإجازات بالتاريخ</h3><p class="small muted" style="margin:0 0 8px">أضف الإجازة مرة واحدة ثم «تطبيق على الأسابيع» لتظهر أيامها إجازةً في الأسابيع المطابقة (لا تُحذف أي إجازة موجودة ولا أي خطة).</p><div id="blHol"></div></section>
     </div>
     <div class="card bl-pv"><div class="head"><div class="grow"><h2>ملصق الجدول الزمني</h2><p class="sub" style="margin:2px 0 0">معاينة حية لما سيُطبع — A4 بهوية دينا.</p></div>
-      <div class="row" style="gap:6px;flex-wrap:wrap"><select class="in" id="blPvC" aria-label="الملصق لصف" style="width:auto"><option value="">الفسحات العامة</option>${allCls().map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select><button class="btn sm" id="blPrint">${A.I.print || ''} طباعة / PDF</button><button class="btn ghost sm" id="blPng">${A.I.down || ''} صورة PNG</button></div></div>
+      <div class="row" style="gap:6px;flex-wrap:wrap"><select class="in" id="blPvC" aria-label="الملصق لصف" style="width:auto"><option value="">كل الفئات</option>${allCls().map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select><button class="btn sm" id="blPrint">${A.I.print || ''} طباعة / PDF</button><button class="btn ghost sm" id="blPng">${A.I.down || ''} صورة PNG</button></div></div>
       <div class="bl-stage"><div class="bl-scale" id="blPv"></div></div></div>`;
 
     const drawPv = () => { const s = S0(); const box = $('#blPv', root); box.innerHTML = posterHTML(sec, s, pvCls); fitPv(); };
@@ -235,6 +269,7 @@
             <button class="btn bad sm" data-bx aria-label="حذف">×</button></div>`).join('') || '<p class="small muted">لا توجد فسحات.</p>'}</div>
         <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn ghost sm" id="eAddB">+ فسحة / صلاة</button><button class="btn ghost sm" id="eAddPr">+ صلاة بعد ${PER[P - 1] ? 'الحصة ' + PER[P - 1] : 'آخر حصة'}</button>${P < SP ? `<span class="small muted">هذا الجدول ${AR(P)} حصص — لإظهار الحصة ${PER[SP - 1] || AR(SP)} وما بعدها اختر «${AR(SP)} حصص» من «عدد الحصص في هذا الجدول».</span>` : ''}<span class="grow"></span>
           ${s.id !== b.def ? '<button class="btn ok sm" id="eDef">اجعله الأساسي</button><button class="btn bad sm" id="eDel">حذف الجدول</button>' : ''}</div>
+        <div class="bl-sv" role="status"><span class="bl-sv-st ${dirty ? 'wait' : 'ok'}">${dirty ? 'تعديلات غير محفوظة — تُحفظ تلقائياً…' : '✓ محفوظ ومعتمد — يظهر في اللوحة والجداول والحضور'}</span><button class="btn ok sm" id="eSave">حفظ واعتماد التوقيت</button></div>
         <div class="bl-sum small">اليوم: من <b>${fmt(tl.start, s)}</b> إلى <b>${fmt(tl.end, s)}</b> · ${AR(Math.round((tl.end - tl.start) / 6) / 10)} ساعة${pvCls ? ` · محسوب لـ ${esc((allCls().find(c => c.id === pvCls) || {}).name || '')}` : ''}</div>`;
       const bind = (id, k, num) => { const i = $('#' + id, ed); i.oninput = () => { s[k] = i.type === 'checkbox' ? i.checked : num ? +i.value : i.value; if (k === 'name') { const ch = $(`[data-sc="${s.id}"]`, root); if (ch) ch.firstChild.textContent = i.value; } later(); drawPv(); if (num || k === 'start') sumOnly(); }; };
       $('#eNp', ed).onchange = e => { s.np = +e.target.value; Object.keys(s.perDay || {}).forEach(k => { if (s.perDay[k] >= s.np) delete s.perDay[k]; }); later(); drawEd(); drawPv(); };
@@ -246,6 +281,7 @@
         $$('[data-k]', row).forEach(i => i.oninput = i.onchange = () => { br[i.dataset.k] = i.dataset.k === 'label' ? i.value : +i.value; later(); drawPv(); sumOnly(); });
         $('[data-bx]', row).onclick = () => { s.breaks.splice(s.breaks.indexOf(br), 1); later(); drawEd(); drawPv(); };
         $('[data-bc]', row).onclick = () => pickClasses(br, () => { later(); drawEd(); drawPv(); }); });
+      $('#eSave', ed).onclick = ev => A.run(ev.currentTarget, async () => { clearTimeout(saving); await save(true); A.toast('حُفظ التوقيت واعتُمد — يظهر الآن في اللوحة اليومية والجداول وحضور الحصص', 'ok'); });
       $('#eAddPr', ed).onclick = () => { if (s.breaks.some(x => +x.after === P && /صلا/.test(x.label || ''))) return A.toast('الصلاة مضافة بعد آخر حصة مسبقاً', 'err'); s.breaks.push({ id: uid(), after: P, dur: 20, label: 'صلاة الظهر', classes: [] }); later(); drawEd(); drawPv(); };
       $('#eAddB', ed).onclick = () => { s.breaks.push({ id: uid(), after: Math.min(P - 1, 4), dur: 15, label: s.breaks.length ? 'الصلاة' : 'الفسحة', classes: [] }); later(); drawEd(); drawPv(); };
       const df = $('#eDef', ed); if (df) df.onclick = () => { b.def = s.id; later(); V.bell(root); };

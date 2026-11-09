@@ -40,12 +40,13 @@ footer .lb{background:var(--s);color:var(--n);font-weight:800;font-size:2.6vh;pa
 .err{display:grid;place-items:center;height:100vh;font-size:3vh;text-align:center;padding:4vw}
 @media (prefers-reduced-motion:reduce){.slide{transition:none}.tk span{animation:none;padding:0}}
 h2 .src{font-size:.5em;font-weight:400;opacity:.75;margin-inline-start:.6em}
+table.mx th small{display:block;font-size:.55em;font-weight:400;opacity:.8;line-height:1.4;max-width:22vw;margin:auto}table.mx td{text-align:center}table.mx td:first-child{text-align:right}table.mx tr.brk td{background:rgba(186,223,147,.18);color:#BADF93}table.mx td.cur{background:#3AB1DB;color:#082B5A;font-weight:700}
 </style>
 </head>
 <body>
 <div id="app"><div class="err">جارٍ التحميل…</div></div>
 <script src="config.js"></script>
-<script src="bellcore.js?v=1794208602"></script>
+<script src="bellcore.js?v=1794209257"></script>
 <script>
 (function () {
   const C = window.APP_CONFIG, app = document.getElementById('app');
@@ -76,7 +77,10 @@ h2 .src{font-size:.5em;font-weight:400;opacity:.75;margin-inline-start:.6em}
     if (off.length) add('off', `<section class="slide"><h2>غياب المنسوبين اليوم</h2><div class="grid">${off.map(n => `<div class="card" style="font-size:3vh">${esc(n)}</div>`).join('')}</div></section>`);
     if ((B.events || []).length) add('events', `<section class="slide"><h2>فعاليات اليوم</h2><table><tbody>${B.events.map(e => `<tr><td style="width:18vw;direction:ltr;text-align:center">${esc(e.time || '')}</td><td><b>${esc(e.title || '')}</b>${e.place ? ` — <span style="color:#BFD9F2">${esc(e.place)}</span>` : ''}</td></tr>`).join('')}</tbody></table></section>`);
     if ((B.ann || '').trim()) add('ann', `<section class="slide"><h2>إعلان</h2><div class="big"><div class="q" style="font-size:5vh">${esc(B.ann)}</div></div></section>`);
-    const T = tl().filter(x => x.k === 'p'), PL = plan() || {}; if (T.length) add('times', `<section class="slide"><h2>مواعيد الحصص <small class="src">${esc(PL.name || '')}${PL.src === 'pin' ? ' · معتمد' : PL.src === 'disp' ? ' · جدول استثنائي' : PL.src === 'act' ? ' · مفعّل لهذه الفترة' : ''}</small></h2><table><tbody>${tl().filter(x => x.k !== 't').map(x => `<tr class="${cur && cur.from === x.from ? 'cur' : ''}"><td>${x.k === 'p' ? 'الحصة ' + (PER[x.i] || AR(x.i + 1)) : (/صلا/.test(x.label || '') ? '🕌 ' : '☕ ') + esc(x.label || 'الفسحة')}</td><td style="direction:ltr;text-align:center">${AR(t12(x.from))} – ${AR(t12(x.to))} <small>${Math.floor(x.from / 60) % 24 < 12 ? 'ص' : 'م'}</small></td></tr>`).join('')}</tbody></table></section>`);
+    { const PL0 = plan() || {}, MX = PL0.sched && window.DinaBell.matrix ? window.DinaBell.matrix(PL0.sched, tl().filter(x => x.k === 'p').length, D.classes || []) : null;
+      if (MX) { const tt = m => AR(t12(m)) + ' ' + (Math.floor(m / 60) % 24 < 12 ? 'ص' : 'م'), n = (() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); })();
+        add('times', `<section class="slide"><h2>مواعيد الحصص حسب الفئات <small class="src">${esc(PL0.name || '')}</small></h2><table class="mx"><thead><tr><th>الحصة</th>${MX.cols.map((c, k) => `<th>الفئة ${AR(k + 1)}<small>${esc(c.name)}</small></th>`).join('')}</tr></thead><tbody>${MX.rows.map(r => `<tr class="${r.k === 'b' ? 'brk' : ''}"><td>${r.k === 'p' ? 'الحصة ' + (PER[r.i] || AR(r.i + 1)) : (/صلا/.test(r.label) ? '🕌 ' : '☕ ') + esc(r.label)}</td>${r.cells.map(c => `<td class="${c && n >= c.from && n < c.to ? 'cur' : ''}">${c ? tt(c.from) + ' – ' + tt(c.to) : '—'}</td>`).join('')}</tr>`).join('')}</tbody></table></section>`); } }
+    const T = tl().filter(x => x.k === 'p'), PL = plan() || {}; if (T.length && !(PL.sched && window.DinaBell.matrix && window.DinaBell.matrix(PL.sched, T.length, D.classes || []))) add('times', `<section class="slide"><h2>مواعيد الحصص <small class="src">${esc(PL.name || '')}${PL.src === 'pin' ? ' · معتمد' : PL.src === 'disp' ? ' · جدول استثنائي' : PL.src === 'act' ? ' · مفعّل لهذه الفترة' : ''}</small></h2><table><tbody>${tl().filter(x => x.k !== 't').map(x => `<tr class="${cur && cur.from === x.from ? 'cur' : ''}"><td>${x.k === 'p' ? 'الحصة ' + (PER[x.i] || AR(x.i + 1)) : (/صلا/.test(x.label || '') ? '🕌 ' : '☕ ') + esc(x.label || 'الفسحة')}</td><td style="direction:ltr;text-align:center">${AR(t12(x.from))} – ${AR(t12(x.to))} <small>${Math.floor(x.from / 60) % 24 < 12 ? 'ص' : 'م'}</small></td></tr>`).join('')}</tbody></table></section>`);
     return S;
   }
   function render() {
@@ -98,7 +102,7 @@ h2 .src{font-size:.5em;font-weight:400;opacity:.75;margin-inline-start:.6em}
     try { D = await fetchData(); render(); } catch (e) { app.innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }
     setInterval(tick, 1000);
     setInterval(() => { if (!slides.length) return; idx = (idx + 1) % slides.length; show(); }, Math.max(6, +((D.board || {}).secs) || 12) * 1000);
-    setInterval(async () => { try { const n = await fetchData(); const ch = JSON.stringify(n) !== JSON.stringify(D); D = n; if (ch) render(); } catch (_) { } }, 60000);
+    setInterval(async () => { try { const n = await fetchData(); const ch = JSON.stringify(n) !== JSON.stringify(D); D = n; if (ch) render(); } catch (_) { } }, 20000);
   }
   boot();
 })();

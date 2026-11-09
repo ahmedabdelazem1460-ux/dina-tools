@@ -23,7 +23,7 @@
   };
   const bellOf = sec => norm((sec || A.section() || {}).bell);
   const actOn = (b, d) => b.acts.find(a => a.from && a.to && a.from <= d && d <= a.to && b.schedules.some(s => s.id === a.sid));
-  const activeSched = (b, d = isoToday()) => { const a = actOn(b, d); return b.schedules.find(s => s.id === (a ? a.sid : b.def)) || b.schedules[0]; };
+  const activeSched = (b, d = isoToday()) => { const pn = window.DinaBell && window.DinaBell.pinOn(b, d); if (pn && pn.kind === 'sched') { const ps = b.schedules.find(s => s.id === pn.id); if (ps) return ps; } const a = actOn(b, d); return b.schedules.find(s => s.id === (a ? a.sid : b.def)) || b.schedules[0]; };
   const applies = (br, cid) => !(br.classes || []).length || (cid && br.classes.includes(cid));
   // الخط الزمني لجدول + فصل (الفسحات المقيّدة بصفوف تظهر لتلك الصفوف فقط)
   function timeline(s, P, cid) {
@@ -47,6 +47,52 @@
   A.bell.loadDisp = async (sid, force) => { sid = sid || S.sectionId; if (!sid) return []; if (!force && DISP[sid] && Date.now() - DISPT[sid] < 120000) return DISP[sid]; try { DISP[sid] = (await api.list('display_schedules', { section_id: sid })) || []; } catch (_) { DISP[sid] = DISP[sid] || []; } DISPT[sid] = Date.now(); return DISP[sid]; };
   A.bell.dispOf = sid => DISP[sid || S.sectionId];
   A.bell.dayPlan = (sec, iso, cid) => { sec = sec || A.section(); if (!window.DinaBell || !sec) return null; if (!DISP[sec.id]) A.bell.loadDisp(sec.id); return window.DinaBell.dayPlan(sec, iso || isoToday(), DISP[sec.id] || [], cid); };
+  /* التحكم في التوقيت المعتمد للعرض (اللوحة اليومية + حضور الحصص + رؤوس الجداول)
+     o = { bell: كائن الجدول الزمني (يُعدَّل), save: async bell => حفظ, done: () => بعد الحفظ } — لحساب المالك */
+  A.bell.pinCtl = async (el, sec, o) => {
+    const DB = window.DinaBell; if (!el || !DB) return;
+    const b = o.bell, disp = await A.bell.loadDisp(sec.id, true), td = isoToday(), dow = DB.dowOf(td);
+    const nD = sec.days || 5, wkEnd = DB.addDays(td, dow < nD ? nD - 1 - dow : nD - 1 + 7 - dow);
+    const sx = () => ({ bell: b, periods: sec.periods, days: sec.days });
+    const cur = DB.dayPlan(sx(), td, disp, null), pin = b.pin && b.pin.id ? b.pin : null;
+    const pinName = pin ? (pin.kind === 'sched' ? (b.schedules.find(x => x.id === pin.id) || {}).name : (disp.find(x => x.id === pin.id) || {}).label) : '';
+    const tS = s => fmt(toMin(s.start), s);
+    const opt = (v, t, sel) => `<option value="${v}" ${sel ? 'selected' : ''}>${esc(t)}</option>`;
+    el.innerHTML = `<div class="pin-ctl">
+      <div class="pin-now"><span>التوقيت المعتمد للعرض الآن:</span> <b>${esc(cur.name || '—')}</b> ${pin ? `<span class="pill st-sub">معتمد يدوياً${pin.to ? ' حتى ' + dAR(pin.to) : ' حتى تغييره'}</span>` : '<span class="pill st-ok">تلقائي</span>'}</div>
+      <div class="pin-row">
+        <div class="field"><label for="pcS">اختر الجدول المعتمد</label><select class="in" id="pcS">
+          ${opt('auto', 'تلقائي — حسب الأولوية (الإجازة ← الاستثنائي المنشور ← المفعّل لفترة ← الأساسي)', !pin)}
+          <optgroup label="الجداول الزمنية">${b.schedules.map(s => opt('s:' + s.id, `${(s.name || '').trim()} — يبدأ ${tS(s)}${s.id === b.def ? ' (الأساسي)' : ''}`, pin && pin.kind === 'sched' && pin.id === s.id)).join('')}</optgroup>
+          ${disp.length ? `<optgroup label="الجداول الاستثنائية">${disp.slice().sort((x, y) => String(y.date_from).localeCompare(String(x.date_from))).map(d => opt('d:' + d.id, `${d.label} — ${dAR(d.date_from)} إلى ${dAR(d.date_to)}${d.published ? '' : ' (غير منشور)'}${(d.meta && d.meta.times && d.meta.times[0]) ? ' — يبدأ ' + AR(d.meta.times[0][0]) : ''}`, pin && pin.kind === 'disp' && pin.id === d.id)).join('')}</optgroup>` : ''}
+        </select></div>
+        <div class="field" id="pcRw"><label for="pcR">مدة الاعتماد</label><select class="in" id="pcR">
+          ${opt('ever', 'حتى أغيّره', pin && !pin.to)}${opt('today', 'اليوم فقط (' + dAR(td) + ')')}${opt('week', 'حتى نهاية الأسبوع (' + dAR(wkEnd) + ')', pin && pin.to === wkEnd)}${opt('ds', 'فترة الجدول الاستثنائي')}${opt('custom', 'فترة محددة…', pin && pin.to && pin.to !== wkEnd)}
+        </select></div>
+        <div class="field pc-dt" hidden><label for="pcF">من</label><input class="in" type="date" id="pcF" value="${(pin && pin.from) || td}"></div>
+        <div class="field pc-dt" hidden><label for="pcT">إلى</label><input class="in" type="date" id="pcT" value="${(pin && pin.to) || wkEnd}"></div>
+        <div class="field"><label>&nbsp;</label><button class="btn sm" id="pcGo">اعتماد وعرض توقيته</button></div>
+      </div>
+      <div class="pin-pv" id="pcPv" aria-live="polite"></div></div>`;
+    const g = id => el.querySelector(id), selV = () => g('#pcS').value;
+    const range = () => { const r = g('#pcR').value, v = selV(); if (r === 'today') return [td, td]; if (r === 'week') return [td, wkEnd]; if (r === 'custom') return [g('#pcF').value || td, g('#pcT').value || '']; if (r === 'ds' && v.startsWith('d:')) { const d = disp.find(x => x.id === v.slice(2)); return d ? [d.date_from, d.date_to] : [td, '']; } return [td, '']; };
+    const build = () => { const v = selV(); if (v === 'auto') return null; const [from, to] = range(); return { kind: v.startsWith('s:') ? 'sched' : 'disp', id: v.slice(2), from, to: to || null, at: new Date().toISOString(), by: S.me && S.me.id }; };
+    const pv = () => {
+      const v = selV(), isD = v.startsWith('d:'); g('#pcRw').hidden = v === 'auto'; el.querySelectorAll('.pc-dt').forEach(x => x.hidden = v === 'auto' || g('#pcR').value !== 'custom');
+      const dsO = g('#pcR').querySelector('[value="ds"]'); dsO.disabled = !isD; if (!isD && g('#pcR').value === 'ds') g('#pcR').value = 'ever';
+      const nb = JSON.parse(JSON.stringify(b)); const np = build(); if (np) nb.pin = np; else delete nb.pin;
+      const day = np && np.from && np.from > td ? np.from : td, pl = DB.dayPlan({ bell: nb, periods: sec.periods, days: sec.days }, day, disp, null), ps = pl.items.filter(x => x.k === 'p'), br = pl.items.filter(x => x.k === 'b'), f = m => fmt(m, pl.sched || {});
+      g('#pcPv').innerHTML = `<span class="small muted">${day === td ? 'سيظهر اليوم' : 'سيظهر يوم ' + dAR(day)}:</span> <b>${esc(pl.name || DB.SRC[pl.src] || '')}</b> ${ps.length ? `· ${f(pl.start)} – ${f(pl.end)} · ${AR(ps.length)} حصص · ${br.length ? 'الفسحة ' + br.map(x => f(x.from) + ' – ' + f(x.to)).join('، ') : 'بلا فسحة'}` : `· ${esc(DB.SRC[pl.src] || '')}`}${pl.warn.length ? `<div class="small" style="color:#C0392B">${esc(pl.warn.join(' — '))}</div>` : ''}${ps.length ? `<div class="bl-strip" style="margin-top:6px">${pl.items.map(x => `<div class="bl-it ${x.k}" style="flex:${Math.max(1, x.dur)}">${x.k === 'p' ? `<b>${AR(x.i + 1)}</b><small>${f(x.from)}</small>` : x.k === 'b' ? '<b>☕</b>' : ''}</div>`).join('')}</div>` : ''}`;
+    };
+    ['#pcS', '#pcR', '#pcF', '#pcT'].forEach(id => g(id).onchange = pv); pv();
+    g('#pcGo').onclick = ev => A.run(ev.currentTarget, async () => {
+      const np = build(); if (np && np.to && np.to < np.from) throw new Error('تاريخ النهاية قبل البداية');
+      const nm = np ? (np.kind === 'sched' ? (b.schedules.find(x => x.id === np.id) || {}).name : (disp.find(x => x.id === np.id) || {}).label) : 'التوقيت التلقائي';
+      if (!(await A.confirmBox(`اعتماد «${esc(nm)}» للعرض في ${esc(sec.name)}${np ? (np.to ? ` من ${dAR(np.from)} إلى ${dAR(np.to)}` : ' حتى تغييره') : ''}؟<br><span class="small muted">يظهر توقيته في شاشة اللوحة اليومية وحضور الحصص ورؤوس الجداول. لا يُحذف أي جدول ولا تتغيّر الخطط، ويمكن الرجوع للتلقائي في أي وقت.</span>`, 'اعتماد'))) return;
+      if (np) b.pin = np; else delete b.pin;
+      await o.save(b); A.toast(np ? 'اعتُمد التوقيت للعرض' : 'عاد التوقيت التلقائي', 'ok'); if (o.done) o.done();
+    });
+  };
   // وقت الحصة في رؤوس الجداول (إن كان الإظهار مفعّلاً في الجدول الساري اليوم)
   A.ptime = (p, cid) => { try { const sec = A.section(); if (!sec || !sec.bell || !sec.bell.schedules) return ''; const b = bellOf(sec), s = activeSched(b); if (!s.show) return ''; const it = timeline(s, maxP(s, sec), cid).items.find(x => x.k === 'p' && x.i === p); return it ? `<small class="ptm" dir="rtl">${fmt(it.from, s)} – ${fmt(it.to, s)}</small>` : ''; } catch (_) { return ''; } };
 
@@ -147,7 +193,7 @@
         <p class="small muted" style="margin:0">ينطبق على جدول الحصص والخطط الأسبوعية لهذا القسم. تقليل العدد لا يحذف أي خطة مدخلة، لكن الحصص الزائدة تختفي من العرض.</p></section>
 
       <section class="bl-sec"><h3>الجداول الزمنية</h3>
-        <div class="bl-chips" role="tablist">${b.schedules.map(s => `<button role="tab" data-sc="${s.id}" class="${s.id === cur ? 'on' : ''}" aria-selected="${s.id === cur}">${esc(s.name)}${s.id === b.def ? ' <span class="pill st-ok">أساسي</span>' : ''}${act && act.sid === s.id ? ' <span class="pill st-sub">ساري الآن</span>' : ''}</button>`).join('')}
+        <div class="bl-chips" role="tablist">${b.schedules.map(s => `<button role="tab" data-sc="${s.id}" class="${s.id === cur ? 'on' : ''}" aria-selected="${s.id === cur}">${esc(s.name)}${s.id === b.def ? ' <span class="pill st-ok">أساسي</span>' : ''}${act && act.sid === s.id ? ' <span class="pill st-sub">ساري الآن</span>' : ''}${b.pin && b.pin.kind === 'sched' && b.pin.id === s.id ? ' <span class="pill st-warn">معتمد للعرض</span>' : ''}</button>`).join('')}
           <button class="btn ghost sm" id="blNew">+ جدول جديد</button><button class="btn ghost sm" id="blDup">نسخ الحالي</button></div>
         <div id="blEd"></div></section>
 
@@ -283,11 +329,13 @@
       const fixNm = unclear.map(s => `<div class="bl-fix"><label for="blFxN${s.id}">تسمية «${esc(s.name)}»:</label><input class="in" id="blFxN${s.id}" data-fxn="${s.id}" placeholder="مثل: الحضوري — يبدأ ${esc(s.start || '')}" style="width:auto;min-width:220px"><button class="btn ghost sm" data-fxs="${s.id}">حفظ الاسم</button></div>`).join('');
       const L = showAll ? iss : iss.slice(0, 6);
       box.innerHTML = `<h3>فحص التوقيت وما ستعرضه اللوحة اليومية <span class="pill ${nb ? 'st-bad' : nw ? 'st-warn' : 'st-ok'}">${nb ? AR(nb) + ' تعارض' : nw ? AR(nw) + ' ملاحظة' : 'مرتّب ✓'}</span></h3>
+        <div id="blPin"></div>
         <div class="bl-today"><div class="small"><b>اللوحة اليوم:</b> <span class="pill ${SRCC[tp.src]}">${esc(DB.SRC[tp.src])}</span> ${esc(tp.name || '')}${tp.items.length ? ` · من <b>${f(tp.start)}</b> إلى <b>${f(tp.end)}</b> · ${AR(tp.items.filter(x => x.k === 'p').length)} حصص` : ''}</div>${strip}</div>
         ${iss.length ? `<ul class="bl-iss">${L.map(x => `<li class="${x.lv}">${AR(esc(x.t))}</li>`).join('')}</ul>${iss.length > 6 ? `<button class="btn ghost sm" id="blChkMore">${showAll ? 'عرض أقل' : 'عرض الكل (' + AR(iss.length) + ')'}</button>` : ''}` : '<p class="small" style="color:#2E8B57;margin:6px 0">لا تعارض ولا تداخل — التوقيت مرتّب.</p>'}
         ${fixDef}${fixNm}
         <details class="bl-next"><summary>توقيت الأيام الدراسية القادمة كما سيظهر في اللوحة</summary><div class="scroll"><table class="tbl"><thead><tr><th>اليوم</th><th>التاريخ</th><th>المصدر</th><th>الجدول</th><th>البداية</th><th>النهاية</th><th>الحصص</th><th>الفسحة</th></tr></thead><tbody>${days.map(d => { const ps = d.items.filter(x => x.k === 'p'), br = d.items.filter(x => x.k === 'b'), g = m => fmt(m, d.sched || {}); return `<tr class="${d.iso === today ? 'cur' : ''}"><td>${DAYS[d.dow] || ''}</td><td>${dAR(d.iso)}</td><td><span class="pill ${SRCC[d.src]}">${esc(DB.SRC[d.src])}</span></td><td>${esc(d.name || '')}</td><td>${ps.length ? g(d.start) : '—'}</td><td>${ps.length ? g(d.end) : '—'}</td><td>${ps.length ? AR(ps.length) : '—'}</td><td>${br.length ? br.map(x => g(x.from)).join('، ') : '—'}</td></tr>`; }).join('')}</tbody></table></div>
         <p class="small muted" style="margin:6px 0 0">الأولوية في اللوحة والحضور: الإجازة ← الجدول الاستثنائي المنشور (من «جداول العرض الاستثنائية») ← الجدول المفعّل لفترة ← الجدول الأساسي.</p></details>`;
+      if (S.me.is_owner) A.bell.pinCtl($('#blPin', box), sec, { bell: b, save: async () => { await save(true); }, done: () => V.bell(root) });
       const mo = $('#blChkMore', box); if (mo) mo.onclick = () => { showAll = !showAll; drawChk(); };
       const fd = $('#blFxDo', box); if (fd) fd.onclick = ev => A.run(ev.currentTarget, async () => { const id = $('#blFxD', box).value, s = b.schedules.find(x => x.id === id); if (!(await A.confirmBox(`اعتماد «${esc(s.name)}» جدولاً أساسياً لـ${esc(sec.name)}؟<br><span class="small muted">لا يُحذف أي جدول، ويمكن التراجع من شارة «أساسي».</span>`, 'اعتماد'))) return; b.def = id; await save(true); A.toast('اعتُمد الجدول الأساسي', 'ok'); V.bell(root); });
       $$('[data-fxs]', box).forEach(bt => bt.onclick = ev => A.run(ev.currentTarget, async () => { const id = bt.dataset.fxs, v = ($(`[data-fxn="${id}"]`, box).value || '').trim(); if (!v) throw new Error('اكتب اسماً واضحاً'); const s = b.schedules.find(x => x.id === id); s.name = v; await save(true); A.toast('حُفظ الاسم', 'ok'); V.bell(root); }));

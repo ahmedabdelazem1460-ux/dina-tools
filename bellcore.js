@@ -14,8 +14,10 @@
     b.acts = Array.isArray(b.acts) ? b.acts : []; b.holidays = Array.isArray(b.holidays) ? b.holidays : [];
     return b;
   };
+  // الاعتماد اليدوي: bell.pin = {kind:'sched'|'disp', id, from?, to?} — يتقدّم على كل شيء عدا الإجازة
+  const pinOn = (b, iso) => { const p = b && b.pin; return p && p.id && (!p.from || p.from <= iso) && (!p.to || iso <= p.to) ? p : null; };
   const actOn = (b, d) => b.acts.find(a => a.from && a.to && a.from <= d && d <= a.to && b.schedules.some(s => s.id === a.sid));
-  const activeSched = (b, d) => { const a = actOn(b, d); return b.schedules.find(s => s.id === (a ? a.sid : b.def)) || b.schedules[0] || null; };
+  const activeSched = (b, d) => { const pn = pinOn(b, d); if (pn && pn.kind === 'sched') { const ps = b.schedules.find(s => s.id === pn.id); if (ps) return ps; } const a = actOn(b, d); return b.schedules.find(s => s.id === (a ? a.sid : b.def)) || b.schedules[0] || null; };
   const applies = (br, cid) => !(br.classes || []).length || (cid && br.classes.includes(cid));
   // مطابق تماماً لـ A.bell.timeline
   function timeline(s, P, cid) {
@@ -66,6 +68,22 @@
     const b = norm(sec && sec.bell), nDays = (sec && sec.days) || 5, nPer = (sec && sec.periods) || 7, dow = dowOf(iso), warn = [];
     const R = (o) => Object.assign({ iso, dow, items: [], warn, h24: false }, o);
     const ho = holidayOn(b, iso); if (ho) return R({ src: 'holiday', name: ho.label || 'إجازة' });
+    const pn = pinOn(b, iso);
+    if (pn && pn.kind === 'disp') {
+      const d = (disp || []).find(x => x.id === pn.id);
+      if (d && d.meta && (d.meta.times || []).length) {
+        const M = d.meta; if (Array.isArray(M.days) && M.days.length && !M.days.includes(dow)) return R({ src: 'off', name: d.label || 'جدول استثنائي', pin: pn });
+        const items = fromMeta(M, dow, warn);
+        return R({ src: 'pin', name: d.label || 'جدول استثنائي', tag: d.tag || '', ref: d, pin: pn, items, start: items.length ? items[0].from : null, end: items.length ? items[items.length - 1].to : null });
+      }
+      warn.push('الجدول المعتمد يدوياً لم يعد متاحاً — يُعرض التوقيت التلقائي');
+    }
+    if (pn && pn.kind === 'sched' && b.schedules.some(x => x.id === pn.id)) {
+      const s = b.schedules.find(x => x.id === pn.id);
+      if (dow >= nDays || !actDays(s, nDays).includes(dow)) return R({ src: 'off', name: s.name, pin: pn });
+      const tl = timeline(s, schedP(s, nPer, dow), cid), items = tidy(tl.items, warn);
+      return R({ src: 'pin', name: s.name, sched: s, pin: pn, h24: !!s.h24, items, start: tl.start, end: tl.end });
+    }
     const ds = dispOn(disp, iso);
     if (ds.length) {
       const d = ds[0], M = d.meta;
@@ -81,7 +99,7 @@
     const tl = timeline(s, schedP(s, nPer, dow), cid), items = tidy(tl.items, warn);
     return R({ src: a ? 'act' : 'def', name: s.name, sched: s, act: a, h24: !!s.h24, items, start: tl.start, end: tl.end });
   }
-  const SRC = { holiday: 'إجازة', off: 'لا دراسة', disp: 'جدول استثنائي منشور', act: 'جدول مفعّل لهذه الفترة', def: 'الجدول الأساسي', none: 'غير محدد' };
+  const SRC = { pin: 'معتمد يدوياً', holiday: 'إجازة', off: 'لا دراسة', disp: 'جدول استثنائي منشور', act: 'جدول مفعّل لهذه الفترة', def: 'الجدول الأساسي', none: 'غير محدد' };
 
   /* فحص التعارضات: يعيد [{lv:'bad'|'warn'|'info', t:'نص', fix?}] — للعرض فقط */
   function check(sec, disp, from, days) {
@@ -114,6 +132,7 @@
       else if (a.to < a.from) add('bad', `تفعيل نهايته (${a.to}) قبل بدايته (${a.from}).`);
       b.acts.slice(i + 1).forEach(c => { if (a.from && a.to && c.from && c.to && a.from <= c.to && c.from <= a.to) add('bad', `تفعيلان متداخلان: ${a.from}→${a.to} و ${c.from}→${c.to} — يُعتمد الأول فقط.`); });
     });
+    if (b.pin && b.pin.id) { const ok = b.pin.kind === 'sched' ? b.schedules.some(x => x.id === b.pin.id) : (disp || []).some(x => x.id === b.pin.id); if (!ok) add('bad', 'الجدول المعتمد يدوياً محذوف — ألغِ الاعتماد أو اختر غيره.'); else if (b.pin.to && b.pin.to < (from || '')) add('info', 'انتهت فترة الاعتماد اليدوي — يعمل التوقيت التلقائي.'); }
     const pub = (disp || []).filter(d => d.published);
     pub.forEach((d, i) => pub.slice(i + 1).forEach(e => { if (d.date_from <= e.date_to && e.date_from <= d.date_to) add('bad', `جدولان استثنائيان منشوران متداخلان: «${d.label}» (${d.date_from}→${d.date_to}) و«${e.label}» (${e.date_from}→${e.date_to}).`); }));
     (disp || []).forEach(d => { const w = []; tidy((d.meta && d.meta.times || []).map((t, i) => ({ k: 'p', i, from: toMin(t[0]), to: toMin(t[1]) })), w); w.forEach(x => add('bad', `«${d.label}»: ${x}`)); });
@@ -123,5 +142,5 @@
     for (let k = 0; k < (days || 14); k++) { const iso = addDays(F, k), p = dayPlan(sec, iso, disp, null); p.warn.forEach(w => add('bad', `${iso}: ${w}`)); }
     const seen = new Set(); return out.filter(x => !seen.has(x.t) && seen.add(x.t));
   }
-  window.DinaBell = { toMin, hhmm, norm, activeSched, actOn, timeline, actDays, schedP, dowOf, addDays, holidayOn, tidy, fromMeta, dispOn, dayPlan, check, SRC };
+  window.DinaBell = { pinOn, toMin, hhmm, norm, activeSched, actOn, timeline, actDays, schedP, dowOf, addDays, holidayOn, tidy, fromMeta, dispOn, dayPlan, check, SRC };
 })();

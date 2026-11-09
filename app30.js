@@ -13,7 +13,7 @@
   // أوقات الحصص من «اليوم الدراسي والجدول الزمني»
   function times(cid) { try { const sec = A.section(), b = A.bell.bellOf(sec), s = A.bell.activeSched(b);
     // جدول استثنائي منشور يغطي اليوم يتقدّم على الجدول الزمني (نفس ما تعرضه اللوحة اليومية)
-    const pl = A.bell.dayPlan && A.bell.dayPlan(sec, null, cid); if (pl && pl.src === 'disp' && pl.items.length) return pl.items.filter(x => x.k === 'p').map(x => ({ i: x.i, from: x.from, to: x.to, f: A.bell.fmt(x.from, s), t: A.bell.fmt(x.to, s) }));
+    const pl = A.bell.dayPlan && A.bell.dayPlan(sec, null, cid); if (pl && pl.ref && (pl.src === 'disp' || pl.src === 'pin') && pl.items.length) return pl.items.filter(x => x.k === 'p').map(x => ({ i: x.i, from: x.from, to: x.to, f: A.bell.fmt(x.from, s), t: A.bell.fmt(x.to, s) }));
     return A.bell.timeline(s, A.bell.maxP(s, sec), cid).items.filter(x => x.k === 'p').map(x => ({ i: x.i, from: x.from, to: x.to, f: A.bell.fmt(x.from, s), t: A.bell.fmt(x.to, s) })); } catch (_) { return []; } }
   A.attTimes = cid => times(cid); A.attPassed = (cid, day, p) => passed(cid, day, p); A.attEntryOf = (cid, day, p) => entryOf(cid, day, p);
   A.curPeriod = cid => { const n = nowMin(), t = times(cid).find(x => n >= x.from && n < x.to); return t ? t.i : -1; };

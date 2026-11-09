@@ -45,7 +45,7 @@ h2 .src{font-size:.5em;font-weight:400;opacity:.75;margin-inline-start:.6em}
 <body>
 <div id="app"><div class="err">جارٍ التحميل…</div></div>
 <script src="config.js"></script>
-<script src="bellcore.js?v=1794208130"></script>
+<script src="bellcore.js?v=1794208453"></script>
 <script>
 (function () {
   const C = window.APP_CONFIG, app = document.getElementById('app');
@@ -76,7 +76,7 @@ h2 .src{font-size:.5em;font-weight:400;opacity:.75;margin-inline-start:.6em}
     if (off.length) add('off', `<section class="slide"><h2>غياب المنسوبين اليوم</h2><div class="grid">${off.map(n => `<div class="card" style="font-size:3vh">${esc(n)}</div>`).join('')}</div></section>`);
     if ((B.events || []).length) add('events', `<section class="slide"><h2>فعاليات اليوم</h2><table><tbody>${B.events.map(e => `<tr><td style="width:18vw;direction:ltr;text-align:center">${esc(e.time || '')}</td><td><b>${esc(e.title || '')}</b>${e.place ? ` — <span style="color:#BFD9F2">${esc(e.place)}</span>` : ''}</td></tr>`).join('')}</tbody></table></section>`);
     if ((B.ann || '').trim()) add('ann', `<section class="slide"><h2>إعلان</h2><div class="big"><div class="q" style="font-size:5vh">${esc(B.ann)}</div></div></section>`);
-    const T = tl().filter(x => x.k === 'p'), PL = plan() || {}; if (T.length) add('times', `<section class="slide"><h2>مواعيد الحصص <small class="src">${esc(PL.name || '')}${PL.src === 'disp' ? ' · جدول استثنائي' : PL.src === 'act' ? ' · مفعّل لهذه الفترة' : ''}</small></h2><table><tbody>${tl().filter(x => x.k !== 't').map(x => `<tr class="${cur && cur.from === x.from ? 'cur' : ''}"><td>${x.k === 'p' ? 'الحصة ' + (PER[x.i] || AR(x.i + 1)) : '☕ ' + esc(x.label || 'الفسحة')}</td><td style="direction:ltr;text-align:center">${AR(t12(x.from))} – ${AR(t12(x.to))} <small>${Math.floor(x.from / 60) % 24 < 12 ? 'ص' : 'م'}</small></td></tr>`).join('')}</tbody></table></section>`);
+    const T = tl().filter(x => x.k === 'p'), PL = plan() || {}; if (T.length) add('times', `<section class="slide"><h2>مواعيد الحصص <small class="src">${esc(PL.name || '')}${PL.src === 'pin' ? ' · معتمد' : PL.src === 'disp' ? ' · جدول استثنائي' : PL.src === 'act' ? ' · مفعّل لهذه الفترة' : ''}</small></h2><table><tbody>${tl().filter(x => x.k !== 't').map(x => `<tr class="${cur && cur.from === x.from ? 'cur' : ''}"><td>${x.k === 'p' ? 'الحصة ' + (PER[x.i] || AR(x.i + 1)) : '☕ ' + esc(x.label || 'الفسحة')}</td><td style="direction:ltr;text-align:center">${AR(t12(x.from))} – ${AR(t12(x.to))} <small>${Math.floor(x.from / 60) % 24 < 12 ? 'ص' : 'م'}</small></td></tr>`).join('')}</tbody></table></section>`);
     return S;
   }
   function render() {

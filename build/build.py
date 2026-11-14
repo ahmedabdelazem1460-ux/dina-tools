@@ -12,7 +12,7 @@
 import json, re, sys, time, glob, hashlib, os
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); os.chdir(ROOT)
 MODS = json.load(open('build/modules.json', encoding='utf-8'))['bundle']
-PAGES = ['index.html', 'student.html', 'parents.html', 'me.html', 'play.html', 'nisab.html', 'timetable.html', 'whiteboard.html', 'board.html'] + sorted(glob.glob('tools/*.html'))
+PAGES = ['index.html', 'poll.html', 'student.html', 'parents.html', 'me.html', 'play.html', 'nisab.html', 'timetable.html', 'whiteboard.html', 'board.html'] + sorted(glob.glob('tools/*.html'))
 TAG = '<script src="dist/platform.js?v={v}"></script>'
 
 def bundle():

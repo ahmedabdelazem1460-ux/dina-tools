@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>السؤال اللحظي — مدارس دينا العالمية</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#082B5A">
+<link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+<style>
+@font-face{font-family:'GE SS Two';font-weight:400 500;src:url(fonts/gess-two-medium.woff2) format('woff2');font-display:swap}
+@font-face{font-family:'GE SS Two';font-weight:600 900;src:url(fonts/gess-two-bold.woff2) format('woff2');font-display:swap}
+:root{--navy:#082B5A;--blue:#005499;--sky:#3AB1DB;--green:#2E8B57;--lime:#BADF93}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;font-family:'GE SS Two',Tahoma,sans-serif;color:var(--navy);background:radial-gradient(1200px 500px at 50% -10%,#DCEFFA,transparent),#EEF3F9;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--navy);color:#fff;border-bottom:4px solid var(--sky)}
+header img{height:34px}header .t{font-weight:800}header .s{font-size:12px;color:#BFD6EE}
+main{flex:1;display:grid;place-items:start center;padding:18px 14px}
+.card{width:min(560px,100%);background:#fff;border-radius:22px;padding:20px;box-shadow:0 24px 50px -30px rgba(8,43,90,.6),0 1px 0 rgba(8,43,90,.06)}
+h1{font-size:20px;margin:0 0 6px}
+.q{font-size:20px;font-weight:800;line-height:1.6;margin:6px 0 14px;white-space:pre-line}
+.in{width:100%;font:inherit;font-size:18px;border:2px solid #CFE0F2;border-radius:14px;padding:12px 14px;outline:none;color:var(--navy)}
+.in:focus{border-color:var(--sky);box-shadow:0 0 0 4px rgba(58,177,219,.2)}
+.btn{font:inherit;font-weight:800;font-size:17px;border:0;border-radius:14px;padding:13px 18px;background:linear-gradient(135deg,var(--blue),var(--navy));color:#fff;cursor:pointer;width:100%;margin-top:12px;box-shadow:0 10px 20px -12px rgba(0,84,153,.9)}
+.btn:focus-visible,.op:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+.btn[disabled]{opacity:.6}
+.ops{display:grid;gap:10px}.ops.g2{grid-template-columns:1fr 1fr}
+.op{display:flex;align-items:center;gap:12px;font:inherit;font-size:18px;font-weight:800;text-align:start;border:2px solid #DCE7F3;border-radius:16px;padding:14px;background:#fff;color:var(--navy);cursor:pointer;min-height:64px}
+.op .l{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;color:#fff;flex:none;font-size:18px}
+.op.on{border-color:var(--green);background:#F1F9EE;box-shadow:0 0 0 4px rgba(46,139,87,.18)}
+.op.ok{border-color:var(--green);background:#E5F3EA}.op.bad{opacity:.55}
+.sc{display:flex;gap:8px;justify-content:space-between}.sc .op{flex:1;justify-content:center;padding:10px 0}
+.msg{text-align:center;padding:20px 6px;font-size:18px;line-height:1.7}
+.msg b{display:block;font-size:22px;margin-bottom:6px}
+.pulse{width:14px;height:14px;border-radius:50%;background:var(--sky);display:inline-block;margin-inline-end:6px}
+@media (prefers-reduced-motion:no-preference){.pulse{animation:pl 1.4s infinite}@keyframes pl{50%{opacity:.3;transform:scale(.7)}}}
+.small{font-size:13px;color:#5b6b7f}
+.err{color:#B42318;font-weight:700;margin-top:8px}
+</style>
+</head>
+<body>
+<header><img src="assets/logo_white.svg" alt="مدارس دينا العالمية"><div><div class="t">السؤال اللحظي</div><div class="s" id="sch">مدارس دينا العالمية</div></div></header>
+<main><div class="card" id="m" aria-live="polite">جارٍ التحميل…</div></main>
+<script src="config.js?v=1794629155"></script>
+<script>
+(function () {
+  const C = window.APP_CONFIG, m = document.getElementById('m');
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const AR = s => String(s).replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+  const LS = { get: k => { try { return localStorage.getItem(k); } catch (_) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (_) { } } };
+  const COL = ['#E0675A', '#005499', '#C9A44C', '#2F855A', '#AE95DA', '#3AB1DB'], LET = ['أ', 'ب', 'ج', 'د', 'هـ', 'و'];
+  async function rpc(fn, body) { const r = await fetch(`${C.supabaseUrl}/rest/v1/rpc/${fn}`, { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); const j = await r.json().catch(() => null); if (!r.ok) throw new Error((j && (j.message || j.hint)) || 'تعذّر الاتصال'); return j; }
+  let dev = LS.get('poll_dev'); if (!dev) { dev = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now()); LS.set('poll_dev', dev); }
+  let code = (new URLSearchParams(location.search).get('c') || '').toUpperCase(), P = null, sent = {}, timer = null, pick = null;
+  const name = () => LS.get('poll_name') || '';
+  function join() {
+    m.innerHTML = `<h1>انضم للسؤال</h1><p class="small">اكتب الرمز الظاهر على شاشة المعلم.</p>
+      <label for="cd" class="small">الرمز</label><input class="in" id="cd" dir="ltr" maxlength="8" autocomplete="off" style="text-align:center;letter-spacing:.25em;font-size:26px;font-weight:800" value="${esc(code)}">
+      <label for="nm" class="small" style="display:block;margin-top:10px">اسمك (اختياري)</label><input class="in" id="nm" maxlength="40" value="${esc(name())}">
+      <button class="btn" id="go">دخول</button><div class="err" id="er"></div>`;
+    const go = () => { code = m.querySelector('#cd').value.trim().toUpperCase(); LS.set('poll_name', m.querySelector('#nm').value.trim()); if (!code) return; history.replaceState(null, '', '?c=' + encodeURIComponent(code)); tick(true); };
+    m.querySelector('#go').onclick = go; m.querySelector('#cd').onkeydown = e => { if (e.key === 'Enter') go(); };
+  }
+  async function tick(first) {
+    clearTimeout(timer);
+    try { const p = await rpc('poll_get', { p_code: code }); if (!p) { if (first) { join(); m.querySelector('#er').textContent = 'الرمز غير صحيح أو انتهى السؤال'; } else wait('انتهى السؤال', 'شكراً لمشاركتك'); return; }
+      document.getElementById('sch').textContent = p.school || '';
+      const changed = !P || P.q_no !== p.q_no || P.state !== p.state; P = p; if (changed) { pick = null; draw(); }
+    } catch (e) { if (first) { join(); m.querySelector('#er').textContent = e.message; return; } }
+    timer = setTimeout(tick, 2000);
+  }
+  function wait(t, s) { m.innerHTML = `<div class="msg"><b>${esc(t)}</b><span class="pulse" aria-hidden="true"></span>${esc(s || '')}</div>`; }
+  function draw() {
+    const key = P.id + ':' + P.q_no, mine = sent[key];
+    if (P.state === 'closed') { const ok = P.correct; m.innerHTML = `<div class="q">${esc(P.question || 'السؤال')}</div>${ok != null && ['mcq', 'tf'].includes(P.kind) ? `<div class="ops">${opts().map((o, i) => `<div class="op ${String(i) === String(ok) ? 'ok' : 'bad'}"><span class="l" style="background:${COL[i % 6]}">${LET[i]}</span>${esc(o)}</div>`).join('')}</div>` : ''}<div class="msg">${mine != null ? (ok != null && ['mcq', 'tf'].includes(P.kind) ? (String(mine) === String(ok) ? '<b>إجابتك صحيحة ✓</b>' : '<b>إجابتك غير صحيحة</b>') : '<b>استُلمت إجابتك</b>') : '<b>أُغلق السؤال</b>'}<span class="pulse"></span>بانتظار السؤال التالي…</div>`; return; }
+    if (mine != null) { m.innerHTML = `<div class="msg"><b>استُلمت إجابتك ✓</b>يمكنك تغييرها ما دام السؤال مفتوحاً.<br><button class="btn" id="ch" style="max-width:240px">تغيير الإجابة</button></div>`; m.querySelector('#ch').onclick = () => { delete sent[key]; draw(); }; return; }
+    const head = `<div class="small">السؤال ${AR(P.q_no)}${name() ? ' · ' + esc(name()) : ''}</div><div class="q">${esc(P.question || 'أجب على السؤال الظاهر على الشاشة')}</div>`;
+    if (P.kind === 'mcq' || P.kind === 'tf') { m.innerHTML = head + `<div class="ops ${opts().length > 2 && opts().every(o => String(o).length < 14) ? 'g2' : ''}">${opts().map((o, i) => `<button class="op" data-i="${i}"><span class="l" style="background:${COL[i % 6]}">${LET[i]}</span>${esc(o)}</button>`).join('')}</div>`;
+      m.querySelectorAll('.op').forEach(b => b.onclick = () => send(b.dataset.i)); return; }
+    if (P.kind === 'scale') { m.innerHTML = head + `<div class="sc" role="group" aria-label="التقييم">${[1, 2, 3, 4, 5].map(n => `<button class="op" data-v="${n}" aria-label="${n}">${AR(n)}</button>`).join('')}</div><div class="sc small" style="margin-top:6px"><span>${esc((P.options || [])[0] || 'لا أوافق')}</span><span>${esc((P.options || [])[1] || 'أوافق تماماً')}</span></div>`; m.querySelectorAll('.op').forEach(b => b.onclick = () => send(b.dataset.v)); return; }
+    m.innerHTML = head + `<input class="in" id="ans" ${P.kind === 'number' ? 'inputmode="decimal" dir="ltr"' : ''} maxlength="${P.kind === 'cloud' ? 30 : 280}" placeholder="${P.kind === 'cloud' ? 'كلمة أو كلمتان' : P.kind === 'number' ? 'رقم' : 'إجابتك'}" aria-label="إجابتك"><button class="btn" id="sd">إرسال</button><div class="err" id="er"></div>`;
+    const sd = () => { const v = m.querySelector('#ans').value.trim(); if (!v) return; if (P.kind === 'number' && !/^-?[0-9٠-٩.,]+$/.test(v)) { m.querySelector('#er').textContent = 'اكتب رقماً'; return; } send(v.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))); };
+    m.querySelector('#sd').onclick = sd; m.querySelector('#ans').onkeydown = e => { if (e.key === 'Enter') sd(); }; setTimeout(() => m.querySelector('#ans').focus(), 50);
+  }
+  const opts = () => P.kind === 'tf' ? ['صواب', 'خطأ'] : (P.options || []);
+  async function send(v) { try { await rpc('poll_vote', { p_code: code, p_device: dev, p_name: name(), p_answer: String(v) }); sent[P.id + ':' + P.q_no] = v; draw(); } catch (e) { alert(e.message); } }
+  if (code) tick(true); else join();
+})();
+</script>
+</body>
+</html>

@@ -23,7 +23,7 @@ input[type=range]{width:80px;accent-color:var(--sky)}
 .txt{position:absolute;z-index:3;font:inherit;border:2px dashed var(--sky);background:rgba(255,255,255,.9);padding:4px 6px;min-width:120px;outline:none;direction:rtl}
 @media (max-width:640px){.tb{gap:3px}.tb .g{padding:0 3px}.hide-s{display:none}}
 </style>
-<script src="digits.js?v=1794628340"></script>
+<script src="digits.js?v=1794629155"></script>
 </head>
 <body>
 <div class="tb" role="toolbar" aria-label="أدوات السبورة">
@@ -34,6 +34,7 @@ input[type=range]{width:80px;accent-color:var(--sky)}
   <div class="g"><button id="undo" title="تراجع (Ctrl+Z)">↶</button><button id="redo" title="إعادة">↷</button><button id="clr" title="مسح الصفحة">مسح</button></div>
   <div class="g"><button id="bg" title="الخلفية">الخلفية</button><label class="b" title="إدراج صورة">صورة<input type="file" id="img" accept="image/*" hidden></label></div>
   <div class="g"><button id="pv" aria-label="الصفحة السابقة">‹</button><span class="pg" id="pgn"></span><button id="nx" aria-label="الصفحة التالية">›</button><button id="add" title="صفحة جديدة">+ صفحة</button></div>
+  <div class="g" id="lpollG" hidden><button id="lpoll" title="سؤال لحظي للطلاب (يجيبون من جوالاتهم)">سؤال لحظي</button></div>
   <div class="g"><button id="png" title="حفظ صورة">PNG</button><button id="pdf" title="طباعة / PDF">PDF</button><button id="fs" title="ملء الشاشة">⛶</button></div>
 </div>
 <div class="wrap" id="wrap"><canvas id="cv" aria-label="مساحة الرسم"></canvas></div>
@@ -94,6 +95,11 @@ input[type=range]{width:80px;accent-color:var(--sky)}
   document.getElementById('add').onclick = () => { st.pages.splice(st.cur + 1, 0, { items: [], bg: pg().bg }); st.cur++; redo = []; save(); render(); };
   document.getElementById('pv').onclick = () => { if (st.cur > 0) { st.cur--; redo = []; save(); render(); } };
   document.getElementById('nx').onclick = () => { if (st.cur < st.pages.length - 1) { st.cur++; redo = []; save(); render(); } };
+  // السؤال اللحظي: يُفتح في المنصة (الأب أو النافذة التي فتحت السبورة)، وتُدرج نتائجه صورةً هنا
+  document.getElementById('lpoll').onclick = () => { const t = window.parent !== window ? window.parent : window.opener; if (t) { try { t.postMessage({ type: 'dina-poll' }, location.origin); if (window.opener && t === window.opener) window.opener.focus(); return; } catch (_) { } } window.open('index.html#/poll', '_blank'); };
+  { const t = window.parent !== window ? window.parent : window.opener; if (t) try { t.postMessage({ type: 'dina-wb-hello' }, location.origin); } catch (_) { } }
+  window.addEventListener('message', e => { if (e.origin === location.origin && e.data && e.data.type === 'dina-wb-cfg') document.getElementById('lpollG').hidden = !e.data.poll; });
+  window.addEventListener('message', e => { if (e.origin !== location.origin || !e.data || e.data.type !== 'dina-wb-img' || !e.data.src) return; const im = new Image(); im.onload = () => { const W = cv.clientWidth * .7, k = Math.min(1, W / im.width, cv.clientHeight * .8 / im.height); pg().items.push({ t: 'img', src: e.data.src, x: 30, y: 30, w: im.width * k, h: im.height * k }); imgs[e.data.src] = im; tool = 'move'; mark(); save(); render(); }; im.src = e.data.src; });
   document.getElementById('img').onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { const im = new Image(); im.onload = () => { const W = cv.clientWidth * .6, k = Math.min(1, W / im.width, cv.clientHeight * .7 / im.height); pg().items.push({ t: 'img', src: r.result, x: 40, y: 40, w: im.width * k, h: im.height * k }); imgs[r.result] = im; tool = 'move'; mark(); save(); render(); }; im.src = r.result; }; r.readAsDataURL(f); e.target.value = ''; };
   const pageCanvas = p => { const w = cv.clientWidth, h = cv.clientHeight, c = document.createElement('canvas'); c.width = w * 2; c.height = h * 2; const x = c.getContext('2d'); x.scale(2, 2); bg(x, w, h, p.bg); const keep = st.cur; st.cur = st.pages.indexOf(p); [...p.items.filter(i => i.t === 'img'), ...p.items.filter(i => i.t !== 'img')].forEach(i => draw(x, i)); st.cur = keep; return c; };
   document.getElementById('png').onclick = () => { const a = document.createElement('a'); a.download = 'سبورة-' + (st.cur + 1) + '.png'; a.href = pageCanvas(pg()).toDataURL('image/png'); a.click(); };

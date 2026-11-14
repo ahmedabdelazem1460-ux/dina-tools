@@ -81,3 +81,5 @@
 | 73 | `src/attendance/hr.js` | — | 33 | الموارد البشرية V.hr: حضور الموظفين بالموقع ورمز QR المتغير والرصد اليدوي، السجل والتصدير، المساءلات، الإعدادات، وربط الغياب بتأمين الحصص وعدم احتساب واجب الغائب (sql/096) | home hr | dropAbsent |
 | 74 | `src/supervision/myforms.js` | — | 30 | نماذجي V.myforms: نماذج المستخدم من الصفر أو نص أو ملف (تحويل ذكي A.textToTpl) بهوية المدرسة، تعبئة وحفظ وترتيب ومجلدات ومشاركة (sql/097) | myforms | textToTpl |
 | 75 | `src/core/teacher-features.js` | — | 4 | التحكم في الميزات الجديدة داخل حسابات المعلمين (للمالك) — schools.settings.tfeat ويقرؤه A.tfeat | tui | TFEAT |
+| 76 | `src/assess/live-poll.js` | — | 22 | السؤال اللحظي V.poll + A.livePoll (مثل ClassPoint): رمز/QR للطلاب على poll.html، نتائج لحظية، إدراج النتائج في السبورة (sql/098) | poll | livePoll livePollStart |
+| 77 | `src/assess/slides.js` | — | 34 | العروض التقديمية V.slides: من بنك الأسئلة أو نص/ملف، ست هويات مشتقة من دينا، محرر، عرض بملء الشاشة مع السؤال اللحظي، تصدير PowerPoint (vendor/pptxgen) وPDF (sql/098 decks) | slides | presentDeck slideHTML textToSlides |

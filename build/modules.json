@@ -15,6 +15,7 @@
     {"src": "src/core/reports-archive-staff.js", "old": "app6.js", "about": "التقارير، الأرشيف، استيراد الموظفين، هوية كل قسم"},
     {"src": "src/plan/sheets-sync.js", "old": "app7.js", "about": "مزامنة Google Sheets"},
     {"src": "src/core/sidebar-appearance.js", "old": "app8.js", "about": "القائمة الجانبية، المظهر، من يعمل الآن"},
+    {"src": "src/core/notifications.js", "about": "الإشعارات: الجرس، إذن الجهاز، التنبيهات العامة والمجدولة، التفضيلات وتحكم المالك، مركز الإشعارات V.notify، التثبيت كتطبيق"},
     {"src": "src/plan/parent-posts.js", "old": "app9.js", "about": "إعلانات أولياء الأمور"},
     {"src": "src/core/resources-analysis-roles.js", "old": "app10.js", "about": "المصادر (قديم)، تحليل النتائج، المسميات والصلاحيات V.roles وإظهار البنود features"},
     {"src": "src/attendance/attendance-behavior-supervision.js", "old": "app11.js", "about": "الحضور والغياب والسلوك V.attendance + الإشراف التربوي V.supervision"},

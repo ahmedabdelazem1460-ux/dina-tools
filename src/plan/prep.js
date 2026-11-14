@@ -8,8 +8,8 @@
   if (A.NAV && !A.NAV.some(n => n[0] === 'prep')) { const i = A.NAV.findIndex(n => n[0] === 'assess'); A.NAV.splice(i < 0 ? A.NAV.length : i, 0, ['prep', 'التحضير', () => !!S.me && !(A.coordOnly && A.coordOnly())]); }
   const gk = c => c ? `${c.stage}|${c.grade_word}` : '';
   const gLabel = k => { const [st, g] = (k || '|').split('|'); return g ? A.gradeName(g, st) : '—'; };
-  const mySubjects = () => { const m = new Set(S.entries.filter(e => e.teacher_id === S.me.id && e.subject_id).map(e => e.subject_id)); return (S.me.is_owner || lead() || !m.size) ? S.subjects : S.subjects.filter(s => m.has(s.id)); };
-  const myGrades = () => { const mine = new Set(S.entries.filter(e => e.teacher_id === S.me.id).map(e => e.class_id)); const cl = S.classes.filter(c => c.active && (S.me.is_owner || lead() || !mine.size || mine.has(c.id))); return [...new Set(cl.map(gk))]; };
+  const mySubjects = () => { const m = new Set(S.entries.filter(e => e.teacher_id === S.me.id && e.subject_id).map(e => e.subject_id)); return ((S.me.is_owner || lead() || !m.size) ? S.subjects.slice() : S.subjects.filter(s => m.has(s.id))).sort((a, b) => A.cmpSubj ? A.cmpSubj(a.id, b.id) : 0); };
+  const myGrades = () => { const mine = new Set(S.entries.filter(e => e.teacher_id === S.me.id).map(e => e.class_id)); const cl = S.classes.filter(c => c.active && (S.me.is_owner || lead() || !mine.size || mine.has(c.id))); return [...new Set(cl.slice().sort((a, b) => A.cmpCls ? A.cmpCls(a, b) : 0).map(gk))]; };
   const STRAT = ['التعلم التعاوني', 'العصف الذهني', 'الخرائط الذهنية', 'التعلم بالأقران', 'حل المشكلات', 'الاستقصاء', 'التجريب العملي', 'لعب الأدوار', 'القصة', 'الحوار والمناقشة', 'التعلم باللعب', 'فكّر - زاوج - شارك', 'المحطات التعليمية', 'الصف المقلوب', 'التعلم القائم على المشروع', 'القراءة الموجهة', 'النمذجة', 'التعلم الرقمي التفاعلي'];
   const TOOLS = ['الكتاب المدرسي', 'السبورة الذكية', 'عرض تقديمي', 'أوراق عمل', 'بطاقات تعليمية', 'فيديو تعليمي', 'نماذج ومجسمات', 'أدوات المختبر', 'منصة تفاعلية', 'جهاز لوحي'];
 

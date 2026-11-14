@@ -24,7 +24,9 @@
     phone: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg>',
   };
   // الميزات الجديدة لا تظهر لغير المالك إلا بعد أن يفعّلها المالك من «تخصيص صفحة المعلم» (schools.settings.tfeat)
-  A.tfeat = k => !!(S.me && ((S.realMe ? false : S.me.is_owner) || ((((S.school || {}).settings || {}).tfeat || {})[k] === true)));
+  // القيمة: true = للجميع، 'some' = لمن في settings.tfeatTo[k] فقط، وغير ذلك = مخفية
+  A.tfeat = k => { if (!S.me) return false; if (!S.realMe && S.me.is_owner) return true; const st = (S.school || {}).settings || {}, v = (st.tfeat || {})[k];
+    return v === true || (v === 'some' && Array.isArray((st.tfeatTo || {})[k]) && st.tfeatTo[k].includes(S.me.id)); };
   const canIssue = () => !!(S.me && !S.realMe && (S.me.is_owner || (A.hasModule && A.hasModule('supervision'))));
   const myId = () => S.me && S.me.id;
   const nowIso = () => new Date().toISOString();
@@ -194,6 +196,7 @@
     m.el.querySelector('#apCopy').onclick = async () => { try { await navigator.clipboard.writeText(url); A.toast('نُسخ الرابط', 'ok'); } catch (_) { A.toast(url); } };
   }
   A.appDialog = appDialog;
+  A.notifPanel = () => panel();
   document.addEventListener('click', e => {
     if (!e.target.closest('#ub')) return;
     setTimeout(() => { const m = $('.menu'); if (!m || !A.tfeat('app') || m.querySelector('[data-a="app"]')) return; const b = document.createElement('button'); b.dataset.a = 'app'; b.innerHTML = `${ICO.phone} تطبيق الجوال (أندرويد وآيفون)`; b.style.display = 'flex'; b.style.gap = '8px'; b.style.alignItems = 'center'; b.onclick = () => { m.remove(); appDialog(); }; const lang = m.querySelector('[data-a="lang"]'); lang ? lang.before(b) : m.appendChild(b); }, 0);

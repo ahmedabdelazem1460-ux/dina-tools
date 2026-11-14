@@ -140,7 +140,7 @@ body[data-th=pattern] .card>.head h2::after,body[data-th=pattern] .card>h2::afte
     if (!S.me || S.realMe || document.querySelector('.ovl') || (navigator.webdriver && !window.__wnTest)) return;
     let seen = null; try { seen = JSON.parse(localStorage.getItem(seenKey()) || 'null'); } catch (_) { }
     const tf = (((S.school || {}).settings || {}).tfeat) || {}, F = (A.TFEAT || []);
-    const items = S.me.is_owner ? NEWS.map(n => n.slice()) : [NEWS.find(x => x[0] === 'themes').slice(), ...F.filter(f => tf[f[0]] === true).map(f => { const n = NEWS.find(x => x[0] === f[0]); return n ? n.slice() : [f[0], '✨', f[1], f[2], '', '#3AB1DB', '#005499']; })];
+    const items = S.me.is_owner ? NEWS.map(n => n.slice()) : [NEWS.find(x => x[0] === 'themes').slice(), ...F.filter(f => tf[f[0]] === true || (tf[f[0]] === 'some' && A.tfeat(f[0]))).map(f => { const n = NEWS.find(x => x[0] === f[0]); return n ? n.slice() : [f[0], '✨', f[1], f[2], '', '#3AB1DB', '#005499']; })];
     const fresh = items.filter(n => !(seen || []).includes(n[0]));
     if (!fresh.length) return;
     try { localStorage.setItem(seenKey(), JSON.stringify(items.map(n => n[0]).concat(seen || []))); } catch (_) { }
@@ -151,15 +151,15 @@ body[data-th=pattern] .card>.head h2::after,body[data-th=pattern] .card>h2::afte
   let wnT = 0; const wnTry = () => { if (wnT++ > 20) return; if (S.me && S.school && $('#nav')) setTimeout(whatsNew, 1800); else setTimeout(wnTry, 1000); };
   setTimeout(wnTry, 1500);
   // إشعار «تمت إضافة…» لكل المعلمين عند تفعيل المالك ميزة جديدة لهم
-  A.announceNew = async keys => {
+  A.announceNew = async (keys, ids) => {
     const F = A.TFEAT || []; const L = keys.map(k => F.find(f => f[0] === k)).filter(Boolean); if (!L.length) return 0;
     const n = NEWS.find(x => x[0] === keys[0]);
-    try { return await api.rpc('notify_send', { p_ids: null, p_title: '✨ تمت إضافة: ' + L.map(f => f[1]).join('، '), p_body: L.map(f => '• ' + f[1] + ' — ' + f[2]).join('\n'), p_link: (n && n[4]) || '', p_kind: 'new', p_show_at: null }); } catch (_) { return 0; }
+    try { return await api.rpc('notify_send', { p_ids: ids && ids.length ? ids : null, p_title: '✨ تمت إضافة: ' + L.map(f => f[1]).join('، '), p_body: L.map(f => '• ' + f[1] + ' — ' + f[2]).join('\n'), p_link: (n && n[4]) || '', p_kind: 'new', p_show_at: null }); } catch (_) { return 0; }
   };
 
   // ======================= (٢) لوحة المعلم =======================
   const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
-  const QUICK = { prep: ['#5E9BD3', '#082B5A'], assess: ['#C2AEEB', '#7E62C2'], records: ['#F2C66D', '#C98A12'], refer: ['#F09A8E', '#D0564A'], forms: ['#84B7E3', '#005499'], games: ['#5BC48A', '#2E8B57'], wboard: ['#3AB1DB', '#005499'], labs: ['#BADF93', '#3F7D2A'], poll: ['#F2C66D', '#C98A12'], slides: ['#C2AEEB', '#7E62C2'], compass: ['#3AB1DB', '#082B5A'], gifted: ['#F2C66D', '#B07A10'], assistant: ['#5BC48A', '#2E8B57'], notify: ['#84B7E3', '#082B5A'] };
+  const QUICK = { x_app: ['#84B7E3', '#005499'], prep: ['#5E9BD3', '#082B5A'], assess: ['#C2AEEB', '#7E62C2'], records: ['#F2C66D', '#C98A12'], refer: ['#F09A8E', '#D0564A'], forms: ['#84B7E3', '#005499'], games: ['#5BC48A', '#2E8B57'], wboard: ['#3AB1DB', '#005499'], labs: ['#BADF93', '#3F7D2A'], poll: ['#F2C66D', '#C98A12'], slides: ['#C2AEEB', '#7E62C2'], compass: ['#3AB1DB', '#082B5A'], gifted: ['#F2C66D', '#B07A10'], assistant: ['#5BC48A', '#2E8B57'], notify: ['#84B7E3', '#082B5A'] };
   const PAL = [['#3AB1DB', '#005499'], ['#5BC48A', '#2E8B57'], ['#C2AEEB', '#7E62C2'], ['#F2C66D', '#C98A12'], ['#F09A8E', '#D0564A'], ['#84B7E3', '#082B5A']];
   const parse = s => { const [y, mo, d] = String(s || '').split('-').map(Number); return new Date(y, (mo || 1) - 1, d || 1); };
   function hero() {
@@ -170,14 +170,17 @@ body[data-th=pattern] .card>.head h2::after,body[data-th=pattern] .card>h2::afte
     const hol = (w.holidays || []).map(h => h.day);
     const days = DAYS.map((n, i) => { const d = st ? new Date(st.getFullYear(), st.getMonth(), st.getDate() + i) : null; const L = mine.filter(e => e.day === i); return { i, n, d, cnt: L.length, ok: L.filter(fil).length, today: d && d.getTime() === today.getTime(), hol: hol.includes(i) }; });
     const fmt = d => d ? AR(d.getDate()) + '/' + AR(d.getMonth() + 1) : '';
-    const nav = (A.NAV || []).filter(n => n[0] !== 'my' && n[0] !== 'dash' && (typeof n[2] !== 'function' || (() => { try { return n[2](); } catch (_) { return false; } })())).slice(0, 10);
+    // ترتيب منطقي موحّد مع الرئيسية (A.HOME_GROUPS): عملي اليومي ← داخل الصف ← التقويم ← الطلاب ← التواصل
+    const ORD = [].concat(...((A.HOME_GROUPS || []).map(g => g[1])));
+    const rank = k => { const i = ORD.indexOf(k); return i < 0 ? 999 : i; };
+    const nav = (A.NAV || []).filter(n => !['my', 'dash', 'home', 'notify'].includes(n[0]) && (typeof n[2] !== 'function' || (() => { try { return n[2](); } catch (_) { return false; } })())).sort((a, b) => rank(a[0]) - rank(b[0])).slice(0, 11);
     const unread = +((($('#notifN') || {}).textContent || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))) || 0;
-    const icons = [...nav.map(n => [n[0], n[1], '#/' + n[0]]), ...(A.tfeat('notif') && $('#notifBtn') ? [['notify', 'الإشعارات', '#/notify']] : [])];
+    const icons = [...nav.map(n => [n[0], n[1], '#/' + n[0]]), ...(A.tfeat('notif') && A.notifPanel ? [['notify', 'الإشعارات', '']] : []), ...(A.tfeat('app') && A.appDialog ? [['x_app', 'تطبيق الجوال', '']] : [])];
     const ring = `<div class="tq-ring" style="--p:${p}" role="img" aria-label="إنجاز الخطة ${p}٪"><div><b>${AR(p)}٪</b><small>${AR(done)} من ${AR(mine.length)}</small></div></div>`;
     return `<section class="tq" id="myHero" aria-label="أسبوعي">
       <div class="tq-top"><div class="tq-wk"><small>أهلاً ${esc((S.me.full_name || S.me.name || '').split(' ').slice(0, 2).join(' '))} 👋</small><h2>${esc(w.word ? 'الأسبوع ' + w.word : (w.label || 'الأسبوع الحالي'))}</h2><span>${days[0].d ? `من ${fmt(days[0].d)} إلى ${fmt(days[4].d)} · ` : ''}${AR(mine.length)} حصة في جدولك</span></div>${ring}</div>
       <div class="tq-days" role="list">${days.map(d => `<button class="tq-d ${d.today ? 'today' : ''} ${d.hol ? 'hol' : ''}" data-hd="${d.i}" role="listitem" aria-label="${d.n} ${d.hol ? 'إجازة' : AR(d.cnt) + ' حصص'}"><b>${d.n}</b><span>${d.hol ? 'إجازة' : `${fmt(d.d)} · ${AR(d.cnt)} حصص`}</span><i><u style="width:${d.cnt ? d.ok * 100 / d.cnt : 0}%"></u></i></button>`).join('')}</div>
-      ${icons.length ? `<div class="tq-ics">${icons.map(([k, l, h], i) => { const c = QUICK[k] || PAL[i % PAL.length]; return `<a class="tq-ic" href="${h}"><span class="g" style="--a:${c[0]};--b:${c[1]}">${A.I[k] || A.I.book || ''}${k === 'notify' && unread ? `<span class="bd">${AR(unread)}</span>` : ''}</span>${esc(l)}</a>`; }).join('')}</div>` : ''}
+      ${icons.length ? `<div class="tq-ics">${icons.map(([k, l, h], i) => { const c = QUICK[k] || PAL[i % PAL.length]; const ic = (A.HOME_ICO && k === 'x_app') ? A.HOME_ICO(k) : (A.I[k] || A.I.book || ''), inner = `<span class="g" style="--a:${c[0]};--b:${c[1]}">${ic}${k === 'notify' && unread ? `<span class="bd">${AR(unread)}</span>` : ''}</span>${esc(l)}`; return h ? `<a class="tq-ic" href="${h}">${inner}</a>` : `<button type="button" class="tq-ic" data-tqa="${k}" aria-label="${esc(l)}${k === 'notify' && unread ? ' — ' + AR(unread) + ' غير مقروء' : ''}">${inner}</button>`; }).join('')}</div>` : ''}
     </section>`;
   }
   ['my'].forEach(k => { const v0 = V[k]; if (!v0) return; V[k] = function (root) {
@@ -186,6 +189,7 @@ body[data-th=pattern] .card>.head h2::after,body[data-th=pattern] .card>h2::afte
       if (!S.me || !A.tfeat('home2') || !root || !root.isConnected) return; const old = $('#myHero', root); if (old) old.remove();
       root.insertAdjacentHTML('afterbegin', hero()); const h = $('#myHero', root);
       const g = $('details.tgrid', root); if (g) { h.after(g); g.open = true; }
+      $$('[data-tqa]', h).forEach(b => b.onclick = () => { if (b.dataset.tqa === 'notify') A.notifPanel(); else if (b.dataset.tqa === 'x_app') A.appDialog(); });
       $$('[data-hd]', h).forEach(b => b.onclick = () => { const t = $('details.tgrid', root); if (!t) return; t.open = true; t.scrollIntoView({ behavior: 'smooth', block: 'start' }); t.classList.remove('tq-flash'); void t.offsetWidth; t.classList.add('tq-flash'); $$('.tg tbody tr', t).forEach((tr, i) => tr.classList.toggle('tq-row', i === +b.dataset.hd)); });
     } catch (e) { console.warn('hero', e); } };
     if (r && typeof r.then === 'function') r.then(go); else setTimeout(go, 0);

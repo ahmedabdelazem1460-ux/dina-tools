@@ -7,6 +7,7 @@
     {"src": "demo.js", "about": "وضع التجربة ?demo=1: نفس واجهة api في الذاكرة"},
     {"src": "bellcore.js", "about": "نواة التوقيت الموحّدة DinaBell (المنصة + board.html)"},
     {"src": "src/core/core.js", "old": "app.js", "about": "الأساس: الحالة S، الدخول، التنقل NAV/route، «خطتي» V.my، لوحة المتابعة V.dash، المساعدات A.*"},
+    {"src": "src/core/order.js", "about": "ترتيب منطقي موحّد للمراحل والصفوف والفصول والمواد: A.cmpCls / A.cmpSubj / A.cmpEntrySG (عرض فقط)"},
     {"src": "src/plan/export-timetable-weeks-admin.js", "old": "app2.js", "about": "التصدير، الجدول الدراسي، الأسابيع، الإدارة"},
     {"src": "src/core/tools-dev.js", "old": "app3.js", "about": "أداتا النصاب والجدول الآلي داخل المنصة + لوحة المطوّر"},
     {"src": "src/plan/extra-pages-join.js", "old": "app4.js", "about": "الصفحات الإضافية في الخطة + روابط انضمام المعلمين"},

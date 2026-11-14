@@ -20,7 +20,7 @@
     const mine = S.entries.filter(e => e.subject_id && e.teacher_id === S.me.id && A.required(e));
     const g = {};
     mine.forEach(e => { const k = e.subject_id + '|' + gradeKey(clsOf(e.class_id)); (g[k] = g[k] || { key: k, subject_id: e.subject_id, grade: gradeKey(clsOf(e.class_id)), classes: new Set(), entries: [] }); g[k].classes.add(e.class_id); g[k].entries.push(e); });
-    return Object.values(g).filter(x => x.classes.size > 1).map(x => ({ ...x, classes: [...x.classes].sort((a, b) => (clsOf(a).sort ?? 0) - (clsOf(b).sort ?? 0) || (clsOf(a).name || '').localeCompare(clsOf(b).name || '', 'ar')) }));
+    return Object.values(g).filter(x => x.classes.size > 1).map(x => ({ ...x, classes: [...x.classes].sort((a, b) => A.cmpCls(a, b)) })).sort((x, y) => A.cmpSubj(x.subject_id, y.subject_id) || A.cmpCls(x.classes[0], y.classes[0]));
   }
   // وضع «بالمادة»: كل مادة مرة واحدة لكل صف، ومربعات اختيار لكل فصول المادة (يمكن ضم فصل من صف آخر أو الاكتفاء بفصل واحد)
   function blocks() {
@@ -28,12 +28,12 @@
     const bySub = {}; mine.forEach(e => { (bySub[e.subject_id] = bySub[e.subject_id] || []).push(e); });
     const out = [];
     Object.entries(bySub).forEach(([sid, es]) => {
-      const all = [...new Set(es.map(e => e.class_id))].sort((a, b) => (clsOf(a).sort ?? 0) - (clsOf(b).sort ?? 0) || (clsOf(a).name || '').localeCompare(clsOf(b).name || '', 'ar'));
+      const all = [...new Set(es.map(e => e.class_id))].sort((a, b) => A.cmpCls(a, b));
       const grades = [...new Set(all.map(c => gradeKey(clsOf(c))))];
       grades.forEach(gk => out.push({ key: 'b|' + sid + '|' + gk, subject_id: sid, grade: gk, classes: all, entries: es, defEx: all.filter(c => gradeKey(clsOf(c)) !== gk) }));
     });
-    const ord = g => Math.min(...g.classes.filter(c => !g.defEx.includes(c)).map(c => clsOf(c).sort ?? 999));
-    return out.sort((x, y) => (A.subjName(x.subject_id) || '').localeCompare(A.subjName(y.subject_id) || '', 'ar') || ord(x) - ord(y));
+    const ord = g => Math.min(...g.classes.filter(c => !g.defEx.includes(c)).map(c => A.clsRank(c)));
+    return out.sort((x, y) => A.cmpSubj(x.subject_id, y.subject_id) || ord(x) - ord(y));
   }
   // توزيع: لكل فصل حصصه مرتبة بالأيام ثم الحصص، مع إزاحة التأخر
   function plan(g, cfg) {

@@ -1603,7 +1603,8 @@ body.band .foot{background:#082B5A;color:#fff;border-top:0;height:56px}
   // ---------- جدول المعلم الأسبوعي (حصصه المسندة فقط) ----------
   function myPairs(mine) {
     const m = {}; mine.forEach(e => { const k = e.class_id + '|' + e.subject_id; (m[k] = m[k] || [k, `${subjName(e.subject_id)} — ${(cls(e.class_id) || {}).name || ''}${e.teacher_id !== S.me.id ? ' (نيابة)' : ''}`, 0])[2]++; });
-    return Object.values(m).sort((a, b) => a[1].localeCompare(b[1], 'ar'));
+    const sp = k => { const [c, sb] = k.split('|'); return { class_id: c, subject_id: sb }; };
+    return Object.values(m).sort((a, b) => (window.APP.cmpEntrySG ? window.APP.cmpEntrySG(sp(a[0]), sp(b[0])) : 0) || a[1].localeCompare(b[1], 'ar'));
   }
   function myGrid(mine, dates) {
     const P = section().periods || 7, D = dates.length;
@@ -1951,6 +1952,36 @@ body.band .foot{background:#082B5A;color:#fff;border-top:0;height:56px}
   window.addEventListener('beforeunload', e => { if (pending.size) { flushSaves(); e.preventDefault(); e.returnValue = ''; } });
 })();
 }catch(e){console.error('[dina] src/core/core.js',e)}
+
+/* ==== src/core/order.js ==== */
+;try{
+/* منصة دينا — ترتيب منطقي موحّد للمراحل والصفوف والفصول والمواد (عرض فقط، لا يغيّر البيانات)
+   المرحلة: رياض الأطفال ← الابتدائية ← المتوسطة ← الثانوية، ثم الصف (الأول… الثاني عشر)، ثم الفصل (أ، ب…).
+   - A.clsRank(c|id)        رقم ترتيب الفصل
+   - A.cmpCls(a, b)         مقارنة فصلين (معرّفات أو كائنات)
+   - A.cmpEntrySG(a, b)     مقارنة حصتين: المادة ثم الصف ثم الفصل
+   - A.subjRank(id)         ترتيب المادة (حقل sort إن وُجد، وإلا الأبجدي) */
+(function () {
+  const A = window.APP; if (!A) return;
+  const { S } = A;
+  const STAGES = [/^(KG|روض|رياض|تمهيدي)/i, /ابتدائ/, /متوسط/, /ثانو/];
+  const stageIdx = s => { s = String(s || ''); const i = STAGES.findIndex(r => r.test(s)); return i < 0 ? (/grade/i.test(s) ? 1 : 5) : i; };
+  const WORDS = ['اول', 'ثاني', 'ثالث', 'رابع', 'خامس', 'سادس', 'سابع', 'ثامن', 'تاسع', 'عاشر'];
+  const gradeOrd = w => {
+    const t = String(w || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[أإآ]/g, 'ا').replace(/ال/g, '');
+    const n = t.match(/\d+/); if (n) return +n[0];
+    if (/حادي\s*عشر/.test(t)) return 11; if (/ثاني\s*عشر/.test(t)) return 12;
+    const i = WORDS.findIndex(x => t.includes(x)); return i < 0 ? 50 : i + 1;
+  };
+  const clsObj = c => (typeof c === 'string' ? (A.cls && A.cls(c)) : c) || {};
+  A.gradeOrd = gradeOrd; A.stageIdx = stageIdx;
+  A.clsRank = c => { const x = clsObj(c); return stageIdx(x.stage || x.name) * 100000 + gradeOrd(x.grade_word || x.name) * 1000 + Math.min(999, +x.sort || 0); };
+  A.cmpCls = (a, b) => { const x = clsObj(a), y = clsObj(b); return A.clsRank(x) - A.clsRank(y) || String(x.class_label || x.name || '').localeCompare(String(y.class_label || y.name || ''), 'ar'); };
+  A.subjRank = id => { const L = S.subjects || [], s = L.find(x => x.id === id); if (s && s.sort != null && s.sort !== '') return +s.sort; const names = L.map(x => x.name || '').sort((a, b) => a.localeCompare(b, 'ar')); return 1000 + names.indexOf((s || {}).name || ''); };
+  A.cmpSubj = (a, b) => A.subjRank(a) - A.subjRank(b) || String(A.subjName ? A.subjName(a) : a).localeCompare(String(A.subjName ? A.subjName(b) : b), 'ar');
+  A.cmpEntrySG = (a, b) => A.cmpSubj(a.subject_id, b.subject_id) || A.cmpCls(a.class_id, b.class_id);
+})();
+}catch(e){console.error('[dina] src/core/order.js',e)}
 
 /* ==== src/plan/export-timetable-weeks-admin.js ==== */
 ;try{
@@ -4219,7 +4250,9 @@ ${S.me.full_name}`;
     phone: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg>',
   };
   // الميزات الجديدة لا تظهر لغير المالك إلا بعد أن يفعّلها المالك من «تخصيص صفحة المعلم» (schools.settings.tfeat)
-  A.tfeat = k => !!(S.me && ((S.realMe ? false : S.me.is_owner) || ((((S.school || {}).settings || {}).tfeat || {})[k] === true)));
+  // القيمة: true = للجميع، 'some' = لمن في settings.tfeatTo[k] فقط، وغير ذلك = مخفية
+  A.tfeat = k => { if (!S.me) return false; if (!S.realMe && S.me.is_owner) return true; const st = (S.school || {}).settings || {}, v = (st.tfeat || {})[k];
+    return v === true || (v === 'some' && Array.isArray((st.tfeatTo || {})[k]) && st.tfeatTo[k].includes(S.me.id)); };
   const canIssue = () => !!(S.me && !S.realMe && (S.me.is_owner || (A.hasModule && A.hasModule('supervision'))));
   const myId = () => S.me && S.me.id;
   const nowIso = () => new Date().toISOString();
@@ -4389,6 +4422,7 @@ ${S.me.full_name}`;
     m.el.querySelector('#apCopy').onclick = async () => { try { await navigator.clipboard.writeText(url); A.toast('نُسخ الرابط', 'ok'); } catch (_) { A.toast(url); } };
   }
   A.appDialog = appDialog;
+  A.notifPanel = () => panel();
   document.addEventListener('click', e => {
     if (!e.target.closest('#ub')) return;
     setTimeout(() => { const m = $('.menu'); if (!m || !A.tfeat('app') || m.querySelector('[data-a="app"]')) return; const b = document.createElement('button'); b.dataset.a = 'app'; b.innerHTML = `${ICO.phone} تطبيق الجوال (أندرويد وآيفون)`; b.style.display = 'flex'; b.style.gap = '8px'; b.style.alignItems = 'center'; b.onclick = () => { m.remove(); appDialog(); }; const lang = m.querySelector('[data-a="lang"]'); lang ? lang.before(b) : m.appendChild(b); }, 0);
@@ -7041,24 +7075,52 @@ ${S.me.full_name}`;
 (function () {
   const A = window.APP, V = window.VIEWS, { S, $, $$, esc, AR, I } = A;
   A.I.home = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>';
+  // ترتيب منطقي: من عمل المعلم اليومي إلى أدوات الصف ثم التقويم ثم الطلاب، وأدوات القيادة والإدارة آخراً — مع لون لكل مجموعة
   const GROUPS = [
-    ['التخطيط والمتابعة', ['my', 'classes', 'dash', 'hwf', 'export', 'weeks', 'reports']],
-    ['الجداول والأنصبة', ['studio', 'timetable', 'nisab', 'plan', 'builder']],
-    ['التقويم والتعلّم', ['prep', 'assess', 'games', 'labs', 'wboard', 'paper', 'analysis', 'records', 'resources']],
-    ['الطلاب والإشراف', ['board', 'duty', 'attendance', 'stucodes', 'supervision', 'myreports', 'posts']],
-    ['الإدارة', ['admin', 'roles', 'tui', 'testt', 'activity', 'archive', 'trash', 'dev']],
+    ['عملي اليومي', ['my', 'prep', 'assistant', 'records', 'hwf', 'myforms', 'myreports'], '#3AB1DB', '#005499', '🗓️'],
+    ['داخل الصف', ['slides', 'poll', 'wboard', 'games', 'labs', 'resources'], '#5BC48A', '#2E8B57', '🍎'],
+    ['الاختبارات والتقويم', ['assess', 'qbank', 'paper', 'analysis', 'noor'], '#C2AEEB', '#7E62C2', '✅'],
+    ['الطلاب والرعاية', ['refer', 'attendance', 'compass', 'gifted', 'counsel', 'deputy', 'stucodes'], '#F2C66D', '#C98A12', '🧑‍🎓'],
+    ['التواصل', ['notify', 'x_notif', 'x_app', 'posts', 'board'], '#84B7E3', '#082B5A', '💬'],
+    ['المتابعة والتخطيط', ['dash', 'classes', 'export', 'weeks', 'reports'], '#5E9BD3', '#082B5A', '📈'],
+    ['الجداول والأنصبة', ['studio', 'timetable', 'nisab', 'plan', 'builder'], '#3AB1DB', '#0B3F8A', '🧩'],
+    ['الإشراف والموارد البشرية', ['supervision', 'forms', 'duty', 'hr'], '#F09A8E', '#D0564A', '📋'],
+    ['الإدارة', ['admin', 'roles', 'tui', 'testt', 'activity', 'archive', 'trash', 'dev'], '#9AA9BC', '#40526A', '⚙️'],
   ];
+  A.HOME_GROUPS = GROUPS;
   const DESC = {
     hwf: 'متابعة الواجبات: الحِمل اليومي لكل فصل، وواجبات كل معلم وأنواعها، والواجبات الإلكترونية وتسليماتها.',
     my: 'أدخل خطتك الأسبوعية لكل حصة وأرسلها للمراجعة.', classes: 'خطة كل فصل أسبوعياً مع الاعتماد والإرجاع والمعاينة.', dash: 'نسب الإنجاز والإرسال والاعتماد لكل فصل ومعلم.', export: 'ملفات PDF وWord للخطة بهوية دينا.', weeks: 'الأسابيع والمواعيد والإجازات.', reports: 'تقارير الالتزام والإنجاز والتنفيذ والتعديلات.',
     studio: 'استوديو الجداول: النصاب والتوزيع والتوليد والاعتماد في مكان واحد.', timetable: 'الجدول المعتمد لكل قسم وإسناد المعلمين.', nisab: 'احتساب النصاب واحتياج المعلمين.', plan: 'توزيع الحصص بقيود مرنة وتوليد آلي.', builder: 'بناء الجدول آلياً.',
     prep: 'تحضير الدروس بالمولّد الآلي، ومكتبة المدرسة، والإدراج في الخطة.', assess: 'الاختبارات الورقية والإلكترونية: أوراق تظليل وتصحيح آلي، بنك أسئلة، تحليل ولجان وخطط علاجية.', paper: 'اختبارات ورقية بأوراق تظليل وتصحيح آلي وتحليل ومشاركة.', analysis: 'تحليل نتائج الاختبارات.', records: 'سجل متابعة الطلاب بغلاف دينا وحفظ سحابي.', resources: 'مكتبة المصادر وأوراق العمل وروابط Drive.',
     board: 'شاشة المدرسة اليومية والمتابعة اللحظية.', labs: 'محاكيات علمية ورياضية تفاعلية مصنفة بالمادة والمرحلة.', wboard: 'سبورة رسم وكتابة وصفحات للعرض على السبورة الذكية.', games: 'مسابقة مباشرة برمز يجيب فيها الطلاب من جوالاتهم، وألعاب ذاتية (بطاقات، مطابقة، تحدٍّ، صح أم خطأ، عجلة) من بنك الأسئلة.', stucodes: 'رموز دخول الطلاب إلى «حسابي»: خطة الفصل والاختبارات والنتائج، مع بطاقات QR وإرسال واتساب.', duty: 'جداول الإشراف والمناوبة المرتبطة بالجدول الزمني، والتوزيع العادل، والمتابعة اللحظية للتواجد.', attendance: 'الحضور والسلوك والإحالات.', supervision: 'نماذج الإشراف التربوي والزيارات والتقارير.', myreports: 'تقارير الإشراف الموجهة إليك.', posts: 'إعلانات أولياء الأمور.',
+    assistant: 'جهّز درسك تلقائياً: أهداف، سير الحصة، أنشطة، أسئلة، واجب وتمايز.', myforms: 'نماذج عملك الخاصة بهوية المدرسة: إنشاء وتعبئة وترتيب.', qbank: 'كل أسئلة المدرسة في بنك واحد مع التصدير والإتاحة.', noor: 'تحليل درجات نور ومقارنة الفصول والمواد.',
+    slides: 'حوّل الدرس أو البنك أو الملف إلى عرض احترافي بهوية دينا.', poll: 'سؤال يجيب عنه الطلاب من جوالاتهم برمز، ونتائج لحظية.', compass: 'مقاييس تربوية للطلاب وتقارير وتوصيات لكل طالب وفصل.', gifted: 'الكشف عن الموهوبين وترشيحهم ورعايتهم.',
+    refer: 'أحِل طالباً للإرشاد أو الوكيل بخطوات بسيطة.', counsel: 'ملفات الإرشاد الطلابي والإحالات والمتابعة.', deputy: 'إحالات الوكيل والإجراءات.', hr: 'حضور الموظفين بالموقع ورمز QR والمساءلات.', forms: 'النماذج والاستمارات بالتوقيع الإلكتروني.',
+    notify: 'مركز الإشعارات: إصدار التنبيهات ومتابعتها.', x_notif: 'تنبيهاتك: النماذج المطلوبة، حصص الانتظار، الرسائل والإعلانات.', x_app: 'ثبّت المنصة على جوالك كتطبيق: أندرويد وآيفون.', qx: '',
     admin: 'المدرسة والأقسام والفصول والمواد والموظفون.', trash: 'كل ما حُذف — استعادة أو حذف نهائي.', testt: 'معلم وفصل تجريبيان لا يراهما غيرك، لتجربة الأداء والإسناد دون التأثير على التقارير.', tui: 'ما يظهر للمعلمين في صفحتهم والقائمة، وإخفاء التحضير من حساب المالك.', roles: 'المسميات وحزم الصلاحيات وإظهار البنود.', activity: 'مرات الدخول وتوقيت الإدخال — لك وحدك.', archive: 'الأسابيع المؤرشفة.', dev: 'أدوات المالك المتقدمة.',
   };
-  const navItems = () => A.NAV.filter(A.navOK).map(n => [n[0], n[1]]).filter(([k]) => k !== 'home');
+  const ACT = {
+    x_notif: ['الإشعارات', () => A.tfeat && A.tfeat('notif') && A.notifPanel && !A.navOK(A.NAV.find(n => n[0] === 'notify') || ['', '', () => false]), () => A.notifPanel(), 'bell'],
+    x_app: ['تطبيق الجوال', () => A.tfeat && A.tfeat('app') && A.appDialog, () => A.appDialog(), 'phone'],
+  };
+  A.HOME_ACT = ACT;
+  const PHONE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg>';
+  const BELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>';
+  A.HOME_ICO = k => k === 'x_app' ? PHONE : k === 'x_notif' ? (I.notify || BELL) : (I[k] || I.home);
+  const navItems = () => [...A.NAV.filter(A.navOK).map(n => [n[0], n[1]]).filter(([k]) => k !== 'home'), ...Object.entries(ACT).filter(([, a]) => { try { return a[1](); } catch (_) { return false; } }).map(([k, a]) => [k, a[0]])];
   const hello = () => { const h = new Date().getHours(); return h < 12 ? 'صباح الخير' : 'مساء الخير'; };
 
+  if (!document.getElementById('hm2css')) { const st = document.createElement('style'); st.id = 'hm2css'; st.textContent = `
+.hm-grp h2{display:flex;align-items:center;gap:8px}
+.hm-ge{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;font-size:16px;background:linear-gradient(145deg,var(--ga),var(--gb));box-shadow:0 6px 12px -6px var(--gb)}
+.hm-gn{font-size:12px;font-weight:800;color:var(--gb);background:#fff;border:1px solid #e3eaf3;border-radius:20px;padding:0 8px;margin-inline-start:2px}
+.hm-grp .hm-ic{background:linear-gradient(145deg,var(--ga),var(--gb));box-shadow:0 8px 16px -8px var(--gb);position:relative;overflow:hidden}
+.hm-grp .hm-ic::before{content:"";position:absolute;inset:2px 2px 52% 2px;border-radius:10px 10px 40% 40%;background:linear-gradient(180deg,rgba(255,255,255,.4),rgba(255,255,255,0))}
+.hm-grp .hm-card{border-top:3px solid var(--ga)}
+.hm-grp .hm-card:focus-visible{outline:3px solid var(--ga);outline-offset:2px}
+@media (max-width:600px){.hm-grp .hm-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.hm-grp .hm-card{padding:12px 10px;align-items:center;text-align:center}.hm-grp .hm-card b{font-size:14px}.hm-grp .hm-d{display:none}.hm-grp .hm-go{display:none}}
+@media (prefers-reduced-motion:reduce){.hm-grp .hm-card{transition:none}}`; document.head.appendChild(st); }
   V.home = function (root) {
     const items = navItems(), have = new Map(items), w = A.week();
     const mine = S.entries.filter(e => e.teacher_id === S.me.id && A.required(e)), myDone = mine.filter(A.filled).length;
@@ -7071,15 +7133,16 @@ ${S.me.full_name}`;
       have.has('classes') && A.anyPerm('review') ? ['بانتظار المراجعة', AR(toReview), 'حصة مُرسلة', 'classes'] : null,
       ['الرسائل', AR(unread), unread ? 'غير مقروءة' : 'لا جديد', 'inbox'],
     ].filter(Boolean);
-    const groups = GROUPS.map(([g, ks]) => [g, ks.filter(k => have.has(k))]).filter(([, ks]) => ks.length);
+    const groups = GROUPS.map(([g, ks, ca, cb, em]) => [g, ks.filter(k => have.has(k)), ca, cb, em]).filter(([, ks]) => ks.length);
     const other = items.filter(([k]) => !GROUPS.some(([, ks]) => ks.includes(k)));
-    if (other.length) groups.push(['المزيد', other.map(([k]) => k)]);
+    if (other.length) groups.push(['المزيد', other.map(([k]) => k), '#3AB1DB', '#005499', '✨']);
     root.innerHTML = `<section class="hm-hero"><div class="hm-hero-in"><div><p class="hm-hi">${hello()}، ${esc(S.me.full_name)}</p><h1>منصة دينا للتخطيط الدراسي</h1><p class="hm-sub">${esc(S.school.name)} · ${esc(A.section().name)}${w ? ' · الأسبوع ' + esc(w.word) : ''}</p></div>
         <img src="assets/logo_white.svg" alt="" class="hm-logo"></div>
         <div class="hm-kpis">${kpis.map(([l, v, d, go]) => `<button class="hm-kpi" data-go="${go}"><span class="hm-kl">${l}</span><b>${v}</b><span class="hm-kd">${d}</span></button>`).join('')}</div></section>
       <div class="hm-tools"><input class="in" id="hmQ" type="search" placeholder="ابحث عن ميزة… (مثال: جدول، اختبار، تقرير)" aria-label="بحث في مزايا المنصة"><span class="small muted" id="hmN"></span></div>
-      <div id="hmG">${groups.map(([g, ks]) => `<section class="hm-grp"><h2>${g}</h2><div class="hm-grid">${ks.map(k => `<a class="hm-card" href="#/${k}" data-k="${k}" data-s="${esc(have.get(k) + ' ' + (DESC[k] || ''))}"><span class="hm-ic">${I[k] || I.home}</span><b>${esc(have.get(k))}</b><span class="hm-d">${esc(DESC[k] || '')}</span><span class="hm-go" aria-hidden="true">←</span></a>`).join('')}</div></section>`).join('')}</div>`;
+      <div id="hmG">${groups.map(([g, ks, ca, cb, em]) => `<section class="hm-grp" style="--ga:${ca};--gb:${cb}"><h2><span class="hm-ge" aria-hidden="true">${em}</span>${g}<span class="hm-gn">${AR(ks.length)}</span></h2><div class="hm-grid">${ks.map(k => `<a class="hm-card" href="${ACT[k] ? '#/home' : '#/' + k}" ${ACT[k] ? `data-act="${k}" role="button"` : ''} data-k="${k}" data-s="${esc(have.get(k) + ' ' + (DESC[k] || ''))}"><span class="hm-ic">${A.HOME_ICO(k)}</span><b>${esc(have.get(k))}</b><span class="hm-d">${esc(DESC[k] || '')}</span><span class="hm-go" aria-hidden="true">←</span></a>`).join('')}</div></section>`).join('')}</div>`;
     $$('.hm-kpi', root).forEach(b => b.onclick = () => { if (b.dataset.go === 'inbox') { const ib = $('#inboxBtn'); if (ib) ib.click(); } else location.hash = '#/' + b.dataset.go; });
+    $$('[data-act]', root).forEach(a => a.onclick = e => { e.preventDefault(); ACT[a.dataset.act][2](); });
     const q = $('#hmQ', root), n = $('#hmN', root);
     q.oninput = () => { const t = A.normKey(q.value || ''); let c = 0; $$('.hm-card', root).forEach(a => { const ok = !t || A.normKey(a.dataset.s).includes(t); a.hidden = !ok; if (ok) c++; }); $$('.hm-grp', root).forEach(s => s.hidden = !$$('.hm-card:not([hidden])', s).length); n.textContent = t ? `${AR(c)} نتيجة` : ''; };
     // ميلان ثلاثي الأبعاد خفيف (يُعطَّل مع تقليل الحركة)
@@ -8250,7 +8313,7 @@ ${S.me.full_name}`;
     const mine = S.entries.filter(e => e.subject_id && e.teacher_id === S.me.id && A.required(e));
     const g = {};
     mine.forEach(e => { const k = e.subject_id + '|' + gradeKey(clsOf(e.class_id)); (g[k] = g[k] || { key: k, subject_id: e.subject_id, grade: gradeKey(clsOf(e.class_id)), classes: new Set(), entries: [] }); g[k].classes.add(e.class_id); g[k].entries.push(e); });
-    return Object.values(g).filter(x => x.classes.size > 1).map(x => ({ ...x, classes: [...x.classes].sort((a, b) => (clsOf(a).sort ?? 0) - (clsOf(b).sort ?? 0) || (clsOf(a).name || '').localeCompare(clsOf(b).name || '', 'ar')) }));
+    return Object.values(g).filter(x => x.classes.size > 1).map(x => ({ ...x, classes: [...x.classes].sort((a, b) => A.cmpCls(a, b)) })).sort((x, y) => A.cmpSubj(x.subject_id, y.subject_id) || A.cmpCls(x.classes[0], y.classes[0]));
   }
   // وضع «بالمادة»: كل مادة مرة واحدة لكل صف، ومربعات اختيار لكل فصول المادة (يمكن ضم فصل من صف آخر أو الاكتفاء بفصل واحد)
   function blocks() {
@@ -8258,12 +8321,12 @@ ${S.me.full_name}`;
     const bySub = {}; mine.forEach(e => { (bySub[e.subject_id] = bySub[e.subject_id] || []).push(e); });
     const out = [];
     Object.entries(bySub).forEach(([sid, es]) => {
-      const all = [...new Set(es.map(e => e.class_id))].sort((a, b) => (clsOf(a).sort ?? 0) - (clsOf(b).sort ?? 0) || (clsOf(a).name || '').localeCompare(clsOf(b).name || '', 'ar'));
+      const all = [...new Set(es.map(e => e.class_id))].sort((a, b) => A.cmpCls(a, b));
       const grades = [...new Set(all.map(c => gradeKey(clsOf(c))))];
       grades.forEach(gk => out.push({ key: 'b|' + sid + '|' + gk, subject_id: sid, grade: gk, classes: all, entries: es, defEx: all.filter(c => gradeKey(clsOf(c)) !== gk) }));
     });
-    const ord = g => Math.min(...g.classes.filter(c => !g.defEx.includes(c)).map(c => clsOf(c).sort ?? 999));
-    return out.sort((x, y) => (A.subjName(x.subject_id) || '').localeCompare(A.subjName(y.subject_id) || '', 'ar') || ord(x) - ord(y));
+    const ord = g => Math.min(...g.classes.filter(c => !g.defEx.includes(c)).map(c => A.clsRank(c)));
+    return out.sort((x, y) => A.cmpSubj(x.subject_id, y.subject_id) || ord(x) - ord(y));
   }
   // توزيع: لكل فصل حصصه مرتبة بالأيام ثم الحصص، مع إزاحة التأخر
   function plan(g, cfg) {
@@ -10296,8 +10359,8 @@ ${S.me.full_name}`;
   if (A.NAV && !A.NAV.some(n => n[0] === 'prep')) { const i = A.NAV.findIndex(n => n[0] === 'assess'); A.NAV.splice(i < 0 ? A.NAV.length : i, 0, ['prep', 'التحضير', () => !!S.me && !(A.coordOnly && A.coordOnly())]); }
   const gk = c => c ? `${c.stage}|${c.grade_word}` : '';
   const gLabel = k => { const [st, g] = (k || '|').split('|'); return g ? A.gradeName(g, st) : '—'; };
-  const mySubjects = () => { const m = new Set(S.entries.filter(e => e.teacher_id === S.me.id && e.subject_id).map(e => e.subject_id)); return (S.me.is_owner || lead() || !m.size) ? S.subjects : S.subjects.filter(s => m.has(s.id)); };
-  const myGrades = () => { const mine = new Set(S.entries.filter(e => e.teacher_id === S.me.id).map(e => e.class_id)); const cl = S.classes.filter(c => c.active && (S.me.is_owner || lead() || !mine.size || mine.has(c.id))); return [...new Set(cl.map(gk))]; };
+  const mySubjects = () => { const m = new Set(S.entries.filter(e => e.teacher_id === S.me.id && e.subject_id).map(e => e.subject_id)); return ((S.me.is_owner || lead() || !m.size) ? S.subjects.slice() : S.subjects.filter(s => m.has(s.id))).sort((a, b) => A.cmpSubj ? A.cmpSubj(a.id, b.id) : 0); };
+  const myGrades = () => { const mine = new Set(S.entries.filter(e => e.teacher_id === S.me.id).map(e => e.class_id)); const cl = S.classes.filter(c => c.active && (S.me.is_owner || lead() || !mine.size || mine.has(c.id))); return [...new Set(cl.slice().sort((a, b) => A.cmpCls ? A.cmpCls(a, b) : 0).map(gk))]; };
   const STRAT = ['التعلم التعاوني', 'العصف الذهني', 'الخرائط الذهنية', 'التعلم بالأقران', 'حل المشكلات', 'الاستقصاء', 'التجريب العملي', 'لعب الأدوار', 'القصة', 'الحوار والمناقشة', 'التعلم باللعب', 'فكّر - زاوج - شارك', 'المحطات التعليمية', 'الصف المقلوب', 'التعلم القائم على المشروع', 'القراءة الموجهة', 'النمذجة', 'التعلم الرقمي التفاعلي'];
   const TOOLS = ['الكتاب المدرسي', 'السبورة الذكية', 'عرض تقديمي', 'أوراق عمل', 'بطاقات تعليمية', 'فيديو تعليمي', 'نماذج ومجسمات', 'أدوات المختبر', 'منصة تفاعلية', 'جهاز لوحي'];
 
@@ -11104,7 +11167,7 @@ ${S.me.full_name}`;
     el.innerHTML = `<section class="sec-box pb-w" aria-label="جدولي والتحضير"><div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><b>${A.I.prep || ''} جدولي والتحضير</b><span class="small muted">اضغط على الحصة لتحضيرها، أو على المادة لتحضير حصصها الأسبوعية</span></div>
       <div class="pb-k"><div class="pb-m"><div class="pb-ring" style="--p:${pct}"><b>${AR(pct)}٪</b></div><span>محضَّرة<br><b>${AR(st.pr)} من ${AR(st.n)}</b> حصة</span></div>
         <div class="k"><b>${AR(st.hw)}</b>واجب</div><div class="k"><b>${AR(st.pt)}</b>مهمة أدائية</div><div class="k"><b>${AR(st.qz)}</b>اختبار / ورقة عمل</div><div class="k"><b>${AR(st.files + st.res)}</b>ملف ومصدر</div></div>
-      <div class="pb-subj">${Object.values(groups).map(g => { const n = g.L.length, d = g.L.filter(isPrepared).length; return `<button type="button" class="pb-sb ${d === n ? 'ok' : ''}" data-sb="${g.s}|${g.g}"><b>${esc(A.subjName(g.s))}</b><span>${esc(A.gradeName(...g.g.split('|').reverse()))}</span><small>${A.cnt(n, 'حصة', 'حصص')} · محضَّر ${AR(d)}</small></button>`; }).join('')}</div>
+      <div class="pb-subj">${Object.values(groups).sort((x, y) => (A.cmpSubj ? A.cmpSubj(x.s, y.s) : 0) || (A.cmpCls ? A.cmpCls(x.L[0].class_id, y.L[0].class_id) : 0)).map(g => { const n = g.L.length, d = g.L.filter(isPrepared).length; return `<button type="button" class="pb-sb ${d === n ? 'ok' : ''}" data-sb="${g.s}|${g.g}"><b>${esc(A.subjName(g.s))}</b><span>${esc(A.gradeName(...g.g.split('|').reverse()))}</span><small>${A.cnt(n, 'حصة', 'حصص')} · محضَّر ${AR(d)}</small></button>`; }).join('')}</div>
       <div class="pb-mob">${days.map(d => `<div class="pb-day"><b>${DAYS[d]}</b><div class="pb-dl">${L.filter(e => e.day === d).map(e => `<div class="pb-pi"><span>${PER[e.period] || AR(e.period + 1)}</span>${cellBtn(e)}</div>`).join('')}</div></div>`).join('')}</div><div class="scroll pb-desk"><table class="pb-g"><thead><tr><th></th>${Array.from({ length: Pn }, (_, p) => `<th>${PER[p] || AR(p + 1)}</th>`).join('')}</tr></thead><tbody>${days.map(d => `<tr><th>${DAYS[d]}</th>${Array.from({ length: Pn }, (_, p) => { const es = cellOf(d, p); if (!es.length) return '<td class="pb-e"></td>'; return `<td>${es.map(cellBtn).join('')}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>
       <p class="small muted" style="margin:6px 0 0">✓ محضَّرة · و واجب · م مهمة أدائية · خ اختبار/ورقة عمل · الرقم = ملفات ومصادر. ${A.prepEditor ? '' : ''}</p></section>`;
     const re = () => A.myPrepBoard(el, opts);
@@ -16289,51 +16352,199 @@ ${S.me.full_name}`;
 ;try{
 /* منصة دينا — التحكم في الميزات الجديدة داخل حسابات المعلمين (للمالك وحده)
    كل ميزة جديدة تبقى جاهزة في المنصة وتعمل في حساب المالك، ولا تظهر لأي حساب آخر إلا بعد تفعيلها هنا.
-   يُحفظ في schools.settings.tfeat — ويقرؤه A.tfeat(k) (notifications.js). */
+   يُحفظ في schools.settings:
+     tfeat   {key: true (للجميع) | false (مخفية) | 'some' (لمعلمين محددين)}
+     tfeatTo {key: [staff ids]}   — يقرؤهما A.tfeat(k) (notifications.js)
+     ehw     {mode: follow|off|all|granted, staff[]} — بند «الاختبارات والواجبات الإلكترونية» (يُفرض في القاعدة بـ ehw_ok) */
 (function () {
   const A = window.APP, V = window.VIEWS; if (!A) return;
   const { S, api, $, $$, esc } = A;
+  const AR = A.AR || (n => String(n));
+  // [مفتاح، الاسم، الوصف، الرمز، المجموعة]
   const F = [
-    ['notif', 'الإشعارات', 'جرس الإشعارات وتنبيهات الجهاز: النماذج المطلوبة، حصص الانتظار، رسائلك وتنبيهاتك العامة.'],
-    ['myforms', 'نماذجي', 'إنشاء المعلم نماذج عمله الخاصة بهوية المدرسة وحفظها وترتيبها.'],
-    ['hr', 'الموارد البشرية', 'تسجيل الحضور الذاتي (الموقع/رمز QR)، وصفحة «حضوري»، وصلاحية الإدارة لمن تمنحه «hr».'],
-    ['terms', 'مؤشر الفصل الدراسي', 'تنقّل المعلم بين الفصل الأول والثاني لمراجعة خطط الفصل السابق (الفصل الحالي يظهر دائماً).'],
-    ['poll', 'السؤال اللحظي', 'صفحة «السؤال اللحظي» وزرّه في السبورة والعروض: يجيب الطلاب من جوالاتهم برمز.'],
-    ['slides', 'العروض التقديمية', 'تحويل بنوك الأسئلة والدروس والملفات لعروض احترافية بهويات مشتقة من دينا.'],
-    ['compass', 'البوصلة', 'تطبيق المقاييس التربوية على الطلاب وعرض نتائجها (مؤشرات الأداء تبقى للمالك).'],
-    ['assistant', 'مساعد المعلم', 'تجهيز الدرس تلقائياً: أهداف، سير الحصة، أنشطة، أسئلة، واجب، تمايز.'],
-    ['games2', 'قوالب الألعاب الجديدة', 'ترتيب الحروف، فرقعة البالونات، الفرز، سباق الفريقين — ضمن طرق اللعب عند إنشاء لعبة.'],
-    ['models3d', 'المجسمات التفاعلية', 'المجسمات الهندسية ونموذج الذرة والمجموعة الشمسية داخل المعامل الافتراضية.'],
-    ['gifted', 'رعاية الموهوبين', 'الدليل المرجعي ونماذج الكشف والترشيح؛ يرى المعلم ترشيحاته فقط، والملفات كاملة للمالك ومن يُمنح «gifted» أو «counselor».'],
-    ['home2', 'واجهة المعلم الجديدة', 'لوحة أعلى صفحة المعلم: الأسبوع الحالي وأيامه ونسبة الإنجاز وأيقونات تفاعلية للوصول السريع.'],
-    ['app', 'زر «تطبيق الجوال»', 'تعليمات تثبيت المنصة على أندرويد وآيفون في قائمة المستخدم.'],
+    ['notif', 'الإشعارات', 'جرس الإشعارات وتنبيهات الجهاز: النماذج المطلوبة، حصص الانتظار، رسائلك وتنبيهاتك العامة.', '🔔', 'com'],
+    ['myforms', 'نماذجي', 'إنشاء المعلم نماذج عمله الخاصة بهوية المدرسة وحفظها وترتيبها.', '📝', 'adm'],
+    ['hr', 'الموارد البشرية', 'تسجيل الحضور الذاتي (الموقع/رمز QR)، وصفحة «حضوري»، وصلاحية الإدارة لمن تمنحه «hr».', '🪪', 'adm'],
+    ['terms', 'مؤشر الفصل الدراسي', 'تنقّل المعلم بين الفصل الأول والثاني لمراجعة خطط الفصل السابق (الفصل الحالي يظهر دائماً).', '📅', 'com'],
+    ['poll', 'السؤال اللحظي', 'صفحة «السؤال اللحظي» وزرّه في السبورة والعروض: يجيب الطلاب من جوالاتهم برمز.', '📊', 'tch'],
+    ['slides', 'العروض التقديمية', 'تحويل بنوك الأسئلة والدروس والملفات لعروض احترافية بهويات مشتقة من دينا.', '🖥️', 'tch'],
+    ['compass', 'البوصلة', 'تطبيق المقاييس التربوية على الطلاب وعرض نتائجها (مؤشرات الأداء تبقى للمالك).', '🧭', 'asm'],
+    ['assistant', 'مساعد المعلم', 'تجهيز الدرس تلقائياً: أهداف، سير الحصة، أنشطة، أسئلة، واجب، تمايز.', '🤖', 'tch'],
+    ['games2', 'قوالب الألعاب الجديدة', 'ترتيب الحروف، فرقعة البالونات، الفرز، سباق الفريقين — ضمن طرق اللعب عند إنشاء لعبة.', '🎮', 'tch'],
+    ['models3d', 'المجسمات التفاعلية', 'المجسمات الهندسية ونموذج الذرة والمجموعة الشمسية داخل المعامل الافتراضية.', '🧪', 'tch'],
+    ['gifted', 'رعاية الموهوبين', 'الدليل المرجعي ونماذج الكشف والترشيح؛ يرى المعلم ترشيحاته فقط، والملفات كاملة للمالك ومن يُمنح «gifted» أو «counselor».', '⭐', 'adm'],
+    ['home2', 'واجهة المعلم الجديدة', 'لوحة أعلى صفحة المعلم: الأسبوع الحالي وأيامه ونسبة الإنجاز وأيقونات تفاعلية للوصول السريع.', '🏠', 'com'],
+    ['app', 'زر «تطبيق الجوال»', 'تعليمات تثبيت المنصة على أندرويد وآيفون في قائمة المستخدم.', '📱', 'com'],
   ];
-  A.TFEAT = F;
+  A.TFEAT = F.map(f => [f[0], f[1], f[2]]);
+  const EHW = ['ehw', 'الاختبارات والواجبات الإلكترونية', 'إنشاء اختبار أو واجب إلكتروني برابط يحلّه الطالب من جواله، مع التصحيح الآلي وواجهات الطالب. يُفرض في قاعدة البيانات.', '✅', 'asm'];
+  const GROUPS = [['asm', 'الاختبارات والتقويم'], ['tch', 'التدريس والمحتوى'], ['com', 'التواصل وواجهة المعلم'], ['adm', 'الإدارة والرعاية']];
+  const MODES = [['off', 'مخفية'], ['all', 'للجميع'], ['some', 'محددون']];
+  const EMODES = [['follow', 'حسب الصلاحيات'], ['off', 'مخفية'], ['all', 'للجميع'], ['some', 'محددون']];
+
   if (!document.getElementById('tfcss')) { const st = document.createElement('style'); st.id = 'tfcss'; st.textContent = `
-.tf-card{border:1px solid #DCE7F3;border-radius:18px;padding:14px 16px;background:linear-gradient(180deg,#fff,#F5F9FD);box-shadow:0 12px 26px -22px rgba(8,43,90,.6);margin-bottom:14px}
-.tf-g{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));margin-top:10px}
-.tf-it{display:flex;gap:10px;align-items:flex-start;border:1.5px solid #DCE7F3;border-radius:14px;padding:10px 12px;background:#fff;cursor:pointer}
-.tf-it:has(input:checked){border-color:#2E8B57;background:#F4FBF6}
-.tf-it input{width:20px;height:20px;accent-color:#2E8B57;margin-top:2px;flex:none}
-.tf-it b{display:block;color:#082B5A}.tf-it small{color:#5b6b7f}
-.tf-st{font-size:11.5px;font-weight:800;border-radius:20px;padding:1px 8px;margin-inline-start:6px}
-.tf-on{background:#E5F3EA;color:#2E8B57}.tf-off{background:#EEF1F5;color:#5b6b7f}`; document.head.appendChild(st); }
+#toasts{z-index:10001}
+.tf-card{border:1px solid #DCE7F3;border-radius:18px;background:linear-gradient(180deg,#fff,#F5F9FD);box-shadow:0 12px 26px -22px rgba(8,43,90,.6);margin-bottom:14px}
+.tf-in{padding:14px 16px 4px}
+.tf-hd{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.tf-hd h3{margin:0;color:#082B5A}.tf-hd .grow{flex:1;min-width:220px}
+.tf-sum{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.tf-sum span{font-size:12.5px;font-weight:800;border-radius:20px;padding:3px 10px;background:#EEF1F5;color:#40526a}
+.tf-sum .on{background:#E5F3EA;color:#1F6E45}.tf-sum .some{background:#E3F2FA;color:#005499}
+.tf-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.tf-tools .in{flex:1;min-width:180px;max-width:320px;padding:8px 12px}
+.tf-flt{display:inline-flex;border:1.5px solid #DCE7F3;border-radius:12px;overflow:hidden;background:#fff}
+.tf-flt button{border:0;background:none;padding:7px 12px;font:inherit;font-size:13px;font-weight:700;color:#40526a;cursor:pointer;min-height:36px}
+.tf-flt button[aria-pressed="true"]{background:#082B5A;color:#fff}
+.tf-gr{margin-top:14px}
+.tf-gr h4{margin:0 0 8px;font-size:14px;color:#005499;display:flex;align-items:center;gap:8px}
+.tf-gr h4::after{content:"";flex:1;height:1px;background:#DCE7F3}
+.tf-g{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr))}
+.tf-it{border:1.5px solid #DCE7F3;border-radius:14px;padding:12px;background:#fff;display:flex;flex-direction:column;gap:10px;transition:border-color .15s,background .15s}
+.tf-it[data-m="all"]{border-color:#2E8B57;background:#F4FBF6}
+.tf-it[data-m="some"]{border-color:#3AB1DB;background:#F3FAFE}
+.tf-it.dirty{box-shadow:0 0 0 3px #F2C66D55}
+.tf-top{display:flex;gap:10px;align-items:flex-start}
+.tf-ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:19px;background:#EEF4FB;flex:none}
+.tf-it b{display:block;color:#082B5A;font-size:15px}.tf-it small{color:#5b6b7f;line-height:1.6;display:block}
+.tf-st{font-size:11.5px;font-weight:800;border-radius:20px;padding:1px 8px;margin-inline-start:6px;white-space:nowrap}
+.tf-on{background:#E5F3EA;color:#1F6E45}.tf-off{background:#EEF1F5;color:#5b6b7f}.tf-some{background:#E3F2FA;color:#005499}.tf-fol{background:#FFF4DA;color:#8A5A00}
+.tf-seg{display:flex;border:1.5px solid #DCE7F3;border-radius:12px;overflow:hidden;background:#fff}
+.tf-seg label{flex:1;position:relative;cursor:pointer}
+.tf-seg input{position:absolute;opacity:0;inset:0;cursor:pointer;margin:0}
+.tf-seg span{display:block;text-align:center;padding:8px 4px;font-size:12.5px;font-weight:700;color:#40526a;min-height:36px;line-height:20px}
+.tf-seg label+label span{border-inline-start:1px solid #DCE7F3}
+.tf-seg input:checked+span{background:#082B5A;color:#fff}
+.tf-seg input[value="all"]:checked+span{background:#2E8B57}
+.tf-seg input[value="some"]:checked+span{background:#005499}
+.tf-seg input:focus-visible+span{outline:3px solid #3AB1DB;outline-offset:-3px}
+.tf-who{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;color:#005499;font-weight:700}
+.tf-who .btn{min-height:34px}
+.tf-bar{position:sticky;bottom:0;z-index:5;margin-top:14px;padding:10px 16px;border-top:1px solid #DCE7F3;border-radius:0 0 18px 18px;background:rgba(255,255,255,.96);backdrop-filter:blur(6px);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.tf-bar .msg{flex:1;min-width:160px;font-weight:700;font-size:13.5px;color:#5b6b7f}
+.tf-bar.dirty{background:#FFF8E6;border-top-color:#F2C66D}.tf-bar.dirty .msg{color:#8A5A00}
+.tf-bar.ok .msg{color:#1F6E45}.tf-bar.err .msg{color:#B3261E}
+@media (max-width:760px){.tf-bar{bottom:calc(64px + env(safe-area-inset-bottom))}}
+.tf-empty{padding:16px;text-align:center;color:#5b6b7f}
+.tfp-l{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));gap:4px 12px;max-height:min(52vh,420px);overflow:auto;margin-top:10px;padding:2px}
+.tfp-l label{display:flex;gap:8px;align-items:center;padding:7px 8px;border-radius:10px;cursor:pointer;min-height:40px}
+.tfp-l label:hover{background:#F3F7FC}.tfp-l input{width:18px;height:18px;accent-color:#005499;flex:none}
+@media (prefers-reduced-motion:reduce){.tf-it{transition:none}}`; document.head.appendChild(st); }
+
+  const staffList = () => (S.staff || []).filter(p => p.active !== false && !p.is_owner).sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'ar'));
+  const norm = s => (A.normKey ? A.normKey(s || '') : String(s || '').trim());
+
+  // قراءة الإعداد المحفوظ إلى مسودة قابلة للتعديل
+  function load() {
+    const st = S.school.settings || {}, tf = st.tfeat || {}, to = st.tfeatTo || {}, e = st.ehw || {};
+    const d = { m: {}, to: {} };
+    F.forEach(([k]) => { d.m[k] = tf[k] === true ? 'all' : tf[k] === 'some' ? 'some' : 'off'; d.to[k] = Array.isArray(to[k]) ? to[k].slice() : []; });
+    const em = e.mode || 'follow'; d.m.ehw = em === 'granted' ? 'some' : ['all', 'off', 'follow'].includes(em) ? em : 'follow'; d.to.ehw = Array.isArray(e.staff) ? e.staff.slice() : [];
+    return d;
+  }
+  const sig = (d, k) => d.m[k] + (d.m[k] === 'some' ? ':' + d.to[k].slice().sort().join(',') : '');
+
   const prev = V.tui;
   V.tui = function (root) {
     const r = prev.apply(this, arguments);
     if (!S.me || !S.me.is_owner || S.realMe) return r;
-    const cur = ((S.school.settings || {}).tfeat) || {};
+    let saved = load(), d = load(), q = '', flt = 'all', lastMsg = '', lastCls = '';
+    const ALL = [EHW, ...F];
+    const changed = () => ALL.filter(f => sig(saved, f[0]) !== sig(d, f[0])).map(f => f[0]);
+
     const box = document.createElement('div'); box.className = 'tf-card'; box.id = 'tfCard';
-    box.innerHTML = `<div class="head" style="margin:0"><div class="grow"><h3 style="margin:0">الميزات الجديدة في حسابات المعلمين</h3><p class="sub" style="margin:4px 0 0">كل ميزة جديدة جاهزة وتعمل في حسابك، ولا تظهر لأي معلم أو موظف إلا عندما تفعّلها هنا.</p></div><button class="btn sm" id="tfGo">حفظ</button></div>
-      <div class="tf-g">${F.map(([k, l, d]) => `<label class="tf-it"><input type="checkbox" data-tf="${k}" ${cur[k] === true ? 'checked' : ''}><span><b>${esc(l)}<span class="tf-st ${cur[k] === true ? 'tf-on' : 'tf-off'}">${cur[k] === true ? 'ظاهرة للمعلمين' : 'مخفية عنهم'}</span></b><small>${esc(d)}</small></span></label>`).join('')}</div>`;
+    box.innerHTML = `<div class="tf-in"><div class="tf-hd"><div class="grow"><h3>الميزات الجديدة في حسابات المعلمين</h3><p class="sub" style="margin:4px 0 0">كل ميزة جاهزة وتعمل في حسابك، ولا تظهر لأي معلم أو موظف إلا بما تحدده هنا: <b>مخفية</b>، أو <b>للجميع</b>، أو <b>لمعلمين محددين</b>.</p></div><button type="button" class="btn sm" id="tfGo2" disabled>لا تغييرات</button></div>
+      <div class="tf-sum" id="tfSum" aria-live="polite"></div>
+      <div class="tf-tools"><input class="in" id="tfQ" type="search" placeholder="ابحث عن ميزة…" aria-label="ابحث عن ميزة">
+        <div class="tf-flt" role="group" aria-label="تصفية">${[['all', 'الكل'], ['on', 'الظاهرة'], ['off', 'المخفية']].map(([k, l]) => `<button type="button" data-flt="${k}" aria-pressed="${k === 'all'}">${l}</button>`).join('')}</div>
+        <button type="button" class="btn ghost sm" id="tfAllOn">إظهار الكل للجميع</button><button type="button" class="btn ghost sm" id="tfAllOff">إخفاء الكل</button></div>
+      <div id="tfList"></div></div>
+      <div class="tf-bar" id="tfBar" role="status" aria-live="polite"><span class="msg" id="tfMsg"></span><button type="button" class="btn ghost sm" id="tfUndo">تراجع</button><button type="button" class="btn sm" id="tfGo">حفظ</button></div>`;
     const host = root.querySelector('.card') || root; host.parentNode ? host.parentNode.insertBefore(box, host) : root.prepend(box);
-    box.querySelector('#tfGo').onclick = e => A.run(e.currentTarget, async () => {
-      const tfeat = {}; $$('[data-tf]', box).forEach(i => tfeat[i.dataset.tf] = i.checked);
-      const added = Object.keys(tfeat).filter(k => tfeat[k] && cur[k] !== true);
-      const settings = { ...(S.school.settings || {}), tfeat }; const res = await api.updateSchool(S.school.id, { settings }); S.school.settings = (res && res.settings) || settings;
-      let sent = 0; if (added.length && A.announceNew) sent = await A.announceNew(added);
-      A.toast('حُفظ — يظهر للمعلمين ما فعّلته فقط' + (added.length ? ' · وصلهم إشعار «تمت إضافة…»' : ''), 'ok'); V.tui(root);
-    });
+
+    const badge = f => { const m = d.m[f[0]], n = d.to[f[0]].length;
+      return m === 'all' ? '<span class="tf-st tf-on">ظاهرة للجميع</span>' : m === 'some' ? `<span class="tf-st tf-some">${n ? 'لـ' + AR(n) + ' ' + (n > 2 && n < 11 ? 'معلمين' : 'معلم') : 'لم تحدد أحداً'}</span>` : m === 'follow' ? '<span class="tf-st tf-fol">حسب صلاحية الاختبارات</span>' : '<span class="tf-st tf-off">مخفية</span>'; };
+    const item = f => { const [k, l, desc, ic] = f, modes = k === 'ehw' ? EMODES : MODES, m = d.m[k], dirty = sig(saved, k) !== sig(d, k);
+      return `<div class="tf-it ${dirty ? 'dirty' : ''}" data-k="${k}" data-m="${m}">
+        <div class="tf-top"><span class="tf-ic" aria-hidden="true">${ic}</span><div><b id="tfL-${k}">${esc(l)}${badge(f)}</b><small>${esc(desc)}</small></div></div>
+        <div class="tf-seg" role="radiogroup" aria-labelledby="tfL-${k}">${modes.map(([v, t]) => `<label><input type="radio" name="tf-${k}" value="${v}" ${m === v ? 'checked' : ''}><span>${t}</span></label>`).join('')}</div>
+        ${m === 'some' ? `<div class="tf-who"><span>${d.to[k].length ? esc(d.to[k].map(id => (staffList().find(p => p.id === id) || {}).full_name).filter(Boolean).slice(0, 3).join('، ')) + (d.to[k].length > 3 ? ' و' + AR(d.to[k].length - 3) + ' آخرون' : '') : 'اختر المعلمين الذين تظهر لهم'}</span><button type="button" class="btn sm ghost" data-pick="${k}">${d.to[k].length ? 'تعديل' : 'اختيار'} المعلمين</button></div>` : ''}
+        ${k === 'ehw' && m === 'follow' ? '<small>«حسب الصلاحيات»: يظهر لمن لديه صلاحية الاختبارات في «المسميات والصلاحيات».</small>' : ''}
+      </div>`; };
+
+    function renderSum() {
+      const c = { all: 0, some: 0, off: 0 }; ALL.forEach(f => { const m = d.m[f[0]]; c[m === 'follow' ? 'off' : m]++; });
+      $('#tfSum', box).innerHTML = `<span class="on">ظاهرة للجميع: ${AR(c.all)}</span><span class="some">لمعلمين محددين: ${AR(c.some)}</span><span>مخفية: ${AR(c.off)}</span>`;
+    }
+    function renderBar() {
+      const ch = changed(), bar = $('#tfBar', box), go = $('#tfGo', box), un = $('#tfUndo', box);
+      bar.className = 'tf-bar' + (ch.length ? ' dirty' : lastCls ? ' ' + lastCls : '');
+      $('#tfMsg', box).textContent = ch.length ? `تغييرات غير محفوظة: ${AR(ch.length)} — اضغط «حفظ»` : (lastMsg || 'لا توجد تغييرات غير محفوظة');
+      go.disabled = !ch.length; un.style.display = ch.length ? '' : 'none'; go.textContent = ch.length ? `حفظ (${AR(ch.length)})` : 'حفظ';
+      const g2 = $('#tfGo2', box); g2.disabled = !ch.length; g2.textContent = ch.length ? `حفظ التغييرات (${AR(ch.length)})` : 'لا تغييرات';
+    }
+    function renderList() {
+      const v = norm(q);
+      const show = f => (!v || norm(f[1] + ' ' + f[2]).includes(v)) && (flt === 'all' || (flt === 'on' ? ['all', 'some'].includes(d.m[f[0]]) : !['all', 'some'].includes(d.m[f[0]])));
+      const html = GROUPS.map(([g, gl]) => { const L = ALL.filter(f => f[4] === g && show(f)); return L.length ? `<section class="tf-gr" aria-label="${gl}"><h4>${gl}</h4><div class="tf-g">${L.map(item).join('')}</div></section>` : ''; }).join('');
+      $('#tfList', box).innerHTML = html || '<div class="tf-empty">لا توجد ميزة مطابقة</div>';
+      renderSum(); renderBar();
+    }
+    const touch = () => { lastMsg = ''; lastCls = ''; renderList(); };
+
+    function picker(k) {
+      const f = ALL.find(x => x[0] === k), people = staffList(), sel = new Set(d.to[k]);
+      const m = A.modal(`<h3>من تظهر له «${esc(f[1])}»؟</h3><p class="sub">حدّد المعلمين والموظفين؛ لن تظهر الميزة لغيرهم.</p>
+        <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><input class="in" id="tfpQ" type="search" placeholder="بحث بالاسم أو المسمى" aria-label="بحث بالاسم" style="flex:1;min-width:170px">
+        <button type="button" class="btn ghost sm" id="tfpAll">تحديد الظاهرين</button><button type="button" class="btn ghost sm" id="tfpNone">إلغاء الكل</button><span class="pill st-approved" id="tfpN"></span></div>
+        <div class="tfp-l">${people.map(p => `<label data-nm="${esc(norm(p.full_name + ' ' + (p.title || '')))}"><input type="checkbox" value="${p.id}" ${sel.has(p.id) ? 'checked' : ''}><span>${esc(p.full_name)}${p.title ? ` <span class="small muted">· ${esc(p.title)}</span>` : ''}</span></label>`).join('') || '<p class="small muted">لا يوجد موظفون</p>'}</div>
+        <div class="acts"><button type="button" class="btn ghost" id="tfpX">إلغاء</button><button type="button" class="btn" id="tfpOk">اعتماد الاختيار</button></div>`, { cls: 'wide' });
+      const el = m.el, cnt = () => { $('#tfpN', el).textContent = AR($$('.tfp-l input:checked', el).length) + ' محدد'; };
+      cnt(); $$('.tfp-l input', el).forEach(i => i.onchange = cnt);
+      $('#tfpQ', el).oninput = ev => { const v = norm(ev.target.value); $$('[data-nm]', el).forEach(l => l.hidden = !!v && !l.dataset.nm.includes(v)); };
+      $('#tfpAll', el).onclick = () => { $$('[data-nm]', el).forEach(l => { if (!l.hidden) l.querySelector('input').checked = true; }); cnt(); };
+      $('#tfpNone', el).onclick = () => { $$('.tfp-l input', el).forEach(i => i.checked = false); cnt(); };
+      $('#tfpX', el).onclick = () => m.close();
+      $('#tfpOk', el).onclick = () => { d.to[k] = $$('.tfp-l input:checked', el).map(i => i.value); d.m[k] = 'some'; m.close(); touch(); const b = box.querySelector(`[data-pick="${k}"]`); if (b) b.focus(); };
+      setTimeout(() => { const s = $('#tfpQ', el); if (s) s.focus(); }, 50);
+    }
+
+    box.addEventListener('change', e => { const t = e.target; if (t.name && t.name.startsWith('tf-')) { const k = t.name.slice(3); d.m[k] = t.value; touch(); if (t.value === 'some' && !d.to[k].length) picker(k); else { const n = box.querySelector(`input[name="tf-${k}"][value="${t.value}"]`); if (n) n.focus(); } } });
+    box.addEventListener('click', e => { const b = e.target.closest('[data-pick]'); if (b) picker(b.dataset.pick); const fb = e.target.closest('[data-flt]'); if (fb) { flt = fb.dataset.flt; $$('[data-flt]', box).forEach(x => x.setAttribute('aria-pressed', x === fb)); renderList(); } });
+    $('#tfGo2', box).onclick = () => $('#tfGo', box).click();
+    $('#tfQ', box).oninput = e => { q = e.target.value; renderList(); };
+    $('#tfAllOn', box).onclick = () => { F.forEach(([k]) => d.m[k] = 'all'); touch(); };
+    $('#tfAllOff', box).onclick = () => { F.forEach(([k]) => d.m[k] = 'off'); touch(); };
+    $('#tfUndo', box).onclick = () => { d = load(); touch(); };
+
+    $('#tfGo', box).onclick = async e => {
+      const ch = changed(); if (!ch.length) return;
+      const empty = ch.filter(k => d.m[k] === 'some' && !d.to[k].length);
+      if (empty.length) { lastMsg = 'اختر معلماً واحداً على الأقل لـ: ' + empty.map(k => ALL.find(f => f[0] === k)[1]).join('، '); lastCls = 'err'; renderBar(); $('#tfBar', box).className = 'tf-bar err'; $('#tfMsg', box).textContent = lastMsg; return; }
+      $('#tfMsg', box).textContent = 'جارٍ الحفظ…';
+      await A.run(e.currentTarget, async () => {
+        try {
+          const old = S.school.settings || {}, tfeat = {}, tfeatTo = {};
+          F.forEach(([k]) => { tfeat[k] = d.m[k] === 'all' ? true : d.m[k] === 'some' ? 'some' : false; if (d.m[k] === 'some') tfeatTo[k] = d.to[k].slice(); });
+          const ehw = { ...(old.ehw || {}), mode: d.m.ehw === 'some' ? 'granted' : d.m.ehw, staff: d.m.ehw === 'some' ? d.to.ehw.slice() : ((old.ehw || {}).staff || []) };
+          const settings = { ...old, tfeat, tfeatTo, ehw };
+          const res = await api.updateSchool(S.school.id, { settings }); S.school.settings = (res && res.settings) || settings;
+          // إشعار «تمت إضافة…» لمن صارت الميزة ظاهرة لهم حديثاً
+          let sent = 0;
+          if (A.announceNew) {
+            const toAll = ch.filter(k => k !== 'ehw' && d.m[k] === 'all' && saved.m[k] !== 'all');
+            if (toAll.length) sent += await A.announceNew(toAll) ? 1 : 0;
+            for (const k of ch.filter(k => k !== 'ehw' && d.m[k] === 'some')) { const was = saved.m[k] === 'all' ? null : new Set(saved.m[k] === 'some' ? saved.to[k] : []); const ids = was ? d.to[k].filter(id => !was.has(id)) : []; if (ids.length) sent += await A.announceNew([k], ids) ? 1 : 0; }
+          }
+          saved = load(); d = load();
+          const t = new Date(); lastMsg = `✓ حُفظ الساعة ${AR(t.getHours())}:${AR(String(t.getMinutes()).padStart(2, '0'))}${sent ? ' — وصل المعنيين إشعار «تمت إضافة…»' : ''}`; lastCls = 'ok';
+          renderList(); if (A.tuiApply) try { A.tuiApply(); } catch (_) { }
+          A.toast('حُفظ — يظهر للمعلمين ما حددته فقط', 'ok');
+        } catch (err) { lastMsg = '✗ لم يُحفظ: ' + ((err && err.message) || 'تحقق من الاتصال وأعد المحاولة'); lastCls = 'err'; throw err; }
+      });
+      renderBar(); if (lastCls === 'err') { $('#tfBar', box).className = 'tf-bar err'; $('#tfMsg', box).textContent = lastMsg; }
+    };
+    renderList();
     return r;
   };
 })();
@@ -18100,7 +18311,7 @@ body[data-th=pattern] .card>.head h2::after,body[data-th=pattern] .card>h2::afte
     if (!S.me || S.realMe || document.querySelector('.ovl') || (navigator.webdriver && !window.__wnTest)) return;
     let seen = null; try { seen = JSON.parse(localStorage.getItem(seenKey()) || 'null'); } catch (_) { }
     const tf = (((S.school || {}).settings || {}).tfeat) || {}, F = (A.TFEAT || []);
-    const items = S.me.is_owner ? NEWS.map(n => n.slice()) : [NEWS.find(x => x[0] === 'themes').slice(), ...F.filter(f => tf[f[0]] === true).map(f => { const n = NEWS.find(x => x[0] === f[0]); return n ? n.slice() : [f[0], '✨', f[1], f[2], '', '#3AB1DB', '#005499']; })];
+    const items = S.me.is_owner ? NEWS.map(n => n.slice()) : [NEWS.find(x => x[0] === 'themes').slice(), ...F.filter(f => tf[f[0]] === true || (tf[f[0]] === 'some' && A.tfeat(f[0]))).map(f => { const n = NEWS.find(x => x[0] === f[0]); return n ? n.slice() : [f[0], '✨', f[1], f[2], '', '#3AB1DB', '#005499']; })];
     const fresh = items.filter(n => !(seen || []).includes(n[0]));
     if (!fresh.length) return;
     try { localStorage.setItem(seenKey(), JSON.stringify(items.map(n => n[0]).concat(seen || []))); } catch (_) { }
@@ -18111,15 +18322,15 @@ body[data-th=pattern] .card>.head h2::after,body[data-th=pattern] .card>h2::afte
   let wnT = 0; const wnTry = () => { if (wnT++ > 20) return; if (S.me && S.school && $('#nav')) setTimeout(whatsNew, 1800); else setTimeout(wnTry, 1000); };
   setTimeout(wnTry, 1500);
   // إشعار «تمت إضافة…» لكل المعلمين عند تفعيل المالك ميزة جديدة لهم
-  A.announceNew = async keys => {
+  A.announceNew = async (keys, ids) => {
     const F = A.TFEAT || []; const L = keys.map(k => F.find(f => f[0] === k)).filter(Boolean); if (!L.length) return 0;
     const n = NEWS.find(x => x[0] === keys[0]);
-    try { return await api.rpc('notify_send', { p_ids: null, p_title: '✨ تمت إضافة: ' + L.map(f => f[1]).join('، '), p_body: L.map(f => '• ' + f[1] + ' — ' + f[2]).join('\n'), p_link: (n && n[4]) || '', p_kind: 'new', p_show_at: null }); } catch (_) { return 0; }
+    try { return await api.rpc('notify_send', { p_ids: ids && ids.length ? ids : null, p_title: '✨ تمت إضافة: ' + L.map(f => f[1]).join('، '), p_body: L.map(f => '• ' + f[1] + ' — ' + f[2]).join('\n'), p_link: (n && n[4]) || '', p_kind: 'new', p_show_at: null }); } catch (_) { return 0; }
   };
 
   // ======================= (٢) لوحة المعلم =======================
   const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
-  const QUICK = { prep: ['#5E9BD3', '#082B5A'], assess: ['#C2AEEB', '#7E62C2'], records: ['#F2C66D', '#C98A12'], refer: ['#F09A8E', '#D0564A'], forms: ['#84B7E3', '#005499'], games: ['#5BC48A', '#2E8B57'], wboard: ['#3AB1DB', '#005499'], labs: ['#BADF93', '#3F7D2A'], poll: ['#F2C66D', '#C98A12'], slides: ['#C2AEEB', '#7E62C2'], compass: ['#3AB1DB', '#082B5A'], gifted: ['#F2C66D', '#B07A10'], assistant: ['#5BC48A', '#2E8B57'], notify: ['#84B7E3', '#082B5A'] };
+  const QUICK = { x_app: ['#84B7E3', '#005499'], prep: ['#5E9BD3', '#082B5A'], assess: ['#C2AEEB', '#7E62C2'], records: ['#F2C66D', '#C98A12'], refer: ['#F09A8E', '#D0564A'], forms: ['#84B7E3', '#005499'], games: ['#5BC48A', '#2E8B57'], wboard: ['#3AB1DB', '#005499'], labs: ['#BADF93', '#3F7D2A'], poll: ['#F2C66D', '#C98A12'], slides: ['#C2AEEB', '#7E62C2'], compass: ['#3AB1DB', '#082B5A'], gifted: ['#F2C66D', '#B07A10'], assistant: ['#5BC48A', '#2E8B57'], notify: ['#84B7E3', '#082B5A'] };
   const PAL = [['#3AB1DB', '#005499'], ['#5BC48A', '#2E8B57'], ['#C2AEEB', '#7E62C2'], ['#F2C66D', '#C98A12'], ['#F09A8E', '#D0564A'], ['#84B7E3', '#082B5A']];
   const parse = s => { const [y, mo, d] = String(s || '').split('-').map(Number); return new Date(y, (mo || 1) - 1, d || 1); };
   function hero() {
@@ -18130,14 +18341,17 @@ body[data-th=pattern] .card>.head h2::after,body[data-th=pattern] .card>h2::afte
     const hol = (w.holidays || []).map(h => h.day);
     const days = DAYS.map((n, i) => { const d = st ? new Date(st.getFullYear(), st.getMonth(), st.getDate() + i) : null; const L = mine.filter(e => e.day === i); return { i, n, d, cnt: L.length, ok: L.filter(fil).length, today: d && d.getTime() === today.getTime(), hol: hol.includes(i) }; });
     const fmt = d => d ? AR(d.getDate()) + '/' + AR(d.getMonth() + 1) : '';
-    const nav = (A.NAV || []).filter(n => n[0] !== 'my' && n[0] !== 'dash' && (typeof n[2] !== 'function' || (() => { try { return n[2](); } catch (_) { return false; } })())).slice(0, 10);
+    // ترتيب منطقي موحّد مع الرئيسية (A.HOME_GROUPS): عملي اليومي ← داخل الصف ← التقويم ← الطلاب ← التواصل
+    const ORD = [].concat(...((A.HOME_GROUPS || []).map(g => g[1])));
+    const rank = k => { const i = ORD.indexOf(k); return i < 0 ? 999 : i; };
+    const nav = (A.NAV || []).filter(n => !['my', 'dash', 'home', 'notify'].includes(n[0]) && (typeof n[2] !== 'function' || (() => { try { return n[2](); } catch (_) { return false; } })())).sort((a, b) => rank(a[0]) - rank(b[0])).slice(0, 11);
     const unread = +((($('#notifN') || {}).textContent || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))) || 0;
-    const icons = [...nav.map(n => [n[0], n[1], '#/' + n[0]]), ...(A.tfeat('notif') && $('#notifBtn') ? [['notify', 'الإشعارات', '#/notify']] : [])];
+    const icons = [...nav.map(n => [n[0], n[1], '#/' + n[0]]), ...(A.tfeat('notif') && A.notifPanel ? [['notify', 'الإشعارات', '']] : []), ...(A.tfeat('app') && A.appDialog ? [['x_app', 'تطبيق الجوال', '']] : [])];
     const ring = `<div class="tq-ring" style="--p:${p}" role="img" aria-label="إنجاز الخطة ${p}٪"><div><b>${AR(p)}٪</b><small>${AR(done)} من ${AR(mine.length)}</small></div></div>`;
     return `<section class="tq" id="myHero" aria-label="أسبوعي">
       <div class="tq-top"><div class="tq-wk"><small>أهلاً ${esc((S.me.full_name || S.me.name || '').split(' ').slice(0, 2).join(' '))} 👋</small><h2>${esc(w.word ? 'الأسبوع ' + w.word : (w.label || 'الأسبوع الحالي'))}</h2><span>${days[0].d ? `من ${fmt(days[0].d)} إلى ${fmt(days[4].d)} · ` : ''}${AR(mine.length)} حصة في جدولك</span></div>${ring}</div>
       <div class="tq-days" role="list">${days.map(d => `<button class="tq-d ${d.today ? 'today' : ''} ${d.hol ? 'hol' : ''}" data-hd="${d.i}" role="listitem" aria-label="${d.n} ${d.hol ? 'إجازة' : AR(d.cnt) + ' حصص'}"><b>${d.n}</b><span>${d.hol ? 'إجازة' : `${fmt(d.d)} · ${AR(d.cnt)} حصص`}</span><i><u style="width:${d.cnt ? d.ok * 100 / d.cnt : 0}%"></u></i></button>`).join('')}</div>
-      ${icons.length ? `<div class="tq-ics">${icons.map(([k, l, h], i) => { const c = QUICK[k] || PAL[i % PAL.length]; return `<a class="tq-ic" href="${h}"><span class="g" style="--a:${c[0]};--b:${c[1]}">${A.I[k] || A.I.book || ''}${k === 'notify' && unread ? `<span class="bd">${AR(unread)}</span>` : ''}</span>${esc(l)}</a>`; }).join('')}</div>` : ''}
+      ${icons.length ? `<div class="tq-ics">${icons.map(([k, l, h], i) => { const c = QUICK[k] || PAL[i % PAL.length]; const ic = (A.HOME_ICO && k === 'x_app') ? A.HOME_ICO(k) : (A.I[k] || A.I.book || ''), inner = `<span class="g" style="--a:${c[0]};--b:${c[1]}">${ic}${k === 'notify' && unread ? `<span class="bd">${AR(unread)}</span>` : ''}</span>${esc(l)}`; return h ? `<a class="tq-ic" href="${h}">${inner}</a>` : `<button type="button" class="tq-ic" data-tqa="${k}" aria-label="${esc(l)}${k === 'notify' && unread ? ' — ' + AR(unread) + ' غير مقروء' : ''}">${inner}</button>`; }).join('')}</div>` : ''}
     </section>`;
   }
   ['my'].forEach(k => { const v0 = V[k]; if (!v0) return; V[k] = function (root) {
@@ -18146,6 +18360,7 @@ body[data-th=pattern] .card>.head h2::after,body[data-th=pattern] .card>h2::afte
       if (!S.me || !A.tfeat('home2') || !root || !root.isConnected) return; const old = $('#myHero', root); if (old) old.remove();
       root.insertAdjacentHTML('afterbegin', hero()); const h = $('#myHero', root);
       const g = $('details.tgrid', root); if (g) { h.after(g); g.open = true; }
+      $$('[data-tqa]', h).forEach(b => b.onclick = () => { if (b.dataset.tqa === 'notify') A.notifPanel(); else if (b.dataset.tqa === 'x_app') A.appDialog(); });
       $$('[data-hd]', h).forEach(b => b.onclick = () => { const t = $('details.tgrid', root); if (!t) return; t.open = true; t.scrollIntoView({ behavior: 'smooth', block: 'start' }); t.classList.remove('tq-flash'); void t.offsetWidth; t.classList.add('tq-flash'); $$('.tg tbody tr', t).forEach((tr, i) => tr.classList.toggle('tq-row', i === +b.dataset.hd)); });
     } catch (e) { console.warn('hero', e); } };
     if (r && typeof r.then === 'function') r.then(go); else setTimeout(go, 0);

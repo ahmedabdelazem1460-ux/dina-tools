@@ -503,7 +503,8 @@
   // ---------- جدول المعلم الأسبوعي (حصصه المسندة فقط) ----------
   function myPairs(mine) {
     const m = {}; mine.forEach(e => { const k = e.class_id + '|' + e.subject_id; (m[k] = m[k] || [k, `${subjName(e.subject_id)} — ${(cls(e.class_id) || {}).name || ''}${e.teacher_id !== S.me.id ? ' (نيابة)' : ''}`, 0])[2]++; });
-    return Object.values(m).sort((a, b) => a[1].localeCompare(b[1], 'ar'));
+    const sp = k => { const [c, sb] = k.split('|'); return { class_id: c, subject_id: sb }; };
+    return Object.values(m).sort((a, b) => (window.APP.cmpEntrySG ? window.APP.cmpEntrySG(sp(a[0]), sp(b[0])) : 0) || a[1].localeCompare(b[1], 'ar'));
   }
   function myGrid(mine, dates) {
     const P = section().periods || 7, D = dates.length;

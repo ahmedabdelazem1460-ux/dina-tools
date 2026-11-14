@@ -6,7 +6,7 @@
   const { S, api, $, $$, esc, AR } = A;
   const DEMO = !!api.demo;
   const ST = { present: ['حاضر', 'hr-p'], late: ['متأخر', 'hr-l'], absent: ['غائب', 'hr-a'], excused: ['مستأذن', 'hr-e'], leave: ['إجازة', 'hr-v'], early: ['انصراف مبكر', 'hr-o'] };
-  const isAdm = () => !!(S.me && !S.realMe && (S.me.is_owner || (A.hasModule && A.hasModule('hr'))));
+  const isAdm = () => !!(S.me && !S.realMe && (S.me.is_owner || (A.tfeat('hr') && A.hasModule && A.hasModule('hr'))));
   const cfg = () => Object.assign({ enabled: false, gps: true, qr: false, radius: 150, start: '07:00', grace: 10, end: '13:30', days: [0, 1, 2, 3, 4], excl: [] }, ((S.school || {}).settings || {}).hr || {});
   const todayIso = () => new Date(Date.now() + 3 * 36e5).toISOString().slice(0, 10);
   const hm = s => s ? new Date(s).toLocaleTimeString('ar-SA-u-nu-latn', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Riyadh' }) : '—';
@@ -14,7 +14,7 @@
   const pill = s => `<span class="hr-pill ${(ST[s] || ['', ''])[1]}">${(ST[s] || [s || 'لم يسجّل'])[0]}</span>`;
 
   A.I.hr = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.7-3 3-4.8 5.5-4.8S13.8 16 14.5 19"/><path d="M16 11l2 2 3.5-3.5"/><path d="M16 4.5h5M18.5 2v5" opacity=".0"/></svg>';
-  if (A.NAV && !A.NAV.some(n => n[0] === 'hr')) { const i = A.NAV.findIndex(n => n[0] === 'attendance'); A.NAV.splice(i < 0 ? A.NAV.length : i + 1, 0, ['hr', 'الموارد البشرية', () => !!S.me && (isAdm() || cfg().enabled)]); }
+  if (A.NAV && !A.NAV.some(n => n[0] === 'hr')) { const i = A.NAV.findIndex(n => n[0] === 'attendance'); A.NAV.splice(i < 0 ? A.NAV.length : i + 1, 0, ['hr', 'الموارد البشرية', () => !!S.me && (isAdm() || (A.tfeat('hr') && cfg().enabled))]); }
   if (A.NOTIF_KINDS && !A.NOTIF_KINDS.hr) A.NOTIF_KINDS.hr = ['الموارد البشرية', 'الحضور والتأخر والغياب'];
 
   if (!document.getElementById('hrcss')) { const st = document.createElement('style'); st.id = 'hrcss'; st.textContent = `
@@ -92,7 +92,7 @@
   }
   // على الصفحة الرئيسية
   const prevHome = V.home;
-  V.home = function (root) { const r = prevHome.apply(this, arguments); if (cfg().enabled && !S.realMe && !S.me.is_owner) { const b = document.createElement('div'); b.style.marginBottom = '12px'; root.prepend(b); meCard(b).catch(() => { }); } return r; };
+  V.home = function (root) { const r = prevHome.apply(this, arguments); if (cfg().enabled && !S.realMe && !S.me.is_owner && A.tfeat('hr')) { const b = document.createElement('div'); b.style.marginBottom = '12px'; root.prepend(b); meCard(b).catch(() => { }); } return r; };
 
   // ---------- الصفحة ----------
   const st = { tab: null, day: null, month: null };
@@ -208,6 +208,6 @@
 
   // فتح رابط الرمز ?att=TOKEN بعد الدخول
   const att = new URLSearchParams(location.search).get('att');
-  if (att) { const prev = window.APP_AFTER_SHELL; let done = false; window.APP_AFTER_SHELL = function () { if (prev) prev.apply(this, arguments); if (done || !S.me) return; done = true; history.replaceState(null, '', location.pathname + location.hash);
+  if (att) { const prev0 = 1; const prev = window.APP_AFTER_SHELL; let done = false; window.APP_AFTER_SHELL = function () { if (prev) prev.apply(this, arguments); if (done || !S.me || !A.tfeat('hr')) return; done = true; history.replaceState(null, '', location.pathname + location.hash);
     setTimeout(async () => { try { const r = await selfCheck(false, att); if (r) A.toast(r.status === 'late' ? `سُجّل حضورك — متأخر ${AR(r.late_min)} دقيقة` : 'سُجّل حضورك، يومك سعيد', r.status === 'late' ? 'warn' : 'ok'); } catch (e) { A.toast(e.message, 'err'); } }, 800); }; }
 })();

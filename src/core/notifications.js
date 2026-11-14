@@ -23,6 +23,8 @@
     send: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>',
     phone: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg>',
   };
+  // الميزات الجديدة لا تظهر لغير المالك إلا بعد أن يفعّلها المالك من «تخصيص صفحة المعلم» (schools.settings.tfeat)
+  A.tfeat = k => !!(S.me && ((S.realMe ? false : S.me.is_owner) || ((((S.school || {}).settings || {}).tfeat || {})[k] === true)));
   const canIssue = () => !!(S.me && !S.realMe && (S.me.is_owner || (A.hasModule && A.hasModule('supervision'))));
   const myId = () => S.me && S.me.id;
   const nowIso = () => new Date().toISOString();
@@ -169,7 +171,7 @@
   }
   // شريط لطيف مرة واحدة بعد الدخول
   function softPrompt() {
-    if (S.realMe || !('Notification' in window) || Notification.permission !== 'default' || A.LS.get('nf_soft') || $('#nfSoft')) return;
+    if (S.realMe || !A.tfeat('notif') || !('Notification' in window) || Notification.permission !== 'default' || A.LS.get('nf_soft') || $('#nfSoft')) return;
     const d = document.createElement('div'); d.id = 'nfSoft'; d.className = 'nf-toastpush'; d.style.cursor = 'default'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-label', 'تفعيل الإشعارات');
     d.innerHTML = `${ICO.bell}<div class="grow"><b>هل تريد تفعيل إشعارات المنصة؟</b><span>تصلك النماذج المطلوبة وحصص الانتظار والتنبيهات فور صدورها.</span><div class="row" style="gap:6px;margin-top:8px"><button class="btn sky sm" id="nfSY">تفعيل</button><button class="btn ghost sm" id="nfSN" style="color:#fff;border-color:rgba(255,255,255,.4)">لاحقاً</button></div></div>`;
     document.body.appendChild(d);
@@ -194,7 +196,7 @@
   A.appDialog = appDialog;
   document.addEventListener('click', e => {
     if (!e.target.closest('#ub')) return;
-    setTimeout(() => { const m = $('.menu'); if (!m || m.querySelector('[data-a="app"]')) return; const b = document.createElement('button'); b.dataset.a = 'app'; b.innerHTML = `${ICO.phone} تطبيق الجوال (أندرويد وآيفون)`; b.style.display = 'flex'; b.style.gap = '8px'; b.style.alignItems = 'center'; b.onclick = () => { m.remove(); appDialog(); }; const lang = m.querySelector('[data-a="lang"]'); lang ? lang.before(b) : m.appendChild(b); }, 0);
+    setTimeout(() => { const m = $('.menu'); if (!m || !A.tfeat('app') || m.querySelector('[data-a="app"]')) return; const b = document.createElement('button'); b.dataset.a = 'app'; b.innerHTML = `${ICO.phone} تطبيق الجوال (أندرويد وآيفون)`; b.style.display = 'flex'; b.style.gap = '8px'; b.style.alignItems = 'center'; b.onclick = () => { m.remove(); appDialog(); }; const lang = m.querySelector('[data-a="lang"]'); lang ? lang.before(b) : m.appendChild(b); }, 0);
   }, true);
 
   // ---------------- لوحة الإشعارات ----------------
@@ -327,6 +329,7 @@
 
   // ---------------- الربط ----------------
   function addBtn() {
+    if (!A.tfeat('notif')) { const o = $('#notifBtn'); if (o) o.remove(); return; }
     if ($('#notifBtn')) return; const ib = $('#inboxBtn'); if (!ib) return;
     const b = document.createElement('button'); b.className = 'userbtn icon-only nf-btn'; b.id = 'notifBtn'; b.setAttribute('aria-label', 'الإشعارات'); b.title = 'الإشعارات';
     b.innerHTML = ICO.bell + '<span class="badge hidden" id="notifN"></span>'; b.onclick = panel; ib.before(b);
@@ -346,11 +349,12 @@
   window.APP_AFTER_SHELL = function () {
     if (prevAfter) prevAfter.apply(this, arguments);
     addBtn(); badge();
+    if (!A.tfeat('notif')) { if (unsub) { try { unsub(); } catch (_) { } unsub = null; } lastMe = null; LIST = []; return; }
     if (lastMe !== myId()) { lastMe = myId(); LIST = []; load(); realtime(); }
     clearInterval(tick); tick = setInterval(() => { deliverDue(false); }, 60000);
     setTimeout(softPrompt, 4000);
   };
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && myId()) load(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && myId() && A.tfeat('notif')) load(); });
   // فتح رابط الإشعار عند الضغط عليه من خارج المنصة (service worker)
   if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', e => { const d = e.data || {}; if (d.type === 'nf-open') { const n = LIST.find(x => x.id === d.id) || { id: d.id, link: d.link }; openItem(n); } });
   // فتح مباشر عبر ?nf=<id>

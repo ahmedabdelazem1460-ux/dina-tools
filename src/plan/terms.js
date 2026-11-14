@@ -71,7 +71,7 @@
     return weeks.filter(w => termOf(w) === S.termView);
   };
   A.termPickHtml = function () {
-    const vis = visibleTerms(); if (vis.length <= 1) return '';
+    const vis = visibleTerms(); if (vis.length <= 1 || !A.tfeat('terms')) return '';
     return `<div class="pick tm-pick"><label for="termSel">الفصل</label><select id="termSel" aria-label="الفصل الدراسي">${vis.map(t => `<option value="${t.id}" ${t.id === S.termView ? 'selected' : ''}>${esc(shortName(t))}${t.status === 'prep' ? ' · قيد التجهيز' : ''}</option>`).join('')}</select></div>`;
   };
   const shortName = t => (t.name || '').replace(/^الفصل الدراسي\s*/, 'الفصل ') || ('الفصل ' + (ORDN[t.ord] || AR(t.ord)));
@@ -99,7 +99,7 @@
   document.addEventListener('click', e => {
     if (!e.target.closest('#ub')) return;
     setTimeout(() => {
-      const m = $('.menu'); if (!m || m.querySelector('.tm-menu') || !S.terms) return;
+      const m = $('.menu'); if (!m || m.querySelector('.tm-menu') || !S.terms || !A.tfeat('terms')) return;
       const t = A.termCur(); const vis = visibleTerms(); const pr = progress(t);
       const box = document.createElement('div'); box.className = 'tm-menu';
       box.innerHTML = `<div class="tm-l">الفصل الدراسي</div><div class="tm-n"><span>${esc(t.name)}</span><span class="tm-pill ${ST[t.status][1]}">${ST[t.status][0]}</span></div>

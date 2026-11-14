@@ -20,7 +20,7 @@
 | 12 | `src/core/reports-archive-staff.js` | app6.js | 54 | التقارير، الأرشيف، استيراد الموظفين، هوية كل قسم | archive reports | printDoc |
 | 13 | `src/plan/sheets-sync.js` | app7.js | 20 | مزامنة Google Sheets | classes dash dev weeks | _dashReq pullFromSheet syncLabel |
 | 14 | `src/core/sidebar-appearance.js` | app8.js | 17 | القائمة الجانبية، المظهر، من يعمل الآن | — | uiSettings |
-| 15 | `src/core/notifications.js` | — | 37 | الإشعارات: الجرس، إذن الجهاز، التنبيهات العامة والمجدولة، التفضيلات وتحكم المالك، مركز الإشعارات V.notify، التثبيت كتطبيق | notify | NOTIF_KINDS appDialog notifIssue notifMarkRead notifPanel |
+| 15 | `src/core/notifications.js` | — | 38 | الإشعارات: الجرس، إذن الجهاز، التنبيهات العامة والمجدولة، التفضيلات وتحكم المالك، مركز الإشعارات V.notify، التثبيت كتطبيق | notify | NOTIF_KINDS appDialog notifIssue notifMarkRead notifPanel tfeat |
 | 16 | `src/plan/parent-posts.js` | app9.js | 12 | إعلانات أولياء الأمور | posts | POST_KINDS |
 | 17 | `src/core/resources-analysis-roles.js` | app10.js | 29 | المصادر (قديم)، تحليل النتائج، المسميات والصلاحيات V.roles وإظهار البنود features | analysis resources roles | fetchResources hasModule pickResource |
 | 18 | `src/attendance/attendance-behavior-supervision.js` | app11.js | 62 | الحضور والغياب والسلوك V.attendance + الإشراف التربوي V.supervision | attendance myreports supervision | _attRefresh attWho |
@@ -79,3 +79,5 @@
 | 71 | `src/assess/school-bank.js` | app62.js | 32 | بنك أسئلة المدرسة V.qbank + إتاحة الواجب الإلكتروني + واجهات الطالب + تصدير Excel | qbank | QTHEMES canAssess canAssessFull canEhw canHw ehwCfg ehwOnly qExport themePick |
 | 72 | `src/plan/terms.js` | — | 24 | الفصول الدراسية: مؤشر الفصل في الشريط وقائمة المستخدم، تبويب الإدارة لإضافة الفصل الثاني وتجهيزه وتفعيله (sql/094) | admin | termCur termFilter termOf termPickHtml termSwitch |
 | 73 | `src/attendance/hr.js` | — | 33 | الموارد البشرية V.hr: حضور الموظفين بالموقع ورمز QR المتغير والرصد اليدوي، السجل والتصدير، المساءلات، الإعدادات، وربط الغياب بتأمين الحصص وعدم احتساب واجب الغائب (sql/096) | home hr | dropAbsent |
+| 74 | `src/supervision/myforms.js` | — | 30 | نماذجي V.myforms: نماذج المستخدم من الصفر أو نص أو ملف (تحويل ذكي A.textToTpl) بهوية المدرسة، تعبئة وحفظ وترتيب ومجلدات ومشاركة (sql/097) | myforms | textToTpl |
+| 75 | `src/core/teacher-features.js` | — | 4 | التحكم في الميزات الجديدة داخل حسابات المعلمين (للمالك) — schools.settings.tfeat ويقرؤه A.tfeat | tui | TFEAT |

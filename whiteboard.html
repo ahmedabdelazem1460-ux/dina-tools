@@ -23,7 +23,8 @@ input[type=range]{width:80px;accent-color:var(--sky)}
 .txt{position:absolute;z-index:3;font:inherit;border:2px dashed var(--sky);background:rgba(255,255,255,.9);padding:4px 6px;min-width:120px;outline:none;direction:rtl}
 @media (max-width:640px){.tb{gap:3px}.tb .g{padding:0 3px}.hide-s{display:none}}
 </style>
-<script src="digits.js?v=1794649960"></script>
+<script src="wbtools.js?v=1794658227"></script>
+<script src="digits.js?v=1794658227"></script>
 </head>
 <body>
 <div class="tb" role="toolbar" aria-label="أدوات السبورة">
@@ -34,7 +35,7 @@ input[type=range]{width:80px;accent-color:var(--sky)}
   <div class="g"><button id="undo" title="تراجع (Ctrl+Z)">↶</button><button id="redo" title="إعادة">↷</button><button id="clr" title="مسح الصفحة">مسح</button></div>
   <div class="g"><button id="bg" title="الخلفية">الخلفية</button><label class="b" title="إدراج صورة">صورة<input type="file" id="img" accept="image/*" hidden></label></div>
   <div class="g"><button id="pv" aria-label="الصفحة السابقة">‹</button><span class="pg" id="pgn"></span><button id="nx" aria-label="الصفحة التالية">›</button><button id="add" title="صفحة جديدة">+ صفحة</button></div>
-  <div class="g" id="lpollG" hidden><button id="lpoll" title="سؤال لحظي للطلاب (يجيبون من جوالاتهم)">سؤال لحظي</button></div>
+  <div class="g" id="wbtG" hidden><button id="wbt" class="wbt-btn" title="الأدوات التفاعلية: مؤقت، اختيار طالب، مجموعات، نرد، نقاط الفرق، إشارة الصف، سؤال لحظي">🎯 أدوات تفاعلية</button></div>
   <div class="g"><button id="png" title="حفظ صورة">PNG</button><button id="pdf" title="طباعة / PDF">PDF</button><button id="fs" title="ملء الشاشة">⛶</button></div>
 </div>
 <div class="wrap" id="wrap"><canvas id="cv" aria-label="مساحة الرسم"></canvas></div>
@@ -95,10 +96,21 @@ input[type=range]{width:80px;accent-color:var(--sky)}
   document.getElementById('add').onclick = () => { st.pages.splice(st.cur + 1, 0, { items: [], bg: pg().bg }); st.cur++; redo = []; save(); render(); };
   document.getElementById('pv').onclick = () => { if (st.cur > 0) { st.cur--; redo = []; save(); render(); } };
   document.getElementById('nx').onclick = () => { if (st.cur < st.pages.length - 1) { st.cur++; redo = []; save(); render(); } };
-  // السؤال اللحظي: يُفتح في المنصة (الأب أو النافذة التي فتحت السبورة)، وتُدرج نتائجه صورةً هنا
-  document.getElementById('lpoll').onclick = () => { const t = window.parent !== window ? window.parent : window.opener; if (t) { try { t.postMessage({ type: 'dina-poll' }, location.origin); if (window.opener && t === window.opener) window.opener.focus(); return; } catch (_) { } } window.open('index.html#/poll', '_blank'); };
-  { const t = window.parent !== window ? window.parent : window.opener; if (t) try { t.postMessage({ type: 'dina-wb-hello' }, location.origin); } catch (_) { } }
-  window.addEventListener('message', e => { if (e.origin === location.origin && e.data && e.data.type === 'dina-wb-cfg') document.getElementById('lpollG').hidden = !e.data.poll; });
+  // الأدوات التفاعلية — تظهر بتفعيل المالك (tfeat wbtools/poll) عبر مصافحة المنصة؛ تُحفظ آخر إعدادات لفتح السبورة لاحقاً بلا المنصة
+  const host = () => window.parent !== window ? window.parent : window.opener;
+  let cfg = null; try { cfg = JSON.parse(LSg('dina_wb_cfg') || 'null'); } catch (_) { }
+  const applyCfg = () => { document.getElementById('wbtG').hidden = !(cfg && (cfg.tools || cfg.poll)); };
+  const namesCb = {};
+  const insertText = v => { const n = pg().items.filter(i => i.t === 'text').length, s = 6; pg().items.push({ t: 'text', c: pg().bg === 'dark' ? '#FFFFFF' : col === '#FFFFFF' ? '#082B5A' : col, s, x: cv.clientWidth - 40, y: 60 + (n % 8) * 40, v }); save(); render(); };
+  const livePoll = () => { const t = host(); if (document.fullscreenElement) document.exitFullscreen().catch(() => { });
+    if (t) { try { t.postMessage({ type: 'dina-poll' }, location.origin); if (window.opener && t === window.opener) window.opener.focus(); return; } catch (_) { } } window.open('index.html#/poll', '_blank'); };
+  if (window.WBT) WBT({ wrap, btn: document.getElementById('wbt'), cfg: () => cfg || {}, insertText, poll: livePoll,
+    askNames: (cid, cb) => { const t = host(); if (!t) return cb([]); namesCb[cid] = cb; try { t.postMessage({ type: 'dina-wb-names', cid }, location.origin); } catch (_) { cb([]); } setTimeout(() => { if (namesCb[cid]) { namesCb[cid]([]); delete namesCb[cid]; } }, 8000); } });
+  { const t = host(); if (t) try { t.postMessage({ type: 'dina-wb-hello' }, location.origin); } catch (_) { } }
+  window.addEventListener('message', e => { if (e.origin !== location.origin || !e.data) return;
+    if (e.data.type === 'dina-wb-cfg') { cfg = { poll: !!e.data.poll, tools: !!e.data.tools, classes: e.data.classes || [] }; LSs('dina_wb_cfg', JSON.stringify(cfg)); applyCfg(); }
+    if (e.data.type === 'dina-wb-names' && namesCb[e.data.cid] && Array.isArray(e.data.names)) { namesCb[e.data.cid](e.data.names); delete namesCb[e.data.cid]; } });
+  applyCfg();
   window.addEventListener('message', e => { if (e.origin !== location.origin || !e.data || e.data.type !== 'dina-wb-img' || !e.data.src) return; const im = new Image(); im.onload = () => { const W = cv.clientWidth * .7, k = Math.min(1, W / im.width, cv.clientHeight * .8 / im.height); pg().items.push({ t: 'img', src: e.data.src, x: 30, y: 30, w: im.width * k, h: im.height * k }); imgs[e.data.src] = im; tool = 'move'; mark(); save(); render(); }; im.src = e.data.src; });
   document.getElementById('img').onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { const im = new Image(); im.onload = () => { const W = cv.clientWidth * .6, k = Math.min(1, W / im.width, cv.clientHeight * .7 / im.height); pg().items.push({ t: 'img', src: r.result, x: 40, y: 40, w: im.width * k, h: im.height * k }); imgs[r.result] = im; tool = 'move'; mark(); save(); render(); }; im.src = r.result; }; r.readAsDataURL(f); e.target.value = ''; };
   const pageCanvas = p => { const w = cv.clientWidth, h = cv.clientHeight, c = document.createElement('canvas'); c.width = w * 2; c.height = h * 2; const x = c.getContext('2d'); x.scale(2, 2); bg(x, w, h, p.bg); const keep = st.cur; st.cur = st.pages.indexOf(p); [...p.items.filter(i => i.t === 'img'), ...p.items.filter(i => i.t !== 'img')].forEach(i => draw(x, i)); st.cur = keep; return c; };

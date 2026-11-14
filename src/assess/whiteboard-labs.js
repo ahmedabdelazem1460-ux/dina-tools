@@ -39,7 +39,8 @@
   };
 
   V.wboard = function (root) {
-    root.innerHTML = `<div class="card" style="padding:10px"><div class="head" style="margin-bottom:8px"><div class="grow"><h2 style="margin:0">السبورة التفاعلية</h2><p class="sub" style="margin:2px 0 0">قلم وتظليل وأشكال ونصوص وصور وصفحات متعددة، تُحفظ تلقائياً على هذا الجهاز، وتُصدَّر صورة أو PDF. للسبورة الذكية افتحها في نافذة مستقلة بملء الشاشة.</p></div><a class="btn" href="whiteboard.html" target="_blank" rel="noopener">نافذة مستقلة</a></div>
+    root.innerHTML = `<div class="card" style="padding:10px"><div class="head" style="margin-bottom:8px"><div class="grow"><h2 style="margin:0">السبورة التفاعلية</h2><p class="sub" style="margin:2px 0 0">قلم وتظليل وأشكال ونصوص وصور وصفحات متعددة، تُحفظ تلقائياً على هذا الجهاز، وتُصدَّر صورة أو PDF. للسبورة الذكية افتحها في نافذة مستقلة بملء الشاشة.</p></div><button class="btn" type="button" id="wbWin">نافذة مستقلة</button></div>
       <iframe src="whiteboard.html" title="السبورة التفاعلية" style="width:100%;height:calc(100vh - 220px);min-height:480px;border:1px solid var(--border);border-radius:14px;background:#fff"></iframe></div>`;
+    const wb = root.querySelector('#wbWin'); if (wb) wb.onclick = () => { const w = window.open('whiteboard.html', 'dina_wb'); if (!w) location.href = 'whiteboard.html'; }; // تبقى مرتبطة بالمنصة (الأدوات والسؤال اللحظي)
   };
 })();

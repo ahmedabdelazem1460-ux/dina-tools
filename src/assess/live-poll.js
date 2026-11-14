@@ -152,8 +152,11 @@
 
   // من السبورة (داخل المنصة أو نافذتها المستقلة)
   window.addEventListener('message', e => { if (e.origin !== location.origin || !e.data || !S.me) return;
-    if (e.data.type === 'dina-wb-hello') { try { e.source.postMessage({ type: 'dina-wb-cfg', poll: A.tfeat('poll') && !S.realMe }, location.origin); } catch (_) { } }
-    if (e.data.type === 'dina-poll' && A.tfeat('poll')) setup(e.data.pre || {}, e.source); });
+    if (e.data.type === 'dina-wb-hello') { let classes = [];
+      try { const mine = S.me.is_owner || S.realMe ? null : new Set((S.entries || []).filter(x => x.teacher_id === S.me.id).map(x => x.class_id)); classes = (S.classes || []).filter(c => !mine || !mine.size || mine.has(c.id)).slice().sort(A.cmpCls || (() => 0)).map(c => ({ id: c.id, name: c.name || (A.cls(c.id) || {}).name || '' })); } catch (_) { }
+      try { e.source.postMessage({ type: 'dina-wb-cfg', poll: A.tfeat('poll') && !S.realMe, tools: A.tfeat('wbtools'), classes: A.tfeat('wbtools') ? classes : [] }, location.origin); } catch (_) { } }
+    if (e.data.type === 'dina-wb-names' && e.data.cid && A.tfeat('wbtools')) { const src = e.source; api.list('students', { class_id: e.data.cid, active: true }, { order: 'full_name', select: 'id,full_name' }).then(L => L.map(x => x.full_name)).catch(() => []).then(names => { try { src.postMessage({ type: 'dina-wb-names', cid: e.data.cid, names }, location.origin); } catch (_) { } }); }
+    if (e.data.type === 'dina-poll' && A.tfeat('poll')) { if (document.fullscreenElement) document.exitFullscreen().catch(() => { }); setup(e.data.pre || {}, e.source); } });
 
   V.poll = function (root) {
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>السؤال اللحظي</h2><p class="sub" style="margin:2px 0 0">اطرح سؤالاً في أي لحظة من الحصة، فيجيب الطلاب من جوالاتهم بمسح الرمز — بلا حسابات ولا تطبيقات — وتظهر النتائج فوراً على الشاشة.</p></div><button class="btn" id="pg">${A.I.poll} سؤال جديد</button></div>

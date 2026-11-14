@@ -44,7 +44,7 @@
 | 36 | `live.js` | — | 44 | عرض الجدول الاستثنائي التفاعلي (مشترك مع صفحات العرض) | — | — |
 | 37 | `src/schedule/display-schedule.js` | app27.js | 67 | الجدول الاستثنائي للعرض display_schedules V.live | live my | _live _liveDetach _liveEntries _liveImport _livePlanMap _syncLiveTimes bindLive liveTable |
 | 38 | `src/schedule/remote-day.js` | app28.js | 61 | تحويل يوم/أسبوع للتعلم عن بعد | — | _liveFit _liveHue liveConvert liveEditTab liveRearrange liveRepTab liveVisTab |
-| 39 | `src/assess/import-questions.js` | app29.js | 44 | «المطلوب مني» في خطتي + استيراد الأسئلة A.importQ (Excel/Word/PDF/صور OCR) | my | _fileLines _imageLines _ocrDone _ocrProg _parseQ importQ |
+| 39 | `src/assess/import-questions.js` | app29.js | 61 | «المطلوب مني» في خطتي + استيراد الأسئلة A.importQ (Excel/Word/PDF/صور OCR) | my | _fileLines _imageLines _imageQs _ocrDone _ocrProg _parseQ _smartType importQ |
 | 40 | `src/attendance/period-attendance.js` | app30.js | 27 | حضور الحصص (معلم الحصة) | — | _paLive attEntryOf attLive attPassed attPeriods attTimes curBreaks curPeriod myPeriodAtt takePeriod |
 | 41 | `src/plan/calendar.js` | app31.js | 12 | التقويم الدراسي المرن داخل الأسابيع | weeks | _calInfer _calPlan |
 | 42 | `src/core/trash.js` | app32.js | 6 | سلة المحذوفات V.trash | trash | confirmBox |
@@ -81,8 +81,8 @@
 | 73 | `src/plan/terms.js` | — | 24 | الفصول الدراسية: مؤشر الفصل في الشريط وقائمة المستخدم، تبويب الإدارة لإضافة الفصل الثاني وتجهيزه وتفعيله (sql/094) | admin | termCur termFilter termOf termPickHtml termSwitch |
 | 74 | `src/attendance/hr.js` | — | 33 | الموارد البشرية V.hr: حضور الموظفين بالموقع ورمز QR المتغير والرصد اليدوي، السجل والتصدير، المساءلات، الإعدادات، وربط الغياب بتأمين الحصص وعدم احتساب واجب الغائب (sql/096) | home hr | dropAbsent |
 | 75 | `src/supervision/myforms.js` | — | 30 | نماذجي V.myforms: نماذج المستخدم من الصفر أو نص أو ملف (تحويل ذكي A.textToTpl) بهوية المدرسة، تعبئة وحفظ وترتيب ومجلدات ومشاركة (sql/097) | myforms | textToTpl |
-| 76 | `src/core/teacher-features.js` | — | 20 | التحكم في الميزات الجديدة داخل حسابات المعلمين (للمالك) — schools.settings.tfeat ويقرؤه A.tfeat | tui | TFEAT |
-| 77 | `src/assess/live-poll.js` | — | 22 | السؤال اللحظي V.poll + A.livePoll (مثل ClassPoint): رمز/QR للطلاب على poll.html، نتائج لحظية، إدراج النتائج في السبورة (sql/098) | poll | livePoll livePollStart |
+| 76 | `src/core/teacher-features.js` | — | 21 | التحكم في الميزات الجديدة داخل حسابات المعلمين (للمالك) — schools.settings.tfeat ويقرؤه A.tfeat | tui | TFEAT |
+| 77 | `src/assess/live-poll.js` | — | 23 | السؤال اللحظي V.poll + A.livePoll (مثل ClassPoint): رمز/QR للطلاب على poll.html، نتائج لحظية، إدراج النتائج في السبورة (sql/098) | poll | livePoll livePollStart |
 | 78 | `src/assess/slides.js` | — | 34 | العروض التقديمية V.slides: من بنك الأسئلة أو نص/ملف، ست هويات مشتقة من دينا، محرر، عرض بملء الشاشة مع السؤال اللحظي، تصدير PowerPoint (vendor/pptxgen) وPDF (sql/098 decks) | slides | presentDeck slideHTML textToSlides |
 | 79 | `scales.js` | — | 65 | تعريف مقاييس البوصلة DinaScales (مشترك مع scale.html) | — | — |
 | 80 | `src/attendance/compass.js` | — | 57 | البوصلة ٢ V.compass: ٩ مقاييس بثلاث لغات وأربعة مستويات (scales.js) برابط scale.html، تقارير احترافية للفصل والطالب (رادار، مقارنة، توصيات)، PDF/صورة/Excel وواتساب لولي الأمر، ومؤشرات الأداء للمالك (sql/099–100). يصدّر A.elToPdf/elToPng/waOpen | compass | compassPoster elToPdf elToPng waOpen |

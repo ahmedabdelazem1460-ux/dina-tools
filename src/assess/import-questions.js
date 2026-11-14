@@ -75,19 +75,121 @@
     _tw = await Tesseract.createWorker(['ara', 'eng'], 1, { workerPath: base + 'worker.min.js', corePath: base, langPath: base + 'lang', gzip: true, logger: m => { if (m.status === 'recognizing text') prog(`${pg} قراءة النص ${AR(Math.round((m.progress || 0) * 100))}٪`); else if (/load/.test(m.status || '')) prog('تجهيز قارئ الصور…'); } });
     _tw._pg = t => { pg = t; }; return _tw;
   }
+  let _ta = null; // قارئ عربي فقط للخلايا (أدق من العربي+الإنجليزي)
+  async function arWorker() { if (_ta) return _ta; await ocrWorker(); const base = new URL('vendor/tess/', location.href).href; _ta = await Tesseract.createWorker(['ara'], 1, { workerPath: base + 'worker.min.js', corePath: base, langPath: base + 'lang', gzip: true }); try { await _ta.setParameters({ tessedit_pageseg_mode: '6' }); } catch (_) { } return _ta; }
   // تصحيح أخطاء القراءة الشائعة في أوراق الأسئلة العربية
   const ocrFix = t => clean(String(t || '').normalize('NFKC')).replace(/^[|¦!]\s*/, '').replace(/\s+([،.؟:)])/g, '$1').replace(/\(\s+/g, '(').replace(/[_]{2,}|[.·•]{3,}|…+/g, '......').replace(/^([0-9٠-٩]{1,3})\s*[-–—_.,،]\s*/, '$1) ').replace(/^\(?([أابجدهو])\s*[-–—_.,،]\s+/, '$1) ');
   // أخطاء شائعة: «2(» بدل «2)»، وسقوط حرف الخيار الأول «أ)» قبل سطر «ب)»
-  const ocrPost = L => L.map((l, i) => { l = l.replace(/^([0-9٠-٩]{1,3})\s*\(\s*/, '$1) '); const nx = L[i + 1] || ''; if (/^\(?\s*ب\s*[)\-.ـ]/.test(nx) && !/^\(?\s*[أا]\s*[)\-.ـ]/.test(l) && !/^[0-9٠-٩]{1,3}\s*[)\-.]/.test(l)) { const m = l.match(/^[(\[|!1lIاإآ]\s*\)?\s*(.+)$/); if (m && !/\)/.test(m[1])) return 'أ) ' + m[1]; } return l; });
+  const ocrPost = L => { let qn = 0; return L.map((l, i) => { l = l.replace(/^([0-9٠-٩]{1,3})\s*\(\s*/, '$1) ').replace(/^[)(]\s*([0-9٠-٩]{1,3})[^\s؀-ۿ]*\s+/, '$1) ').replace(/^[)(]\s*([أابجده])\s+/, '$1) ').replace(/^[©®€“”"'^*•]\s*[)(]\s*/, '§ ');
+    const nm = l.match(/^([0-9٠-٩]{1,3})\s*[)\-.]/); if (nm) qn = +NUM(nm[1]); else { const n2 = l.match(/^([0-9٠-٩]{1,2})\s+(?=[؀-ۿ])/); if (n2 && +NUM(n2[1]) === qn + 1) { qn++; l = l.replace(/^([0-9٠-٩]{1,2})\s+/, '$1) '); } }
+    const nx = L[i + 1] || ''; if (/^\(?\s*[بج]\s*[)\-.ـ]/.test(nx) && /^[أا]\s+\S/.test(l)) l = l.replace(/^([أا])\s+/, '$1) ');
+    if (/^\(?\s*ب\s*[)\-.ـ]/.test(nx) && !/^\(?\s*[أا]\s*[)\-.ـ]/.test(l) && !/^[0-9٠-٩]{1,3}\s*[)\-.]/.test(l)) { const m = l.match(/^[(\[|!1lIاإآ]\s*\)?\s*(.+)$/); if (m && !/\)/.test(m[1])) return 'أ) ' + m[1]; } return l; }); };
   async function imgCanvas(f) { const bmp = await (window.createImageBitmap ? createImageBitmap(f) : new Promise((ok, no) => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => no(new Error('تعذّر فتح الصورة')); im.src = URL.createObjectURL(f); }));
     const k = Math.min(2.2, Math.max(1, 2000 / Math.max(bmp.width, bmp.height))), c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k); const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(bmp, 0, 0, c.width, c.height); return c; }
-  async function ocrCanvas(c, label) { const w = await ocrWorker(); w._pg(label || ''); const r = await w.recognize(c); return ocrPost(String((r.data || {}).text || '').split(/\r?\n/).map(ocrFix).filter(Boolean)); }
-  async function imageLines(f) { return ocrCanvas(await imgCanvas(f), ''); }
-  async function pdfOcr(doc) { const out = [], n = Math.min(doc.numPages, 25);
-    for (let i = 1; i <= n; i++) { const pg = await doc.getPage(i), vp = pg.getViewport({ scale: 2 }), c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height; await pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise; out.push(...await ocrCanvas(c, `صفحة ${AR(i)} من ${AR(n)} —`)); }
-    return out; }
-  A._imageLines = imageLines;
-  A._ocrDone = () => { if (_tw) { try { _tw.terminate(); } catch (_) { } _tw = null; } };
+  /* ===== القراءة الذكية للصور =====
+     (أ) أوراق الأسئلة المصمّمة جداول (رقم | نص السؤال، ثم صف الخيارات أ | … | ب | … ): تُكتشف خطوط الجدول،
+         وتُقرأ كل خلية وحدها (أدق بكثير من قراءة الصفحة كاملة)، وتُعرف الإجابة الصحيحة من الخلية المظللة (أصفر/أخضر/…).
+     (ب) الأوراق العادية: تُزال ألوان التظليل قبل القراءة، والكلمات المظللة تُعلَّم إجابةً صحيحة. */
+  const HLM = '✱';
+  function pix(c) { const W = c.width, H = c.height, d = c.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data, dark = new Uint8Array(W * H), hl = new Uint8Array(W * H), lum = new Uint8Array(W * H);
+    for (let i = 0, p = 0; p < W * H; i += 4, p++) { const r = d[i], g = d[i + 1], b = d[i + 2], L = (r * 299 + g * 587 + b * 114) / 1000, mx = Math.max(r, g, b), mn = Math.min(r, g, b); lum[p] = L; dark[p] = L < 110 ? 1 : 0; hl[p] = mx - mn > 70 && mx > 150 && L > 120 ? 1 : 0; }
+    return { W, H, dark, hl, lum }; }
+  const ratio = (P, x0, y0, x1, y1, k) => { let n = 0, t = 0; for (let y = Math.max(0, y0); y <= Math.min(P.H - 1, y1); y++) for (let x = Math.max(0, x0); x <= Math.min(P.W - 1, x1); x++) { t++; n += P[k][y * P.W + x]; } return t ? n / t : 0; };
+  const groups = (idx) => { const g = []; idx.forEach(v => { const l = g[g.length - 1]; if (l && v - l.b <= 2) l.b = v; else g.push({ a: v, b: v }); }); return g; };
+  // خطوط الجدول: صفوف أفقية (سطر داكن متصل ≥ ٤٥٪ من العرض)، ثم خطوط عمودية داخل كل صف
+  function findGrid(P) {
+    const { W, H, dark } = P, hy = [];
+    for (let y = 0; y < H; y++) { let run = 0, best = 0; for (let x = 0; x < W; x++) { if (dark[y * W + x]) { if (++run > best) best = run; } else run = 0; } if (best >= W * 0.45) hy.push(y); }
+    const hg = groups(hy), bands = [];
+    for (let i = 0; i + 1 < hg.length; i++) { const top = hg[i].b + 1, bot = hg[i + 1].a - 1, h = bot - top + 1; if (h < 12) continue;
+      const vx = []; for (let x = 0; x < W; x++) { let n = 0; for (let y = top + 1; y < bot; y++) n += dark[y * W + x]; if (n >= (h - 2) * 0.88) vx.push(x); }
+      const vg = groups(vx); if (!vg.length || vg[0].a > 4) vg.unshift({ a: -1, b: -1 }); if (vg[vg.length - 1].b < W - 5) vg.push({ a: W, b: W });
+      const cells = []; for (let j = 0; j + 1 < vg.length; j++) { const x0 = vg[j].b + 1, x1 = vg[j + 1].a - 1; if (x1 - x0 < 8) continue; const ink = ratio(P, x0 + 3, top + 3, x1 - 3, bot - 3, 'dark'); cells.push({ x0, x1, y0: top, y1: bot, ink: ink > 0.004 }); }
+      if (cells.length) bands.push({ top, bot, cells }); }
+    return bands;
+  }
+  // قصّ خلية وتنظيفها للقراءة: التظليل والخلفيات الرمادية ← أبيض، والنص ← أسود
+  function cellCanvas(src, P, c, k) { const pad = 10, ix = 3, x0 = c.x0 + ix, y0 = c.y0 + ix, w = Math.max(4, c.x1 - c.x0 - 2 * ix), h = Math.max(4, c.y1 - c.y0 - 2 * ix);
+    const a = document.createElement('canvas'); a.width = w + pad * 2; a.height = h + pad * 2; const g = a.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, a.width, a.height); g.drawImage(src, x0, y0, w, h, pad, pad, w, h);
+    const im = g.getImageData(0, 0, a.width, a.height), d = im.data; for (let i = 0; i < d.length; i += 4) { const r = d[i], gg = d[i + 1], b = d[i + 2], mx = Math.max(r, gg, b), mn = Math.min(r, gg, b), L = (r * 299 + gg * 587 + b * 114) / 1000; const v = mx - mn > 70 && mx > 150 && L > 120 ? 255 : L < 165 ? Math.max(0, L - 60) : 255; d[i] = d[i + 1] = d[i + 2] = v; } g.putImageData(im, 0, 0);
+    const o = document.createElement('canvas'); o.width = Math.round(a.width * k); o.height = Math.round(a.height * k); const q = o.getContext('2d'); q.fillStyle = '#fff'; q.fillRect(0, 0, o.width, o.height); q.imageSmoothingQuality = 'high'; try { q.filter = 'blur(1px)'; } catch (_) { } q.drawImage(a, 0, 0, o.width, o.height); return o; }
+  // جودة النص المقروء: حروف عربية في كلمات سليمة ناقص الرموز الغريبة
+  const quality = t => { const w = String(t || '').split(/\s+/).filter(Boolean); let g = 0, j = 0; w.forEach(x => { const a = (x.match(/[ء-يٱ-ۓ]/g) || []).length; if (a >= 2 && a >= x.replace(/[ً-ْ]/g, '').length - 1) g += a; else if (/^[0-9٠-٩]+$/.test(x) && x.length > 1) g += x.length; else j += Math.max(1, x.length - a); }); return g - 3 * j; };
+  // تقسيم الخلية إلى أسطر بالإسقاط الأفقي
+  function lineCrops(cv) { const W = cv.width, H = cv.height, d = cv.getContext('2d').getImageData(0, 0, W, H).data, rows = []; for (let y = 0; y < H; y++) { let n = 0; for (let x = 0; x < W; x++) if (d[(y * W + x) * 4] < 128) n++; rows.push(n); }
+    let B = [], s0 = -1; rows.forEach((n, y) => { if (n && s0 < 0) s0 = y; if (!n && s0 >= 0) { B.push([s0, y]); s0 = -1; } }); if (s0 >= 0) B.push([s0, H]); if (!B.length) return [cv];
+    const mx = Math.max(...B.map(b => b[1] - b[0])); const M = []; B.forEach(b => { const l = M[M.length - 1]; if (l && (b[1] - b[0] < mx * 0.4 || l[1] - l[0] < mx * 0.4)) l[1] = b[1]; else M.push(b.slice()); });
+    return M.map(([a, b]) => { const p = 12, o = document.createElement('canvas'); o.width = W; o.height = b - a + p * 2; const g = o.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, o.width, o.height); g.drawImage(cv, 0, a, W, b - a, 0, p, W, b - a); return o; }); }
+  const cellText = t => { let s = String(t || '').normalize('NFKC').replace(/\s*[«»‘’“”]\s*/g, '، ').replace(/[©®™]/g, ' ').replace(/[|¦\[\]{}_~`]/g, ' ').replace(/\r?\n+/g, ' '); const ar = /[؀-ۿ]/.test(s);
+    if (ar) s = s.split(/\s+/).filter(w => !/^[A-Za-z@#$%^&*=+<>\\/'"]+[.,:;!?]*$/.test(w)).join(' ');
+    return clean(s).replace(/^[\s.,،:;\-–—]+|[\s,،;\-–—]+$/g, '').replace(/\s+([،.؟:)])/g, '$1').replace(/\(\s+/g, '('); };
+  async function tableQs(src, label) {
+    const P = pix(src), bands = findGrid(P);
+    const tw = Math.max(1, ...bands.map(b => b.cells[b.cells.length - 1].x1 - b.cells[0].x0));
+    const rows = bands.map(b => { const wide = b.cells.filter(c => c.ink && c.x1 - c.x0 >= tw * 0.1), lab = b.cells.filter(c => c.ink && c.x1 - c.x0 < tw * 0.1); return { b, wide, lab, kind: wide.length >= 2 ? 'opt' : wide.length === 1 ? 'txt' : '' }; });
+    const nOpt = rows.filter(r => r.kind === 'opt').length, nTxt = rows.filter(r => r.kind === 'txt').length;
+    if (nOpt < 2 || nTxt < 2) return null; // ليست ورقة أسئلة بجدول
+    const wa = await arWorker(); let we = null;
+    const total = rows.reduce((a, r) => a + (r.kind === 'opt' ? r.wide.length : r.kind === 'txt' ? 1 : 0), 0); let done = 0;
+    // تُقرأ كل خلية بمقاسين ويؤخذ الأوثق؛ والخلايا الإنجليزية بالقارئ الإنجليزي
+    const rec = async (w, c) => { const C = [];
+      for (const k of [1.5, 2]) { const cv = cellCanvas(src, P, c, k), r = (await w.recognize(cv)).data || {}; C.push({ confidence: r.confidence || 0, text: r.text || '', cv }); if ((r.confidence || 0) >= 90) break; }
+      if (Math.max(...C.map(x => x.confidence)) < 85) { // قراءة سطراً سطراً (أفضل للنص القصير والخلايا متعددة الأسطر)
+        const cv = cellCanvas(src, P, c, 1); try { await w.setParameters({ tessedit_pageseg_mode: '13' }); const T = []; for (const l of lineCrops(cv)) T.push(((await w.recognize(l)).data || {}).text || ''); C.push({ confidence: 0, text: T.join('\n').replace(/(^|\s)[0\-.ـ](?=\s|$)/g, ' '), cv }); } catch (_) { } finally { try { await w.setParameters({ tessedit_pageseg_mode: '6' }); } catch (_) { } } }
+      C.forEach(x => x.score = quality(x.text) + x.confidence / 50); return C.sort((a, b) => b.score - a.score)[0]; };
+    const read = async c => { done++; prog(`${label || ''} قراءة الخلايا ${AR(done)} من ${AR(total)}`.trim()); let b = await rec(wa, c);
+      if (b.confidence < 55 && !/[؀-ۿ]{3}/.test(b.text)) { we = we || await ocrWorker(); try { await we.setParameters({ tessedit_pageseg_mode: '6' }); } catch (_) { } const e = await rec(we, c); if (e.confidence > b.confidence) b = e; }
+      const t = cellText(b.text); if (A._tblDbg) A._tblDbg.push({ c, img: b.cv.toDataURL(), raw: b.text, conf: b.confidence, t }); return t; };
+    const qs = []; let cur = null;
+    try {
+      for (const r of rows) {
+        if (r.kind === 'txt') { let t = await read(r.wide[0]); t = t.replace(/^\(?[0-9٠-٩]{1,3}\s*[)\-.ـ:]\s*/, '').replace(/\s+[0-9٠-٩]{1,3}$/, '');
+          if (t.replace(/[^؀-ۿA-Za-z]/g, '').length < 4) continue; // رقم الصفحة أو خلية فارغة
+          cur = { body: t, qtype: 'essay', options: [], answer: '', points: 1, _ocr: 1, _tbl: 1, _y: [r.b.top, r.b.bot] }; qs.push(cur); continue; }
+        if (r.kind !== 'opt' || !cur) continue;
+        const cells = r.wide.slice().sort((a, b) => b.x0 - a.x0); // من اليمين لليسار
+        const hr = cells.map(c => ratio(P, c.x0 + 3, c.y0 + 3, c.x1 - 3, c.y1 - 3, 'hl'));
+        // حرف الخيار المظلل يدل على خليته المجاورة يساراً
+        r.lab.forEach(l => { if (ratio(P, l.x0 + 2, l.y0 + 2, l.x1 - 2, l.y1 - 2, 'hl') > 0.3) { let j = -1, best = 1e9; cells.forEach((c, k) => { const d = l.x0 - c.x1; if (d >= -4 && d < best) { best = d; j = k; } }); if (j >= 0) hr[j] = Math.max(hr[j], 0.5); } });
+        for (let k = 0; k < cells.length; k++) cur.options.push({ t: await read(cells[k]), _h: hr[k] }); cur._y[1] = r.b.bot;
+      }
+    } finally { if (we) try { await we.setParameters({ tessedit_pageseg_mode: '3' }); } catch (_) { } }
+    qs.forEach(q => { const o = q.options; if (o.length) { const lat = o.filter(x => /[A-Za-z]/.test(x.t) && !/[؀-ۿ]/.test(x.t)).length; if (lat > o.length / 2) o.reverse(); // جدول إنجليزي: من اليسار لليمين
+        const mx = Math.max(...o.map(x => x._h)); o.forEach(x => { if (x._h > 0.22 && x._h >= mx * 0.6) x.ok = true; delete x._h; }); }
+      smartType(q); try { const [y0, y1] = q._y, x0 = Math.max(0, Math.min(...bands.map(b => b.cells[0].x0)) - 4), w = Math.min(src.width - x0, tw + 10), h = y1 - y0 + 8, k = Math.min(1, 900 / w), o = document.createElement('canvas'); o.width = Math.round(w * k); o.height = Math.round(h * k); o.getContext('2d').drawImage(src, x0, Math.max(0, y0 - 4), w, h, 0, 0, o.width, o.height); q._img = o.toDataURL('image/jpeg', 0.82); } catch (_) { } delete q._y; });
+    return qs.length ? qs : null;
+  }
+  // تحديد نوع السؤال تلقائياً من نصه وخياراته
+  function smartType(q) {
+    const o = q.options.filter(x => x.t || x.ok), body = q.body || '';
+    if (o.length >= 2) { const isTF = o.length === 2 && o.every(x => /^(صح|صواب|خطأ|خطا|true|false|✓|✗|×)$/i.test(x.t.trim()));
+      if (isTF) { const ok = o.find(x => x.ok); q.qtype = 'tf'; q.answer = ok ? TF(ok.t) : ''; q.options = []; return q; }
+      q.options = o; q.qtype = o.filter(x => x.ok).length > 1 ? 'multi' : 'mcq'; return q; }
+    q.options = []; const nb = (body.match(/\.{3,}|…+|_{3,}/g) || []).length;
+    if (/\(\s*\)\s*$|\(\s*(✓|✗|صح|خطأ)?\s*\)\s*$/.test(body) || /^(?:ضع|ضعي).*(صح|✓|علامة)/.test(body)) { q.qtype = 'tf'; return q; }
+    if (nb) { q.qtype = 'blank'; q.options = Array.from({ length: nb }, () => ({ t: '' })); q.points = Math.max(1, nb); return q; }
+    q.qtype = /علل|اشرح|وضح|وضّح|قارن|ناقش|فسّر|فسر|بيّن|بين/.test(body) ? 'essay' : /^(?:ما|من|متى|أين|كم|ماذا|عرّف|عرف|اذكر|سمّ|سم)\b/.test(body) && body.length < 90 ? 'short' : 'essay'; return q;
+  }
+  const qsToLines = qs => { const L = []; qs.forEach((q, i) => { L.push(`${i + 1}) ${q.body}`); (q.options || []).forEach((o, j) => L.push(`${LETTERS[j] || j + 1}) ${o.t}`)); }); return L; };
+  // القراءة العامة مع إزالة التظليل وتعليم الكلمات المظللة
+  async function ocrCanvas(c, label, mark, mode) { const w = await ocrWorker(); w._pg(label || ''); const P = pix(c), g = c.getContext('2d'), im = g.getImageData(0, 0, c.width, c.height), d = im.data;
+    for (let p = 0, i = 0; p < P.W * P.H; p++, i += 4) if (P.hl[p]) d[i] = d[i + 1] = d[i + 2] = 255; const cc = document.createElement('canvas'); cc.width = c.width; cc.height = c.height; cc.getContext('2d').putImageData(im, 0, 0);
+    let D = {}; if (mode === 'ar') { const wa = await arWorker(); await wa.setParameters({ tessedit_pageseg_mode: '4' }); try { D = (await wa.recognize(cc)).data || {}; } finally { await wa.setParameters({ tessedit_pageseg_mode: '6' }); } } else D = (await w.recognize(cc)).data || {};
+    let lines = (D.lines || []).length ? D.lines.map(l => { let t = String(l.text || '').replace(/\r?\n/g, ' '); if (mark) (l.words || []).forEach(x => { const b = x.bbox || {}; if (b.x1 > b.x0 && x.text && ratio(P, b.x0, b.y0, b.x1, b.y1, 'hl') > 0.3) { const k = t.indexOf(x.text); if (k >= 0) t = t.slice(0, k + x.text.length) + HLM + t.slice(k + x.text.length); } }); return t; }) : String(D.text || '').split(/\r?\n/);
+    return ocrPost(lines.map(ocrFix).filter(Boolean)); }
+  // يعيد { lines, qs } — qs موجودة إذا كانت الورقة جدولاً
+  async function smartCanvas(c, label) { let qs = null; try { qs = await tableQs(c, label); } catch (e) { console.warn('table ocr', e); }
+    if (qs) return { qs, lines: qsToLines(qs) };
+    // قراءتان (عربي فقط، وعربي+إنجليزي) ويؤخذ ما استُخرج منه أسئلة أكثر وأكمل
+    const sc = L => { const q = parseLines(L).qs; return q.length * 4 + q.reduce((a, x) => a + (x.options || []).length + ((x.options || []).some(o => o.ok) ? 2 : 0), 0) + L.reduce((a, l) => a + quality(l), 0) / 400; };
+    const L1 = await ocrCanvas(c, label, true, 'ar'), L2 = await ocrCanvas(c, label, true, 'mix'); return { qs: null, lines: sc(L2) > sc(L1) ? L2 : L1 }; }
+  async function imageLines(f) { const r = await smartCanvas(await imgCanvas(f), ''); return r.lines.map(l => l.split(HLM).join('')); }
+  async function imageQs(f) { return smartCanvas(await imgCanvas(f), ''); }
+  async function pdfOcr(doc) { const out = [], qs = [], n = Math.min(doc.numPages, 25); let any = false;
+    for (let i = 1; i <= n; i++) { const pg = await doc.getPage(i), vp = pg.getViewport({ scale: 2 }), c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height; await pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise; const r = await smartCanvas(c, `صفحة ${AR(i)} من ${AR(n)} —`); out.push(...r.lines); if (r.qs) { any = true; qs.push(...r.qs); } else qs.push(...parseLines(r.lines).qs); }
+    out._qs = any ? qs : null; return out; }
+  A._imageLines = imageLines; A._imageQs = imageQs; A._smartType = smartType;
+  A._ocrDone = () => { if (_tw) { try { _tw.terminate(); } catch (_) { } _tw = null; } if (_ta) { try { _ta.terminate(); } catch (_) { } _ta = null; } };
   const IS_IMG = f => /\.(png|jpe?g|webp|bmp|gif|heic)$/i.test(f.name) || (f.type || '').startsWith('image/');
   async function pdfLines(f) {
     const lib = await loadPdf(); const doc = await lib.getDocument({ data: await f.arrayBuffer() }).promise; const out = [];
@@ -101,7 +203,7 @@
         else t = r.it.map(x => x.str).join(' ');
         t = t.normalize('NFKC'); if (glyph && rtl) t = t.replace(/[()]/g, c => c === '(' ? ')' : '(');
         out.push(clean(t)); }); }
-    if (out.join('').replace(/\s/g, '').length < 20) { const o = await pdfOcr(doc); if (!o.join('').trim()) throw new Error('تعذّرت قراءة الصفحات — جرّب صورة أوضح أو ملف Word'); o._ocr = true; return o; }
+    if (out.join('').replace(/\s/g, '').length < 20) { const o = await pdfOcr(doc); if (!o.join('').trim()) throw new Error('تعذّرت قراءة الصفحات — جرّب صورة أوضح أو ملف Word'); const z = o.map(l => l.split(HLM).join('')); z._ocr = true; z._qs = o._qs; return z; }
     if (false) throw new Error('الملف PDF صورة ممسوحة بلا نص — صدّره من Word أو Google Docs بصيغة PDF أو Word ثم أعد المحاولة');
     return out;
   }
@@ -159,6 +261,7 @@
   const LETTER = s => { const x = clean(s).replace(/[()]/g, '').replace(/^ا$/, 'أ'); const i = LETTERS.indexOf(x); if (i >= 0) return i; const j = 'abcdef'.indexOf(x.toLowerCase()); return x.length === 1 ? j : -1; };
   const TF = s => /✓|✔|صح|صواب|true|^\s*√/i.test(s) ? 'صواب' : /✗|✘|×|خطأ|خطا|false/i.test(s) ? 'خطأ' : '';
   const OK_MARK = /\s*(\*|✓|✔|\(صح\)|\(الصحيحة\)|←\s*الصحيح)\s*$/;
+  const optOf = t => { const ok = OK_MARK.test(t) || t.includes('✱'); return { t: clean(t.split('✱').join('').replace(OK_MARK, '')), ...(ok ? { ok: true } : {}) }; };
   const Q_RE = /^\s*(?:§\s*|س\s*[0-9٠-٩]+\s*[\/\-:)]?\s*|\(?\s*[0-9٠-٩]{1,3}\s*[\)\-\.ـ:]\s*)/;
   const OPT_RE = /^\s*\(?\s*([أابجدهوa-fA-F])\s*[\)\-\.ـ:]\s*(.+)$/;
   const SEC_RE = /^\s*(?:السؤال|سؤال)\s+(?:ال)?(?:أول|اول|ثاني|ثالث|رابع|خامس|سادس|[0-9٠-٩]+)/;
@@ -171,11 +274,13 @@
     for (let raw of lines) {
       let l = clean(raw); if (!l) continue;
       if (!qs.length && !cur && !title && l.length < 80 && !Q_RE.test(l) && /اختبار|ورقة عمل|واجب|تقويم|مراجعة|نشاط/.test(l)) { title = l.replace(/^§\s*/, ''); continue; }
-      if (SEC_RE.test(l) || (/^(اختر|ضع|أكمل|اكمل|أجب|اجب|علل|صل|زاوج|رتب|رتّب|املأ|ظلل)/.test(l.replace(/^§\s*/, '')) && l.length < 90 && !OPT_RE.test(l))) { push(); const k = kindOf(l); if (k) sec = k; continue; }
+      { const tail = l.replace(/^§\s*/, '').split(/[:：]/).slice(1).join(':').trim(); // «علل: …» / «أكمل: …» سؤال كامل لا عنوان قسم
+        if (!SEC_RE.test(l) && tail.replace(/[^؀-ۿ]/g, '').length >= 8 && /^(أكمل|اكمل|علل|عرّف|عرف|اشرح|وضح|وضّح|قارن|اذكر|فسر|فسّر)/.test(l.replace(/^§\s*/, ''))) { const k = kindOf(l); if (!Q_RE.test(l)) l = '§ ' + l; if (k === 'essay' || k === 'short') sec = k; } }
+      if (SEC_RE.test(l) || (/^(اختر|ضع|أكمل|اكمل|أجب|اجب|علل|صل|زاوج|رتب|رتّب|املأ|ظلل)/.test(l.replace(/^§\s*/, '')) && l.length < 90 && !OPT_RE.test(l) && !/^§/.test(l))) { push(); const k = kindOf(l); if (k) sec = k; continue; }
       const ans = l.match(/^(?:الإجابة|الاجابة|الجواب|الحل)\s*(?:الصحيحة)?\s*[:：\-]\s*(.+)$/);
       if (ans && cur) { const a = clean(ans[1]); if (cur.qtype === 'blank') { const p = a.split(/\s*[،,؛]\s*|\s+-\s+/).filter(Boolean); cur.options = cur.options.map((o, j) => ({ t: p[j] || o.t || '' })); if (p.length > cur.options.length) p.slice(cur.options.length).forEach(t => cur.options.push({ t })); continue; } const ml = a.split(/\s*[،,]\s*|\s+و\s*/).map(x => LETTER(x.trim().split(/\s/)[0])).filter(k => k >= 0); if (cur.options.length && ml.length > 1) { cur.qtype = 'multi'; cur.options.forEach((o, j) => o.ok = ml.includes(j)); continue; } if (cur.qtype === 'mcq' || (cur.options.length && cur.qtype !== 'match' && cur.qtype !== 'order')) { const k = LETTER(a.split(/\s/)[0]); const i = k >= 0 ? k : cur.options.findIndex(o => A.normKey(o.t) === A.normKey(a)); cur.options.forEach((o, j) => o.ok = j === i); } else if (cur.qtype === 'tf') cur.answer = TF(a) || cur.answer; else if (cur.qtype === 'blank') { const p = a.split(/\s*[،,؛]\s*|\s+-\s+/).filter(Boolean); cur.options = cur.options.map((o, j) => ({ t: p[j] || o.t || '' })); if (p.length > cur.options.length) p.slice(cur.options.length).forEach(t => cur.options.push({ t })); } else cur.answer = a; continue; }
       const om = l.match(OPT_RE);
-      if (cur && om && !Q_RE.test(l.replace(OPT_RE, ''))) { const inl = splitInline(l); (inl || [om[2]]).forEach(t => { const ok = OK_MARK.test(t); cur.options.push({ t: clean(t.replace(OK_MARK, '')), ...(ok ? { ok: true } : {}) }); }); cur.qtype = 'mcq'; continue; }
+      if (cur && om && !Q_RE.test(l.replace(OPT_RE, ''))) { const inl = splitInline(l); (inl || [om[2]]).forEach(t => cur.options.push(optOf(t))); cur.qtype = 'mcq'; continue; }
       if (Q_RE.test(l)) { push(); let body = clean(l.replace(Q_RE, '')); let tf = '';
         const tm = body.match(/\(\s*(✓|✔|✗|✘|×|صح|خطأ|خطا|صواب)?\s*\)\s*$/) || body.match(/^\(\s*(✓|✔|✗|✘|×|صح|خطأ|خطا|صواب)?\s*\)\s*/);
         if (tm) { tf = TF(tm[1] || ''); body = clean(body.replace(tm[0], '')); }
@@ -185,13 +290,13 @@
         if (sec === 'order' && !opts.length) { const it = body.split(/\s*[،,؛/]\s*|\s+-\s+/).filter(Boolean); if (it.length >= 3) { cur = { body: 'رتّب ما يلي', qtype: 'order', options: it.map(t => ({ t: clean(t) })), answer: '', points: 1 }; continue; } }
         const nb = (body.match(/\.{3,}|…+|_{3,}/g) || []).length;
         if (!tm && !opts.length && nb && (sec === 'short' || sec === '' || sec === 'blank')) { cur = { body, qtype: 'blank', options: Array.from({ length: nb }, () => ({ t: '' })), answer: '', points: nb > 1 ? nb : 1 }; continue; }
-        cur = { body, qtype: tm ? 'tf' : opts.length ? 'mcq' : (sec === 'order' || sec === 'match' ? '' : sec) || (/\.{3,}|…{1,}|_{3,}/.test(body) ? 'short' : 'essay'), options: opts.map(t => { const ok = OK_MARK.test(t); return { t: clean(t.replace(OK_MARK, '')), ...(ok ? { ok: true } : {}) }; }), answer: tf, points: 1 };
+        cur = { body, qtype: tm ? 'tf' : opts.length ? 'mcq' : (sec === 'order' || sec === 'match' ? '' : sec) || ((k => k === 'short' || k === 'essay' ? k : '')(kindOf(body))) || (/\.{3,}|…{1,}|_{3,}/.test(body) ? 'short' : 'essay'), options: opts.map(optOf), answer: tf, points: 1 };
         continue; }
       if (cur) { if (!cur.options.length) cur.body = clean(cur.body + ' ' + l); else cur.options[cur.options.length - 1].t = clean(cur.options[cur.options.length - 1].t + ' ' + l); }
       else if (l.length > 8 && /[؟?]|\.{3,}/.test(l)) { cur = { body: l.replace(/^§\s*/, ''), qtype: sec || 'essay', options: [], answer: '', points: 1 }; }
     }
     push();
-    qs.forEach(q => { if (q.qtype === 'mcq' && q.options.length < 2) { q.qtype = sec === 'tf' ? 'tf' : 'short'; q.options = []; } if (!['mcq', 'multi', 'blank', 'match', 'order'].includes(q.qtype)) q.options = []; delete q._grp; if (q.qtype === 'mcq' && !q.options.length) q.qtype = 'essay'; });
+    qs.forEach(q => { q.body = clean(String(q.body).split('✱').join('')); (q.options || []).forEach(o => { if (typeof o.t === 'string' && o.t.includes('✱')) { o.t = clean(o.t.split('✱').join('')); o.ok = true; } }); if ((q.qtype === 'mcq' || q.qtype === 'multi') && q.options.length === 2 && q.options.some(o => /صح|صواب/.test(o.t)) && q.options.some(o => /خط/.test(o.t))) { const k = q.options.find(o => o.ok); q.qtype = 'tf'; q.answer = k ? (/خط/.test(k.t) ? 'خطأ' : 'صواب') : ''; q.options = []; } if (q.qtype === 'mcq' && q.options.length < 2) { q.qtype = sec === 'tf' ? 'tf' : 'short'; q.options = []; } if (!['mcq', 'multi', 'blank', 'match', 'order'].includes(q.qtype)) q.options = []; delete q._grp; if (q.qtype === 'mcq' && !q.options.length) q.qtype = 'essay'; });
     return { title, qs };
   }
   A._parseQ = parseLines;
@@ -202,9 +307,11 @@
       const n = f.name.toLowerCase();
       try {
         if (/\.(xlsx|xls|csv)$/.test(n)) { const q = await sheetQs(f); all = all.concat(q); rep.push(`${f.name}: ${AR(q.length)}`); continue; }
-        const lines = IS_IMG(f) ? Object.assign(await imageLines(f), { _ocr: true }) : /\.pdf$/.test(n) || f.type === 'application/pdf' ? await pdfLines(f) : /\.docx$/.test(n) ? await docxLines(f) : /\.(txt|md)$/.test(n) || f.type.startsWith('text/') ? (await f.text()).split(/\r?\n/) : null;
+        if (IS_IMG(f)) { const r = await imageQs(f); const q = r.qs || parseLines(r.lines).qs; q.forEach(x => { x.source = f.name; x._ocr = 1; }); all = all.concat(q); const nOk = q.filter(x => (x.options || []).some(o => o.ok) || x.answer).length;
+          rep.push(`${f.name}: ${AR(q.length)} سؤال${r.qs ? ' (جدول' + (nOk ? ` — عُرفت إجابة ${AR(nOk)} من التظليل` : '') + ')' : ''} — قراءة ضوئية، راجع النص`); continue; }
+        const lines = /\.pdf$/.test(n) || f.type === 'application/pdf' ? await pdfLines(f) : /\.docx$/.test(n) ? await docxLines(f) : /\.(txt|md)$/.test(n) || f.type.startsWith('text/') ? (await f.text()).split(/\r?\n/) : null;
         if (!lines) { rep.push(`${f.name}: صيغة غير مدعومة (استخدم Excel أو Word أو PDF أو صورة)`); continue; }
-        const r = parseLines(lines); r.qs.forEach(x => { x.source = f.name; if (lines._ocr) x._ocr = 1; }); all = all.concat(r.qs); title = title || r.title; rep.push(`${f.name}: ${AR(r.qs.length)}${lines._ocr ? ' (قراءة ضوئية — راجع النص)' : ''}`);
+        const r = lines._qs ? { qs: lines._qs, title: '' } : parseLines(lines); r.qs.forEach(x => { x.source = f.name; if (lines._ocr) x._ocr = 1; }); all = all.concat(r.qs); title = title || r.title; rep.push(`${f.name}: ${AR(r.qs.length)}${lines._ocr ? ' (قراءة ضوئية — راجع النص)' : ''}`);
       } catch (e) { rep.push(`${f.name}: ${e.message}`); }
     }
     return { qs: all, title, rep };
@@ -248,6 +355,7 @@
             <label class="small">الدرجة <input class="in" type="number" min="0.5" step="0.5" data-pt="${i}" value="${x.points}" style="width:70px"></label>
             <select class="in" data-lv="${i}" aria-label="المستوى المعرفي" style="width:auto">${X.LV.map(([k, n]) => `<option value="${k}" ${x.level === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
             ${x._ocr ? '<span class="pill st-warn" title="قُرئ ضوئياً من صورة — راجع النص والإجابة">قراءة ضوئية</span>' : ''}${x._lesson ? `<span class="pill st-empty" title="الدرس من الملف">${esc(x._lesson)}</span>` : ''}${x.dup ? `<span class="pill st-returned" title="${esc(x.dup)}">مكرر في البنك</span>` : ''}${pr && x.on ? `<span class="iq-pr">${esc(pr)}</span>` : ''}<button type="button" class="btn bad sm" data-rm="${i}" aria-label="حذف السؤال">×</button></div>
+          ${x._img ? `<details class="iq-img"><summary class="small">عرض السؤال كما في الصورة للمقارنة</summary><img src="${x._img}" alt="صورة السؤال ${AR(i + 1)} من الملف"></details>` : ''}
           <textarea class="in" rows="2" data-bd="${i}" aria-label="نص السؤال">${esc(x.body)}</textarea>
           ${x.qtype === 'mcq' || x.qtype === 'multi' ? `<div class="iq-opts">${x.options.map((o, j) => `<label class="${o.ok ? 'ok' : ''}"><input type="${x.qtype === 'multi' ? 'checkbox' : 'radio'}" name="ok${i}" data-ok="${i}|${j}" ${o.ok ? 'checked' : ''} aria-label="الإجابة الصحيحة"><span>${LETTERS[j] || AR(j + 1)}</span><input class="in" data-op="${i}|${j}" value="${esc(o.t)}"></label>`).join('')}<button type="button" class="btn ghost sm" data-oa="${i}">+ خيار</button></div>`
             : x.qtype === 'blank' ? `<div class="iq-opts">${x.options.map((o, j) => `<label><span>ف${AR(j + 1)}</span><input class="in" data-bo="${i}|${j}" value="${esc(o.t || '')}" placeholder="إجابة الفراغ"></label>`).join('')}<button type="button" class="btn ghost sm" data-ba="${i}">+ فراغ</button><label class="chk small"><input type="checkbox" data-bk="${i}" ${x.answer === 'bank' ? 'checked' : ''}> بنك كلمات</label></div>`

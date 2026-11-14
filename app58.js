@@ -27,7 +27,7 @@
   const as0 = V.assess;
   if (as0) V.assess = function (root) {
     const r = as0.apply(this, arguments);
-    const arm = () => { const n = root.querySelector('#zNew'); if (n && !root.querySelector('#zHw')) { const b = document.createElement('button'); b.className = 'btn hw-new'; b.id = 'zHw'; b.type = 'button'; b.innerHTML = `${A.I.plus || ''} واجب إلكتروني برابط`; b.title = 'واجب تفاعلي للطلاب برابط ورمز QR، بمحاولتين وترتيب عشوائي (يمكن تغييرها)'; b.onclick = () => newHw(root); n.parentNode.insertBefore(b, n); }
+    const arm = () => { const n = root.querySelector('#zNew'); if (n && !root.querySelector('#zHw') && (!A.canHw || A.canHw())) { const b = document.createElement('button'); b.className = 'btn hw-new'; b.id = 'zHw'; b.type = 'button'; b.innerHTML = `${A.I.plus || ''} واجب إلكتروني برابط`; b.title = 'واجب تفاعلي للطلاب برابط ورمز QR، بمحاولتين وترتيب عشوائي (يمكن تغييرها)'; b.onclick = () => newHw(root); n.parentNode.insertBefore(b, n); }
       if (sessionStorage.getItem('dina_new_hw') && n) { sessionStorage.removeItem('dina_new_hw'); newHw(root); } };
     const o = new MutationObserver(arm); o.observe(root, { childList: true, subtree: true }); setTimeout(() => o.disconnect(), 60000); arm();
     return r;
@@ -36,7 +36,7 @@
   const hw0 = V.hwf;
   if (hw0) V.hwf = async function (root) {
     const r = await hw0.apply(this, arguments);
-    const head = root.querySelector('.card .head'); if (head && !root.querySelector('#hwNew') && A.canAssess && A.canAssess()) {
+    const head = root.querySelector('.card .head'); if (head && !root.querySelector('#hwNew') && A.canAssess && A.canAssess() && (!A.canHw || A.canHw())) {
       const b = document.createElement('button'); b.className = 'btn hw-new'; b.id = 'hwNew'; b.type = 'button'; b.innerHTML = `${A.I.plus || ''} واجب إلكتروني برابط`;
       b.onclick = () => { try { sessionStorage.setItem('dina_new_hw', '1'); } catch (_) { } A.LS.set('as_t', 'quizzes'); location.hash = '#/assess'; };
       head.appendChild(b);

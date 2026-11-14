@@ -316,7 +316,7 @@
   // ظهور البنود للمعلمين بقرار المالك — الإخفاء لا يمس البيانات
   const FEAT_DEF = { assess: 'all', records: 'all', resources: 'all', analysis: 'granted', attendance: 'granted', supervision: 'granted' };
   const featMode = k => ((((S.school || {}).settings || {}).features || {})[k]) || FEAT_DEF[k];
-  const featGate = k => { if (!(k in FEAT_DEF) || !S.me || S.me.is_owner) return true; const m = featMode(k); if (m === 'off') return false; if (m === 'granted' && FEAT_DEF[k] === 'all') return !!(APP.hasModule && APP.hasModule(k)); return true; };
+  const featGate = k => { if (!(k in FEAT_DEF) || !S.me || S.me.is_owner) return true; if (k === 'assess' && window.APP && window.APP.canEhw && window.APP.canEhw()) return true; const m = featMode(k); if (m === 'off') return false; if (m === 'granted' && FEAT_DEF[k] === 'all') return !!(APP.hasModule && APP.hasModule(k)); return true; };
   const navOK = n => n[2]() && featGate(n[0]) && (n[0] !== 'myreports' || featGate('supervision'));
   function renderNav() {
     const myCount = S.entries.filter(e => e.teacher_id === S.me.id && required(e) && !filled(e)).length;

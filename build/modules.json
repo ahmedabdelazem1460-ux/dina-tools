@@ -80,6 +80,7 @@
     {"src": "src/assess/slides.js", "about": "العروض التقديمية V.slides: من بنك الأسئلة أو نص/ملف، ست هويات مشتقة من دينا، محرر، عرض بملء الشاشة مع السؤال اللحظي، تصدير PowerPoint (vendor/pptxgen) وPDF (sql/098 decks)"},
     {"src": "scales.js", "about": "تعريف مقاييس البوصلة DinaScales (مشترك مع scale.html)"},
     {"src": "src/attendance/compass.js", "about": "البوصلة V.compass: مقاييس الطلاب برابط scale.html ونتائج الفصل والطالب، ومؤشرات الأداء للمالك (sql/099)"},
-    {"src": "src/plan/assistant.js", "about": "مساعد المعلم V.assistant (مجاني داخل المتصفح): أهداف بلوم، ملخص، سير الحصة، استراتيجيات، أسئلة (A.genFromText)، واجب، تمايز، طباعة، تحويل لعرض/سؤال لحظي"}
+    {"src": "src/plan/assistant.js", "about": "مساعد المعلم V.assistant (مجاني داخل المتصفح): أهداف بلوم، ملخص، سير الحصة، استراتيجيات، أسئلة (A.genFromText)، واجب، تمايز، طباعة، تحويل لعرض/سؤال لحظي"},
+    {"src": "src/assess/models3d.js", "about": "المجسمات التفاعلية A.models3d داخل المعامل: مجسمات هندسية بمحرك Canvas، نموذج الذرة، المجموعة الشمسية"}
   ]
 }

@@ -11,7 +11,9 @@
   const gName = k => { const [st, g] = String(k || '|').split('|'); return g ? A.gradeName(g, st) : ''; };
   const SH = ['▲', '◆', '●', '■', '★', '⬟'], COL = ['#E0675A', '#005499', '#C9A44C', '#2F855A', '#AE95DA', '#3AB1DB'];
   const QTN = { mcq: 'اختيار', multi: 'متعدد', tf: 'صواب وخطأ', short: 'قصيرة', blank: 'أكمل', match: 'صل', order: 'ترتيب', essay: 'مقالي' };
-  const MODES = [['flash', 'البطاقات'], ['match', 'المطابقة'], ['quiz', 'التحدي السريع'], ['tf', 'صح أم خطأ'], ['wheel', 'عجلة الأسئلة']];
+  const MODES0 = [['flash', 'البطاقات'], ['match', 'المطابقة'], ['quiz', 'التحدي السريع'], ['tf', 'صح أم خطأ'], ['wheel', 'عجلة الأسئلة'], ['anagram', 'ترتيب الحروف'], ['balloon', 'فرقعة البالونات'], ['groups', 'الفرز'], ['race', 'سباق الفريقين']];
+  const NEWM = ['anagram', 'balloon', 'groups', 'race'];
+  const MODES = new Proxy([], { get: (t, k) => { const L = MODES0.filter(m => !NEWM.includes(m[0]) || A.tfeat('games2')); const v = L[k]; return typeof v === 'function' ? v.bind(L) : v; } });
   let QR = null; const loadQR = () => QR ? Promise.resolve(QR) : new Promise(ok => { const s = document.createElement('script'); s.src = 'vendor/qrcode.js'; s.onload = () => ok(QR = window.qrcode); s.onerror = () => ok(null); document.head.appendChild(s); });
   const qrSvg = (q, t, cell) => { if (!q) return ''; const x = q(0, 'M'); x.addData(t); x.make(); return x.createSvgTag({ cellSize: cell || 4, margin: 0, scalable: true }); };
   const ctxOpts = () => { const mine = new Set(S.entries.filter(e => e.teacher_id === S.me.id).map(e => e.class_id)); const cls = S.classes.filter(c => c.active !== false && (S.me.is_owner || !mine.size || mine.has(c.id))); const subs = new Set(S.entries.filter(e => e.teacher_id === S.me.id && e.subject_id).map(e => e.subject_id)); return { grades: [...new Set(cls.map(gk))].filter(Boolean), subjects: S.me.is_owner || !subs.size ? S.subjects : S.subjects.filter(s => subs.has(s.id)) }; };

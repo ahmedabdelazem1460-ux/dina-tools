@@ -71,6 +71,7 @@
     {"src": "src/core/report-studio.js", "old": "app59.js", "about": "استوديو التقارير A.printDoc بهوية المدرسة"},
     {"src": "src/attendance/counseling.js", "old": "app60.js", "about": "الإرشاد الطلابي: الإحالات والحالات والوكيل V.refer/V.counsel/V.deputy"},
     {"src": "src/attendance/students-browser.js", "old": "app61.js", "about": "تبويب الطلاب: قوائم وإحصاءات تفاعلية A.stuBrowser"},
-    {"src": "src/assess/school-bank.js", "old": "app62.js", "about": "بنك أسئلة المدرسة V.qbank + إتاحة الواجب الإلكتروني + واجهات الطالب + تصدير Excel"}
+    {"src": "src/assess/school-bank.js", "old": "app62.js", "about": "بنك أسئلة المدرسة V.qbank + إتاحة الواجب الإلكتروني + واجهات الطالب + تصدير Excel"},
+    {"src": "src/plan/terms.js", "about": "الفصول الدراسية: مؤشر الفصل في الشريط وقائمة المستخدم، تبويب الإدارة لإضافة الفصل الثاني وتجهيزه وتفعيله (sql/094)"}
   ]
 }

@@ -177,6 +177,26 @@
     d.querySelector('#nfSN').onclick = () => { d.remove(); A.LS.set('nf_soft', 1); };
   }
 
+  // ---------------- تطبيق الجوال (أندرويد وآيفون) ----------------
+  function appDialog() {
+    const url = location.origin + location.pathname.replace(/[^/]*$/, '') + 'index.html?src=app';
+    let qr = ''; try { const q = window.qrcode(0, 'M'); q.addData(url); q.make(); qr = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true }); } catch (_) { }
+    const and = /android/i.test(navigator.userAgent), ios = isIOS();
+    const m = A.modal(`<h3>تطبيق منصة دينا على الجوال</h3><p class="sub">ثبّت المنصة على الشاشة الرئيسية لتعمل كتطبيق مستقل: أيقونة دينا، فتح بملء الشاشة، وإشعارات.</p>
+      <div class="nf-grid" style="align-items:start">
+        <div class="card" style="margin:0"><h3 style="margin-top:0">أندرويد</h3><ol style="line-height:1.9;margin:0;padding-inline-start:18px"><li>افتح المنصة في <b>Chrome</b>.</li><li>اضغط <b>«تثبيت»</b> بالأسفل، أو القائمة ⋮ ← <b>«تثبيت التطبيق»</b>.</li><li>افتح «منصة دينا» من الشاشة الرئيسية وفعّل الإشعارات.</li></ol>${installEv ? `<button class="btn sm" id="apInst" style="margin-top:10px">${ICO.phone} تثبيت الآن</button>` : ''}</div>
+        <div class="card" style="margin:0"><h3 style="margin-top:0">آيفون وآيباد</h3><ol style="line-height:1.9;margin:0;padding-inline-start:18px"><li>افتح المنصة في <b>Safari</b>.</li><li>اضغط زر <b>المشاركة</b> (المربع والسهم).</li><li>اختر <b>«إضافة إلى الشاشة الرئيسية»</b>.</li><li>افتح التطبيق من الأيقونة وفعّل الإشعارات من الجرس.</li></ol></div>
+        <div class="card" style="margin:0;text-align:center"><h3 style="margin-top:0">من جهاز آخر</h3><div style="width:170px;margin:0 auto">${qr}</div><p class="small muted" style="margin:6px 0 0">امسح الرمز بكاميرا الجوال لفتح المنصة ثم ثبّتها.</p><button class="btn ghost sm" id="apCopy">نسخ الرابط</button></div>
+      </div>${isStandalone() ? '<div class="notice ok" style="margin-top:12px">أنت تستخدم المنصة كتطبيق مثبّت على هذا الجهاز.</div>' : (and || ios ? '' : '')}`, { cls: 'wide' });
+    const bi = m.el.querySelector('#apInst'); if (bi) bi.onclick = async () => { installEv.prompt(); await installEv.userChoice.catch(() => { }); installEv = null; m.close(); };
+    m.el.querySelector('#apCopy').onclick = async () => { try { await navigator.clipboard.writeText(url); A.toast('نُسخ الرابط', 'ok'); } catch (_) { A.toast(url); } };
+  }
+  A.appDialog = appDialog;
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#ub')) return;
+    setTimeout(() => { const m = $('.menu'); if (!m || m.querySelector('[data-a="app"]')) return; const b = document.createElement('button'); b.dataset.a = 'app'; b.innerHTML = `${ICO.phone} تطبيق الجوال (أندرويد وآيفون)`; b.style.display = 'flex'; b.style.gap = '8px'; b.style.alignItems = 'center'; b.onclick = () => { m.remove(); appDialog(); }; const lang = m.querySelector('[data-a="lang"]'); lang ? lang.before(b) : m.appendChild(b); }, 0);
+  }, true);
+
   // ---------------- لوحة الإشعارات ----------------
   function panel() {
     let only = false;

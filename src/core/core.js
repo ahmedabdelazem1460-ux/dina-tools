@@ -232,7 +232,7 @@
   const stageLim = () => { if (!S.me || S.me.is_owner) return null; const e = (myMem() || {}).extra || {}; const any = [e.stages, e.grades, e.classes].some(x => x && x.length); return any ? (e.stages || []) : null; };
   async function loadSection(keepWeek) {
     const [c, w] = await Promise.all([api.classes(S.sectionId), api.weeks(S.sectionId)]);
-    S.allClasses = c; S.weeks = w;
+    S.allClasses = c; S.weeksAll = w; S.weeks = window.APP.termFilter ? await window.APP.termFilter(w) : w;
     const order = ['KG', 'رياض الأطفال', 'ابتدائي', 'الابتدائية', 'Grade', 'متوسط', 'المتوسطة', 'ثانوي', 'الثانوية'];
     S.stages = [...new Set(c.map(stageOf))].sort((a, b) => (order.indexOf(a) + 1 || 9) - (order.indexOf(b) + 1 || 9));
     // نطاق الموظف: مراحل/صفوف/فصول (بلا اختيار = القسم كاملاً)
@@ -294,7 +294,7 @@
       <div class="grow"></div>
       <div class="pick"><label>القسم</label><select id="secSel">${S.sections.map(s => `<option value="${s.id}" ${s.id === S.sectionId ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>
       ${(S.stages || []).length > 1 ? `<div class="pick"><label>المرحلة</label><select id="stSel"><option value="all">${stageLim() ? 'كل مراحلي' : 'كل المراحل'}</option>${S.stages.map(x => `<option value="${esc(x)}" ${S.stage === x ? 'selected' : ''}>${esc(STAGE_L[x] || x)}</option>`).join('')}</select></div>` : ''}
-      <div class="pick"><label>الأسبوع</label><select id="weekSel">${S.weeks.length ? S.weeks.map(w => `<option value="${w.id}" ${w.id === S.weekId ? 'selected' : ''}>الأسبوع ${esc(w.word)} ${w.archived ? '· أرشيف' : w.status !== 'open' ? '· ' + WSTATUS[w.status] : ''}</option>`).join('') : '<option>لا توجد أسابيع</option>'}</select></div>
+      ${window.APP.termPickHtml ? window.APP.termPickHtml() : ''}      <div class="pick"><label>الأسبوع</label><select id="weekSel">${S.weeks.length ? S.weeks.map(w => `<option value="${w.id}" ${w.id === S.weekId ? 'selected' : ''}>الأسبوع ${esc(w.word)} ${w.archived ? '· أرشيف' : w.status !== 'open' ? '· ' + WSTATUS[w.status] : ''}</option>`).join('') : '<option>لا توجد أسابيع</option>'}</select></div>
       <button class="userbtn icon-only" id="inboxBtn" aria-label="الرسائل"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H7l-3 3z"/></svg><span class="badge hidden" id="inboxN"></span></button>
       <button class="userbtn" id="ub"><span class="avatar">${esc((S.me.full_name.replace(/^(أ\.|Ms\.|Mr\.|د\.)\s*/, '')[0]) || '؟')}</span><span class="small" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.me.full_name)}</span></button>
     </div></header>

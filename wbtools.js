@@ -12,7 +12,12 @@
   const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const mmss = s => { s = Math.max(0, Math.round(s)); const m = Math.floor(s / 60), x = s % 60; return AR(String(m).padStart(2, '0') + ':' + String(x).padStart(2, '0')); };
   const short = n => String(n).trim().split(/\s+/).slice(0, 2).join(' ');
-  let audio = null, muted = LSg('dina_wbt_mute') === '1';
+  const full = n => String(n).trim().replace(/\s+/g, ' ');
+  // إعدادات الأدوات (تُعدَّل من «⚙️ إعدادات الأدوات» وتُحفظ على الجهاز)
+  const SET_DEF = { nmf: 'full', ns: 1, mute: false, conf: true, spin: 'n', rmw: true, nr: true, gMode: 'g', gN: 4, tmin: 5, tpre: '1,2,3,5,10,15' };
+  const SET = Object.assign({}, SET_DEF, { nmf: LSg('dina_wbt_nmf') || SET_DEF.nmf, mute: LSg('dina_wbt_mute') === '1' }, LJ('dina_wbt_set', {}));
+  const saveSet = () => LSs('dina_wbt_set', JSON.stringify(SET));
+  let audio = null, muted = !!SET.mute;
   const ac = () => { try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume(); return audio; } catch (_) { return null; } };
   const tone = (f, d, t0 = 0, type = 'sine', vol = .22) => { if (muted) return; const a = ac(); if (!a) return; const o = a.createOscillator(), g = a.createGain(), t = a.currentTime + t0; o.type = type; o.frequency.setValueAtTime(f, t); o.connect(g); g.connect(a.destination); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + d); o.start(t); o.stop(t + d + .02); };
   const beep = (f = 880, d = .25, n = 3) => { for (let i = 0; i < n; i++) tone(f, d, i * (d + .12)); };
@@ -72,12 +77,12 @@
 .fc.on>div{transform:rotateY(180deg)}
 .fc .f,.fc .bk{position:absolute;inset:0;backface-visibility:hidden;border-radius:20px;display:grid;place-items:center;font-weight:900;text-align:center;padding:10px}
 .fc .f{background:repeating-linear-gradient(45deg,#005499 0 14px,#0A62AD 14px 28px);color:#fff;font-size:64px;box-shadow:0 10px 0 #003C70}
-.fc .bk{background:linear-gradient(135deg,#BADF93,#fff);color:#082B5A;font-size:clamp(28px,6vw,72px);transform:rotateY(180deg);box-shadow:0 10px 0 #2E8B57}
+.fc .bk{background:linear-gradient(135deg,#BADF93,#fff);color:#082B5A;font-size:calc(clamp(22px,4.6vw,56px) * var(--wbt-ns,1));line-height:1.25;transform:rotateY(180deg);box-shadow:0 10px 0 #2E8B57}
 .st-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
 .st-c{position:relative;border:0;font:inherit;border-radius:16px;padding:10px 8px 8px;background:#fff;box-shadow:0 0 0 1.5px #DCE7F3,0 6px 0 -2px #DCE7F3;cursor:pointer;text-align:center;color:#082B5A}
 .st-c:hover{box-shadow:0 0 0 2px #C9A44C,0 6px 0 -2px #DCE7F3}
 .st-c .av{width:42px;height:42px;border-radius:50%;margin:0 auto 4px;display:grid;place-items:center;color:#fff;font-weight:900;font-size:18px}
-.st-c b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st-c b{display:block;font-size:calc(13px * var(--wbt-ns,1));line-height:1.35;overflow-wrap:anywhere}
 .st-c .s{font-size:15px;font-weight:900;color:#8A6416}.st-c .m{position:absolute;top:4px;inset-inline-start:4px;background:#F1F4F8;border-radius:8px;width:26px;height:26px;display:grid;place-items:center;cursor:pointer;font-weight:900;color:#5b6b7f}
 .st-c.top{box-shadow:0 0 0 2.5px #C9A44C,0 6px 0 -2px #E9D49A}
 .st-pop{position:absolute;left:50%;top:30%;font-size:26px;pointer-events:none;animation:stUp .8s ease-out forwards}@keyframes stUp{to{transform:translateY(-46px) scale(1.4);opacity:0}}
@@ -86,7 +91,7 @@
 .to-l li i{font-style:normal;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#DCE7F3;font-weight:900;flex:none}
 .to-l li.cur{background:linear-gradient(90deg,#BADF93,#fff);border-color:#2E8B57;font-size:1.15em}.to-l li.cur i{background:#2E8B57;color:#fff}.to-l li.done{opacity:.55;text-decoration:line-through}
 .wbw .grps{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
-.wbw .grp{border-radius:16px;padding:8px 10px;border:2px solid #DCE7F3;background:#fff}.wbw .grp b{display:block;margin-bottom:4px}.wbw .grp div{font-size:14px;line-height:1.7}
+.wbw .grp{border-radius:16px;padding:8px 10px;border:2px solid #DCE7F3;background:#fff}.wbw .grp b{display:block;margin-bottom:4px}.wbw .grp div{font-size:calc(14px * var(--wbt-ns,1));line-height:1.7}
 .wbw .dice{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 .wbw .die{width:84px;height:84px;border-radius:18px;background:#fff;border:3px solid #082B5A;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:10px;box-shadow:0 6px 0 #082B5A}
 .wbw .die span{border-radius:50%;margin:3px}.wbw .die span.d{background:#082B5A}
@@ -119,6 +124,7 @@
     ['poll', '📊', 'سؤال لحظي', 'يجيب الطلاب من جوالاتهم', '#005499'],
   ];
   const T = k => TOOLS.find(t => t[0] === k);
+  const tpre = () => { const L = String(SET.tpre || '').split(/[,،\s]+/).map(Number).filter(n => n > 0 && n <= 180); return (L.length ? L : [1, 2, 3, 5, 10, 15]).slice(0, 8); };
 
   window.WBT = function (o) { // o: { wrap, btn, insertText(v), cfg(): {poll, classes}, askNames(cid, cb), poll() }
     if (!document.getElementById('wbtcss')) { const s = document.createElement('style'); s.id = 'wbtcss'; s.textContent = CSS; document.head.appendChild(s); }
@@ -129,7 +135,13 @@
     if (!R) { const old = (LSg('dina_wbt_names') || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean); R = { label: old.length ? 'قائمتي' : '', names: old, key: 'manual' }; }
     const subs = new Set(); const onRoster = f => { subs.add(f); return () => subs.delete(f); };
     const setRoster = r => { R = r; LSs('dina_wbt_roster', JSON.stringify(R)); subs.forEach(f => { try { f(); } catch (_) { } }); };
-    const names = () => (R && R.names) || [];
+    const raw = () => (R && R.names) || [];
+    const NMF = [['full', 'الاسم كاملاً'], ['two', 'الاسم الثنائي'], ['fl', 'الأول والأخير']];
+    let nmf = SET.nmf; if (!NMF.some(x => x[0] === nmf)) nmf = 'full';
+    const fmt1 = (n, f) => { const p = full(n).split(' '); if (p.length < 3 || f === 'full') return p.join(' '); return f === 'two' ? p.slice(0, 2).join(' ') : p[0] + ' ' + p[p.length - 1]; };
+    const names = () => { const L = raw(); if (nmf === 'full') return L.slice(); const F = L.map(n => fmt1(n, nmf)); const cnt = {}; F.forEach(x => cnt[x] = (cnt[x] || 0) + 1); return F.map((x, i) => cnt[x] > 1 ? full(L[i]) : x); }; // المتشابهون بالاختصار يُعرضون كاملين
+    const notify = () => subs.forEach(g => { try { g(); } catch (_) { } }); wrap.style.setProperty('--wbt-ns', SET.ns); const setFmt = f => { nmf = SET.nmf = f; saveSet(); subs.forEach(g => { try { g(); } catch (_) { } }); };
+    if (R && R.key && R.key !== 'manual' && R.key !== 'num' && !R.full) setTimeout(() => { try { const k = R.key; o.askNames(k, L => { L = (L || []).map(full).filter(Boolean); if (L.length && R.key === k && !R.full) { LSs('dina_wbt_cls2_' + k, JSON.stringify(L)); setRoster(Object.assign({}, R, { names: L, full: 1 })); } }); } catch (_) { } }, 1500);
     const rosterLabel = () => names().length ? `${R.label || 'قائمة الأسماء'} · ${AR(names().length)} طالباً` : 'لم يُحدَّد فصل بعد';
     const rosterBar = B => { const d = document.createElement('div'); d.className = 'rb'; const paint = () => { d.innerHTML = `<span aria-hidden="true">👥</span><b>${esc(rosterLabel())}</b><button type="button">تغيير الفصل</button>`; d.querySelector('button').onclick = () => rosterDialog(); }; paint(); B.prepend(d); return onRoster(paint); };
     function rosterDialog(after) {
@@ -137,21 +149,46 @@
       B.innerHTML = `<p class="muted" style="margin:0">اختر فصلك مرة واحدة، فتستخدم أسماءه كل الأدوات: العجلة، والبطاقة، والنجوم، والأدوار، والمجموعات.</p>
         ${cls.length ? `<div class="grps">${cls.map(c => `<button class="bt" data-c="${esc(c.id)}" style="min-height:52px">${esc(c.name)}</button>`).join('')}</div>` : '<p class="muted" style="margin:0">تظهر فصولك هنا عند فتح السبورة من المنصة.</p>'}
         <div class="row"><label class="muted">أرقام من ١ إلى <input type="number" min="2" max="60" class="nn" style="width:72px" aria-label="عدد الطلاب"></label><button class="bt s nb">استخدم الأرقام</button></div>
+        <div class="row nmf" role="radiogroup" aria-label="طريقة عرض الاسم في الأدوات"><span class="muted">عرض الاسم:</span>${NMF.map(([k, t]) => `<button type="button" class="bt ${k === nmf ? 'p' : 's'}" role="radio" aria-checked="${k === nmf}" data-f="${k}">${t}</button>`).join('')}<small class="muted ex" style="flex-basis:100%"></small></div>
+        <button type="button" class="bt s gos" style="align-self:flex-start">⚙️ إعدادات أخرى للأدوات</button>
         <label class="muted lb" for="wbtNT"></label><textarea id="wbtNT" rows="8" class="nt"></textarea>
         <div class="row"><button class="bt g sv">اعتماد الأسماء المكتوبة</button><span class="muted st" role="status" aria-live="polite">${esc(rosterLabel())}</span></div>`;
       const st = B.querySelector('.st'), ta = B.querySelector('.nt'), lb = B.querySelector('.lb'), sv = B.querySelector('.sv');
       let taKey = 'manual', taLabel = 'قائمتي';
       const fillTa = () => { const fromCls = R.key && R.key !== 'manual' && R.key !== 'num'; taKey = fromCls ? R.key : 'manual'; taLabel = fromCls ? R.label : 'قائمتي';
-        ta.value = R.key === 'num' ? '' : names().join('\n');
-        lb.textContent = fromCls ? `أسماء «${R.label}» (${AR(names().length)}) — يمكنك حذف الغائبين أو إضافة اسم ثم الاعتماد` : 'أو اكتب الأسماء (اسم في كل سطر)';
+        ta.value = R.key === 'num' ? '' : raw().join('\n');
+        lb.textContent = fromCls ? `أسماء «${R.label}» (${AR(raw().length)}) — يمكنك حذف الغائبين أو إضافة اسم ثم الاعتماد` : 'أو اكتب الأسماء (اسم في كل سطر)';
         sv.textContent = fromCls ? 'اعتماد التعديل على الأسماء' : 'اعتماد الأسماء المكتوبة'; };
       fillTa();
-      const done = () => { fillTa(); st.textContent = '✓ ' + rosterLabel(); B.querySelectorAll('[data-c]').forEach(x => x.classList.toggle('p', x.dataset.c === R.key)); if (after) { const f = after; after = null; setTimeout(() => { const c = B.closest('.wbw'); if (c) c.querySelector('.cx').click(); f(); }, 450); } };
+      const paintFmt = () => { B.querySelectorAll('.nmf [data-f]').forEach(x => { const on = x.dataset.f === nmf; x.classList.toggle('p', on); x.classList.toggle('s', !on); x.setAttribute('aria-checked', on); }); const e = raw().find(n => full(n).split(' ').length >= 3) || 'محمد عبدالله سعد الغامدي'; B.querySelector('.nmf .ex').textContent = 'مثال: ' + fmt1(e, nmf); };
+      B.querySelectorAll('.nmf [data-f]').forEach(x => x.onclick = () => { setFmt(x.dataset.f); paintFmt(); st.textContent = '✓ تُعرض الأسماء: ' + x.textContent; });
+      paintFmt(); B.querySelector('.gos').onclick = () => settings();
+      const done = () => { paintFmt(); fillTa(); st.textContent = '✓ ' + rosterLabel(); B.querySelectorAll('[data-c]').forEach(x => x.classList.toggle('p', x.dataset.c === R.key)); if (after) { const f = after; after = null; setTimeout(() => { const c = B.closest('.wbw'); if (c) c.querySelector('.cx').click(); f(); }, 450); } };
       B.querySelectorAll('[data-c]').forEach(b => { b.classList.toggle('p', b.dataset.c === R.key); b.onclick = () => { const c = cls.find(x => x.id === b.dataset.c); st.textContent = 'جارٍ تحميل أسماء «' + c.name + '»…';
-        const cache = LJ('dina_wbt_cls_' + c.id, null); o.askNames(c.id, L => { L = (L || []).map(short).filter(Boolean); if (!L.length && cache) L = cache; if (!L.length) { st.textContent = 'لم أجد طلاباً في هذا الفصل'; return; } LSs('dina_wbt_cls_' + c.id, JSON.stringify(L)); setRoster({ key: c.id, label: c.name, names: L }); done(); }); }; });
+        const cache = LJ('dina_wbt_cls2_' + c.id, null); o.askNames(c.id, L => { L = (L || []).map(full).filter(Boolean); if (!L.length && cache) L = cache; if (!L.length) { st.textContent = 'لم أجد طلاباً في هذا الفصل'; return; } LSs('dina_wbt_cls2_' + c.id, JSON.stringify(L)); setRoster({ key: c.id, label: c.name, names: L, full: 1 }); done(); }); }; });
       B.querySelector('.nb').onclick = () => { const n = Math.min(60, Math.max(2, +B.querySelector('.nn').value || 0)); if (n >= 2) { setRoster({ key: 'num', label: 'أرقام ١–' + AR(n), names: Array.from({ length: n }, (_, i) => 'طالب ' + AR(i + 1)) }); done(); } };
       sv.onclick = () => { const L = ta.value.split(/\r?\n|،|,/).map(s => s.trim()).filter(Boolean); if (L.length < 2) { st.textContent = 'اكتب اسمين على الأقل'; return; } setRoster({ key: taKey, label: taLabel, names: L }); done(); };
     }
+    function settings() {
+      const B = card('settings', '⚙️ إعدادات الأدوات', 460, '#082B5A'); if (!B) return;
+      const seg = (k, opts) => `<div class="row" role="radiogroup">${opts.map(([v, t]) => `<button type="button" class="bt ${String(SET[k]) === String(v) ? 'p' : 's'}" role="radio" aria-checked="${String(SET[k]) === String(v)}" data-k="${k}" data-v="${v}">${t}</button>`).join('')}</div>`;
+      const chk = (k, t) => `<label class="muted" style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" data-c="${k}" ${SET[k] ? 'checked' : ''} style="width:20px;height:20px;flex:none;margin:0"> ${t}</label>`;
+      const paint = () => { B.innerHTML = `<p class="muted" style="margin:0">تُحفظ على هذا الجهاز وتُطبَّق على كل الأدوات فوراً.</p>
+        <div class="wbt-sec">الأسماء</div>${seg('nmf', NMF)}<small class="muted ex"></small>
+        <div class="muted">حجم خط الأسماء</div>${seg('ns', [[0.85, 'صغير'], [1, 'متوسط'], [1.2, 'كبير']])}
+        <div class="wbt-sec">عجلة الأسماء</div><div class="muted">سرعة الدوران</div>${seg('spin', [['f', 'سريعة'], ['n', 'عادية'], ['s', 'بطيئة']])}${chk('rmw', 'إخراج الفائز من العجلة افتراضياً')}
+        <div class="wbt-sec">بطاقة الاسم</div>${chk('nr', 'بلا تكرار افتراضياً')}
+        <div class="wbt-sec">المجموعات</div><div class="row"><label class="muted">التقسيم حسب <select data-s="gMode"><option value="g" ${SET.gMode === 'g' ? 'selected' : ''}>عدد المجموعات</option><option value="s" ${SET.gMode === 's' ? 'selected' : ''}>عدد الطلاب في كل مجموعة</option></select></label><input type="number" min="2" max="20" data-s="gN" value="${+SET.gN || 4}" style="width:70px" aria-label="العدد الافتراضي"></div>
+        <div class="wbt-sec">المؤقت</div><div class="row"><label class="muted">المدة الافتراضية (دقائق) <input type="number" min="1" max="180" data-s="tmin" value="${+SET.tmin || 5}" style="width:70px"></label></div><label class="muted">أزرار المدد الجاهزة <input data-s="tpre" value="${esc(SET.tpre)}" style="width:150px" aria-label="المدد الجاهزة مفصولة بفواصل"></label>
+        <div class="wbt-sec">المؤثرات</div>${chk('conf', 'قصاصات الاحتفال')} ${chk('mute', 'كتم الأصوات')}
+        <div class="row" style="justify-content:space-between"><span class="muted st" role="status" aria-live="polite"></span><button class="bt s rs" type="button">↺ الإعدادات الافتراضية</button></div>`;
+        const e = raw().find(n => full(n).split(' ').length >= 3) || 'محمد عبدالله سعد الغامدي'; B.querySelector('.ex').textContent = 'مثال: ' + fmt1(e, nmf);
+        const ok = m => { saveSet(); const s2 = B.querySelector('.st'); if (s2) s2.textContent = '✓ ' + (m || 'حُفظ'); };
+        B.querySelectorAll('[data-k]').forEach(x => x.onclick = () => { const k = x.dataset.k, v = x.dataset.v; if (k === 'nmf') { setFmt(v); } else { SET[k] = k === 'ns' ? +v : v; if (k === 'ns') wrap.style.setProperty('--wbt-ns', SET.ns); notify(); } paint(); ok(x.textContent); B.querySelector(`[data-k="${k}"][data-v="${v}"]`).focus(); });
+        B.querySelectorAll('[data-c]').forEach(x => x.onchange = () => { SET[x.dataset.c] = x.checked; if (x.dataset.c === 'mute') muted = x.checked; ok(); });
+        B.querySelectorAll('[data-s]').forEach(x => x.onchange = () => { const k = x.dataset.s; const isN = x.hasAttribute('min'), v = String(x.value).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)); SET[k] = isN ? Math.max(+x.min || 1, Math.min(+x.max || 999, Math.round(+v) || SET_DEF[k])) : x.value; if (isN) x.value = SET[k]; ok(); });
+        B.querySelector('.rs').onclick = () => { Object.assign(SET, SET_DEF); nmf = SET.nmf; muted = SET.mute; wrap.style.setProperty('--wbt-ns', 1); saveSet(); notify(); paint(); ok('أُعيدت الإعدادات الافتراضية'); }; };
+      paint(); }
     const needNames = k => { if (names().length >= 2) return false; rosterDialog(() => open(k)); return true; };
 
     // ---------- اللوحة ----------
@@ -163,10 +200,11 @@
         <div class="wbt-ros"><span class="av" aria-hidden="true">🎓</span><div class="grow"><b>${esc(names().length ? R.label || 'قائمة الأسماء' : 'فصل الحصة')}</b><small>${names().length ? AR(names().length) + ' طالباً — تستخدمه كل أدوات الأسماء' : 'اختر الفصل لتعمل الأدوات بأسماء طلابك'}</small></div><button class="rs">${names().length ? 'تغيير' : 'اختيار الفصل'}</button></div>
         <div class="wbt-sec">بأسماء الطلاب</div><div class="wbt-g">${TOOLS.filter(t => t[5]).map(tile).join('')}</div>
         <div class="wbt-sec">إدارة الصف</div><div class="wbt-g">${TOOLS.filter(t => !t[5] && (t[0] !== 'poll' || cfg.poll)).map(tile).join('')}</div>
-        <label style="display:flex;gap:6px;align-items:center;margin-top:12px;font-size:12px;color:#5b6b7f"><input type="checkbox" class="mu" ${muted ? 'checked' : ''}> كتم أصوات الأدوات</label>`;
+        <div class="row" style="margin-top:12px;justify-content:space-between"><label style="display:flex;gap:6px;align-items:center;font-size:12px;color:#5b6b7f"><input type="checkbox" class="mu" ${muted ? 'checked' : ''}> كتم أصوات الأدوات</label><button class="bt s wbt-set" type="button">⚙️ إعدادات الأدوات</button></div>`;
       wrap.appendChild(pan); o.btn.setAttribute('aria-expanded', 'true');
       pan.querySelector('.wbt-x').onclick = close; pan.querySelector('.rs').onclick = () => { close(); rosterDialog(); };
-      pan.querySelector('.mu').onchange = e => { muted = e.target.checked; LSs('dina_wbt_mute', muted ? '1' : '0'); };
+      pan.querySelector('.mu').onchange = e => { muted = SET.mute = e.target.checked; saveSet(); };
+      pan.querySelector('.wbt-set').onclick = () => { close(); settings(); };
       pan.addEventListener('click', e => { const b = e.target.closest('[data-w]'); if (!b) return; const k = b.dataset.w; close(); if (k === 'poll') o.poll(); else open(k); });
       pan.addEventListener('keydown', e => { if (e.key === 'Escape') close(); }); pan.querySelector('[data-w]').focus(); }
     o.btn.onclick = panel; o.btn.setAttribute('aria-haspopup', 'dialog'); o.btn.setAttribute('aria-expanded', 'false');
@@ -192,7 +230,7 @@
       return c.querySelector('.wbw-b'); }
 
     // احتفال (قصاصات ملونة)
-    function confetti(host) { if (RM()) return; const cv = document.createElement('canvas'); cv.className = 'wbt-conf'; host.appendChild(cv); const W = cv.width = host.clientWidth, H = cv.height = host.clientHeight, g = cv.getContext('2d');
+    function confetti(host) { if (RM() || !SET.conf) return; const cv = document.createElement('canvas'); cv.className = 'wbt-conf'; host.appendChild(cv); const W = cv.width = host.clientWidth, H = cv.height = host.clientHeight, g = cv.getContext('2d');
       const P = Array.from({ length: 140 }, () => ({ x: W / 2 + (Math.random() - .5) * 60, y: H * .45, vx: (Math.random() - .5) * 12, vy: -Math.random() * 13 - 4, r: 4 + Math.random() * 5, c: PAL[rnd(PAL.length)], a: Math.random() * 6, s: Math.random() < .5 }));
       let f = 0; const step = () => { g.clearRect(0, 0, W, H); P.forEach(p => { p.vy += .35; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.a += .2; g.save(); g.translate(p.x, p.y); g.rotate(p.a); g.fillStyle = p.c; if (p.s) g.fillRect(-p.r, -p.r / 2, p.r * 2, p.r); else { g.beginPath(); g.arc(0, 0, p.r / 1.4, 0, 7); g.fill(); } g.restore(); }); if (++f < 150) requestAnimationFrame(step); else cv.remove(); }; step(); }
     const shade = (hex, p) => { const n = parseInt(hex.slice(1), 16), c = v => Math.max(0, Math.min(255, Math.round(v + p * 2.55))); return `rgb(${c(n >> 16)},${c((n >> 8) & 255)},${c(n & 255)})`; };
@@ -204,7 +242,7 @@
       if (k === 'wheel') { const B = card(k, '🎡 عجلة الأسماء', 480); if (!B) return; const C0 = B.parentNode;
         let pool = [], ang = 0, spinning = false, hist = []; const mark = new Image(); mark.onload = () => draw(); mark.src = 'assets/mark.svg';
         const un = rosterBar(B); B.insertAdjacentHTML('beforeend', `<div class="wh-st"><div class="wh-pin" aria-hidden="true"></div><canvas role="img" aria-label="عجلة أسماء الطلاب"></canvas><button class="wh-go" aria-label="أدِر العجلة">أدِر</button></div>
-          <div class="row cen"><label class="muted"><input type="checkbox" class="rmw" checked> إخراج الفائز من العجلة</label><button class="bt s rst">↺ إعادة كل الأسماء</button></div>
+          <div class="row cen"><label class="muted"><input type="checkbox" class="rmw" ${SET.rmw ? 'checked' : ''}> إخراج الفائز من العجلة</label><button class="bt s rst">↺ إعادة كل الأسماء</button></div>
           <div class="muted hs" aria-live="polite" style="text-align:center"></div>`);
         const st = B.querySelector('.wh-st'), cv = st.querySelector('canvas'), go = st.querySelector('.wh-go'), pin = st.querySelector('.wh-pin'), hs = B.querySelector('.hs');
         const paintHist = () => { hs.textContent = `في العجلة ${AR(pool.length)} من ${AR(names().length)}` + (hist.length ? ' · اختيروا: ' + hist.slice(-6).join('، ') : ''); };
@@ -216,13 +254,13 @@
           g.rotate(ang);
           for (let i = 0; i < n; i++) { let ci = i % PAL.length; if (i === n - 1 && n > 1 && ci === 0) ci = 2; const c = PAL[ci]; g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, r * .88, i * seg, (i + 1) * seg); g.closePath();
             const gr = g.createRadialGradient(0, 0, r * .15, 0, 0, r * .88); gr.addColorStop(0, shade(c, 14)); gr.addColorStop(1, shade(c, -14)); g.fillStyle = gr; g.fill(); g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = Math.max(1, s / 300); g.stroke();
-            if (pool[i]) { g.save(); const mid = i * seg + seg / 2, wa = ((ang + mid) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2), flip = wa > Math.PI / 2 && wa < Math.PI * 1.5; g.rotate(mid + (flip ? Math.PI : 0)); g.textAlign = flip ? 'left' : 'right'; g.textBaseline = 'middle'; g.fillStyle = '#fff'; const fs = Math.min(r * .1, Math.max(r * .04, seg * r * .4)); g.font = `800 ${fs}px 'GE SS Two', Tahoma, sans-serif`; g.shadowColor = 'rgba(0,0,0,.4)'; g.shadowBlur = 3;
-              let t = pool[i], f2 = fs; const mw = r * .62; while (g.measureText(t).width > mw && f2 > r * .05) { f2 -= 1; g.font = `800 ${f2}px 'GE SS Two', Tahoma, sans-serif`; } while (g.measureText(t).width > mw && t.length > 3) t = t.slice(0, -2) + '…'; g.direction = 'rtl'; g.fillText(t, flip ? -r * .84 : r * .84, 0); g.restore(); } }
+            if (pool[i]) { g.save(); const mid = i * seg + seg / 2, wa = ((ang + mid) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2), flip = wa > Math.PI / 2 && wa < Math.PI * 1.5; g.rotate(mid + (flip ? Math.PI : 0)); g.textAlign = flip ? 'left' : 'right'; g.textBaseline = 'middle'; g.fillStyle = '#fff'; const fs = Math.min(r * .1, Math.max(r * .04, seg * r * .4)) * Math.min(1.3, Math.max(.8, +SET.ns || 1)); g.font = `800 ${fs}px 'GE SS Two', Tahoma, sans-serif`; g.shadowColor = 'rgba(0,0,0,.4)'; g.shadowBlur = 3;
+              let t = pool[i], f2 = fs; const mw = r * .52; while (g.measureText(t).width > mw && f2 > r * .05) { f2 -= 1; g.font = `800 ${f2}px 'GE SS Two', Tahoma, sans-serif`; } if (g.measureText(t).width > mw) t = short(t); while (g.measureText(t).width > mw && t.length > 3) t = t.slice(0, -2) + '…'; g.direction = 'rtl'; g.fillText(t, flip ? -r * .84 : r * .84, 0); g.restore(); } }
           g.restore(); g.save(); g.translate(r, r); g.beginPath(); g.arc(0, 0, r * .16, 0, 7); g.fillStyle = '#fff'; g.fill(); if (mark.complete && mark.naturalWidth) g.drawImage(mark, -r * .09, -r * .09, r * .18, r * .18); g.restore(); }
         const idxAt = a => { const n = pool.length, seg = Math.PI * 2 / n; const p = ((-Math.PI / 2 - a) % (Math.PI * 2) + Math.PI * 4) % (Math.PI * 2); return Math.floor(p / seg) % n; };
         function spin() { if (spinning || st.querySelector('.wh-win')) return; if (!pool.length) reset(); if (!pool.length) return; spinning = true; go.disabled = true; ac();
           const n = pool.length, win = rnd(n), seg = Math.PI * 2 / n, target = -Math.PI / 2 - (win * seg + seg * (.2 + Math.random() * .6));
-          const start = ang, turns = RM() ? 1 : 6 + rnd(3), end = start + (((target - start) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) + Math.PI * 2 * turns, dur = RM() ? 700 : 5200 + rnd(1200), t0 = performance.now(); let last = idxAt(ang);
+          const start = ang, turns = RM() ? 1 : ({ f: 3, n: 6, s: 9 }[SET.spin] || 6) + rnd(3), end = start + (((target - start) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) + Math.PI * 2 * turns, dur = RM() ? 700 : ({ f: 2400, n: 5200, s: 8500 }[SET.spin] || 5200) + rnd(1200), t0 = performance.now(); let last = idxAt(ang);
           const ease = t => 1 - Math.pow(1 - t, 4);
           const step = now => { const t = Math.min(1, (now - t0) / dur); ang = start + (end - start) * ease(t); draw(); const i = idxAt(ang); if (i !== last) { last = i; tick(); pin.classList.remove('hit'); void pin.offsetWidth; pin.classList.add('hit'); }
             if (t < 1) requestAnimationFrame(step); else { spinning = false; go.disabled = false; result(pool[idxAt(ang)]); } };
@@ -239,13 +277,14 @@
 
       if (k === 'flip') { const B = card(k, '🃏 بطاقة الاسم', 380); if (!B) return; let used = [];
         const un = rosterBar(B); B.insertAdjacentHTML('beforeend', `<div class="fc" aria-live="polite"><div><div class="f" aria-hidden="true">؟</div><div class="bk"></div></div></div>
-          <div class="row cen"><button class="bt p big go">🃏 اقلب البطاقة</button></div><div class="row cen"><label class="muted"><input type="checkbox" class="nr" checked> بلا تكرار</label><button class="bt s ins">إدراج في السبورة</button></div><div class="muted left" style="text-align:center"></div>`);
+          <div class="row cen"><button class="bt p big go">🃏 اقلب البطاقة</button></div><div class="row cen"><label class="muted"><input type="checkbox" class="nr" ${SET.nr ? 'checked' : ''}> بلا تكرار</label><button class="bt s ins">إدراج في السبورة</button></div><div class="muted left" style="text-align:center"></div>`);
         const fc = B.querySelector('.fc'), bk = B.querySelector('.bk'), left = () => { const N = names(); B.querySelector('.left').textContent = `المتبقي ${AR(N.filter(x => !used.includes(x)).length)} من ${AR(N.length)}${used.length ? ' · ' + used.slice(-5).join('، ') : ''}`; };
-        const show = w => { bk.textContent = w; fc.classList.add('on'); used.push(w); tone(660, .12); tone(990, .2, .12); left(); if (!RM()) setTimeout(() => confetti(fc), 450); };
+        const fit = () => { bk.style.fontSize = ''; let f = parseFloat(getComputedStyle(bk).fontSize) || 40; while ((bk.scrollHeight > bk.clientHeight + 1 || bk.scrollWidth > bk.clientWidth + 1) && f > 14) { f -= 2; bk.style.fontSize = f + 'px'; } };
+        const show = w => { bk.textContent = w; fit(); fc.classList.add('on'); used.push(w); tone(660, .12); tone(990, .2, .12); left(); if (!RM()) setTimeout(() => confetti(fc), 450); };
         B.querySelector('.go').onclick = () => { const N = names(); let p = B.querySelector('.nr').checked ? N.filter(x => !used.includes(x)) : N; if (!p.length) { used = []; p = N; } const w = p[rnd(p.length)];
           if (fc.classList.contains('on')) { fc.classList.remove('on'); setTimeout(() => show(w), RM() ? 0 : 380); } else show(w); };
         B.querySelector('.ins').onclick = () => { if (fc.classList.contains('on')) o.insertText('🃏 ' + bk.textContent); };
-        const un2 = onRoster(() => { used = []; fc.classList.remove('on'); left(); }); B.parentNode._stop = () => { un(); un2(); }; left(); }
+        const un2 = onRoster(() => { used = []; fc.classList.remove('on'); left(); }); B.parentNode._stop = () => { un(); un2(); }; B.parentNode._resize = () => setTimeout(fit, 60); left(); }
 
       if (k === 'stars') { const B = card(k, '⭐ نجوم الطلاب', 560); if (!B) return; const key = () => 'dina_wbt_stars_' + (R.key || 'x') + '_' + new Date().toISOString().slice(0, 10);
         let S = LJ(key(), {}), sort = false; const un = rosterBar(B); const box = document.createElement('div'); box.style.cssText = 'display:grid;gap:10px'; B.appendChild(box);
@@ -270,7 +309,7 @@
         const un2 = onRoster(shuf); B.parentNode._stop = () => { clearInterval(iv); un(); un2(); }; shuf(); }
 
       if (k === 'groups') { const B = card(k, '👥 تقسيم مجموعات', 520); if (!B) return; let G = [];
-        const un = rosterBar(B); B.insertAdjacentHTML('beforeend', `<div class="row"><label>عدد <select class="md" aria-label="طريقة التقسيم"><option value="g">المجموعات</option><option value="s">الطلاب في كل مجموعة</option></select></label><input type="number" min="2" max="20" value="4" class="gn" style="width:70px" aria-label="العدد"><button class="bt p go">🔀 قسّم</button><button class="bt s ins">إدراج في السبورة</button></div><div class="grps" aria-live="polite"></div>`);
+        const un = rosterBar(B); B.insertAdjacentHTML('beforeend', `<div class="row"><label>عدد <select class="md" aria-label="طريقة التقسيم"><option value="g" ${SET.gMode === 'g' ? 'selected' : ''}>المجموعات</option><option value="s" ${SET.gMode === 's' ? 'selected' : ''}>الطلاب في كل مجموعة</option></select></label><input type="number" min="2" max="20" value="${+SET.gN || 4}" class="gn" style="width:70px" aria-label="العدد"><button class="bt p go">🔀 قسّم</button><button class="bt s ins">إدراج في السبورة</button></div><div class="grps" aria-live="polite"></div>`);
         const GN = ['النجوم', 'الصقور', 'المبدعون', 'الرواد', 'العباقرة', 'الأبطال', 'المكتشفون', 'المتميزون', 'السفراء', 'القادة'];
         const go = () => { const N = shuffle(names()); const v = Math.max(1, +B.querySelector('.gn').value || 2); const g = B.querySelector('.md').value === 'g' ? Math.min(v, N.length) : Math.max(1, Math.ceil(N.length / v));
           G = Array.from({ length: g }, () => []); N.forEach((x, i) => G[i % g].push(x)); tone(784, .15);
@@ -278,9 +317,9 @@
         B.querySelector('.go').onclick = go; B.querySelector('.ins').onclick = () => { if (G.length) o.insertText(G.map((x, i) => `${GN[i % GN.length]}: ${x.join('، ')}`).join('\n')); };
         const un2 = onRoster(go); B.parentNode._stop = () => { un(); un2(); }; go(); }
 
-      if (k === 'timer') { const B = card(k, '⏳ مؤقت تنازلي', 340); if (!B) return; let total = 300, left = 300, t = null, end = 0;
+      if (k === 'timer') { const B = card(k, '⏳ مؤقت تنازلي', 340); if (!B) return; let total = Math.max(1, +SET.tmin || 5) * 60, left = total, t = null, end = 0;
         B.innerHTML = `<div class="big" aria-live="off">${mmss(left)}</div><div class="bar" aria-hidden="true"><i style="width:100%"></i></div>
-          <div class="row" role="group" aria-label="مدة جاهزة">${[1, 2, 3, 5, 10, 15].map(m => `<button class="bt s" data-m="${m}">${AR(m)} د</button>`).join('')}<input type="number" min="1" max="180" aria-label="دقائق" placeholder="دقائق" class="cm" style="width:84px"></div>
+          <div class="row" role="group" aria-label="مدة جاهزة">${tpre().map(m => `<button class="bt s" data-m="${m}">${AR(m)} د</button>`).join('')}<input type="number" min="1" max="180" aria-label="دقائق" placeholder="دقائق" class="cm" style="width:84px"></div>
           <div class="row"><button class="bt p go">▶ ابدأ</button><button class="bt rs">↺ إعادة</button><button class="bt s ad">+١ د</button></div><div class="muted st" role="status" aria-live="polite"></div>`;
         const big = B.querySelector('.big'), bar = B.querySelector('.bar i'), go = B.querySelector('.go'), st = B.querySelector('.st');
         const paint = () => { big.textContent = mmss(left); bar.style.width = (total ? left / total * 100 : 0) + '%'; big.classList.toggle('end', left <= 0); };

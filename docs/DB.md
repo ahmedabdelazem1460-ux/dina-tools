@@ -48,3 +48,10 @@
 3. الدوال `security definer` مع `set search_path = public` و`revoke … from public, anon` ثم `grant execute … to authenticated` (إلا الروابط العامة).
 4. جرّب بالأدوار داخل معاملة ثم `rollback` قبل الاعتماد.
 5. **للتعدد (قادم):** `classes`, `plan_entries`, `notes`, `extra_pages`, `timetable_slots`, `quiz_attempts`, `paper_results`, `module_grants` وغيرها تعتمد على الجدول الأب للعزل — راجعها عند إضافة مدارس أخرى.
+
+
+### إضافات 100 (البوصلة ٢ والموهوبون)
+- `scale_runs.opts` JSON {lv: k|p|m|s, lang: ar|en|fr}. `scale_get` يعيد أيضاً `opts`, `stage`, `grade`, و`avg` (متوسط الفصل المجهول عند ٣ استجابات فأكثر).
+- `gifted_files` (school_id, student_id, name, class_id, gate 1–5, level x|g|p|n, source teacher,parent,self,results, data JSON لكل نموذج، created_by): القراءة/التعديل للمالك و`has_module('gifted'|'counselor')` ومنشئ الترشيح؛ الحذف للمالك و`gifted`.
+- `schools.settings.gifted` {w:{rating,mawh,torr,pi}, cut:{x,g,p}}، `schools.settings.uitheme`.
+- 101: `scale_runs.shared uuid[]` (معلمون يقرؤون التطبيق ونتائجه)، `scale_resp.meta` JSON {school, grade, ph, lang} لطلاب الرابط الخارجي، RPC `scale_submit_ext(p_code,p_device,p_name,p_meta,p_answers,p_scores)` للعموم.

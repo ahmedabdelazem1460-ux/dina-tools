@@ -15,6 +15,8 @@
     ['assistant', 'مساعد المعلم', 'تجهيز الدرس تلقائياً: أهداف، سير الحصة، أنشطة، أسئلة، واجب، تمايز.'],
     ['games2', 'قوالب الألعاب الجديدة', 'ترتيب الحروف، فرقعة البالونات، الفرز، سباق الفريقين — ضمن طرق اللعب عند إنشاء لعبة.'],
     ['models3d', 'المجسمات التفاعلية', 'المجسمات الهندسية ونموذج الذرة والمجموعة الشمسية داخل المعامل الافتراضية.'],
+    ['gifted', 'رعاية الموهوبين', 'الدليل المرجعي ونماذج الكشف والترشيح؛ يرى المعلم ترشيحاته فقط، والملفات كاملة للمالك ومن يُمنح «gifted» أو «counselor».'],
+    ['home2', 'واجهة المعلم الجديدة', 'لوحة أعلى صفحة المعلم: الأسبوع الحالي وأيامه ونسبة الإنجاز وأيقونات تفاعلية للوصول السريع.'],
     ['app', 'زر «تطبيق الجوال»', 'تعليمات تثبيت المنصة على أندرويد وآيفون في قائمة المستخدم.'],
   ];
   A.TFEAT = F;
@@ -38,8 +40,10 @@
     const host = root.querySelector('.card') || root; host.parentNode ? host.parentNode.insertBefore(box, host) : root.prepend(box);
     box.querySelector('#tfGo').onclick = e => A.run(e.currentTarget, async () => {
       const tfeat = {}; $$('[data-tf]', box).forEach(i => tfeat[i.dataset.tf] = i.checked);
+      const added = Object.keys(tfeat).filter(k => tfeat[k] && cur[k] !== true);
       const settings = { ...(S.school.settings || {}), tfeat }; const res = await api.updateSchool(S.school.id, { settings }); S.school.settings = (res && res.settings) || settings;
-      A.toast('حُفظ — يظهر للمعلمين ما فعّلته فقط', 'ok'); V.tui(root);
+      let sent = 0; if (added.length && A.announceNew) sent = await A.announceNew(added);
+      A.toast('حُفظ — يظهر للمعلمين ما فعّلته فقط' + (added.length ? ' · وصلهم إشعار «تمت إضافة…»' : ''), 'ok'); V.tui(root);
     });
     return r;
   };

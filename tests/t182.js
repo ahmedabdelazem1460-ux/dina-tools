@@ -27,7 +27,7 @@ const TXT = `دورة الماء في الطبيعة هي حركة الماء ا
     await s.route('**/rest/v1/rpc/scale_submit', r => { sent = JSON.parse(r.request().postData()); r.fulfill({ contentType: 'application/json', body: 'true' }); });
     await s.goto('http://localhost:8766/scale.html?c=ABCDEF'); await s.waitForTimeout(800);
     await s.selectOption('#st', { index: 1 }); await s.click('#go'); await s.waitForTimeout(300);
-    const n = await s.$$eval('.it', x => x.length); for (let i = 0; i < n; i++) await s.click(`.ch[data-i="${i}"][data-v="${1 + (i % 5)}"]`);
+    let n = 0; for (let pg = 0; pg < 20; pg++) { const its = await s.$$('.it'); for (let i = 0; i < its.length; i++) { const bs = await its[i].$$('.ch'); await bs[(n + i) % bs.length].click(); } n += its.length; if (await s.$('#nx')) { await s.click('#nx'); await s.waitForTimeout(120); } else break; }
     await s.screenshot({ path: `p0/scale-q-${w}.png` }); await s.click('#sd'); await s.waitForTimeout(600); await s.screenshot({ path: `p0/scale-res-${w}.png` });
     console.log(w, JSON.stringify({ kpis: kp, secs, qs, decks, items: n, sentScores: sent && sent.p_scores }));
     await s.close(); await p.close(); }

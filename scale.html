@@ -11,67 +11,141 @@
 @font-face{font-family:'GE SS Two';font-weight:400 500;src:url(fonts/gess-two-medium.woff2) format('woff2');font-display:swap}
 @font-face{font-family:'GE SS Two';font-weight:600 900;src:url(fonts/gess-two-bold.woff2) format('woff2');font-display:swap}
 *{box-sizing:border-box}
-body{margin:0;min-height:100vh;font-family:'GE SS Two',Tahoma,sans-serif;color:#082B5A;background:radial-gradient(1000px 420px at 50% -10%,#DCEFFA,transparent),#EEF3F9}
-header{display:flex;align-items:center;gap:10px;padding:12px 16px;background:#082B5A;color:#fff;border-bottom:4px solid #3AB1DB}
-header img{height:34px}header .t{font-weight:800}header .s{font-size:12px;color:#BFD6EE}
-main{padding:16px 12px;display:grid;place-items:start center}
-.card{width:min(620px,100%);background:#fff;border-radius:22px;padding:18px;box-shadow:0 24px 50px -30px rgba(8,43,90,.6)}
-h1{font-size:20px;margin:0 0 6px}.small{font-size:13px;color:#5b6b7f}
-.in{width:100%;font:inherit;font-size:17px;border:2px solid #CFE0F2;border-radius:14px;padding:11px 13px;color:#082B5A}
-.btn{font:inherit;font-weight:800;font-size:17px;border:0;border-radius:14px;padding:13px 18px;background:linear-gradient(135deg,#005499,#082B5A);color:#fff;cursor:pointer;width:100%;margin-top:12px}
-.btn:focus-visible,.ch:focus-visible{outline:3px solid #3AB1DB;outline-offset:2px}
-.prog{height:8px;border-radius:8px;background:#E6EDF4;overflow:hidden;margin:10px 0 14px}.prog i{display:block;height:100%;background:linear-gradient(90deg,#2E8B57,#BADF93)}
-.it{border:1px solid #E4EBF5;border-radius:16px;padding:12px;margin-bottom:10px}
-.it p{margin:0 0 10px;font-weight:800;font-size:17px;line-height:1.6}
+body{margin:0;min-height:100vh;font-family:'GE SS Two','Myriad Pro',Tahoma,sans-serif;color:#082B5A;background:radial-gradient(circle at 1px 1px,rgba(58,177,219,.16) 1px,transparent 1.3px) 0 0/22px 22px,radial-gradient(1000px 420px at 50% -10%,#DCEFFA,transparent),#EEF3F9}
+header{display:flex;align-items:center;gap:10px;padding:10px 14px;background:linear-gradient(180deg,#0A3268,#082B5A);color:#fff;border-bottom:4px solid #3AB1DB;position:sticky;top:0;z-index:5}
+header img{height:34px}header .t{font-weight:800}header .s{font-size:12px;color:#BFD6EE}header .grow{flex:1;min-width:0}
+.lng{display:flex;gap:4px}.lng button{font:inherit;font-size:12px;font-weight:800;border:1px solid rgba(255,255,255,.3);background:transparent;color:#fff;border-radius:9px;padding:6px 8px;cursor:pointer;min-width:36px;min-height:36px}
+.lng button.on{background:#3AB1DB;border-color:#3AB1DB;color:#082B5A}
+main{padding:16px 12px 40px;display:grid;place-items:start center}
+.card{width:min(680px,100%);background:#fff;border-radius:24px;padding:20px;box-shadow:0 1px 0 #fff inset,0 2px 4px rgba(8,43,90,.06),0 28px 60px -30px rgba(8,43,90,.55)}
+h1{font-size:21px;margin:0 0 6px}.small{font-size:13px;color:#4D6A8F;line-height:1.7}
+.in{width:100%;font:inherit;font-size:17px;border:2px solid #CFE0F2;border-radius:14px;padding:11px 13px;color:#082B5A;background:#fff}
+.in:focus-visible{outline:3px solid #3AB1DB;outline-offset:1px}
+.btn{font:inherit;font-weight:800;font-size:16px;border:0;border-radius:14px;padding:13px 18px;background:linear-gradient(135deg,#005499,#082B5A);color:#fff;cursor:pointer;min-height:48px;box-shadow:0 10px 20px -12px rgba(8,43,90,.8),inset 0 1px 0 rgba(255,255,255,.2)}
+.btn.ghost{background:#fff;color:#082B5A;border:2px solid #CFE0F2;box-shadow:none}.btn.wa{background:linear-gradient(135deg,#25D366,#128C7E)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn:focus-visible,.ch:focus-visible,.lng button:focus-visible{outline:3px solid #3AB1DB;outline-offset:2px}
+.w100{width:100%;margin-top:12px}
+.hero{display:flex;gap:12px;align-items:center;margin-bottom:8px}.hero .ic{font-size:40px;width:64px;height:64px;border-radius:20px;display:grid;place-items:center;background:linear-gradient(145deg,#EAF6FB,#DCEBF7);box-shadow:inset 0 -3px 0 #BFD9EE;flex:none}
+.prog{height:10px;border-radius:10px;background:#E6EDF4;overflow:hidden;margin:10px 0 14px}.prog i{display:block;height:100%;background:linear-gradient(90deg,#3AB1DB,#2E8B57);transition:width .3s}
+.it{border:1px solid #E4EBF5;border-radius:18px;padding:14px;margin-bottom:10px;background:linear-gradient(180deg,#fff,#FAFCFE)}
+.it p{margin:0 0 12px;font-weight:800;font-size:17px;line-height:1.6}.it .n{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:9px;background:#E8F1F9;color:#005499;font-size:13px;margin-inline-end:6px}
 .chs{display:grid;gap:6px;grid-template-columns:repeat(5,1fr)}.chs.k3{grid-template-columns:repeat(3,1fr)}
-.ch{font:inherit;font-size:12.5px;font-weight:700;border:2px solid #DCE7F3;border-radius:12px;padding:9px 4px;background:#fff;color:#43597A;cursor:pointer;min-height:48px}
-.ch.on{border-color:#2E8B57;background:#EDF7E4;color:#1F6B44}
-.k3 .ch{font-size:17px}
-.res{display:grid;gap:10px;margin-top:10px}.res div{display:grid;grid-template-columns:110px 1fr 46px;gap:8px;align-items:center;font-weight:800}
-.res i{display:block;height:14px;border-radius:8px}
-.err{color:#B42318;font-weight:700;margin-top:8px}
-@media (max-width:420px){.chs{grid-template-columns:repeat(5,1fr)}.ch{font-size:10.5px;padding:8px 2px}}
+.ch{font:inherit;font-size:12.5px;font-weight:700;border:2px solid #DCE7F3;border-radius:12px;padding:8px 4px;background:#fff;color:#43597A;cursor:pointer;min-height:52px;display:grid;place-items:center;gap:4px;line-height:1.25}
+.ch .d{width:var(--s);height:var(--s);border-radius:50%;background:#CFE0F2}
+.ch.on{border-color:#2E8B57;background:#EDF7E4;color:#1F6B44}.ch.on .d{background:#2E8B57}
+.k3 .ch{font-size:18px;min-height:72px}.big .it p{font-size:22px;text-align:center}.big .k3 .ch{font-size:22px;min-height:110px}
+.nav{display:flex;gap:8px;margin-top:6px}.nav .btn{flex:1}
+.err{color:#B42318;font-weight:700;margin-top:8px;min-height:1em}
+/* التقرير */
+.rep{border-radius:20px;overflow:hidden;border:1px solid #DCE7F3;background:#fff}
+.rep-h{background:linear-gradient(135deg,#082B5A,#005499);color:#fff;padding:16px 18px;display:flex;gap:12px;align-items:center;position:relative}
+.rep-h::after{content:"";position:absolute;inset-inline:0;bottom:0;height:4px;background:linear-gradient(90deg,#3AB1DB,#BADF93,#3AB1DB)}
+.rep-h img{height:38px}.rep-h b{font-size:18px;display:block}.rep-h span{font-size:12.5px;color:#CFE3F5}
+.rep-b{padding:16px 18px;display:grid;gap:14px}
+.rg{display:grid;gap:14px;grid-template-columns:1fr 1fr;align-items:center}
+.bars{display:grid;gap:9px}.bars div{display:grid;grid-template-columns:minmax(80px,120px) 1fr 44px;gap:8px;align-items:center;font-weight:800;font-size:13.5px}
+.bars .tr{height:14px;border-radius:8px;background:#EEF3F9;position:relative;overflow:hidden}.bars .tr i{position:absolute;inset-block:0;inset-inline-start:0;border-radius:8px}.bars .tr u{position:absolute;inset-block:-2px;width:2px;background:#082B5A;opacity:.5}
+.star{border-radius:18px;padding:14px;background:linear-gradient(135deg,#F3FAEC,#EAF6FB);border:1px solid #CFE7F2;display:flex;gap:12px;align-items:flex-start}
+.star .ic{font-size:30px}.star b{font-size:17px}
+.chip{display:inline-block;border-radius:20px;padding:1px 9px;font-size:11.5px;font-weight:800;color:#fff;margin-inline-start:6px}
+.tips{margin:0;padding-inline-start:20px;line-height:1.9;font-size:14px}
+.acts{display:grid;gap:8px;grid-template-columns:1fr 1fr;margin-top:14px}.acts .full{grid-column:1/-1}
+.wa-row{display:flex;gap:8px;flex-wrap:wrap}.wa-row .in{flex:1 1 160px;font-size:15px}.wa-row .btn{flex:1 1 200px}
+.lcard{width:340px;border-radius:22px;padding:18px;color:#fff;background:linear-gradient(145deg,#082B5A,#005499 60%,#3AB1DB);position:fixed;inset-inline-start:-9999px;top:0}
+.lcard b{font-size:20px}.lcard .big{font-size:42px}
+.legend{display:flex;gap:12px;font-size:12px;color:#4D6A8F;align-items:center}.legend i{display:inline-block;width:18px;height:3px;border-radius:2px;vertical-align:middle;margin-inline-end:4px}
+@media (max-width:520px){.chs:not(.k3){grid-template-columns:1fr;gap:5px}.chs:not(.k3) .ch{grid-template-columns:22px 1fr;justify-items:start;text-align:start;min-height:44px;padding:8px 12px;font-size:14px}.rg{grid-template-columns:1fr}.acts{grid-template-columns:1fr}}
+html[lang=en] body,html[lang=fr] body{font-family:'Myriad Pro','Segoe UI',Tahoma,Arial,sans-serif}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media print{header,.acts,.lng,.nav{display:none!important}body{background:#fff}.card{box-shadow:none;padding:0}}
 </style>
 </head>
 <body>
-<header><img src="assets/logo_white.svg" alt="مدارس دينا العالمية"><div><div class="t">البوصلة</div><div class="s" id="sch">مقياس الطالب</div></div></header>
-<main><div class="card" id="m" aria-live="polite">جارٍ التحميل…</div></main>
-<script src="config.js?v=1794630097"></script>
-<script src="scales.js?v=1794630097"></script>
+<header><img src="assets/logo_white.svg" alt="مدارس دينا العالمية"><div class="grow"><div class="t" id="hT">البوصلة</div><div class="s" id="sch"></div></div><div class="lng" role="group" aria-label="Language"><button data-l="ar">ع</button><button data-l="en">EN</button><button data-l="fr">FR</button></div></header>
+<main><div class="card" id="m" aria-live="polite">…</div></main>
+<script src="config.js?v=1794642609"></script>
+<script src="scales.js?v=1794642609"></script>
+<script src="vendor/html2canvas.min.js"></script>
 <script>
 (function () {
   const C = window.APP_CONFIG, m = document.getElementById('m'), DS = window.DinaScales;
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const AR = s => String(s).replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
   const LS = { get: k => { try { return localStorage.getItem(k); } catch (_) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (_) { } } };
+  let lang = LS.get('scale_lang') || 'ar';
+  const N = s => lang === 'ar' ? String(s).replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[d]) : String(s);
+  const t = k => (DS.T[lang] || DS.T.ar)[k];
+  const PC = v => N(v) + (lang === 'ar' ? '٪' : '%');
   async function rpc(fn, body) { const r = await fetch(`${C.supabaseUrl}/rest/v1/rpc/${fn}`, { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); const j = await r.json().catch(() => null); if (!r.ok) throw new Error((j && (j.message || j.hint)) || 'تعذّر الاتصال'); return j; }
   let dev = LS.get('scale_dev'); if (!dev) { dev = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now()); LS.set('scale_dev', dev); }
   const code = (new URLSearchParams(location.search).get('c') || '').toUpperCase();
-  let R = null, sc = null, who = null, ans = [];
+  let R = null, sc = null, who = null, ans = [], page = 0, step = 'start', result = null, avg = null;
+  const opts = () => (R && R.opts) || {};
+  const level = () => opts().lv || DS.levelFor(R && R.stage, R && R.grade);
+  const per = () => sc && sc.faces ? 1 : 5;
+  function setLang(l) {
+    lang = l; LS.set('scale_lang', l); document.documentElement.lang = l; document.documentElement.dir = l === 'ar' ? 'rtl' : 'ltr';
+    document.querySelectorAll('.lng button').forEach(b => { b.classList.toggle('on', b.dataset.l === l); b.setAttribute('aria-pressed', b.dataset.l === l); });
+    if (R) { sc = DS.view(R.key, level(), lang); document.getElementById('hT').textContent = sc.icon + ' ' + sc.name; }
+    render();
+  }
+  document.querySelectorAll('.lng button').forEach(b => b.onclick = () => setLang(b.dataset.l));
   async function start() {
-    if (!code) { m.innerHTML = '<h1>رابط غير مكتمل</h1><p class="small">افتح الرابط أو امسح الرمز الذي أرسله معلمك.</p>'; return; }
+    if (!code) { step = 'bad'; return setLang(lang); }
     try { R = await rpc('scale_get', { p_code: code }); } catch (e) { R = null; }
-    if (!R) { m.innerHTML = '<h1>المقياس غير متاح</h1><p class="small">قد يكون أُغلق. تواصل مع معلمك.</p>'; return; }
-    sc = DS.get(R.key); document.getElementById('sch').textContent = (R.school || '') + (R.cls ? ' · ' + R.cls : '');
-    ans = new Array(sc.items.length).fill(null);
-    m.innerHTML = `<h1>${sc.icon} ${esc(R.title || sc.name)}</h1><p class="small">${esc(sc.about)} لا توجد إجابة صحيحة أو خاطئة، أجب بما ينطبق عليك.</p>
-      ${R.students.length ? `<label class="small" for="st">اختر اسمك</label><select class="in" id="st"><option value="">— اختر —</option>${R.students.map(s => `<option value="${s.id}">${esc(s.n)}</option>`).join('')}</select>` : `<label class="small" for="nm">اسمك</label><input class="in" id="nm" maxlength="60">`}
-      <button class="btn" id="go">ابدأ</button><div class="err" id="er"></div>`;
-    m.querySelector('#go').onclick = () => { const st = m.querySelector('#st'), nm = m.querySelector('#nm'); if (st && !st.value) { m.querySelector('#er').textContent = 'اختر اسمك'; return; } if (nm && !nm.value.trim()) { m.querySelector('#er').textContent = 'اكتب اسمك'; return; } who = st ? { id: st.value, n: st.options[st.selectedIndex].text } : { id: null, n: nm.value.trim() }; items(); };
+    if (!R) { step = 'closed'; return setLang(lang); }
+    if (opts().lang && !LS.get('scale_lang')) lang = opts().lang;
+    document.getElementById('sch').textContent = (R.school || '') + (R.cls ? ' · ' + R.cls : '');
+    sc = DS.view(R.key, level(), lang); ans = new Array(sc.items.length).fill(null); setLang(lang);
+  }
+  function render() {
+    if (step === 'bad') { m.innerHTML = `<h1>${t('badLink')}</h1><p class="small">${t('badLinkT')}</p>`; return; }
+    if (step === 'closed') { m.innerHTML = `<h1>${t('closed')}</h1><p class="small">${t('closedT')}</p>`; return; }
+    if (!sc) return;
+    if (ans.length !== sc.items.length) ans = new Array(sc.items.length).fill(null);
+    ({ start: startView, items, result: resView })[step]();
+  }
+  function startView() {
+    m.innerHTML = `<div class="hero"><span class="ic" aria-hidden="true">${sc.icon}</span><div><h1>${esc(R.title && lang === 'ar' ? R.title : sc.name)}</h1><div class="small">${esc(DS.LEVELS[sc.lv || 'p'][lang])} · ${N(sc.items.length)}</div></div></div>
+      <p class="small">${esc(sc.about)} ${t('intro')}</p>
+      ${R.students && R.students.length ? `<label class="small" for="st">${t('pick')}</label><select class="in" id="st"><option value="">${t('choose')}</option>${R.students.map(s => `<option value="${s.id}" ${who && who.id === s.id ? 'selected' : ''}>${esc(s.n)}</option>`).join('')}</select>` : `<label class="small" for="nm">${t('name')}</label><input class="in" id="nm" maxlength="60" value="${esc(who ? who.n : '')}">`}
+      ${opts().ext ? `<div style="display:grid;gap:8px;grid-template-columns:1fr 1fr;margin-top:8px"><div><label class="small" for="xs">${t('xschool')}</label><input class="in" id="xs" maxlength="80" value="${esc((who && who.meta || {}).school || '')}"></div><div><label class="small" for="xg">${t('xgrade')}</label><input class="in" id="xg" maxlength="40" value="${esc((who && who.meta || {}).grade || '')}"></div></div><label class="small" for="xp">${t('xphone')}</label><input class="in" id="xp" dir="ltr" inputmode="tel" maxlength="20" placeholder="05xxxxxxxx" value="${esc((who && who.meta || {}).ph || '')}">` : ''}
+      <button class="btn w100" id="go">${t('start')}</button><div class="err" id="er"></div>`;
+    m.querySelector('#go').onclick = () => { const st = m.querySelector('#st'), nm = m.querySelector('#nm'); if (st && !st.value) { m.querySelector('#er').textContent = t('pick2'); return; } if (nm && !nm.value.trim()) { m.querySelector('#er').textContent = t('type'); return; } who = st ? { id: st.value, n: st.options[st.selectedIndex].text } : { id: null, n: nm.value.trim() }; if (opts().ext) { who.meta = { school: m.querySelector('#xs').value.trim(), grade: m.querySelector('#xg').value.trim(), ph: m.querySelector('#xp').value.trim(), lang }; if (who.meta.ph) LS.set('scale_ph', who.meta.ph); } step = 'items'; page = 0; render(); };
   }
   function items() {
-    const k3 = sc.scale.length === 3, done = ans.filter(x => x != null).length;
-    m.innerHTML = `<h1>${sc.icon} ${esc(sc.name)}</h1><div class="small">${esc(who.n)} · أجبت ${AR(done)} من ${AR(sc.items.length)}</div><div class="prog"><i style="width:${Math.round(done / sc.items.length * 100)}%"></i></div>
-      ${sc.items.map((it, i) => `<div class="it"><p>${AR(i + 1)}. ${esc(it[1])}</p><div class="chs ${k3 ? 'k3' : ''}" role="radiogroup" aria-label="${esc(it[1])}">${sc.scale.map((l, v) => `<button class="ch ${ans[i] === v + 1 ? 'on' : ''}" data-i="${i}" data-v="${v + 1}" role="radio" aria-checked="${ans[i] === v + 1}">${esc(l)}</button>`).join('')}</div></div>`).join('')}
-      <button class="btn" id="sd">إرسال</button><div class="err" id="er"></div>`;
-    m.querySelectorAll('.ch').forEach(b => b.onclick = () => { const i = +b.dataset.i; ans[i] = +b.dataset.v; b.parentNode.querySelectorAll('.ch').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', x === b); }); const d = ans.filter(x => x != null).length; m.querySelector('.prog i').style.width = Math.round(d / sc.items.length * 100) + '%'; m.querySelector('.small').textContent = `${who.n} · أجبت ${AR(d)} من ${AR(sc.items.length)}`; });
-    m.querySelector('#sd').onclick = async () => { const miss = ans.findIndex(x => x == null); if (miss >= 0) { m.querySelector('#er').textContent = `بقي ${AR(ans.filter(x => x == null).length)} عبارة دون إجابة`; m.querySelectorAll('.it')[miss].scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
-      const scores = DS.score(sc, ans); try { await rpc('scale_submit', { p_code: code, p_device: dev, p_student: who.id, p_name: who.n, p_answers: ans, p_scores: scores }); result(scores); } catch (e) { m.querySelector('#er').textContent = e.message; } };
+    const P = per(), from = page * P, L = sc.items.slice(from, from + P), pages = Math.ceil(sc.items.length / P), done = ans.filter(x => x != null).length, k3 = sc.scale.length === 3;
+    m.innerHTML = `<div class="hero" style="margin:0"><span class="ic" aria-hidden="true" style="width:46px;height:46px;font-size:26px;border-radius:14px">${sc.icon}</span><div><b>${esc(sc.name)}</b><div class="small" id="cnt">${esc(who.n)} · ${t('answered')} ${N(done)} ${t('of')} ${N(sc.items.length)}</div></div></div>
+      <div class="prog" role="progressbar" aria-valuemin="0" aria-valuemax="${sc.items.length}" aria-valuenow="${done}"><i style="width:${Math.round(done / sc.items.length * 100)}%"></i></div>
+      <div class="${sc.faces ? 'big' : ''}">${L.map((it, j) => { const i = from + j; return `<div class="it"><p><span class="n">${N(i + 1)}</span>${esc(it[1])}</p><div class="chs ${k3 ? 'k3' : ''}" role="radiogroup" aria-label="${esc(it[1])}">${sc.scale.map((l, v) => `<button class="ch ${ans[i] === v + 1 ? 'on' : ''}" data-i="${i}" data-v="${v + 1}" role="radio" aria-checked="${ans[i] === v + 1}">${k3 ? '' : `<span class="d" style="--s:${8 + v * 3}px"></span>`}<span>${esc(l)}</span></button>`).join('')}</div></div>`; }).join('')}</div>
+      <div class="nav">${page > 0 ? `<button class="btn ghost" id="pv">${t('prev')}</button>` : ''}${page < pages - 1 ? `<button class="btn" id="nx">${t('next')}</button>` : `<button class="btn" id="sd">${t('send')}</button>`}</div><div class="err" id="er"></div>`;
+    const upd = () => { const d = ans.filter(x => x != null).length; m.querySelector('.prog i').style.width = Math.round(d / sc.items.length * 100) + '%'; m.querySelector('.prog').setAttribute('aria-valuenow', d); m.querySelector('#cnt').textContent = `${who.n} · ${t('answered')} ${N(d)} ${t('of')} ${N(sc.items.length)}`; };
+    m.querySelectorAll('.ch').forEach(b => b.onclick = () => { const i = +b.dataset.i; ans[i] = +b.dataset.v; b.parentNode.querySelectorAll('.ch').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', x === b); }); upd();
+      if (P === 1 && page < pages - 1) setTimeout(() => { page++; render(); }, 320); });
+    const miss = () => { const i = L.findIndex((_, j) => ans[from + j] == null); return i; };
+    if (m.querySelector('#pv')) m.querySelector('#pv').onclick = () => { page--; render(); window.scrollTo(0, 0); };
+    if (m.querySelector('#nx')) m.querySelector('#nx').onclick = () => { const i = miss(); if (i >= 0) { m.querySelector('#er').textContent = `${N(L.filter((_, j) => ans[from + j] == null).length)} ${t('left')}`; m.querySelectorAll('.it')[i].scrollIntoView({ behavior: 'smooth', block: 'center' }); return; } page++; render(); window.scrollTo(0, 0); };
+    if (m.querySelector('#sd')) m.querySelector('#sd').onclick = async e => { const all = ans.findIndex(x => x == null); if (all >= 0) { page = Math.floor(all / P); render(); m.querySelector('#er').textContent = `${N(ans.filter(x => x == null).length)} ${t('left')}`; return; }
+      e.currentTarget.disabled = true; const scores = DS.score(sc, ans);
+      try { if (opts().ext) await rpc('scale_submit_ext', { p_code: code, p_device: dev, p_name: who.n, p_meta: who.meta || {}, p_answers: ans, p_scores: scores }); else await rpc('scale_submit', { p_code: code, p_device: dev, p_student: who.id, p_name: who.n, p_answers: ans, p_scores: scores }); result = scores; try { const R2 = await rpc('scale_get', { p_code: code }); avg = R2 && R2.avg; } catch (_) { } step = 'result'; render(); window.scrollTo(0, 0); }
+      catch (er) { e.currentTarget.disabled = false; m.querySelector('#er').textContent = er.message; } };
   }
-  function result(scores) {
-    const t = DS.top(sc, scores);
-    m.innerHTML = `<h1>شكراً ${esc(who.n)} 🌟</h1><p class="small">هذه صورة أولية عن ${esc(sc.name)} لديك، ستساعد معلمك على دعمك بما يناسبك.</p><div class="res">${t.map(x => `<div><span>${esc(x.n)}</span><i style="width:${Math.max(4, x.v)}%;background:${x.c}"></i><span>${AR(x.v)}٪</span></div>`).join('')}</div>
-      <p style="margin-top:14px"><b>أبرز ما يميزك:</b> ${esc(t[0].n)}${t[0].d ? ' — ' + esc(t[0].d) : ''}</p>`;
+  function resView() {
+    const tp = DS.top(sc, result), best = tp[0], date = new Date().toLocaleDateString(lang === 'ar' ? 'ar-SA-u-ca-gregory' : lang);
+    m.innerHTML = `<h1 style="margin-bottom:10px">${t('thanks')} ${esc(who.n)} 🌟</h1>
+      <div class="rep" id="rep"><div class="rep-h"><img src="assets/logo_white.svg" alt=""><div><b>${sc.icon} ${esc(sc.name)}</b><span>${t('report')} · ${esc(who.n)}${R.cls ? ' · ' + esc(R.cls) : ''} · ${esc(date)}</span></div></div>
+      <div class="rep-b"><div class="star"><span class="ic" aria-hidden="true">⭐</span><div><div class="small">${t('top')}</div><b>${esc(best.n)}</b><span class="chip" style="background:${best.band.c}">${esc(best.band[lang])}</span><div class="small">${esc(best.d)}</div></div></div>
+        <div class="rg"><div>${DS.radar(sc, result, { cmp: avg || null, size: 280 })}${avg ? `<div class="legend"><span><i style="background:#005499"></i>${t('profile')}</span><span><i style="background:#9AA9BC"></i>${t('classAvg')}</span></div>` : ''}</div>
+          <div class="bars">${tp.map(x => `<div><span>${esc(x.n)}</span><span class="tr"><i style="width:${Math.max(3, x.v)}%;background:${x.c}"></i>${avg && avg[x.k] != null ? `<u style="inset-inline-start:${avg[x.k]}%"></u>` : ''}</span><span>${PC(x.v)}</span></div>`).join('')}</div></div>
+        <div><b>${t('tips')}</b><ul class="tips">${tp.slice(0, 2).map(x => `<li><b>${esc(x.n)}:</b> ${esc(x.h)}</li>`).join('')}${tp.length > 2 ? `<li><b>${esc(tp[tp.length - 1].n)}:</b> ${esc(tp[tp.length - 1].h)}</li>` : ''}</ul></div>
+        <p class="small" style="margin:0">${t('note')}</p></div></div>
+      <div class="acts"><button class="btn ghost" id="img">🖼️ ${t('save')}</button><button class="btn ghost" id="pr">🖨️ ${t('print')}</button><button class="btn ghost full" id="crd">🪪 ${t('card')}</button>
+        <div class="full"><label class="small" for="ph">${t('phone')}</label><div class="wa-row"><input class="in" id="ph" inputmode="tel" dir="ltr" placeholder="05xxxxxxxx" value="${esc(LS.get('scale_ph') || '')}"><button class="btn wa" id="wa">${t('wa')}</button></div></div></div>`;
+    m.querySelector('#pr').onclick = () => window.print();
+    const shot = async (el, name) => { if (!window.html2canvas) return; const c = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true }); const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = name + '.png'; a.click(); };
+    m.querySelector('#img').onclick = () => shot(m.querySelector('#rep'), sc.name + ' - ' + who.n);
+    m.querySelector('#crd').onclick = async () => { const d = document.createElement('div'); d.className = 'lcard'; d.dir = lang === 'ar' ? 'rtl' : 'ltr'; d.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><img src="assets/logo_white.svg" style="height:30px" alt=""><span style="font-size:12px">${t('card')}</span></div><div style="margin-top:14px;font-size:13px;opacity:.85">${esc(sc.name)}</div><b>${esc(who.n)}</b><div style="display:flex;gap:10px;align-items:center;margin-top:12px"><span class="big">${sc.icon}</span><div><div style="font-size:12px;opacity:.85">${t('top')}</div><b>${esc(best.n)}</b><div style="font-size:13px">${PC(best.v)}</div></div></div><div style="margin-top:12px;font-size:12.5px;line-height:1.7;background:rgba(255,255,255,.12);border-radius:12px;padding:8px 10px">💡 ${esc(best.h)}</div>`; document.body.appendChild(d); try { await shot(d, t('card') + ' - ' + who.n); } finally { d.remove(); } };
+    m.querySelector('#wa').onclick = () => { const p = m.querySelector('#ph').value.trim(); LS.set('scale_ph', p); const n = DS.waNum(p); window.open(`https://wa.me/${n}?text=${encodeURIComponent(DS.waText(sc, result, who.n, lang))}`, '_blank', 'noopener'); };
   }
   start();
 })();

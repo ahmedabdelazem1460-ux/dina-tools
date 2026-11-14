@@ -79,8 +79,10 @@
     {"src": "src/assess/live-poll.js", "about": "السؤال اللحظي V.poll + A.livePoll (مثل ClassPoint): رمز/QR للطلاب على poll.html، نتائج لحظية، إدراج النتائج في السبورة (sql/098)"},
     {"src": "src/assess/slides.js", "about": "العروض التقديمية V.slides: من بنك الأسئلة أو نص/ملف، ست هويات مشتقة من دينا، محرر، عرض بملء الشاشة مع السؤال اللحظي، تصدير PowerPoint (vendor/pptxgen) وPDF (sql/098 decks)"},
     {"src": "scales.js", "about": "تعريف مقاييس البوصلة DinaScales (مشترك مع scale.html)"},
-    {"src": "src/attendance/compass.js", "about": "البوصلة V.compass: مقاييس الطلاب برابط scale.html ونتائج الفصل والطالب، ومؤشرات الأداء للمالك (sql/099)"},
+    {"src": "src/attendance/compass.js", "about": "البوصلة ٢ V.compass: ٩ مقاييس بثلاث لغات وأربعة مستويات (scales.js) برابط scale.html، تقارير احترافية للفصل والطالب (رادار، مقارنة، توصيات)، PDF/صورة/Excel وواتساب لولي الأمر، ومؤشرات الأداء للمالك (sql/099–100). يصدّر A.elToPdf/elToPng/waOpen"},
+    {"src": "src/attendance/gifted.js", "about": "رعاية الموهوبين V.gifted: الدليل المرجعي، البوابات الخمس، ١٤ نموذجاً وخطة، قرار اللجنة بالأوزان والتصنيف، المؤشرات — gifted_files (sql/100)، A.giftedNominate"},
     {"src": "src/plan/assistant.js", "about": "مساعد المعلم V.assistant (مجاني داخل المتصفح): أهداف بلوم، ملخص، سير الحصة، استراتيجيات، أسئلة (A.genFromText)، واجب، تمايز، طباعة، تحويل لعرض/سؤال لحظي"},
-    {"src": "src/assess/models3d.js", "about": "المجسمات التفاعلية A.models3d داخل المعامل: مجسمات هندسية بمحرك Canvas، نموذج الذرة، المجموعة الشمسية"}
+    {"src": "src/assess/models3d.js", "about": "المجسمات التفاعلية A.models3d داخل المعامل: مجسمات هندسية بمحرك Canvas، نموذج الذرة، المجموعة الشمسية"},
+    {"src": "src/core/ui-pro.js", "about": "الواجهة الاحترافية: السمات (كلاسيكي/عمق ثلاثي الأبعاد/زجاجي/زخارف دينا) وأيقونات القائمة التفاعلية، لوحة المعلم home2 (الأسبوع أعلى الصفحة + أيقونات)، أيقونات الإشعارات ونوع new، «ما الجديد»، A.announceNew عند تفعيل ميزة — يجب أن تبقى آخر وحدة (تغلّف V.my)"}
   ]
 }

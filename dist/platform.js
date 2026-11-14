@@ -4662,7 +4662,7 @@ ${S.me.full_name}`;
   // ---------- صلاحيات الأنظمة الخاصة (تحليل النتائج، سجلاتي…) ----------
   const FOPT = { all: 'لكل المعلمين', granted: 'لمن أمنحه فقط', off: 'مخفي (للمالك فقط)' };
   const FEATS = [['assess', 'التقويم والاختبارات', ['all', 'granted', 'off']], ['records', 'سجل المتابعة', ['all', 'granted', 'off']], ['resources', 'المصادر', ['all', 'granted', 'off']], ['analysis', 'تحليل النتائج', ['granted', 'off']], ['attendance', 'الحضور والسلوك والإرشاد', ['granted', 'off']], ['supervision', 'الإشراف التربوي وتقاريري', ['granted', 'off']]];
-  const MODULES = [['assess', 'التقويم والاختبارات (عند تفعيله «لمن أمنحه»)', 'التقويم'], ['analysis', 'تحليل النتائج والاختبارات التشخيصية', 'التحليل'], ['supervision', 'الإشراف التربوي', 'الإشراف'], ['attendance', 'الحضور والسلوك — مشرف دور', 'الحضور'], ['counselor', 'الإرشاد الطلابي — الإحالات', 'الموجه'], ['deputy', 'الوكيل — استقبال إحالات الطلاب', 'الوكيل'], ['records', 'سجل المتابعة (عند تفعيله «لمن أمنحه»)', 'السجل'], ['resources', 'المصادر (عند تفعيلها «لمن أمنحه»)', 'المصادر'], ['noor', 'تحليل درجات نور', 'نور']];
+  const MODULES = [['assess', 'التقويم والاختبارات (عند تفعيله «لمن أمنحه»)', 'التقويم'], ['analysis', 'تحليل النتائج والاختبارات التشخيصية', 'التحليل'], ['supervision', 'الإشراف التربوي', 'الإشراف'], ['attendance', 'الحضور والسلوك — مشرف دور', 'الحضور'], ['counselor', 'الإرشاد الطلابي — الإحالات', 'الموجه'], ['deputy', 'الوكيل — استقبال إحالات الطلاب', 'الوكيل'], ['records', 'سجل المتابعة (عند تفعيله «لمن أمنحه»)', 'السجل'], ['resources', 'المصادر (عند تفعيلها «لمن أمنحه»)', 'المصادر'], ['noor', 'تحليل درجات نور', 'نور'], ['gifted', 'رعاية الموهوبين — ملفات الطلاب واللجنة', 'الموهوبون']];
   A.hasModule = m => !!S.me && (S.me.is_owner || (S.grants || []).some(g => g.module === m && g.staff_id === S.me.id));
   async function loadGrants() { try { S.grants = await api.moduleGrants(); } catch (_) { S.grants = []; } }
   const prevAfter = window.APP_AFTER_WEEK;
@@ -16304,6 +16304,8 @@ ${S.me.full_name}`;
     ['assistant', 'مساعد المعلم', 'تجهيز الدرس تلقائياً: أهداف، سير الحصة، أنشطة، أسئلة، واجب، تمايز.'],
     ['games2', 'قوالب الألعاب الجديدة', 'ترتيب الحروف، فرقعة البالونات، الفرز، سباق الفريقين — ضمن طرق اللعب عند إنشاء لعبة.'],
     ['models3d', 'المجسمات التفاعلية', 'المجسمات الهندسية ونموذج الذرة والمجموعة الشمسية داخل المعامل الافتراضية.'],
+    ['gifted', 'رعاية الموهوبين', 'الدليل المرجعي ونماذج الكشف والترشيح؛ يرى المعلم ترشيحاته فقط، والملفات كاملة للمالك ومن يُمنح «gifted» أو «counselor».'],
+    ['home2', 'واجهة المعلم الجديدة', 'لوحة أعلى صفحة المعلم: الأسبوع الحالي وأيامه ونسبة الإنجاز وأيقونات تفاعلية للوصول السريع.'],
     ['app', 'زر «تطبيق الجوال»', 'تعليمات تثبيت المنصة على أندرويد وآيفون في قائمة المستخدم.'],
   ];
   A.TFEAT = F;
@@ -16327,8 +16329,10 @@ ${S.me.full_name}`;
     const host = root.querySelector('.card') || root; host.parentNode ? host.parentNode.insertBefore(box, host) : root.prepend(box);
     box.querySelector('#tfGo').onclick = e => A.run(e.currentTarget, async () => {
       const tfeat = {}; $$('[data-tf]', box).forEach(i => tfeat[i.dataset.tf] = i.checked);
+      const added = Object.keys(tfeat).filter(k => tfeat[k] && cur[k] !== true);
       const settings = { ...(S.school.settings || {}), tfeat }; const res = await api.updateSchool(S.school.id, { settings }); S.school.settings = (res && res.settings) || settings;
-      A.toast('حُفظ — يظهر للمعلمين ما فعّلته فقط', 'ok'); V.tui(root);
+      let sent = 0; if (added.length && A.announceNew) sent = await A.announceNew(added);
+      A.toast('حُفظ — يظهر للمعلمين ما فعّلته فقط' + (added.length ? ' · وصلهم إشعار «تمت إضافة…»' : ''), 'ok'); V.tui(root);
     });
     return r;
   };
@@ -16761,129 +16765,616 @@ ${S.me.full_name}`;
 
 /* ==== scales.js ==== */
 ;try{
-/* البوصلة — تعريف المقاييس التربوية (مشترك بين المنصة وصفحة الطالب scale.html).
-   عبارات مؤلفة للاستخدام المدرسي الإرشادي (ليست اختبارات تشخيصية مقننة). كل بُعد = متوسط عباراته على مقياس ليكرت. */
+/* البوصلة — بنك المقاييس التربوية (مشترك بين المنصة وصفحة الطالب scale.html).
+   ٣ لغات (ar/en/fr) و٤ مستويات: k رياض الأطفال والصفوف الأولية (وجوه)، p الابتدائية العليا، m المتوسطة، s الثانوية.
+   عبارات مؤلفة للاستخدام المدرسي الإرشادي (ليست اختبارات تشخيصية مقننة). كل بُعد = متوسط عباراته ٪.
+   العبارة: [البعد، ar، en، fr، المستويات؟] — المستويات الافتراضية = مستويات المقياس عدا k. */
 (function () {
-  const L5 = ['لا تنطبق أبداً', 'نادراً', 'أحياناً', 'غالباً', 'تنطبق تماماً'];
-  const L3 = ['😟 لا', '😐 أحياناً', '😀 نعم'];
+  const L5 = { ar: ['لا تنطبق أبداً', 'نادراً', 'أحياناً', 'غالباً', 'تنطبق تماماً'], en: ['Never', 'Rarely', 'Sometimes', 'Often', 'Always'], fr: ['Jamais', 'Rarement', 'Parfois', 'Souvent', 'Toujours'] };
+  const L3 = { ar: ['😟 لا', '😐 أحياناً', '😀 نعم'], en: ['😟 No', '😐 Sometimes', '😀 Yes'], fr: ['😟 Non', '😐 Parfois', '😀 Oui'] };
+  const LEVELS = { k: { ar: 'رياض الأطفال والصفوف الأولية', en: 'KG & early grades', fr: 'Maternelle et premières classes' }, p: { ar: 'الابتدائية العليا', en: 'Upper primary', fr: 'Primaire supérieur' }, m: { ar: 'المتوسطة', en: 'Middle school', fr: 'Collège' }, s: { ar: 'الثانوية', en: 'High school', fr: 'Lycée' } };
+  const BAND = v => v >= 75 ? { ar: 'مرتفع', en: 'High', fr: 'Élevé', c: '#2E8B57' } : v >= 50 ? { ar: 'متوسط', en: 'Moderate', fr: 'Moyen', c: '#C9A44C' } : { ar: 'يحتاج تنمية', en: 'Developing', fr: 'À développer', c: '#E0675A' };
+  // d = [الاسم ar,en,fr] , c = لون , x = وصف [ar,en,fr] , h = دعم/نصيحة للطالب وولي الأمر [ar,en,fr] , t = توصية للمعلم (ar)
+  const D = (n, c, x, h, t) => ({ n, c, x, h, t });
   const S = [
-    { key: 'styles', name: 'أنماط التعلم', icon: '🧭', stages: ['ابتدائي', 'متوسط', 'ثانوي'], scale: L5, about: 'يكشف الطريقة التي يفضّل الطالب التعلم بها ليُنوّع المعلم استراتيجياته.',
-      dims: { v: ['بصري', '#005499', 'الصور والمخططات والألوان والخرائط الذهنية'], a: ['سمعي', '#3AB1DB', 'الشرح والنقاش والتسجيلات الصوتية'], r: ['قرائي/كتابي', '#2E8B57', 'القراءة وتدوين الملاحظات والملخصات'], k: ['حركي/عملي', '#E0675A', 'التجارب والأنشطة والتمثيل والحركة'] },
-      items: [['v', 'أفهم الدرس أكثر عندما أرى صوراً أو رسوماً.'], ['a', 'أتذكر ما أسمعه من المعلم أكثر مما أقرؤه.'], ['r', 'أحب أن أكتب ملخصاً بعد كل درس.'], ['k', 'أتعلم أفضل عندما أجرب بيدي.'],
-        ['v', 'أستخدم الألوان لتنظيم ملاحظاتي.'], ['a', 'أحب أن أشرح لزملائي بصوت عالٍ.'], ['r', 'أفضّل قراءة الكتاب على مشاهدة فيديو.'], ['k', 'يصعب عليّ الجلوس طويلاً دون حركة.'],
-        ['v', 'أتخيل الأشياء في ذهني كأنها صورة.'], ['a', 'أستفيد من النقاش الجماعي.'], ['r', 'أحب القوائم والنقاط المكتوبة.'], ['k', 'أحب الأنشطة والألعاب التعليمية.']] },
-    { key: 'mi', name: 'الذكاءات المتعددة', icon: '💡', stages: ['ابتدائي', 'متوسط', 'ثانوي'], scale: L5, about: 'يُبرز مواطن القوة لدى الطالب في ثمانية ذكاءات لتوجيه الأنشطة والمشاريع.',
-      dims: { ling: ['لغوي', '#005499', 'القراءة والكتابة والتعبير'], logic: ['منطقي رياضي', '#082B5A', 'الأرقام والتحليل وحل المسائل'], spat: ['بصري مكاني', '#3AB1DB', 'الرسم والتصميم والخرائط'], body: ['جسمي حركي', '#E0675A', 'الرياضة والعمل اليدوي'], mus: ['إيقاعي', '#AE95DA', 'الإيقاع والأناشيد والأصوات'], inter: ['اجتماعي', '#C9A44C', 'التعاون وقيادة المجموعات'], intra: ['ذاتي', '#2F855A', 'التأمل ومعرفة الذات وتحديد الأهداف'], nat: ['طبيعي', '#1F6B44', 'الطبيعة والكائنات والتصنيف'] },
-      items: [['ling', 'أستمتع بالقراءة والقصص.'], ['logic', 'أحب الألغاز والمسائل الحسابية.'], ['spat', 'أرسم أو أصمم بسهولة.'], ['body', 'أحب الرياضة والأعمال اليدوية.'], ['mus', 'أتذكر الأناشيد والإيقاعات بسرعة.'], ['inter', 'أحب العمل مع مجموعة.'], ['intra', 'أعرف نقاط قوتي وضعفي.'], ['nat', 'أهتم بالنباتات والحيوانات.'],
-        ['ling', 'أعبّر عن أفكاري بالكلمات جيداً.'], ['logic', 'أسأل «لماذا» و«كيف» كثيراً.'], ['spat', 'أفهم الخرائط والمخططات بسهولة.'], ['body', 'أفكر أفضل وأنا أتحرك.'], ['mus', 'ألاحظ الأصوات من حولي.'], ['inter', 'يلجأ إليّ زملائي للمساعدة.'], ['intra', 'أضع أهدافاً لنفسي وأتابعها.'], ['nat', 'أحب تصنيف الأشياء ومقارنتها.']] },
-    { key: 'riasec', name: 'الميول المهنية', icon: '🎯', stages: ['متوسط', 'ثانوي'], scale: L5, about: 'يساعد في التوجيه المهني واختيار المسارات بستة أنماط للميول.',
-      dims: { R: ['واقعي', '#E0675A', 'الأعمال التقنية والميدانية'], I: ['بحثي', '#005499', 'العلوم والبحث والتحليل'], A: ['فني', '#AE95DA', 'الإبداع والتصميم والفنون'], S: ['اجتماعي', '#2E8B57', 'التعليم والمساعدة والصحة'], E: ['ريادي', '#C9A44C', 'القيادة والأعمال والإقناع'], C: ['تنظيمي', '#082B5A', 'التنظيم والبيانات والإدارة'] },
-      items: [['R', 'أحب إصلاح الأجهزة أو تركيبها.'], ['I', 'أستمتع بإجراء التجارب العلمية.'], ['A', 'أحب التصميم أو الكتابة الإبداعية.'], ['S', 'أحب مساعدة الآخرين وتعليمهم.'], ['E', 'أحب قيادة المشاريع وإقناع الآخرين.'], ['C', 'أحب ترتيب الملفات والبيانات بدقة.'],
-        ['R', 'أفضّل العمل الميداني على العمل المكتبي.'], ['I', 'أقرأ عن الاكتشافات العلمية.'], ['A', 'أحب الرسم أو التصوير أو المونتاج.'], ['S', 'أهتم بمشاعر الآخرين ومشكلاتهم.'], ['E', 'أفكر في بدء مشروعي الخاص.'], ['C', 'أتبع الخطوات والتعليمات بدقة.']] },
-    { key: 'study', name: 'مهارات الدراسة', icon: '📚', stages: ['متوسط', 'ثانوي'], scale: L5, about: 'يقيس عادات الطالب الدراسية ليُبنى عليها برنامج دعم وإرشاد.',
-      dims: { time: ['إدارة الوقت', '#005499', 'التخطيط والالتزام بالمواعيد'], focus: ['التركيز', '#3AB1DB', 'الانتباه وتجنب المشتتات'], notes: ['التدوين', '#2E8B57', 'تنظيم الملاحظات والمراجعة'], exam: ['الاستعداد للاختبار', '#E0675A', 'المراجعة وضبط القلق'] },
-      items: [['time', 'أضع جدولاً أسبوعياً للمذاكرة.'], ['focus', 'أبعد الجوال عني وقت المذاكرة.'], ['notes', 'أدوّن ملاحظات منظمة في الحصة.'], ['exam', 'أبدأ المراجعة قبل الاختبار بوقت كافٍ.'],
-        ['time', 'أسلّم واجباتي في موعدها.'], ['focus', 'أستطيع التركيز ٣٠ دقيقة متصلة.'], ['notes', 'أراجع ملاحظاتي في اليوم نفسه.'], ['exam', 'أتحكم في توتري أثناء الاختبار.']] },
-    { key: 'motive', name: 'الدافعية للتعلم', icon: '🔥', stages: ['ابتدائي', 'متوسط', 'ثانوي'], scale: L5, about: 'يقيس دافعية الطالب الداخلية والخارجية ومثابرته.',
-      dims: { inner: ['دافعية داخلية', '#2E8B57', 'حب التعلم والفضول'], outer: ['دافعية خارجية', '#C9A44C', 'الدرجات والتقدير'], pers: ['المثابرة', '#005499', 'الاستمرار أمام الصعوبة'] },
-      items: [['inner', 'أتعلم لأنني أستمتع بمعرفة الجديد.'], ['outer', 'أجتهد لأحصل على درجات عالية.'], ['pers', 'لا أستسلم عندما يصعب عليّ الحل.'], ['inner', 'أبحث عن معلومات إضافية بنفسي.'], ['outer', 'يحفزني ثناء المعلم ووالديّ.'], ['pers', 'أعيد المحاولة حتى أنجح.']] },
-    { key: 'wellbeing', name: 'الرضا والمناخ الصفي', icon: '🌱', stages: ['ابتدائي'], scale: L3, about: 'مقياس مبسط بالوجوه للصفوف الأولى عن شعور الطالب في المدرسة والصف.',
-      dims: { happy: ['السعادة بالمدرسة', '#2E8B57', ''], safe: ['الأمان', '#005499', ''], friends: ['العلاقة بالزملاء', '#3AB1DB', ''], teacher: ['العلاقة بالمعلم', '#C9A44C', ''] },
-      items: [['happy', 'أحب المجيء إلى المدرسة.'], ['safe', 'أشعر بالأمان في المدرسة.'], ['friends', 'لدي أصدقاء في صفي.'], ['teacher', 'معلمي يسمعني ويساعدني.'], ['happy', 'أستمتع بالحصص.'], ['friends', 'زملائي يلعبون معي.']] },
+    { key: 'styles', icon: '🧭', lv: 'kpms', name: ['أنماط التعلم', 'Learning Styles', "Styles d'apprentissage"],
+      about: ['يكشف الطريقة التي يفضّل الطالب التعلم بها ليُنوّع المعلم استراتيجياته.', 'Reveals how the student prefers to learn so teaching can be varied.', "Révèle comment l'élève préfère apprendre pour diversifier l'enseignement."],
+      dims: {
+        v: D(['بصري', 'Visual', 'Visuel'], '#005499', ['يتعلم بالصور والمخططات والألوان والخرائط الذهنية.', 'Learns through images, diagrams, colours and mind maps.', 'Apprend avec des images, des schémas, des couleurs et des cartes mentales.'], ['استخدم الخرائط الذهنية والألوان والبطاقات المصورة عند المذاكرة.', 'Use mind maps, colours and picture cards when studying.', 'Utilise des cartes mentales, des couleurs et des cartes illustrées pour réviser.'], 'استخدم الخرائط الذهنية والمخططات والفيديو.'),
+        a: D(['سمعي', 'Auditory', 'Auditif'], '#3AB1DB', ['يتعلم بالاستماع والشرح والنقاش.', 'Learns through listening, explanation and discussion.', "Apprend par l'écoute, l'explication et la discussion."], ['اقرأ بصوت مسموع، وسجّل ملخصاتك واستمع إليها، وناقش ما تعلمته.', 'Read aloud, record and replay your summaries, and talk about what you learn.', 'Lis à voix haute, enregistre tes résumés et réécoute-les, discute de ce que tu apprends.'], 'نوّع بالشرح المسموع والنقاش والتسميع.'),
+        r: D(['قرائي/كتابي', 'Read/Write', 'Lecture/Écriture'], '#2E8B57', ['يتعلم بالقراءة وتدوين الملاحظات والملخصات.', 'Learns through reading, note-taking and summaries.', 'Apprend en lisant, en prenant des notes et en résumant.'], ['اكتب ملخصات وقوائم، وأعد صياغة الدرس بكلماتك.', 'Write summaries and lists, and rewrite the lesson in your own words.', 'Écris des résumés et des listes, reformule la leçon avec tes mots.'], 'وفّر نصوصاً وملخصات ومهام كتابية.'),
+        k: D(['حركي/عملي', 'Kinesthetic', 'Kinesthésique'], '#E0675A', ['يتعلم بالتجربة والحركة والعمل اليدوي.', 'Learns through hands-on practice, movement and doing.', 'Apprend par la pratique, le mouvement et la manipulation.'], ['ذاكر في فترات قصيرة مع حركة، واستخدم النماذج والتجارب والبطاقات.', 'Study in short bursts with movement; use models, experiments and cards.', 'Révise par courtes périodes en bougeant ; utilise maquettes, expériences et cartes.'], 'أدخل التجارب والأنشطة الحركية ولعب الأدوار.') },
+      items: [
+        ['v', 'أفهم الدرس أكثر عندما أرى صوراً أو رسوماً.', 'I understand a lesson better when I see pictures or drawings.', 'Je comprends mieux une leçon quand je vois des images ou des dessins.', 'kpms'],
+        ['a', 'أتذكر ما أسمعه من المعلم أكثر مما أقرؤه.', 'I remember what I hear from the teacher more than what I read.', "Je retiens mieux ce que j'entends du professeur que ce que je lis."],
+        ['r', 'أحب أن أكتب ملخصاً بعد كل درس.', 'I like writing a summary after each lesson.', "J'aime écrire un résumé après chaque leçon."],
+        ['k', 'أتعلم أفضل عندما أجرب بيدي.', 'I learn best when I try things with my hands.', "J'apprends mieux quand j'essaie avec mes mains.", 'kpms'],
+        ['v', 'أستخدم الألوان لتنظيم ملاحظاتي.', 'I use colours to organise my notes.', "J'utilise des couleurs pour organiser mes notes."],
+        ['a', 'أحب أن أشرح لزملائي بصوت عالٍ.', 'I like explaining things to my classmates out loud.', "J'aime expliquer à voix haute à mes camarades."],
+        ['r', 'أفضّل قراءة الكتاب على مشاهدة فيديو.', 'I prefer reading the book to watching a video.', 'Je préfère lire le livre plutôt que regarder une vidéo.'],
+        ['k', 'يصعب عليّ الجلوس طويلاً دون حركة.', 'It is hard for me to sit still for a long time.', "J'ai du mal à rester assis longtemps sans bouger.", 'kpms'],
+        ['v', 'أتخيل الأشياء في ذهني كأنها صورة.', 'I picture things in my mind like an image.', "J'imagine les choses dans ma tête comme une image."],
+        ['a', 'أستفيد من النقاش الجماعي.', 'I learn from group discussions.', "J'apprends grâce aux discussions de groupe."],
+        ['r', 'أحب القوائم والنقاط المكتوبة.', 'I like lists and written bullet points.', "J'aime les listes et les points écrits."],
+        ['k', 'أحب الأنشطة والألعاب التعليمية.', 'I enjoy educational activities and games.', "J'aime les activités et les jeux éducatifs.", 'kpms'],
+        ['v', 'أفضّل الخرائط الذهنية والمخططات على النص الطويل.', 'I prefer mind maps and diagrams to long text.', 'Je préfère les cartes mentales et les schémas aux longs textes.'],
+        ['a', 'أحب أن يقرأ لي أحد القصة.', 'I like someone reading a story to me.', "J'aime qu'on me lise une histoire.", 'kp'],
+        ['r', 'أفهم التعليمات المكتوبة أفضل من الشفهية.', 'I understand written instructions better than spoken ones.', 'Je comprends mieux les consignes écrites que les consignes orales.'],
+        ['k', 'أفهم أكثر عندما أبني نموذجاً أو مجسماً.', 'I understand more when I build a model.', 'Je comprends mieux quand je construis une maquette.'],
+        ['v', 'أتذكر مكان المعلومة في الصفحة أو السبورة.', 'I remember where information was on the page or board.', "Je me souviens de l'endroit où était l'information sur la page ou le tableau."],
+        ['a', 'أكرر المعلومة بصوتي لأحفظها.', 'I repeat information aloud to memorise it.', "Je répète l'information à voix haute pour la mémoriser.", 'kpms'],
+        ['r', 'أحب أن أكتب الكلمات الجديدة في دفتري.', 'I like writing new words in my notebook.', "J'aime écrire les nouveaux mots dans mon cahier.", 'kpms'],
+        ['k', 'أحب التجارب في المختبر.', 'I like experiments in the lab.', "J'aime les expériences au laboratoire."],
+        ['v', 'أحب مشاهدة الفيديو التعليمي لفهم الفكرة.', 'I like watching educational videos to understand an idea.', "J'aime regarder des vidéos éducatives pour comprendre une idée.", 'kpms'],
+        ['a', 'أستمع إلى التسجيلات الصوتية للمراجعة.', 'I listen to audio recordings to revise.', "J'écoute des enregistrements audio pour réviser."],
+        ['r', 'أبحث عن معنى الكلمات في القاموس أو الإنترنت.', 'I look up word meanings in a dictionary or online.', 'Je cherche le sens des mots dans le dictionnaire ou sur Internet.'],
+        ['k', 'أتحرك أو أمشي وأنا أراجع.', 'I move or walk around while revising.', 'Je bouge ou je marche pendant que je révise.']] },
+
+    { key: 'mi', icon: '💡', lv: 'kpms', name: ['الذكاءات المتعددة', 'Multiple Intelligences', 'Intelligences multiples'],
+      about: ['يُبرز مواطن القوة لدى الطالب في ثمانية ذكاءات لتوجيه الأنشطة والمشاريع.', "Highlights the student's strengths across eight intelligences to guide activities and projects.", "Met en valeur les forces de l'élève dans huit intelligences pour orienter activités et projets."],
+      dims: {
+        ling: D(['لغوي', 'Linguistic', 'Linguistique'], '#005499', ['قوة في القراءة والكتابة والتعبير.', 'Strong in reading, writing and expression.', "Fort en lecture, écriture et expression."], ['اقرأ يومياً واكتب يومياتك وشارك في الإلقاء.', 'Read daily, keep a journal and take part in public speaking.', "Lis chaque jour, tiens un journal et participe à l'expression orale."], 'مشاريع كتابة وإلقاء ومناظرات.'),
+        logic: D(['منطقي رياضي', 'Logical-mathematical', 'Logico-mathématique'], '#082B5A', ['قوة في الأرقام والتحليل وحل المسائل.', 'Strong in numbers, analysis and problem solving.', 'Fort en nombres, analyse et résolution de problèmes.'], ['جرّب الألغاز والشطرنج وتحديات الرياضيات والبرمجة.', 'Try puzzles, chess, maths challenges and coding.', 'Essaie les énigmes, les échecs, les défis de maths et la programmation.'], 'مسائل تحدٍّ وتحليل بيانات وبرمجة.'),
+        spat: D(['بصري مكاني', 'Visual-spatial', 'Visuo-spatial'], '#3AB1DB', ['قوة في الرسم والتصميم والخرائط.', 'Strong in drawing, design and maps.', 'Fort en dessin, design et cartes.'], ['صمّم ملصقات وخرائط ذهنية وجرّب التصميم الرقمي.', 'Design posters and mind maps; try digital design.', 'Conçois des affiches et des cartes mentales ; essaie le design numérique.'], 'تصميم ملصقات وإنفوجرافيك ونماذج.'),
+        body: D(['جسمي حركي', 'Bodily-kinesthetic', 'Corporelle-kinesthésique'], '#E0675A', ['قوة في الرياضة والعمل اليدوي والتمثيل.', 'Strong in sport, handwork and acting.', 'Fort en sport, travaux manuels et théâtre.'], ['شارك في الرياضة والمسرح والأعمال اليدوية والتجارب.', 'Join sports, drama, crafts and experiments.', 'Participe au sport, au théâtre, aux travaux manuels et aux expériences.'], 'نماذج يدوية وأنشطة ميدانية ولعب أدوار.'),
+        mus: D(['إيقاعي', 'Musical-rhythmic', 'Musicale-rythmique'], '#AE95DA', ['حساسية للأصوات والإيقاع والنغمة.', 'Sensitive to sounds, rhythm and tone.', 'Sensible aux sons, au rythme et au ton.'], ['احفظ بالإيقاع والأناشيد وشارك في الإنشاد والإلقاء.', 'Memorise with rhythm and chants; join recitation.', 'Mémorise avec le rythme et les chants ; participe à la récitation.'], 'أناشيد وإيقاع للحفظ وإلقاء.'),
+        inter: D(['اجتماعي', 'Interpersonal', 'Interpersonnelle'], '#C9A44C', ['قوة في التعاون والتواصل وقيادة المجموعات.', 'Strong in cooperation, communication and leading groups.', 'Fort en coopération, communication et animation de groupe.'], ['انضم إلى الأندية والعمل التطوعي ومجموعات الدراسة.', 'Join clubs, volunteering and study groups.', "Rejoins des clubs, du bénévolat et des groupes d'étude."], 'تعلم تعاوني وأدوار قيادية.'),
+        intra: D(['ذاتي', 'Intrapersonal', 'Intrapersonnelle'], '#2F855A', ['قوة في التأمل ومعرفة الذات وتحديد الأهداف.', 'Strong in reflection, self-knowledge and goal setting.', 'Fort en réflexion, connaissance de soi et fixation d’objectifs.'], ['دوّن أهدافك وتأملاتك واعمل على مشاريع شخصية.', 'Write down goals and reflections; work on personal projects.', 'Note tes objectifs et réflexions ; mène des projets personnels.'], 'سجل تعلم ذاتي وأهداف شخصية.'),
+        nat: D(['طبيعي', 'Naturalist', 'Naturaliste'], '#1F6B44', ['اهتمام بالطبيعة والكائنات والتصنيف.', 'Interest in nature, living things and classification.', 'Intérêt pour la nature, le vivant et la classification.'], ['استكشف الطبيعة، وازرع نباتاً، وصنّف ما تجمعه.', 'Explore nature, grow a plant and classify what you collect.', 'Explore la nature, fais pousser une plante et classe ce que tu collectes.'], 'تصنيف ورحلات واستكشاف.') },
+      items: [
+        ['ling', 'أستمتع بالقراءة والقصص.', 'I enjoy reading and stories.', "J'aime la lecture et les histoires.", 'kpms'],
+        ['logic', 'أحب الألغاز والمسائل الحسابية.', 'I like puzzles and maths problems.', "J'aime les énigmes et les problèmes de maths.", 'kpms'],
+        ['spat', 'أرسم أو أصمم بسهولة.', 'I draw or design easily.', 'Je dessine ou je conçois facilement.', 'kpms'],
+        ['body', 'أحب الرياضة والأعمال اليدوية.', 'I love sports and handicrafts.', "J'aime le sport et les travaux manuels.", 'kpms'],
+        ['mus', 'أتذكر الأناشيد والإيقاعات بسرعة.', 'I remember chants and rhythms quickly.', 'Je retiens vite les chants et les rythmes.', 'kpms'],
+        ['inter', 'أحب العمل مع مجموعة.', 'I like working in a group.', "J'aime travailler en groupe.", 'kpms'],
+        ['intra', 'أحب أن أعمل وحدي أحياناً لأفكر.', 'I sometimes like working alone to think.', "J'aime parfois travailler seul pour réfléchir.", 'kpms'],
+        ['nat', 'أهتم بالنباتات والحيوانات.', 'I care about plants and animals.', "Je m'intéresse aux plantes et aux animaux.", 'kpms'],
+        ['ling', 'أعبّر عن أفكاري بالكلمات جيداً.', 'I express my ideas well in words.', "J'exprime bien mes idées avec des mots."],
+        ['logic', 'أسأل «لماذا» و«كيف» كثيراً.', 'I often ask “why” and “how”.', 'Je demande souvent « pourquoi » et « comment ».'],
+        ['spat', 'أفهم الخرائط والمخططات بسهولة.', 'I understand maps and charts easily.', 'Je comprends facilement les cartes et les graphiques.'],
+        ['body', 'أفكر أفضل وأنا أتحرك.', 'I think better when I move.', 'Je réfléchis mieux en bougeant.'],
+        ['mus', 'ألاحظ الأصوات من حولي.', 'I notice the sounds around me.', 'Je remarque les sons autour de moi.'],
+        ['inter', 'يلجأ إليّ زملائي للمساعدة.', 'My classmates come to me for help.', "Mes camarades viennent me demander de l'aide."],
+        ['intra', 'أعرف نقاط قوتي وضعفي.', 'I know my strengths and weaknesses.', 'Je connais mes points forts et mes points faibles.'],
+        ['nat', 'أحب تصنيف الأشياء ومقارنتها.', 'I like classifying and comparing things.', "J'aime classer et comparer les choses."],
+        ['ling', 'أحب الكتابة الإبداعية أو الشعر.', 'I like creative writing or poetry.', "J'aime l'écriture créative ou la poésie."],
+        ['logic', 'أحب ترتيب الأشياء بخطوات منطقية.', 'I like putting things in logical steps.', "J'aime organiser les choses en étapes logiques."],
+        ['spat', 'أحب ألعاب التركيب والمكعبات.', 'I like building games and blocks.', "J'aime les jeux de construction et les cubes."],
+        ['body', 'أتقن الحركات الجديدة بسرعة.', 'I master new movements quickly.', 'Je maîtrise vite de nouveaux mouvements.'],
+        ['mus', 'أحفظ المعلومات أسهل إذا كانت بإيقاع.', 'I memorise information more easily with a rhythm.', 'Je mémorise plus facilement avec un rythme.'],
+        ['inter', 'أفهم مشاعر الآخرين بسرعة.', 'I quickly understand how others feel.', 'Je comprends vite ce que ressentent les autres.'],
+        ['intra', 'أضع أهدافاً لنفسي وأتابعها.', 'I set goals for myself and follow them.', 'Je me fixe des objectifs et je les suis.'],
+        ['nat', 'أستمتع بالرحلات في الطبيعة.', 'I enjoy trips in nature.', "J'aime les sorties dans la nature."],
+        ['ling', 'أتعلم كلمات جديدة بسرعة.', 'I learn new words quickly.', "J'apprends vite de nouveaux mots."],
+        ['logic', 'أستمتع بالألعاب الاستراتيجية مثل الشطرنج.', 'I enjoy strategy games like chess.', "J'aime les jeux de stratégie comme les échecs."],
+        ['spat', 'أتذكر الطرق والأماكن بسهولة.', 'I remember routes and places easily.', 'Je me souviens facilement des chemins et des lieux.'],
+        ['body', 'أحب التمثيل ولعب الأدوار.', 'I like acting and role-play.', "J'aime le théâtre et les jeux de rôle."],
+        ['mus', 'أميّز اختلاف نغمة الصوت والإلقاء.', 'I can tell differences in tone of voice and delivery.', 'Je distingue les différences de ton et de diction.'],
+        ['inter', 'أنجح في حل الخلافات بين زملائي.', 'I am good at solving disagreements between classmates.', 'Je réussis à régler les désaccords entre camarades.'],
+        ['intra', 'أتأمل في ما تعلمته بعد الدرس.', 'I reflect on what I learned after the lesson.', "Je réfléchis à ce que j'ai appris après la leçon."],
+        ['nat', 'ألاحظ تغيّر الطقس والفصول.', 'I notice changes in weather and seasons.', 'Je remarque les changements de temps et de saisons.']] },
+
+    { key: 'riasec', icon: '🎯', lv: 'ms', name: ['الميول المهنية', 'Career Interests (RIASEC)', 'Intérêts professionnels (RIASEC)'],
+      about: ['يساعد في التوجيه المهني واختيار المسارات بستة أنماط للميول.', 'Supports career guidance and pathway choice through six interest types.', "Aide à l'orientation et au choix des filières selon six types d'intérêts."],
+      dims: {
+        R: D(['واقعي', 'Realistic', 'Réaliste'], '#E0675A', ['يميل إلى الأعمال التقنية والميدانية والأدوات.', 'Drawn to technical, hands-on and field work.', 'Attiré par le travail technique, pratique et de terrain.'], ['استكشف الهندسة التطبيقية والتقنية والروبوتات.', 'Explore applied engineering, technology and robotics.', "Explore l'ingénierie appliquée, la technologie et la robotique."], 'المسارات التقنية والهندسية التطبيقية.'),
+        I: D(['بحثي', 'Investigative', 'Investigateur'], '#005499', ['يميل إلى العلوم والبحث والتحليل.', 'Drawn to science, research and analysis.', "Attiré par les sciences, la recherche et l'analyse."], ['شارك في المسابقات العلمية ومشاريع البحث.', 'Join science competitions and research projects.', 'Participe aux concours scientifiques et aux projets de recherche.'], 'المسارات العلمية والصحية والبحثية.'),
+        A: D(['فني', 'Artistic', 'Artistique'], '#AE95DA', ['يميل إلى الإبداع والتصميم والفنون.', 'Drawn to creativity, design and the arts.', 'Attiré par la création, le design et les arts.'], ['طوّر مَعرض أعمال (Portfolio) في التصميم أو الكتابة أو الإعلام.', 'Build a portfolio in design, writing or media.', 'Constitue un portfolio en design, écriture ou médias.'], 'التصميم والإعلام والفنون.'),
+        S: D(['اجتماعي', 'Social', 'Social'], '#2E8B57', ['يميل إلى التعليم والمساعدة والرعاية.', 'Drawn to teaching, helping and caring.', 'Attiré par l’enseignement, l’aide et le soin.'], ['تطوّع وجرّب أدوار الإرشاد ومساعدة الآخرين.', 'Volunteer and try mentoring and helping roles.', "Fais du bénévolat et essaie des rôles d'accompagnement."], 'التعليم والإرشاد والخدمات الصحية.'),
+        E: D(['ريادي', 'Enterprising', 'Entreprenant'], '#C9A44C', ['يميل إلى القيادة والأعمال والإقناع.', 'Drawn to leadership, business and persuasion.', 'Attiré par le leadership, les affaires et la persuasion.'], ['شارك في برامج ريادة الأعمال ومجالس الطلاب.', 'Join entrepreneurship programmes and student councils.', "Participe aux programmes d'entrepreneuriat et au conseil des élèves."], 'إدارة الأعمال والريادة والقانون.'),
+        C: D(['تنظيمي', 'Conventional', 'Conventionnel'], '#082B5A', ['يميل إلى التنظيم والبيانات والإدارة.', 'Drawn to organisation, data and administration.', "Attiré par l'organisation, les données et la gestion."], ['تعلّم الجداول الإلكترونية وإدارة المشاريع الصغيرة.', 'Learn spreadsheets and small project management.', 'Apprends les tableurs et la gestion de petits projets.'], 'المحاسبة والإدارة ونظم المعلومات.') },
+      items: [
+        ['R', 'أحب إصلاح الأجهزة أو تركيبها.', 'I like fixing or assembling devices.', "J'aime réparer ou assembler des appareils."],
+        ['I', 'أستمتع بإجراء التجارب العلمية.', 'I enjoy doing science experiments.', "J'aime faire des expériences scientifiques."],
+        ['A', 'أحب التصميم أو الكتابة الإبداعية.', 'I like design or creative writing.', "J'aime le design ou l'écriture créative."],
+        ['S', 'أحب مساعدة الآخرين وتعليمهم.', 'I like helping and teaching others.', "J'aime aider et enseigner aux autres."],
+        ['E', 'أحب قيادة المشاريع وإقناع الآخرين.', 'I like leading projects and persuading others.', "J'aime diriger des projets et convaincre les autres."],
+        ['C', 'أحب ترتيب الملفات والبيانات بدقة.', 'I like organising files and data precisely.', "J'aime classer les fichiers et les données avec précision."],
+        ['R', 'أفضّل العمل الميداني على العمل المكتبي.', 'I prefer fieldwork to office work.', 'Je préfère le travail de terrain au travail de bureau.'],
+        ['I', 'أقرأ عن الاكتشافات العلمية.', 'I read about scientific discoveries.', 'Je lis sur les découvertes scientifiques.'],
+        ['A', 'أحب الرسم أو التصوير أو المونتاج.', 'I like drawing, photography or video editing.', "J'aime le dessin, la photo ou le montage vidéo."],
+        ['S', 'أهتم بمشاعر الآخرين ومشكلاتهم.', "I care about others' feelings and problems.", 'Je me soucie des sentiments et des problèmes des autres.'],
+        ['E', 'أفكر في بدء مشروعي الخاص.', 'I think about starting my own business.', 'Je pense à créer ma propre entreprise.'],
+        ['C', 'أتبع الخطوات والتعليمات بدقة.', 'I follow steps and instructions precisely.', 'Je suis les étapes et les consignes avec précision.'],
+        ['R', 'أحب استخدام الأدوات والآلات.', 'I like using tools and machines.', "J'aime utiliser des outils et des machines."],
+        ['I', 'أحب حل المشكلات المعقدة.', 'I like solving complex problems.', "J'aime résoudre des problèmes complexes."],
+        ['A', 'أعبّر عن نفسي بطرق غير تقليدية.', 'I express myself in unconventional ways.', "Je m'exprime de façon originale."],
+        ['S', 'أحب العمل التطوعي.', 'I like volunteering.', "J'aime le bénévolat."],
+        ['E', 'أحب البيع والتسويق والتفاوض.', 'I like selling, marketing and negotiating.', "J'aime vendre, faire du marketing et négocier."],
+        ['C', 'أحب العمل على الحاسب والجداول.', 'I like working with computers and spreadsheets.', "J'aime travailler sur ordinateur et avec des tableaux."],
+        ['R', 'أهتم بالسيارات أو الطائرات أو الروبوتات.', 'I am interested in cars, planes or robots.', "Je m'intéresse aux voitures, aux avions ou aux robots."],
+        ['I', 'أحب تحليل البيانات والأرقام.', 'I like analysing data and numbers.', "J'aime analyser des données et des chiffres."],
+        ['A', 'أهتم بالألوان والتصميم الجميل.', 'I care about colours and beautiful design.', 'Je fais attention aux couleurs et au beau design.'],
+        ['S', 'أستمتع بالعمل ضمن فريق.', 'I enjoy working in a team.', "J'aime travailler en équipe."],
+        ['E', 'أتحمل المسؤولية وأتخذ القرارات.', 'I take responsibility and make decisions.', 'Je prends des responsabilités et des décisions.'],
+        ['C', 'أنظّم وقتي وأدواتي جيداً.', 'I organise my time and things well.', "J'organise bien mon temps et mes affaires."],
+        ['R', 'أحب الأنشطة الخارجية والعمل البدني.', 'I like outdoor activities and physical work.', "J'aime les activités en plein air et le travail physique."],
+        ['I', 'أطرح أسئلة عن أسباب الظواهر.', 'I ask questions about the causes of phenomena.', 'Je pose des questions sur les causes des phénomènes.'],
+        ['A', 'أحب ابتكار أفكار جديدة لمشروعات.', 'I like coming up with new ideas for projects.', "J'aime inventer de nouvelles idées de projets."],
+        ['S', 'أحب الاهتمام بصحة الناس ورعايتهم.', "I like caring for people's health and wellbeing.", "J'aime prendre soin de la santé des gens."],
+        ['E', 'أحب المنافسة وتحقيق الأهداف.', 'I like competition and reaching goals.', "J'aime la compétition et atteindre des objectifs."],
+        ['C', 'أحب الحسابات والميزانيات.', 'I like calculations and budgets.', "J'aime les calculs et les budgets."]] },
+
+    { key: 'study', icon: '📚', lv: 'pms', name: ['مهارات الدراسة', 'Study Skills', "Méthodes de travail"],
+      about: ['يقيس عادات الطالب الدراسية ليُبنى عليها برنامج دعم وإرشاد.', "Measures the student's study habits to build a support plan.", "Mesure les habitudes de travail de l'élève pour bâtir un plan d'accompagnement."],
+      dims: {
+        time: D(['إدارة الوقت', 'Time management', 'Gestion du temps'], '#005499', ['التخطيط والالتزام بالمواعيد.', 'Planning and meeting deadlines.', 'Planifier et respecter les délais.'], ['ضع جدولاً أسبوعياً واقعياً وابدأ بالأهم.', 'Make a realistic weekly plan and start with what matters most.', 'Fais un planning hebdomadaire réaliste et commence par l’essentiel.'], 'تدريب على الجدولة الأسبوعية.'),
+        focus: D(['التركيز', 'Focus', 'Concentration'], '#3AB1DB', ['الانتباه وتجنب المشتتات.', 'Attention and avoiding distractions.', 'Attention et gestion des distractions.'], ['جرّب طريقة بومودورو: ٢٥ دقيقة تركيز و٥ راحة، والجوال بعيد.', 'Try Pomodoro: 25 minutes focus, 5 rest, phone away.', 'Essaie Pomodoro : 25 min de concentration, 5 de pause, téléphone éloigné.'], 'استراتيجيات تقليل المشتتات (بومودورو).'),
+        notes: D(['التدوين', 'Note-taking', 'Prise de notes'], '#2E8B57', ['تنظيم الملاحظات والمراجعة.', 'Organising notes and reviewing.', 'Organiser ses notes et réviser.'], ['استخدم طريقة كورنيل وراجع ملاحظاتك في اليوم نفسه.', 'Use the Cornell method and review notes the same day.', 'Utilise la méthode Cornell et relis tes notes le jour même.'], 'تعليم طريقة كورنيل للتدوين.'),
+        exam: D(['الاستعداد للاختبار', 'Exam readiness', "Préparation aux examens"], '#E0675A', ['المراجعة المبكرة وضبط القلق.', 'Early revision and managing anxiety.', "Révision précoce et gestion du stress."], ['راجع مبكراً وحل نماذج سابقة وتدرّب على التنفس الهادئ.', 'Revise early, practise past papers and calm breathing.', "Révise tôt, entraîne-toi sur d'anciens sujets et respire calmement."], 'برنامج إرشادي لقلق الاختبار.') },
+      items: [
+        ['time', 'أضع جدولاً أسبوعياً للمذاكرة.', 'I make a weekly study schedule.', 'Je fais un planning de révision hebdomadaire.'],
+        ['focus', 'أبعد الجوال عني وقت المذاكرة.', 'I keep my phone away while studying.', 'Je garde mon téléphone loin de moi quand je révise.'],
+        ['notes', 'أدوّن ملاحظات منظمة في الحصة.', 'I take organised notes in class.', 'Je prends des notes organisées en classe.'],
+        ['exam', 'أبدأ المراجعة قبل الاختبار بوقت كافٍ.', 'I start revising well before the exam.', "Je commence à réviser bien avant l'examen."],
+        ['time', 'أسلّم واجباتي في موعدها.', 'I hand in my homework on time.', 'Je rends mes devoirs à temps.'],
+        ['focus', 'أستطيع التركيز ٣٠ دقيقة متصلة.', 'I can focus for 30 minutes in a row.', 'Je peux me concentrer 30 minutes de suite.'],
+        ['notes', 'أراجع ملاحظاتي في اليوم نفسه.', 'I review my notes the same day.', 'Je relis mes notes le jour même.'],
+        ['exam', 'أتحكم في توتري أثناء الاختبار.', 'I control my stress during the exam.', "Je gère mon stress pendant l'examen."],
+        ['time', 'أبدأ بالمهام الأهم أولاً.', 'I start with the most important tasks first.', 'Je commence par les tâches les plus importantes.'],
+        ['focus', 'أذاكر في مكان هادئ ومنظم.', 'I study in a quiet, tidy place.', 'Je révise dans un endroit calme et rangé.'],
+        ['notes', 'أكتب الأفكار الرئيسة بكلماتي.', 'I write the main ideas in my own words.', "J'écris les idées principales avec mes propres mots."],
+        ['exam', 'أحل نماذج اختبارات سابقة.', 'I practise with past exam papers.', "Je m'entraîne avec d'anciens sujets d'examen."],
+        ['time', 'لا أؤجل المذاكرة إلى آخر لحظة.', "I don't leave studying to the last minute.", 'Je ne repousse pas mes révisions à la dernière minute.'],
+        ['focus', 'أنتبه للمعلم طوال الحصة.', 'I pay attention to the teacher throughout the lesson.', 'Je suis attentif au professeur pendant tout le cours.'],
+        ['notes', 'أستخدم العناوين والرموز في ملاحظاتي.', 'I use headings and symbols in my notes.', "J'utilise des titres et des symboles dans mes notes."],
+        ['exam', 'أقرأ السؤال جيداً قبل الإجابة.', 'I read the question carefully before answering.', 'Je lis bien la question avant de répondre.'],
+        ['time', 'أوازن بين الدراسة والراحة.', 'I balance study and rest.', "J'équilibre études et repos."],
+        ['focus', 'أعود للمهمة بسرعة إذا تشتت.', 'I get back to the task quickly if distracted.', 'Je reviens vite à la tâche si je suis distrait.'],
+        ['notes', 'أسأل عمّا لم أفهمه.', "I ask about what I didn't understand.", "Je pose des questions sur ce que je n'ai pas compris."],
+        ['exam', 'أراجع إجاباتي قبل التسليم.', 'I check my answers before handing in.', 'Je vérifie mes réponses avant de rendre ma copie.']] },
+
+    { key: 'motive', icon: '🔥', lv: 'kpms', name: ['الدافعية للتعلم', 'Motivation to Learn', "Motivation à apprendre"],
+      about: ['يقيس دافعية الطالب الداخلية والخارجية ومثابرته.', "Measures the student's intrinsic and extrinsic motivation and persistence.", "Mesure la motivation intrinsèque et extrinsèque de l'élève et sa persévérance."],
+      dims: {
+        inner: D(['دافعية داخلية', 'Intrinsic motivation', 'Motivation intrinsèque'], '#2E8B57', ['حب التعلم والفضول.', 'Love of learning and curiosity.', "Goût d'apprendre et curiosité."], ['اختر موضوعاً تحبه وتعمّق فيه بمشروع صغير.', 'Pick a topic you love and go deeper with a small project.', 'Choisis un sujet que tu aimes et approfondis-le avec un petit projet.'], 'ربط الدروس باهتماماته وتحديات إثرائية.'),
+        outer: D(['دافعية خارجية', 'Extrinsic motivation', 'Motivation extrinsèque'], '#C9A44C', ['التحفيز بالدرجات والتقدير.', 'Driven by marks and recognition.', 'Motivé par les notes et la reconnaissance.'], ['ضع مكافآت صغيرة لإنجازاتك وتابع تقدمك بلوحة مرئية.', 'Set small rewards for achievements and track progress visually.', 'Fixe-toi de petites récompenses et suis tes progrès de façon visuelle.'], 'نظام تعزيز ونقاط واضح.'),
+        pers: D(['المثابرة', 'Persistence', 'Persévérance'], '#005499', ['الاستمرار أمام الصعوبة.', 'Keeping going when things get hard.', 'Continuer face à la difficulté.'], ['قسّم المهمة الصعبة إلى خطوات صغيرة واحتفل بكل خطوة.', 'Break hard tasks into small steps and celebrate each one.', 'Découpe les tâches difficiles en petites étapes et célèbre chacune.'], 'أهداف قصيرة ومتابعة تقدّم مرئية.') },
+      items: [
+        ['inner', 'أتعلم لأنني أستمتع بمعرفة الجديد.', 'I learn because I enjoy discovering new things.', "J'apprends parce que j'aime découvrir des choses nouvelles.", 'kpms'],
+        ['outer', 'أجتهد لأحصل على درجات عالية.', 'I work hard to get high marks.', 'Je travaille dur pour avoir de bonnes notes.'],
+        ['pers', 'لا أستسلم عندما يصعب عليّ الحل.', "I don't give up when a problem is hard.", "Je n'abandonne pas quand c'est difficile.", 'kpms'],
+        ['inner', 'أبحث عن معلومات إضافية بنفسي.', 'I look for extra information on my own.', 'Je cherche des informations supplémentaires par moi-même.'],
+        ['outer', 'يحفزني ثناء المعلم ووالديّ.', 'Praise from my teacher and parents motivates me.', 'Les félicitations de mon professeur et de mes parents me motivent.', 'kpms'],
+        ['pers', 'أعيد المحاولة حتى أنجح.', 'I try again until I succeed.', "Je réessaie jusqu'à réussir.", 'kpms'],
+        ['inner', 'أشعر بالسعادة عندما أفهم شيئاً صعباً.', 'I feel happy when I understand something hard.', 'Je suis content quand je comprends quelque chose de difficile.', 'kpms'],
+        ['outer', 'أحب الجوائز والشهادات.', 'I like prizes and certificates.', "J'aime les prix et les certificats.", 'kpms'],
+        ['pers', 'أكمل واجباتي حتى لو كانت طويلة.', 'I finish my homework even when it is long.', 'Je termine mes devoirs même quand ils sont longs.'],
+        ['inner', 'أحب الأسئلة التي تتحدى تفكيري.', 'I like questions that challenge my thinking.', "J'aime les questions qui défient ma réflexion."],
+        ['outer', 'أذاكر حتى لا أتأخر عن زملائي.', "I study so I don't fall behind my classmates.", 'Je révise pour ne pas être en retard sur mes camarades.'],
+        ['pers', 'أتعلم من أخطائي.', 'I learn from my mistakes.', "J'apprends de mes erreurs."],
+        ['inner', 'أتعلم حتى لو لم يكن هناك اختبار.', 'I learn even when there is no test.', "J'apprends même quand il n'y a pas d'examen."],
+        ['outer', 'يهمني ترتيبي بين زملائي.', 'My rank among classmates matters to me.', 'Mon classement parmi mes camarades compte pour moi.'],
+        ['pers', 'أضع لنفسي تحديات جديدة.', 'I set myself new challenges.', 'Je me lance de nouveaux défis.']] },
+
+    { key: 'eq', icon: '💞', lv: 'pms', name: ['الذكاء الوجداني', 'Emotional Intelligence', 'Intelligence émotionnelle'],
+      about: ['يقيس وعي الطالب بمشاعره وإدارتها وتعاطفه ومهاراته الاجتماعية.', "Measures the student's emotional awareness, self-regulation, empathy and social skills.", "Mesure la conscience émotionnelle, la maîtrise de soi, l'empathie et les compétences sociales."],
+      dims: {
+        self: D(['الوعي بالذات', 'Self-awareness', 'Conscience de soi'], '#005499', ['معرفة المشاعر وأسبابها والثقة بالنفس.', 'Knowing one’s feelings, their causes, and self-confidence.', 'Connaître ses émotions, leurs causes, et avoir confiance en soi.'], ['سمِّ مشاعرك يومياً واكتب ما أثارها.', 'Name your feelings daily and write what triggered them.', "Nomme tes émotions chaque jour et note ce qui les a provoquées."], 'تمارين تسمية المشاعر ويوميات التأمل.'),
+        manage: D(['إدارة الانفعالات', 'Self-regulation', 'Maîtrise de soi'], '#3AB1DB', ['الهدوء والتفكير قبل التصرف وتقبل النقد.', 'Staying calm, thinking before acting, accepting feedback.', 'Rester calme, réfléchir avant d’agir, accepter les critiques.'], ['جرّب التنفس العميق والعد إلى عشرة قبل الرد.', 'Try deep breathing and counting to ten before reacting.', 'Essaie la respiration profonde et compte jusqu’à dix avant de réagir.'], 'استراتيجيات التهدئة وركن الهدوء.'),
+        empathy: D(['التعاطف', 'Empathy', 'Empathie'], '#2E8B57', ['فهم مشاعر الآخرين واحترام اختلافهم.', 'Understanding others’ feelings and respecting differences.', 'Comprendre les autres et respecter leurs différences.'], ['استمع لصديقك حتى النهاية واسأله عن شعوره.', 'Listen to your friend fully and ask how they feel.', 'Écoute ton ami jusqu’au bout et demande-lui ce qu’il ressent.'], 'لعب أدوار ونقاش مواقف وقصص.'),
+        social: D(['المهارات الاجتماعية', 'Social skills', 'Compétences sociales'], '#C9A44C', ['تكوين العلاقات والتعاون وحل الخلافات.', 'Building relationships, cooperating and resolving conflicts.', 'Créer des liens, coopérer et résoudre les conflits.'], ['شارك في عمل جماعي وتدرّب على الحوار الهادئ.', 'Join group work and practise calm dialogue.', 'Participe au travail de groupe et pratique le dialogue calme.'], 'تعلم تعاوني بأدوار واضحة.') },
+      items: [
+        ['self', 'أعرف ما أشعر به ولماذا.', 'I know what I feel and why.', 'Je sais ce que je ressens et pourquoi.'],
+        ['manage', 'أهدأ بسرعة بعد الغضب.', 'I calm down quickly after getting angry.', 'Je me calme vite après une colère.'],
+        ['empathy', 'ألاحظ إذا كان زميلي حزيناً.', 'I notice if a classmate is sad.', 'Je remarque si un camarade est triste.'],
+        ['social', 'أكوّن صداقات بسهولة.', 'I make friends easily.', 'Je me fais des amis facilement.'],
+        ['self', 'أعرف ما يغضبني أو يحزنني.', 'I know what makes me angry or sad.', 'Je sais ce qui me met en colère ou me rend triste.'],
+        ['manage', 'أفكر قبل أن أتصرف.', 'I think before I act.', "Je réfléchis avant d'agir."],
+        ['empathy', 'أضع نفسي مكان الآخرين.', "I put myself in others' shoes.", 'Je me mets à la place des autres.'],
+        ['social', 'أستمع للآخرين دون مقاطعة.', 'I listen to others without interrupting.', "J'écoute les autres sans les interrompre."],
+        ['self', 'أستطيع وصف مشاعري بالكلمات.', 'I can describe my feelings in words.', 'Je peux décrire mes émotions avec des mots.'],
+        ['manage', 'أتعامل مع الضغط دون أن أنفعل.', 'I handle pressure without losing my temper.', "Je gère la pression sans m'énerver."],
+        ['empathy', 'أحترم الآراء المختلفة عن رأيي.', 'I respect opinions different from mine.', 'Je respecte les avis différents du mien.'],
+        ['social', 'أتعاون مع زملائي لإنجاز المهام.', 'I cooperate with classmates to get tasks done.', 'Je coopère avec mes camarades pour accomplir les tâches.'],
+        ['self', 'أثق بقدراتي.', 'I trust my abilities.', "J'ai confiance en mes capacités."],
+        ['manage', 'أتقبل النقد بهدوء.', 'I accept criticism calmly.', "J'accepte les critiques calmement."],
+        ['empathy', 'أواسي من يحتاج إلى مساعدة.', 'I comfort those who need help.', "Je réconforte ceux qui ont besoin d'aide."],
+        ['social', 'أحل الخلافات بالحوار.', 'I resolve conflicts through dialogue.', 'Je règle les conflits par le dialogue.']] },
+
+    { key: 'creative', icon: '🎨', lv: 'pms', name: ['التفكير الإبداعي', 'Creative Thinking', 'Pensée créative'],
+      about: ['تقدير ذاتي لمهارات الإبداع الأربع: الطلاقة والمرونة والأصالة وحب الاستطلاع.', 'Self-rating of four creativity skills: fluency, flexibility, originality and curiosity.', 'Auto-évaluation de quatre compétences créatives : fluidité, flexibilité, originalité et curiosité.'],
+      dims: {
+        flu: D(['الطلاقة', 'Fluency', 'Fluidité'], '#005499', ['إنتاج أفكار كثيرة بسرعة.', 'Producing many ideas quickly.', "Produire beaucoup d'idées rapidement."], ['تحدَّ نفسك بذكر عشرة أفكار لأي مشكلة في خمس دقائق.', 'Challenge yourself to list ten ideas for any problem in five minutes.', 'Défie-toi de trouver dix idées pour un problème en cinq minutes.'], 'عصف ذهني بأزمنة محددة.'),
+        flex: D(['المرونة', 'Flexibility', 'Flexibilité'], '#3AB1DB', ['النظر من زوايا مختلفة وتغيير الطريقة.', 'Seeing from different angles and switching approaches.', "Voir sous différents angles et changer d'approche."], ['اسأل نفسك: كيف يرى هذه المشكلة عالمٌ أو فنانٌ أو طفل؟', 'Ask: how would a scientist, an artist or a child see this?', 'Demande-toi : comment un scientifique, un artiste ou un enfant verrait cela ?'], 'قبعات التفكير الست.'),
+        orig: D(['الأصالة', 'Originality', 'Originalité'], '#AE95DA', ['أفكار جديدة غير مألوفة.', 'New, unusual ideas.', 'Des idées nouvelles et inhabituelles.'], ['دوّن أفكارك الغريبة ولا تحكم عليها مبكراً.', 'Write down your unusual ideas and don’t judge them too early.', 'Note tes idées étranges sans les juger trop vite.'], 'مهام مفتوحة ومشاريع ابتكار.'),
+        curious: D(['حب الاستطلاع', 'Curiosity & risk-taking', 'Curiosité et audace'], '#2E8B57', ['السؤال والتجريب وعدم الخوف من الخطأ.', 'Asking, experimenting and not fearing mistakes.', "Questionner, expérimenter et ne pas craindre l'erreur."], ['جرّب شيئاً جديداً كل أسبوع واسأل «ماذا لو؟».', 'Try something new each week and ask “what if?”.', 'Essaie quelque chose de nouveau chaque semaine et demande « et si ? ».'], 'مختبرات استقصاء وأسئلة «ماذا لو».') },
+      items: [
+        ['flu', 'تأتيني أفكار كثيرة بسرعة.', 'Many ideas come to me quickly.', "Beaucoup d'idées me viennent rapidement."],
+        ['flex', 'أنظر للمشكلة من زوايا مختلفة.', 'I look at a problem from different angles.', 'Je regarde un problème sous différents angles.'],
+        ['orig', 'أفكاري تختلف عن أفكار زملائي.', "My ideas are different from my classmates'.", 'Mes idées sont différentes de celles de mes camarades.'],
+        ['curious', 'أسأل كثيراً عن كيفية عمل الأشياء.', 'I often ask how things work.', 'Je demande souvent comment les choses fonctionnent.'],
+        ['flu', 'أستطيع ذكر حلول عديدة لمشكلة واحدة.', 'I can list many solutions to one problem.', 'Je peux proposer plusieurs solutions à un même problème.'],
+        ['flex', 'أغيّر طريقتي إذا لم تنجح.', "I change my approach if it doesn't work.", 'Je change de méthode si elle ne marche pas.'],
+        ['orig', 'أحب ابتكار أشياء لم يصنعها أحد.', 'I like inventing things no one has made.', "J'aime inventer des choses que personne n'a faites."],
+        ['curious', 'أحب تجربة ما لم أجربه من قبل.', "I like trying things I've never tried.", "J'aime essayer ce que je n'ai jamais essayé."],
+        ['flu', 'أكتب أو أرسم أفكاري دون توقف.', 'I write or draw my ideas without stopping.', "J'écris ou je dessine mes idées sans m'arrêter."],
+        ['flex', 'أجد استخدامات مختلفة للشيء الواحد.', 'I find different uses for the same object.', 'Je trouve différents usages pour un même objet.'],
+        ['orig', 'أضيف لمستي الخاصة لأي عمل.', 'I add my own touch to any work.', "J'ajoute ma touche personnelle à tout travail."],
+        ['curious', 'لا أخشى أن تكون فكرتي غريبة.', "I'm not afraid my idea might seem strange.", "Je n'ai pas peur que mon idée paraisse étrange."],
+        ['flu', 'أقترح أفكاراً كثيرة في النقاش.', 'I suggest many ideas in discussions.', "Je propose beaucoup d'idées dans les discussions."],
+        ['flex', 'أتقبل الأفكار الجديدة بسهولة.', 'I accept new ideas easily.', "J'accepte facilement les idées nouvelles."],
+        ['orig', 'أحب القصص والحلول غير المتوقعة.', 'I like unexpected stories and solutions.', "J'aime les histoires et les solutions inattendues."],
+        ['curious', 'أفكك الأشياء لأعرف ما بداخلها.', 'I take things apart to see what is inside.', "Je démonte les objets pour voir ce qu'il y a dedans."]] },
+
+    { key: 'gifted', icon: '⭐', lv: 'pms', name: ['سمات الموهبة (ترشيح ذاتي)', 'Gifted Traits (self-nomination)', 'Traits de douance (auto-désignation)'],
+      about: ['ترشيح ذاتي يرصد مؤشرات الحلقات الثلاث للموهبة والقيادة، ويُضم إلى ملف الطالب في رعاية الموهوبين.', 'A self-nomination screening the three-ring indicators of giftedness and leadership; feeds the gifted-care file.', "Une auto-désignation repérant les indicateurs des trois anneaux de la douance et du leadership."],
+      dims: {
+        abil: D(['القدرة العقلية', 'Above-average ability', 'Capacité supérieure'], '#082B5A', ['سرعة التعلم وفهم المجرد والربط بين المعارف.', 'Fast learning, abstract understanding, connecting knowledge.', "Apprentissage rapide, compréhension de l'abstrait, liens entre les savoirs."], ['ابحث عن تحديات أعلى من مستواك: مسابقات وقراءات متقدمة.', 'Seek challenges above your level: competitions and advanced reading.', 'Cherche des défis au-dessus de ton niveau : concours et lectures avancées.'], 'تسريع المحتوى وضغط المنهج.'),
+        commit: D(['الالتزام بالمهمة', 'Task commitment', 'Engagement dans la tâche'], '#005499', ['الانغماس والمثابرة ومعايير الجودة العالية.', 'Absorption, persistence and high standards.', 'Implication, persévérance et exigence de qualité.'], ['اختر مشروعاً طويلاً يهمك وأنجزه بمراحل.', 'Choose a long project you care about and complete it in stages.', 'Choisis un long projet qui te tient à cœur et réalise-le par étapes.'], 'مشاريع بحثية فردية ممتدة.'),
+        creat: D(['الإبداع', 'Creativity', 'Créativité'], '#AE95DA', ['حلول غير مألوفة وخيال وتطوير الأفكار.', 'Unusual solutions, imagination and developing ideas.', 'Solutions inhabituelles, imagination et développement des idées.'], ['شارك في مسابقات الابتكار وسجّل أفكارك.', 'Enter innovation competitions and log your ideas.', "Participe aux concours d'innovation et note tes idées."], 'برامج الابتكار والمسابقات.'),
+        lead: D(['القيادة', 'Leadership', 'Leadership'], '#C9A44C', ['تنظيم الآخرين وتحمل المسؤولية والإقناع.', 'Organising others, responsibility and persuasion.', 'Organiser les autres, responsabilité et persuasion.'], ['تولَّ دوراً قيادياً في نادٍ أو مشروع.', 'Take a leading role in a club or project.', 'Prends un rôle de leader dans un club ou un projet.'], 'أدوار قيادية ومجالس طلابية.') },
+      items: [
+        ['abil', 'أتعلم الأشياء الجديدة أسرع من أقراني.', 'I learn new things faster than my peers.', "J'apprends les choses nouvelles plus vite que mes camarades."],
+        ['commit', 'أنغمس طويلاً في المهمة التي تثير اهتمامي.', 'I get absorbed for a long time in tasks that interest me.', "Je m'absorbe longtemps dans une tâche qui m'intéresse."],
+        ['creat', 'أقترح حلولاً غير مألوفة.', 'I suggest unusual solutions.', 'Je propose des solutions inhabituelles.'],
+        ['lead', 'يختارني زملائي لقيادة المجموعة.', 'My classmates choose me to lead the group.', 'Mes camarades me choisissent pour diriger le groupe.'],
+        ['abil', 'أفهم الأفكار المجردة والمعقدة.', 'I understand abstract and complex ideas.', 'Je comprends les idées abstraites et complexes.'],
+        ['commit', 'أضع معايير عالية لعملي.', 'I set high standards for my work.', "Je fixe des exigences élevées pour mon travail."],
+        ['creat', 'أحب تحسين الأشياء وتطويرها.', 'I like improving and developing things.', "J'aime améliorer et développer les choses."],
+        ['lead', 'أنظّم الأنشطة وأوزع الأدوار.', 'I organise activities and assign roles.', "J'organise les activités et je distribue les rôles."],
+        ['abil', 'لدي معلومات واسعة في موضوعات تهمني.', 'I have broad knowledge in topics that interest me.', "J'ai de vastes connaissances dans les sujets qui m'intéressent."],
+        ['commit', 'أكمل مشاريعي حتى النهاية.', 'I finish my projects to the end.', "Je termine mes projets jusqu'au bout."],
+        ['creat', 'أتخيل أفكاراً جديدة باستمرار.', 'I constantly imagine new ideas.', "J'imagine sans cesse de nouvelles idées."],
+        ['lead', 'أتحمل المسؤولية بثقة.', 'I take on responsibility with confidence.', 'Je prends des responsabilités avec confiance.'],
+        ['abil', 'أربط بين المعلومات من مواد مختلفة.', 'I connect information from different subjects.', 'Je relie des informations de différentes matières.'],
+        ['commit', 'أبحث في ما يهمني دون أن يطلب مني أحد.', 'I research what interests me without being asked.', "Je fais des recherches sur ce qui m'intéresse sans qu'on me le demande."],
+        ['creat', 'لدي حس فكاهي وأفكار طريفة.', 'I have a sense of humour and witty ideas.', "J'ai le sens de l'humour et des idées amusantes."],
+        ['lead', 'أقنع الآخرين بأفكاري.', 'I persuade others with my ideas.', 'Je convaincs les autres de mes idées.']] },
+
+    { key: 'wellbeing', icon: '🌱', lv: 'kp', faces: true, name: ['الرضا والمناخ الصفي', 'Wellbeing & Class Climate', 'Bien-être et climat de classe'],
+      about: ['مقياس مبسط بالوجوه عن شعور الطالب في المدرسة والصف.', 'A simple faces scale on how the student feels at school and in class.', "Une échelle simple à visages sur le ressenti de l'élève à l'école et en classe."],
+      dims: {
+        happy: D(['السعادة بالمدرسة', 'Happiness at school', "Bonheur à l'école"], '#2E8B57', ['الاستمتاع بالمدرسة والحصص.', 'Enjoying school and lessons.', "Aimer l'école et les cours."], ['تحدث مع طفلك يومياً عن أجمل ما حدث في المدرسة.', 'Talk daily with your child about the best thing at school.', "Parlez chaque jour avec votre enfant du meilleur moment à l'école."], 'أنشطة ترحيبية وتحفيز يومي.'),
+        safe: D(['الأمان', 'Feeling safe', 'Sécurité'], '#005499', ['الشعور بالأمان وعدم الخوف من الخطأ.', 'Feeling safe and unafraid of mistakes.', "Se sentir en sécurité et ne pas craindre l'erreur."], ['طمئن طفلك أن الخطأ جزء من التعلم وتواصل مع المدرسة عند أي قلق.', 'Reassure your child that mistakes are part of learning; contact school with any worry.', "Rassurez votre enfant : l'erreur fait partie de l'apprentissage ; contactez l'école en cas d'inquiétude."], 'تواصل مع الموجه الطلابي.'),
+        friends: D(['العلاقة بالزملاء', 'Friendships', 'Relations avec les camarades'], '#3AB1DB', ['الصداقة واللعب والتعاون.', 'Friendship, play and cooperation.', 'Amitié, jeu et coopération.'], ['شجّع طفلك على دعوة صديق واللعب الجماعي.', 'Encourage your child to invite a friend and play in groups.', 'Encouragez votre enfant à inviter un ami et à jouer en groupe.'], 'دمج في مجموعات تعاونية.'),
+        teacher: D(['العلاقة بالمعلم', 'Relationship with teacher', 'Relation avec le professeur'], '#C9A44C', ['الثقة بالمعلم والراحة في السؤال.', 'Trust in the teacher and ease in asking.', 'Confiance envers le professeur et aisance à poser des questions.'], ['تحدث بإيجابية عن المعلم وشجّع طفلك على السؤال.', 'Speak positively about the teacher and encourage questions.', 'Parlez positivement du professeur et encouragez les questions.'], 'لقاء فردي قصير مع المعلم.') },
+      items: [
+        ['happy', 'أحب المجيء إلى المدرسة.', 'I like coming to school.', "J'aime venir à l'école."],
+        ['safe', 'أشعر بالأمان في المدرسة.', 'I feel safe at school.', "Je me sens en sécurité à l'école."],
+        ['friends', 'لدي أصدقاء في صفي.', 'I have friends in my class.', "J'ai des amis dans ma classe."],
+        ['teacher', 'معلمي يسمعني ويساعدني.', 'My teacher listens to me and helps me.', "Mon professeur m'écoute et m'aide."],
+        ['happy', 'أستمتع بالحصص.', 'I enjoy my lessons.', "J'aime mes cours."],
+        ['safe', 'أعرف لمن ألجأ إذا ضايقني أحد.', 'I know who to go to if someone bothers me.', "Je sais à qui m'adresser si quelqu'un m'embête."],
+        ['friends', 'زملائي يلعبون معي.', 'My classmates play with me.', 'Mes camarades jouent avec moi.'],
+        ['teacher', 'معلمي يشجعني.', 'My teacher encourages me.', "Mon professeur m'encourage."],
+        ['happy', 'أشعر بالفخر بما أتعلمه.', 'I feel proud of what I learn.', "Je suis fier de ce que j'apprends."],
+        ['safe', 'لا أخاف من الخطأ في الصف.', 'I am not afraid of making mistakes in class.', "Je n'ai pas peur de me tromper en classe."],
+        ['friends', 'أساعد زملائي ويساعدونني.', 'I help my classmates and they help me.', "J'aide mes camarades et ils m'aident."],
+        ['teacher', 'أستطيع أن أسأل معلمي بسهولة.', 'I can ask my teacher questions easily.', 'Je peux poser des questions à mon professeur facilement.']] },
   ];
-  // الدرجات: متوسط كل بُعد ٪
+  const LI = { ar: 0, en: 1, fr: 2 };
+  const pick = (a, lang) => Array.isArray(a) ? (a[LI[lang] ?? 0] || a[0]) : a;
+  const raw = k => S.find(x => x.key === k);
+  const itemLv = (s, it) => it[4] || (s.faces ? s.lv : s.lv.replace('k', ''));
+  // نسخة جاهزة للعرض: مستوى ولغة محددان. المستوى الفارغ = كل عبارات المستويات p/m/s (توافق التطبيقات القديمة)
+  function view(key, lv, lang) {
+    const s = raw(key); if (!s) return null; lang = LI[lang] != null ? lang : 'ar';
+    const L = lv && s.lv.includes(lv) ? lv : null;
+    const items = s.items.filter(it => { const l = itemLv(s, it); return L ? l.includes(L) : /[pms]/.test(l) || s.lv === 'kp'; });
+    const faces = !!s.faces || L === 'k';
+    const dims = {}; Object.entries(s.dims).forEach(([k, d]) => { dims[k] = [pick(d.n, lang), d.c, pick(d.x, lang), pick(d.h, lang), d.t]; });
+    return { key, icon: s.icon, lv: L, lang, dir: lang === 'ar' ? 'rtl' : 'ltr', name: pick(s.name, lang), about: pick(s.about, lang), levels: s.lv.split(''), faces,
+      scale: (faces ? L3 : L5)[lang], dims, items: items.map(it => [it[0], it[1 + (LI[lang] || 0)]]), count: items.length };
+  }
   function score(sc, ans) { const max = sc.scale.length; const out = {}; Object.keys(sc.dims).forEach(d => { const v = sc.items.map((it, i) => it[0] === d ? +ans[i] : null).filter(x => x != null && !isNaN(x)); out[d] = v.length ? Math.round((v.reduce((a, b) => a + b, 0) / v.length - 1) / (max - 1) * 100) : 0; }); return out; }
-  function top(sc, sco) { return Object.entries(sco).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ k, v, n: sc.dims[k][0], c: sc.dims[k][1], d: sc.dims[k][2] })); }
-  window.DinaScales = { list: S, get: k => S.find(x => x.key === k), score, top };
+  function top(sc, sco) { return Object.entries(sco || {}).filter(([k]) => sc.dims[k]).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ k, v, n: sc.dims[k][0], c: sc.dims[k][1], d: sc.dims[k][2], h: sc.dims[k][3], t: sc.dims[k][4], band: BAND(v) })); }
+  // المستوى المقترح من مرحلة الفصل
+  function levelFor(stage, grade) {
+    const s = String(stage || '') + ' ' + String(grade || '');
+    if (/روضة|رياض|تمهيدي|KG/i.test(s)) return 'k';
+    if (/ثانوي/.test(s)) return 's'; if (/متوسط/.test(s)) return 'm';
+    if (/ابتدائ/.test(s)) return /الأول|الثاني|الثالث|أول|ثاني|ثالث/.test(s) ? 'k' : 'p';
+    return 'p';
+  }
+  // رسم رادار SVG (يُستخدم في التقارير)
+  function radar(sc, sco, opt) {
+    opt = opt || {}; const ks = Object.keys(sc.dims), n = ks.length, W = opt.size || 300, c = W / 2, R = W / 2 - (n > 6 ? 64 : 66);
+    const pt = (i, v) => { const a = -Math.PI / 2 + i * 2 * Math.PI / n; return [c + Math.cos(a) * R * v / 100, c + Math.sin(a) * R * v / 100]; };
+    const ring = f => ks.map((_, i) => pt(i, f).join(',')).join(' ');
+    const poly = (s, col, op, dash) => `<polygon points="${ks.map((k, i) => pt(i, Math.max(4, (s || {})[k] || 0)).join(',')).join(' ')}" fill="${col}" fill-opacity="${op}" stroke="${col}" stroke-width="2.4" ${dash ? 'stroke-dasharray="5 4"' : ''} stroke-linejoin="round"/>`;
+    const lab = ks.map((k, i) => { const [x, y] = pt(i, n > 6 ? 128 : 124); return `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-size="${n > 6 ? 10 : 12}" font-weight="700" fill="#082B5A">${String(sc.dims[k][0]).replace(/[<&]/g, '')}</text>`; }).join('');
+    return `<svg viewBox="0 0 ${W} ${W}" width="100%" style="max-width:${W}px;overflow:visible" role="img" aria-label="${String(sc.name).replace(/"/g, '')}">${[25, 50, 75, 100].map(f => `<polygon points="${ring(f)}" fill="${f === 100 ? '#F5F9FD' : 'none'}" stroke="#D5E1F0" stroke-width="1"/>`).join('')}${ks.map((_, i) => { const [x, y] = pt(i, 100); return `<line x1="${c}" y1="${c}" x2="${x}" y2="${y}" stroke="#D5E1F0"/>`; }).join('')}${opt.cmp ? poly(opt.cmp, '#9AA9BC', .08, true) : ''}${poly(sco, opt.color || '#005499', .22)}${ks.map((k, i) => { const [x, y] = pt(i, Math.max(4, (sco || {})[k] || 0)); return `<circle cx="${x}" cy="${y}" r="4" fill="${sc.dims[k][1]}" stroke="#fff" stroke-width="1.5"/>`; }).join('')}${lab}</svg>`;
+  }
+  const T = {
+    ar: { pick: 'اختر اسمك', name: 'اسمك', start: 'ابدأ', next: 'التالي', prev: 'السابق', send: 'إرسال', answered: 'أجبت', of: 'من', left: 'عبارة بقيت دون إجابة', thanks: 'شكراً', intro: 'لا توجد إجابة صحيحة أو خاطئة، أجب بما ينطبق عليك.', top: 'أبرز ما يميزك', tips: 'نصائح تناسبك', profile: 'ملفك', report: 'تقرير الطالب', save: 'حفظ صورة', print: 'طباعة / PDF', wa: 'إرسال لولي الأمر (واتساب)', phone: 'جوال ولي الأمر', card: 'بطاقة التعلم', classAvg: 'متوسط الفصل', level: 'المستوى', date: 'التاريخ', closed: 'المقياس غير متاح', closedT: 'قد يكون أُغلق. تواصل مع معلمك.', badLink: 'رابط غير مكتمل', badLinkT: 'افتح الرابط أو امسح الرمز الذي أرسله معلمك.', note: 'نتيجة إرشادية تساعد على فهم الطالب ودعمه، وليست تشخيصاً.', school: 'مدارس دينا العالمية', choose: '— اختر —', again: 'مقياس جديد', pick2: 'اختر اسمك أولاً', type: 'اكتب اسمك', xschool: 'المدرسة', xgrade: 'الصف', xphone: 'جوال ولي الأمر (واتساب) — اختياري' },
+    en: { pick: 'Choose your name', name: 'Your name', start: 'Start', next: 'Next', prev: 'Back', send: 'Submit', answered: 'Answered', of: 'of', left: 'statements still unanswered', thanks: 'Thank you', intro: 'There are no right or wrong answers — answer what is true for you.', top: 'Your standout strength', tips: 'Tips for you', profile: 'Your profile', report: 'Student report', save: 'Save image', print: 'Print / PDF', wa: 'Send to parent (WhatsApp)', phone: "Parent's mobile", card: 'Learning card', classAvg: 'Class average', level: 'Level', date: 'Date', closed: 'Scale not available', closedT: 'It may have been closed. Contact your teacher.', badLink: 'Incomplete link', badLinkT: 'Open the link or scan the code from your teacher.', note: 'A guidance result to understand and support the student — not a diagnosis.', school: 'Dina International Schools', choose: '— choose —', again: 'New scale', pick2: 'Choose your name first', type: 'Type your name', xschool: 'School', xgrade: 'Grade', xphone: "Parent's WhatsApp — optional" },
+    fr: { pick: 'Choisis ton nom', name: 'Ton nom', start: 'Commencer', next: 'Suivant', prev: 'Retour', send: 'Envoyer', answered: 'Répondu', of: 'sur', left: 'affirmations sans réponse', thanks: 'Merci', intro: "Il n'y a pas de bonne ou de mauvaise réponse — réponds selon ce qui te correspond.", top: 'Ton point fort', tips: 'Conseils pour toi', profile: 'Ton profil', report: "Rapport de l'élève", save: "Enregistrer l'image", print: 'Imprimer / PDF', wa: 'Envoyer au parent (WhatsApp)', phone: 'Mobile du parent', card: "Carte d'apprentissage", classAvg: 'Moyenne de la classe', level: 'Niveau', date: 'Date', closed: 'Échelle indisponible', closedT: 'Elle a peut-être été fermée. Contacte ton professeur.', badLink: 'Lien incomplet', badLinkT: 'Ouvre le lien ou scanne le code de ton professeur.', note: "Un résultat d'orientation pour comprendre et accompagner l'élève — pas un diagnostic.", school: 'Écoles internationales Dina', choose: '— choisir —', again: 'Nouvelle échelle', pick2: "Choisis d'abord ton nom", type: 'Écris ton nom', xschool: 'École', xgrade: 'Classe', xphone: 'WhatsApp du parent — facultatif' },
+  };
+  // واتساب: رقم سعودي محلي ← دولي
+  const waNum = p => { let d = String(p || '').replace(/[^\d]/g, ''); if (/^05\d{8}$/.test(d)) d = '966' + d.slice(1); else if (/^5\d{8}$/.test(d)) d = '966' + d; else if (d.startsWith('00')) d = d.slice(2); return d; };
+  function waText(sc, sco, name, lang) {
+    const t = T[lang] || T.ar, tp = top(sc, sco);
+    return [`${sc.icon} ${sc.name} — ${name}`, ...tp.map(x => `• ${x.n}: ${x.v}% (${x.band[lang] || x.band.ar})`), '', `⭐ ${t.top}: ${tp[0] ? tp[0].n : ''}`, tp[0] ? `💡 ${tp[0].h}` : '', '', t.note, t.school].join('\n');
+  }
+  const list = S.map(s => view(s.key, null, 'ar'));
+  window.DinaScales = { list, raw: S, LEVELS, T, BAND, get: (k, lv, lang) => view(k, lv, lang), view, score, top, levelFor, radar, waNum, waText };
 })();
 }catch(e){console.error('[dina] scales.js',e)}
 
 /* ==== src/attendance/compass.js ==== */
 ;try{
-/* منصة دينا — البوصلة: (١) مقاييس تربوية للطلاب (أنماط التعلم، الذكاءات المتعددة، الميول المهنية، مهارات الدراسة، الدافعية، الرضا)
-   تُطبَّق على فصل برابط/QR (scale.html) وتُعرض نتائجها للفصل ولكل طالب مع توصيات تدريسية وتصدير.
-   (٢) مؤشرات الأداء للمالك: إنجاز الخطط، الواجبات، النماذج، الحضور — لكل معلم وللمدرسة. sql/099 + scales.js */
+/* منصة دينا — البوصلة (الإصدار ٢): (١) بنك مقاييس تربوية (٩ مقاييس، ٣ لغات، ٤ مستويات من الروضة حتى الثانوي)
+   تُطبَّق على فصل أو برابط عام (scale.html)، وتقارير احترافية للفصل والطالب: رادار ومقارنة بمتوسط الفصل ومستويات وتوصيات
+   للمعلم وللطالب وولي الأمر، وتصدير PDF/صورة/Excel/طباعة، وإرسال لولي الأمر واتساب، ونسخة ورقية للمقياس.
+   (٢) مؤشرات الأداء للمالك. sql/099 + sql/100 + scales.js */
 (function () {
   const A = window.APP, V = window.VIEWS; if (!A) return;
   const { S, api, $, $$, esc, AR } = A;
   const DEMO = !!api.demo, DS = () => window.DinaScales;
   A.I.compass = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>';
   if (A.NAV && !A.NAV.some(n => n[0] === 'compass')) { const i = A.NAV.findIndex(n => n[0] === 'analysis'); A.NAV.splice(i < 0 ? A.NAV.length : i + 1, 0, ['compass', 'البوصلة', () => !!S.me && !S.realMe && A.tfeat('compass')]); }
-  const TIPS = {
-    styles: { v: 'استخدم الخرائط الذهنية والمخططات والفيديو.', a: 'نوّع بالشرح المسموع والنقاش والتسميع.', r: 'وفّر نصوصاً وملخصات ومهام كتابية.', k: 'أدخل التجارب والأنشطة الحركية ولعب الأدوار.' },
-    mi: { ling: 'مشاريع كتابة وإلقاء.', logic: 'مسائل تحدٍّ وتحليل بيانات.', spat: 'تصميم ملصقات وإنفوجرافيك.', body: 'نماذج يدوية وأنشطة ميدانية.', mus: 'أناشيد وإيقاع للحفظ.', inter: 'تعلم تعاوني وأدوار قيادية.', intra: 'سجل تعلم ذاتي وأهداف شخصية.', nat: 'تصنيف ورحلات واستكشاف.' },
-    riasec: { R: 'المسارات التقنية والهندسية التطبيقية.', I: 'المسارات العلمية والصحية والبحثية.', A: 'التصميم والإعلام والفنون.', S: 'التعليم والإرشاد والخدمات الصحية.', E: 'إدارة الأعمال والريادة والقانون.', C: 'المحاسبة والإدارة ونظم المعلومات.' },
-    study: { time: 'تدريب على الجدولة الأسبوعية.', focus: 'استراتيجيات تقليل المشتتات (بومودورو).', notes: 'تعليم طريقة كورنيل للتدوين.', exam: 'برنامج إرشادي لقلق الاختبار.' },
-    motive: { inner: 'ربط الدروس باهتماماته وتحديات إثرائية.', outer: 'نظام تعزيز ونقاط واضح.', pers: 'أهداف قصيرة ومتابعة تقدّم مرئية.' },
-    wellbeing: { happy: 'أنشطة ترحيبية وتحفيز يومي.', safe: 'تواصل مع الموجه الطلابي.', friends: 'دمج في مجموعات تعاونية.', teacher: 'لقاء فردي قصير مع المعلم.' },
-  };
+  const LANGS = { ar: 'العربية', en: 'English', fr: 'Français' };
   if (!document.getElementById('cpcss')) { const st = document.createElement('style'); st.id = 'cpcss'; st.textContent = `
-.cp-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr))}
-.cp-sc{border:1px solid #DCE7F3;border-radius:18px;padding:14px;background:linear-gradient(180deg,#fff,#F5F9FD);display:grid;gap:6px;box-shadow:0 12px 26px -22px rgba(8,43,90,.6)}
-.cp-sc .ic{font-size:28px}.cp-sc b{color:#082B5A;font-size:16px}.cp-sc .chips{display:flex;gap:4px;flex-wrap:wrap}.cp-sc .chips span{font-size:11px;border-radius:20px;padding:1px 8px;color:#fff}
-.cp-bars{display:grid;gap:8px}.cp-bars div{display:grid;grid-template-columns:130px 1fr 48px;gap:8px;align-items:center;font-size:13.5px;font-weight:700}
-.cp-bars i{display:block;height:14px;border-radius:8px}
+.cp-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(min(100%,270px),1fr))}
+.cp-sc{position:relative;border:1px solid #DCE7F3;border-radius:20px;padding:16px;background:linear-gradient(180deg,#fff,#F5F9FD);display:grid;gap:7px;box-shadow:0 1px 0 #fff inset,0 16px 30px -24px rgba(8,43,90,.7);transition:transform .2s,box-shadow .2s;overflow:hidden}
+.cp-sc::before{content:"";position:absolute;inset-inline-end:-30px;top:-30px;width:110px;height:110px;border-radius:50%;background:radial-gradient(circle,var(--c,#3AB1DB) 0,transparent 70%);opacity:.14}
+.cp-sc:hover{transform:translateY(-3px);box-shadow:0 1px 0 #fff inset,0 22px 36px -22px rgba(8,43,90,.7)}
+.cp-sc .ic{font-size:30px;width:56px;height:56px;border-radius:18px;display:grid;place-items:center;background:linear-gradient(145deg,#fff,#E3EEF8);box-shadow:inset 0 -3px 0 rgba(8,43,90,.08),0 8px 16px -10px rgba(8,43,90,.5)}
+.cp-sc b{color:#082B5A;font-size:16.5px}.cp-sc .chips{display:flex;gap:4px;flex-wrap:wrap}.cp-sc .chips span{font-size:11px;border-radius:20px;padding:1px 8px;color:#fff}
+.cp-sc .lv{display:flex;gap:4px;flex-wrap:wrap}.cp-sc .lv span{font-size:11px;font-weight:800;border-radius:8px;padding:2px 7px;background:#E8F1F9;color:#005499}
+.cp-sc .row{gap:6px}
+.cp-bars{display:grid;gap:8px}.cp-bars div{display:grid;grid-template-columns:minmax(90px,140px) 1fr 48px;gap:8px;align-items:center;font-size:13.5px;font-weight:700}
+.cp-bars .tr{height:14px;border-radius:8px;background:#EEF3F9;position:relative;overflow:hidden}.cp-bars .tr i{position:absolute;inset-block:0;inset-inline-start:0;border-radius:8px}.cp-bars .tr u{position:absolute;inset-block:-2px;width:2px;background:#082B5A;opacity:.55}
 .cp-kpi{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin:10px 0}
 .cp-k{border:1px solid #DCE7F3;border-radius:18px;padding:14px;background:linear-gradient(180deg,#fff,#F5F9FD);box-shadow:inset 0 -4px 0 var(--c,#3AB1DB)}
 .cp-k b{display:block;font-size:30px;color:#082B5A}.cp-k span{font-size:12.5px;color:#4D6A8F}
 .cp-ring{--p:0;width:64px;height:64px;border-radius:50%;background:conic-gradient(var(--c) calc(var(--p)*1%),#E6EDF4 0);display:grid;place-items:center;float:inline-end}
 .cp-ring::after{content:attr(data-v);width:48px;height:48px;border-radius:50%;background:#fff;display:grid;place-items:center;font-weight:900;color:#082B5A;font-size:13px}
 .cp-pill{display:inline-block;border-radius:20px;padding:1px 9px;font-size:12px;font-weight:800;color:#fff}
+.cp-rep{border:1px solid #DCE7F3;border-radius:20px;overflow:hidden;background:#fff}
+.cp-rep[dir=ltr]{font-family:'Myriad Pro','Segoe UI',Tahoma,Arial,sans-serif}
+.cp-rh{background:linear-gradient(135deg,#082B5A,#005499);color:#fff;padding:14px 18px;display:flex;gap:12px;align-items:center;position:relative}
+.cp-rh::after{content:"";position:absolute;inset-inline:0;bottom:0;height:4px;background:linear-gradient(90deg,#3AB1DB,#BADF93,#3AB1DB)}
+.cp-rh img{height:38px}.cp-rh b{display:block;font-size:17px}.cp-rh span{font-size:12.5px;color:#CFE3F5}.cp-rh .grow{flex:1}
+.cp-rb{padding:16px 18px;display:grid;gap:14px}
+.cp-two{display:grid;gap:14px;grid-template-columns:minmax(0,300px) 1fr;align-items:center}
+.cp-star{border-radius:16px;padding:12px 14px;background:linear-gradient(135deg,#F3FAEC,#EAF6FB);border:1px solid #CFE7F2}
+.cp-tips{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
+.cp-tips>div{border:1px solid #E4EBF5;border-radius:14px;padding:10px 12px;background:#FAFCFE}.cp-tips h4{margin:0 0 6px;font-size:14px}
+.cp-tips ul{margin:0;padding-inline-start:18px;line-height:1.8;font-size:13.5px}
+.cp-dist{display:flex;height:12px;border-radius:8px;overflow:hidden;background:#EEF3F9;min-width:90px}
+.cp-legend{display:flex;gap:12px;font-size:12px;color:#4D6A8F;align-items:center;justify-content:center}.cp-legend i{display:inline-block;width:18px;height:3px;border-radius:2px;vertical-align:middle;margin-inline-end:4px}
+.cp-tools{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.cp-wa{display:grid;gap:6px;max-height:55vh;overflow:auto}.cp-wa>div{display:flex;gap:8px;align-items:center;border:1px solid var(--border);border-radius:12px;padding:8px 10px}
+.cp-wa .grow{flex:1;min-width:0}
+.btn.cp-wab{background:linear-gradient(135deg,#25D366,#128C7E);color:#fff;border:0}
+@media (max-width:640px){.cp-two{grid-template-columns:1fr}.cp-bars div{grid-template-columns:90px 1fr 42px}}
 `; document.head.appendChild(st); }
   const genCode = () => { const ab = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; let s = ''; for (let i = 0; i < 6; i++) s += ab[Math.floor(Math.random() * ab.length)]; return s; };
   const link = c => location.origin + location.pathname.replace(/[^/]*$/, '') + 'scale.html?c=' + c;
-  const bars = (sc, sco) => `<div class="cp-bars">${DS().top(sc, sco).map(x => `<div><span>${esc(x.n)}</span><i style="width:${Math.max(3, x.v)}%;background:${x.c}"></i><span>${AR(x.v)}٪</span></div>`).join('')}</div>`;
+  const optsOf = r => r.opts || {};
+  const viewOf = (r, lang) => DS().view(r.scale_key, optsOf(r).lv || null, lang || 'ar');
+  const NUM = (v, lang) => lang && lang !== 'ar' ? String(v) : AR(v);
+  const barsH = (sc, sco, cmp, lang) => `<div class="cp-bars">${DS().top(sc, sco).map(x => `<div><span>${esc(x.n)}</span><span class="tr"><i style="width:${Math.max(3, x.v)}%;background:${x.c}"></i>${cmp && cmp[x.k] != null ? `<u style="inset-inline-start:${cmp[x.k]}%"></u>` : ''}</span><span>${NUM(x.v, lang)}${lang && lang !== 'ar' ? '%' : '٪'}</span></div>`).join('')}</div>`;
   const avgScores = (sc, rs) => { const o = {}; Object.keys(sc.dims).forEach(k => { const v = rs.map(r => (r.scores || {})[k]).filter(x => x != null); o[k] = v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : 0; }); return o; };
+  const clsName = id => (A.cls && A.cls(id) || {}).name || '';
+  // تصدير عنصر إلى PDF (A4، مع تقسيم الصفحات) أو صورة — مشترك مع رعاية الموهوبين
+  async function snap(el) { return html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true, windowWidth: Math.max(900, el.scrollWidth) }); }
+  A.elToPng = async (el, name) => { if (!window.html2canvas) return A.toast('تعذّر التصدير', 'err'); const c = await snap(el); const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = name + '.png'; a.click(); };
+  A.elToPdf = async (el, name, land) => {
+    if (!window.html2canvas || !window.jspdf) return A.toast('تعذّر التصدير', 'err');
+    const c = await snap(el), pdf = new window.jspdf.jsPDF({ orientation: land ? 'l' : 'p', unit: 'mm', format: 'a4' });
+    const W = pdf.internal.pageSize.getWidth(), H = pdf.internal.pageSize.getHeight(), m = 8, w = W - 2 * m, ph = (H - 2 * m) * c.width / w; let y = 0, first = true;
+    while (y < c.height) { const h = Math.min(ph, c.height - y), part = document.createElement('canvas'); part.width = c.width; part.height = h; part.getContext('2d').drawImage(c, 0, y, c.width, h, 0, 0, c.width, h); if (!first) pdf.addPage(); pdf.addImage(part.toDataURL('image/jpeg', .92), 'JPEG', m, m, w, h * w / c.width); first = false; y += h; }
+    pdf.save(name + '.pdf');
+  };
+  const teachersOf = cid => [...new Set((S.allEntries || S.entries || []).filter(e => e.class_id === cid && e.teacher_id).map(e => e.teacher_id))].filter(id => id !== S.me.id);
+  const canManage = r => S.me.is_owner || r.owner === S.me.id;
+  async function notifyShared(r, ids) { if (!ids.length) return; try { await api.rpc('notify_send', { p_ids: ids, p_title: '🧭 نتائج مقياس: ' + r.title, p_body: 'شاركك ' + (S.me.full_name || '') + ' نتائج «' + r.title + '»' + (clsName(r.class_id) ? ' — ' + clsName(r.class_id) : '') + '. افتح البوصلة ← التطبيقات والتقارير.', p_link: '#/compass', p_kind: 'notice', p_show_at: null }); } catch (_) { } }
+  function shareTeachers(r, after) {
+    const cur = new Set(r.shared || []), cl = new Set(r.class_id ? teachersOf(r.class_id) : []);
+    const staff = (S.staff || []).filter(x => x.id !== S.me.id && x.active !== false && !x.is_test).sort((a, b) => (cl.has(b.id) - cl.has(a.id)) || String(a.full_name).localeCompare(b.full_name, 'ar'));
+    const m = A.modal(`<h3>مشاركة النتائج مع المعلمين</h3><p class="small muted">يرى المعلم المختار هذا التطبيق ونتائجه وتقاريره (قراءة فقط) في البوصلة، ويصله إشعار. تظهر البوصلة للمعلم فقط إذا فعّلتها له من «تخصيص صفحة المعلم».</p>
+      <div class="row" style="gap:6px;margin-bottom:6px"><input class="in" id="shQ" placeholder="بحث" style="max-width:220px">${cl.size ? '<button class="btn ghost sm" id="shCl">معلمو الفصل</button>' : ''}<button class="btn ghost sm" id="shNo">إلغاء الكل</button></div>
+      <div class="nf-rc" style="max-height:46vh">${staff.map(x => `<label data-n="${esc(x.full_name || '')}"><input type="checkbox" value="${x.id}" ${cur.has(x.id) ? 'checked' : ''}> ${esc(x.full_name || '')}${cl.has(x.id) ? ' <span class="pill">يدرّس الفصل</span>' : ''}</label>`).join('')}</div>
+      <div class="acts"><button class="btn" id="shGo">حفظ وإرسال الإشعار</button></div>`);
+    $('#shQ', m.el).oninput = e => $$('[data-n]', m.el).forEach(l => l.style.display = l.dataset.n.includes(e.target.value.trim()) ? '' : 'none');
+    if ($('#shCl', m.el)) $('#shCl', m.el).onclick = () => $$('input[type=checkbox]', m.el).forEach(i => { if (cl.has(i.value)) i.checked = true; });
+    $('#shNo', m.el).onclick = () => $$('input[type=checkbox]', m.el).forEach(i => i.checked = false);
+    $('#shGo', m.el).onclick = e => A.run(e.currentTarget, async () => { const ids = $$('.nf-rc input:checked', m.el).map(i => i.value); const added = ids.filter(id => !cur.has(id)); await api.upd('scale_runs', r.id, { shared: ids }); r.shared = ids; await notifyShared(r, added); m.close(); A.toast(`شوركت مع ${AR(ids.length)} معلماً` + (added.length ? ' · وصلهم إشعار' : ''), 'ok'); after && after(); });
+  }
+  A.waOpen = (phone, text) => window.open(`https://wa.me/${DS().waNum(phone)}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
 
   const st = { tab: null };
   V.compass = async function (root) {
     const own = S.me.is_owner && !S.realMe;
     st.tab = st.tab || 'scales'; if (st.tab === 'kpi' && !own) st.tab = 'scales';
-    const T = [['scales', 'المقاييس'], ['runs', 'التطبيقات والنتائج'], ...(own ? [['kpi', 'مؤشرات الأداء']] : [])];
-    root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>البوصلة</h2><p class="sub" style="margin:2px 0 0">مقاييس تربوية تكشف أنماط تعلم الطلاب وقدراتهم وميولهم لتوجيه التدريس والإرشاد${own ? '، ومؤشرات أداء المدرسة والمعلمين' : ''}.</p></div></div>
+    const T = [['scales', 'بنك المقاييس'], ['runs', 'التطبيقات والتقارير'], ...(own ? [['kpi', 'مؤشرات الأداء']] : [])];
+    root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>البوصلة</h2><p class="sub" style="margin:2px 0 0">${AR(DS().raw.length)} مقاييس تربوية بثلاث لغات ولكل المراحل (من الروضة حتى الثانوي) تكشف أنماط تعلم الطلاب وقدراتهم وميولهم، بتقارير احترافية للفصل والطالب وولي الأمر${own ? '، ومؤشرات أداء المدرسة والمعلمين' : ''}.</p></div></div>
       <div class="fm-tabs">${T.map(([k, l]) => `<button data-t="${k}" class="${st.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div><div id="cpB"></div></div>`;
     $$('[data-t]', root).forEach(b => b.onclick = () => { st.tab = b.dataset.t; V.compass(root); });
     const B = $('#cpB', root); ({ scales, runs, kpi })[st.tab](B, root);
   };
   function scales(B, root) {
-    B.innerHTML = `<div class="cp-grid">${DS().list.map(s => `<div class="cp-sc"><span class="ic" aria-hidden="true">${s.icon}</span><b>${esc(s.name)}</b><span class="small muted">${esc(s.about)}</span><span class="small">المراحل: ${s.stages.join('، ')} · ${AR(s.items.length)} عبارة</span><div class="chips">${Object.values(s.dims).map(d => `<span style="background:${d[1]}">${esc(d[0])}</span>`).join('')}</div><button class="btn sm" data-run="${s.key}">تطبيق على فصل</button></div>`).join('')}</div>
-      <p class="small muted" style="margin-top:10px">العبارات أُعدّت للاستخدام المدرسي الإرشادي، وليست اختبارات تشخيصية مقننة؛ تُستخدم نتائجها لتنويع التدريس والتوجيه لا للحكم على الطالب.</p>`;
-    $$('[data-run]', B).forEach(b => b.onclick = () => runDialog(DS().get(b.dataset.run), () => { st.tab = 'runs'; V.compass(root); }));
+    B.innerHTML = `<div class="cp-grid">${DS().raw.map(r => { const s = DS().view(r.key, null, 'ar'); return `<div class="cp-sc" style="--c:${Object.values(s.dims)[0][1]}"><span class="ic" aria-hidden="true">${s.icon}</span><b>${esc(s.name)}</b><span class="small muted">${esc(s.about)}</span>
+      <div class="lv">${s.levels.map(l => `<span title="${esc(DS().LEVELS[l].ar)}">${esc(DS().LEVELS[l].ar)} · ${AR(DS().view(r.key, l).count)}</span>`).join('')}</div>
+      <div class="chips">${Object.values(s.dims).map(d => `<span style="background:${d[1]}">${esc(d[0])}</span>`).join('')}</div>
+      <span class="small muted">🌐 العربية · English · Français</span>
+      <div class="row"><button class="btn sm" data-run="${s.key}">تطبيق على فصل</button><button class="btn ghost sm" data-pv="${s.key}">معاينة وورقي</button></div></div>`; }).join('')}</div>
+      <p class="small muted" style="margin-top:10px">العبارات مؤلفة للاستخدام المدرسي الإرشادي وليست اختبارات تشخيصية مقننة؛ تُستخدم نتائجها لتنويع التدريس والتوجيه لا للحكم على الطالب. يتغير عدد العبارات حسب المستوى، ويختار الطالب لغته من الصفحة.</p>`;
+    $$('[data-run]', B).forEach(b => b.onclick = () => runDialog(b.dataset.run, () => { st.tab = 'runs'; V.compass(root); }));
+    $$('[data-pv]', B).forEach(b => b.onclick = () => preview(b.dataset.pv));
   }
-  function runDialog(sc, after) {
+  function preview(key) {
+    const s0 = DS().view(key, null, 'ar');
+    const m = A.modal(`<div class="head" style="margin:0;padding-inline-end:44px"><div class="grow"><h3 style="margin:0">${s0.icon} ${esc(s0.name)}</h3></div>
+      <select class="in" id="pvL" style="width:auto">${s0.levels.map(l => `<option value="${l}">${esc(DS().LEVELS[l].ar)}</option>`).join('')}</select><select class="in" id="pvG" style="width:auto">${Object.entries(LANGS).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select><button class="btn sm" id="pvP">${A.I.print || ''} نسخة ورقية</button></div><div id="pvB" style="margin-top:10px"></div>`, { cls: 'wide' });
+    const draw = () => { const s = DS().view(key, $('#pvL', m.el).value, $('#pvG', m.el).value); $('#pvB', m.el).innerHTML = `<div dir="${s.dir}"><p class="small">${esc(s.about)}</p><div class="scroll"><table class="tbl"><thead><tr><th>#</th><th>العبارة</th>${s.scale.map(l => `<th style="font-size:11px">${esc(l)}</th>`).join('')}<th>البعد</th></tr></thead><tbody>${s.items.map((it, i) => `<tr><td>${NUM(i + 1, s.lang)}</td><td><b>${esc(it[1])}</b></td>${s.scale.map(() => '<td style="text-align:center">◯</td>').join('')}<td><span class="cp-pill" style="background:${s.dims[it[0]][1]}">${esc(s.dims[it[0]][0])}</span></td></tr>`).join('')}</tbody></table></div></div>`; return s; };
+    $('#pvL', m.el).onchange = draw; $('#pvG', m.el).onchange = draw; draw();
+    $('#pvP', m.el).onclick = () => { const s = DS().view(key, $('#pvL', m.el).value, $('#pvG', m.el).value); A.printDoc(s.name, DS().LEVELS[s.lv || 'p'][s.lang] + ' — ' + 'الاسم: ............................  الفصل: ..............', `<div dir="${s.dir}"><p>${esc(s.about)}</p><table><tr><th>#</th><th>العبارة</th>${s.scale.map(l => `<th>${esc(l)}</th>`).join('')}</tr>${s.items.map((it, i) => `<tr><td>${NUM(i + 1, s.lang)}</td><td>${esc(it[1])}</td>${s.scale.map(() => '<td style="text-align:center">◯</td>').join('')}</tr>`).join('')}</table></div>`, false); };
+  }
+  function runDialog(key, after) {
+    const s0 = DS().view(key, null, 'ar');
     const cls = (S.allClasses || S.classes || []).filter(c => c.active !== false).sort((a, b) => (a.sort || 0) - (b.sort || 0));
-    const m = A.modal(`<h3>${sc.icon} تطبيق «${esc(sc.name)}»</h3><div class="grid g2"><div class="field"><label for="crC">الفصل</label><select class="in" id="crC">${cls.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></div><div class="field"><label for="crT">العنوان</label><input class="in" id="crT" value="${esc(sc.name)}"></div></div>
-      <p class="small muted">يختار الطالب اسمه من قائمة فصله ثم يجيب. يمكنك إغلاق التطبيق متى شئت.</p><div class="acts"><button class="btn" id="crGo">إنشاء الرابط</button></div>`);
-    m.el.querySelector('#crGo').onclick = e => A.run(e.currentTarget, async () => {
-      const row = { school_id: S.school.id, scale_key: sc.key, title: m.el.querySelector('#crT').value.trim() || sc.name, class_id: m.el.querySelector('#crC').value, code: genCode(), ...(DEMO ? { id: 'sr' + Date.now(), owner: S.me.id, state: 'open', created_at: new Date().toISOString() } : {}) };
-      await api.ins('scale_runs', [row]); m.close(); share(row); after && after();
+    const m = A.modal(`<h3>${s0.icon} تطبيق «${esc(s0.name)}»</h3><div class="grid g2">
+      <div class="field"><label for="crC">الفصل</label><select class="in" id="crC">${cls.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}<option value="">رابط عام (يكتب الطالب اسمه)</option></select></div>
+      <div class="field"><label for="crT">العنوان</label><input class="in" id="crT" value="${esc(s0.name)}"></div>
+      <div class="field"><label for="crL">المستوى</label><select class="in" id="crL">${s0.levels.map(l => `<option value="${l}">${esc(DS().LEVELS[l].ar)} (${AR(DS().view(key, l).count)} عبارة)</option>`).join('')}</select></div>
+      <div class="field"><label for="crG">اللغة الافتراضية للطالب</label><select class="in" id="crG">${Object.entries(LANGS).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select></div></div>
+      <label class="tf-it" id="crXw" style="margin-top:8px;display:none"><input type="checkbox" id="crX"><span><b>طلاب من خارج المدرسة</b><small>يكتب الطالب اسمه ومدرسته وصفه وجوال ولي الأمر، وتظهر نتائجهم عندك فقط.</small></span></label>
+      <label class="tf-it" id="crSw" style="margin-top:8px"><input type="checkbox" id="crS"><span><b>مشاركة النتائج مع معلمي هذا الفصل</b><small>يرون التطبيق ونتائجه (قراءة فقط) ويصلهم إشعار — عند تفعيل «البوصلة» لهم.</small></span></label>
+      <p class="small muted">يُقترح المستوى تلقائياً من مرحلة الفصل، ويستطيع الطالب تغيير اللغة من الصفحة. يمكنك إغلاق التطبيق متى شئت.</p><div class="acts"><button class="btn" id="crGo">إنشاء الرابط</button></div>`);
+    const auto = () => { const c = cls.find(x => x.id === $('#crC', m.el).value); $('#crXw', m.el).style.display = c ? 'none' : 'flex'; $('#crSw', m.el).style.display = c ? 'flex' : 'none'; if (!c) return; const lv = DS().levelFor(c.stage || c.name, c.grade_word || c.name); const sel = $('#crL', m.el); if ([...sel.options].some(o => o.value === lv)) sel.value = lv; };
+    $('#crC', m.el).onchange = auto; auto();
+    $('#crGo', m.el).onclick = e => A.run(e.currentTarget, async () => {
+      const row = { school_id: S.school.id, scale_key: key, title: $('#crT', m.el).value.trim() || s0.name, class_id: $('#crC', m.el).value || null, code: genCode(), opts: { lv: $('#crL', m.el).value, lang: $('#crG', m.el).value, ...(!$('#crC', m.el).value && $('#crX', m.el).checked ? { ext: true } : {}) }, ...($('#crC', m.el).value && $('#crS', m.el).checked ? { shared: teachersOf($('#crC', m.el).value) } : {}), ...(DEMO ? { id: 'sr' + Date.now(), owner: S.me.id, state: 'open', created_at: new Date().toISOString() } : {}) };
+      await api.ins('scale_runs', [row]); if (row.shared && row.shared.length) notifyShared(row, row.shared); m.close(); share(row); after && after();
     });
   }
   function share(r) {
     let qr = ''; try { const q = window.qrcode(0, 'M'); q.addData(link(r.code)); q.make(); qr = q.createSvgTag({ cellSize: 5, margin: 1, scalable: true }); } catch (_) { }
-    const m = A.modal(`<h3>رابط المقياس للطلاب</h3><div style="display:grid;place-items:center;gap:8px;text-align:center"><div style="width:220px">${qr}</div><b style="font-size:28px;letter-spacing:.2em" dir="ltr">${esc(r.code)}</b><input class="in" readonly value="${esc(link(r.code))}" dir="ltr" onclick="this.select()"><div class="row" style="gap:6px"><button class="btn sm" id="shC">نسخ الرابط</button><a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent('مقياس ' + r.title + ': ' + link(r.code))}">واتساب</a></div></div>`);
+    const m = A.modal(`<h3>رابط المقياس للطلاب</h3><div style="display:grid;place-items:center;gap:8px;text-align:center"><div style="width:220px">${qr}</div><b style="font-size:28px;letter-spacing:.2em" dir="ltr">${esc(r.code)}</b><input class="in" readonly value="${esc(link(r.code))}" dir="ltr" onclick="this.select()"><div class="row" style="gap:6px;flex-wrap:wrap;justify-content:center"><button class="btn sm" id="shC">نسخ الرابط</button><a class="btn sm cp-wab" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent('مقياس ' + r.title + ': ' + link(r.code))}">مشاركة واتساب</a><button class="btn ghost sm" id="shP">${A.I.print || ''} طباعة الرمز</button></div></div>`);
     m.el.querySelector('#shC').onclick = async () => { try { await navigator.clipboard.writeText(link(r.code)); A.toast('نُسخ', 'ok'); } catch (_) { } };
+    m.el.querySelector('#shP').onclick = () => A.printDoc(r.title, clsName(r.class_id), `<div style="text-align:center"><div style="width:260px;margin:auto">${qr}</div><h2 dir="ltr" style="letter-spacing:.2em">${esc(r.code)}</h2><p dir="ltr">${esc(link(r.code))}</p></div>`, false);
   }
   async function runs(B) {
     B.innerHTML = '<div class="spinner"></div>';
     let R = [], P = []; try { R = await api.list('scale_runs', { school_id: S.school.id }, { order: 'created_at', desc: true }); P = R.length ? await api.list('scale_resp', { run_id: R.map(r => r.id) }) : []; } catch (_) { }
-    if (DEMO) R.forEach(r => { if (!P.some(p => p.run_id === r.id)) { const sc = DS().get(r.scale_key); (S.allClasses ? [] : []); const st = (A.studentsAll ? [] : []); for (let k = 0; k < 18; k++) { const ans = sc.items.map(() => 1 + Math.floor(Math.random() * sc.scale.length)); P.push({ id: 'p' + k + r.id, run_id: r.id, name: 'طالب ' + AR(k + 1), answers: ans, scores: DS().score(sc, ans) }); } } });
-    B.innerHTML = R.length ? `<div class="fm-list">${R.map(r => { const sc = DS().get(r.scale_key) || { icon: '', name: r.scale_key }; const n = P.filter(p => p.run_id === r.id).length; return `<div class="fm-row" data-r="${r.id}" tabindex="0" role="button"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:26px">${sc.icon}</span><div><b>${esc(r.title)}</b><div class="meta"><span>${esc((A.cls(r.class_id) || {}).name || '')}</span><span>${AR(n)} استجابة</span><span class="pill ${r.state === 'open' ? 'st-approved' : ''}">${r.state === 'open' ? 'مفتوح' : 'مغلق'}</span></div></div></div><span class="small muted">${esc(A.arDate ? A.arDate(String(r.created_at).slice(0, 10)) : '')}</span></div>`; }).join('')}</div>` : A.emptyBox('لا تطبيقات بعد', 'من تبويب «المقاييس» اختر مقياساً وطبّقه على فصل.');
+    if (DEMO) for (const r of R) { if (P.some(p => p.run_id === r.id)) continue; const sc = viewOf(r); let stu = []; try { stu = r.class_id ? await api.list('students', { class_id: r.class_id }) : []; } catch (_) { } const n = stu.length || 14; for (let k = 0; k < n; k++) { const bias = k % Object.keys(sc.dims).length; const ans = sc.items.map(it => Math.min(sc.scale.length, Math.max(1, (Object.keys(sc.dims).indexOf(it[0]) === bias ? sc.scale.length - 1 : 2) + Math.floor(Math.random() * 2)))); P.push({ id: 'p' + k + r.id, run_id: r.id, student_id: stu[k] ? stu[k].id : null, name: stu[k] ? stu[k].full_name.split(' ').slice(0, 2).join(' ') : 'طالب ' + AR(k + 1), answers: ans, scores: DS().score(sc, ans), meta: optsOf(r).ext ? { school: ['مدارس النخبة', 'مدارس الرواد', 'مدارس المستقبل'][k % 3], grade: 'الخامس', ph: '0551234' + String(100 + k) } : {} }); } }
+    B.innerHTML = R.length ? `<div class="fm-list">${R.map(r => { const sc = viewOf(r) || { icon: '', name: r.scale_key }; const n = P.filter(p => p.run_id === r.id).length; const o = optsOf(r); return `<div class="fm-row" data-r="${r.id}" tabindex="0" role="button"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:26px">${sc.icon}</span><div><b>${esc(r.title)}</b><div class="meta"><span>${esc(clsName(r.class_id) || 'رابط عام')}</span>${o.lv ? `<span>${esc(DS().LEVELS[o.lv].ar)}</span>` : ''}${o.ext ? '<span class="pill">طلاب من خارج المدرسة</span>' : ''}${(r.shared || []).length ? (canManage(r) ? `<span class="pill">مشارك مع ${AR(r.shared.length)}</span>` : `<span class="pill">شاركه معك ${esc(A.personName(r.owner) || '')}</span>`) : ''}<span>${AR(n)} استجابة</span><span class="pill ${r.state === 'open' ? 'st-approved' : ''}">${r.state === 'open' ? 'مفتوح' : 'مغلق'}</span></div></div></div><span class="small muted">${esc(A.arDate ? A.arDate(String(r.created_at).slice(0, 10)) : '')}</span></div>`; }).join('')}</div>` : A.emptyBox('لا تطبيقات بعد', 'من تبويب «بنك المقاييس» اختر مقياساً وطبّقه على فصل.');
     $$('[data-r]', B).forEach(x => { const go = () => { const r = R.find(y => y.id === x.dataset.r); report(r, P.filter(p => p.run_id === r.id), () => runs(B)); }; x.onclick = go; x.onkeydown = e => { if (e.key === 'Enter') go(); }; });
   }
+  async function phones(r, rs) { const meta = {}; (rs || []).forEach(p => { if (p.meta && p.meta.ph) meta[p.student_id || p.id] = { guardian_phone: p.meta.ph }; }); if (!r.class_id) return meta; try { const L = await api.list('students', { class_id: r.class_id }, { select: 'id,full_name,guardian_phone' }); const o = { ...meta }; L.forEach(s => o[s.id] = s); return o; } catch (_) { return meta; } }
   function report(r, rs, after) {
-    const sc = DS().get(r.scale_key); const avg = avgScores(sc, rs); const t = DS().top(sc, avg); const tips = TIPS[sc.key] || {};
+    const sc = viewOf(r); const avg = avgScores(sc, rs); const t = DS().top(sc, avg); const keys = Object.keys(sc.dims); const ext = !!optsOf(r).ext;
     const grp = {}; rs.forEach(p => { const k = DS().top(sc, p.scores || {})[0]; if (k) (grp[k.k] = grp[k.k] || []).push(p); });
-    const m = A.modal(`<div class="head" style="margin:0;padding-inline-end:44px"><div class="grow"><h3 style="margin:0">${sc.icon} ${esc(r.title)} — ${esc((A.cls(r.class_id) || {}).name || '')}</h3><span class="small muted">${AR(rs.length)} استجابة</span></div>
-        <button class="btn ghost sm" id="rpS">الرابط</button><button class="btn ghost sm" id="rpT">${r.state === 'open' ? 'إغلاق' : 'إعادة فتح'}</button><button class="btn ghost sm" id="rpX">Excel</button><button class="btn sm" id="rpP">${A.I.print || ''} تقرير الفصل</button></div>
-      <div class="grid g2" style="align-items:start;margin-top:10px"><div class="card" style="margin:0"><h3 style="margin-top:0">ملف الفصل</h3>${bars(sc, avg)}<p class="small" style="margin-top:10px"><b>توصية تدريسية:</b> ${esc(tips[t[0].k] || '')}${t[1] ? ' و' + esc(tips[t[1].k] || '') : ''}</p></div>
-        <div class="card" style="margin:0"><h3 style="margin-top:0">مجموعات حسب البُعد الأبرز</h3>${Object.entries(grp).sort((a, b) => b[1].length - a[1].length).map(([k, L]) => `<div style="margin-bottom:8px"><span class="cp-pill" style="background:${sc.dims[k][1]}">${esc(sc.dims[k][0])} · ${AR(L.length)}</span> <span class="small">${L.map(p => esc(p.name)).join('، ')}</span></div>`).join('') || A.emptyBox('لا استجابات بعد')}</div></div>
-      <h3>الطلاب</h3><div class="scroll"><table class="tbl"><thead><tr><th>الطالب</th>${Object.values(sc.dims).map(d => `<th>${esc(d[0])}</th>`).join('')}<th>الأبرز</th><th></th></tr></thead><tbody>${rs.map((p, i) => { const tp = DS().top(sc, p.scores || {})[0] || {}; return `<tr><td><b>${esc(p.name)}</b></td>${Object.keys(sc.dims).map(k => `<td>${AR((p.scores || {})[k] ?? 0)}٪</td>`).join('')}<td><span class="cp-pill" style="background:${tp.c || '#999'}">${esc(tp.n || '')}</span></td><td><button class="btn ghost sm" data-ind="${i}">تقرير</button></td></tr>`; }).join('')}</tbody></table></div>`, { cls: 'wide' });
-    m.el.querySelector('#rpS').onclick = () => share(r);
-    m.el.querySelector('#rpT').onclick = e => A.run(e.currentTarget, async () => { r.state = r.state === 'open' ? 'closed' : 'open'; await api.upd('scale_runs', r.id, { state: r.state }); m.close(); after && after(); });
-    m.el.querySelector('#rpP').onclick = () => A.printDoc(`${sc.name} — ${(A.cls(r.class_id) || {}).name || ''}`, `${AR(rs.length)} طالباً`, `<h3>ملف الفصل</h3><table><tr>${t.map(x => `<th>${esc(x.n)}</th>`).join('')}</tr><tr>${t.map(x => `<td>${AR(x.v)}٪</td>`).join('')}</tr></table><p><b>توصية تدريسية:</b> ${esc(tips[t[0].k] || '')}</p><h3>الطلاب</h3><table><tr><th>الطالب</th>${Object.values(sc.dims).map(d => `<th>${esc(d[0])}</th>`).join('')}<th>الأبرز</th></tr>${rs.map(p => `<tr><td>${esc(p.name)}</td>${Object.keys(sc.dims).map(k => `<td>${AR((p.scores || {})[k] ?? 0)}٪</td>`).join('')}<td>${esc((DS().top(sc, p.scores || {})[0] || {}).n || '')}</td></tr>`).join('')}</table>`, true);
-    m.el.querySelector('#rpX').onclick = () => { if (!window.XLSX) return; const ws = XLSX.utils.json_to_sheet(rs.map(p => { const o = { 'الطالب': p.name }; Object.entries(sc.dims).forEach(([k, d]) => o[d[0]] = (p.scores || {})[k] ?? 0); o['الأبرز'] = (DS().top(sc, p.scores || {})[0] || {}).n || ''; return o; })); ws['!views'] = [{ RTL: true }]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'النتائج'); XLSX.writeFile(wb, `${sc.name}.xlsx`); };
-    $$('[data-ind]', m.el).forEach(b => b.onclick = () => { const p = rs[+b.dataset.ind]; const tp = DS().top(sc, p.scores || {}); A.printDoc(`${sc.name} — ${p.name}`, (A.cls(r.class_id) || {}).name || '', `<table><tr><th>البُعد</th><th>الدرجة</th><th>الوصف</th></tr>${tp.map(x => `<tr><td><b>${esc(x.n)}</b></td><td>${AR(x.v)}٪</td><td>${esc(x.d || '')}</td></tr>`).join('')}</table><p><b>أبرز ما يميز الطالب:</b> ${esc(tp[0].n)}.</p><p><b>توصيات:</b> ${esc(tips[tp[0].k] || '')} ${tp[1] ? esc(tips[tp[1].k] || '') : ''}</p>`, false); });
+    const dist = k => { const b = [0, 0, 0]; rs.forEach(p => { const v = (p.scores || {})[k] || 0; b[v >= 75 ? 0 : v >= 50 ? 1 : 2]++; }); return b; };
+    const head = `<div class="cp-rh"><img src="assets/logo_white.svg" alt=""><div class="grow"><b>${sc.icon} ${esc(r.title)}</b><span>تقرير الفصل · ${esc(clsName(r.class_id) || 'رابط عام')} · ${AR(rs.length)} استجابة${optsOf(r).lv ? ' · ' + esc(DS().LEVELS[optsOf(r).lv].ar) : ''}</span></div></div>`;
+    const m = A.modal(`<div class="head" style="margin:0;padding-inline-end:44px"><div class="grow"><h3 style="margin:0">${sc.icon} ${esc(r.title)}</h3><span class="small muted">${esc(clsName(r.class_id) || 'رابط عام')} · ${AR(rs.length)} استجابة</span></div>
+        <div class="cp-tools">${canManage(r) ? `<button class="btn ghost sm" id="rpS">الرابط</button><button class="btn ghost sm" id="rpT">${r.state === 'open' ? 'إغلاق' : 'إعادة فتح'}</button><button class="btn ghost sm" id="rpSh">👥 مشاركة مع المعلمين${(r.shared || []).length ? ' (' + AR(r.shared.length) + ')' : ''}</button>` : ''}<button class="btn sm" id="rpC" style="background:linear-gradient(135deg,#7E62C2,#3AB1DB);color:#fff;border:0">✨ تصدير إبداعي</button><button class="btn ghost sm" id="rpX">Excel</button><button class="btn ghost sm" id="rpD">PDF</button><button class="btn sm cp-wab" id="rpW">واتساب لأولياء الأمور</button><button class="btn sm" id="rpP">${A.I.print || ''} طباعة</button></div></div>
+      <div class="cp-rep" id="rpBody" style="margin-top:10px">${head}<div class="cp-rb">
+        <div class="cp-two"><div>${DS().radar(sc, avg, { size: 300 })}</div><div><h3 style="margin:0 0 8px">ملف الفصل</h3>${barsH(sc, avg)}
+          <div class="cp-star" style="margin-top:12px"><b>الأبرز في الفصل: ${esc(t[0] ? t[0].n : '')}</b><div class="small">${esc(t[0] ? t[0].d : '')}</div><div class="small" style="margin-top:6px"><b>توصية تدريسية:</b> ${esc(t[0] ? t[0].t : '')}${t[1] ? ' و' + esc(t[1].t) : ''}</div>${t.length > 2 ? `<div class="small"><b>بحاجة إلى تنمية:</b> ${esc(t[t.length - 1].n)} — ${esc(t[t.length - 1].t)}</div>` : ''}</div></div></div>
+        <div><h3 style="margin:0 0 8px">توزيع المستويات لكل بُعد</h3><div class="scroll"><table class="tbl"><thead><tr><th>البعد</th><th>متوسط</th><th>التوزيع</th><th>مرتفع</th><th>متوسط</th><th>يحتاج تنمية</th></tr></thead><tbody>${keys.map(k => { const b = dist(k), n = rs.length || 1; return `<tr><td><span class="cp-pill" style="background:${sc.dims[k][1]}">${esc(sc.dims[k][0])}</span></td><td><b>${AR(avg[k])}٪</b></td><td><div class="cp-dist"><i style="width:${b[0] * 100 / n}%;background:#2E8B57"></i><i style="width:${b[1] * 100 / n}%;background:#C9A44C"></i><i style="width:${b[2] * 100 / n}%;background:#E0675A"></i></div></td><td>${AR(b[0])}</td><td>${AR(b[1])}</td><td>${AR(b[2])}</td></tr>`; }).join('')}</tbody></table></div></div>
+        <div><h3 style="margin:0 0 8px">مجموعات العمل حسب البُعد الأبرز</h3>${Object.entries(grp).sort((a, b) => b[1].length - a[1].length).map(([k, L]) => `<div style="margin-bottom:8px"><span class="cp-pill" style="background:${sc.dims[k][1]}">${esc(sc.dims[k][0])} · ${AR(L.length)}</span> <span class="small">${L.map(p => esc(p.name)).join('، ')}</span><div class="small muted">${esc(sc.dims[k][4])}</div></div>`).join('') || A.emptyBox('لا استجابات بعد')}</div>
+        <div><h3 style="margin:0 0 8px">الطلاب</h3><div class="scroll"><table class="tbl"><thead><tr><th>الطالب</th>${ext ? '<th>المدرسة</th><th>الصف</th>' : ''}${Object.values(sc.dims).map(d => `<th>${esc(d[0])}</th>`).join('')}<th>الأبرز</th><th data-noexp></th></tr></thead><tbody>${rs.map((p, i) => { const tp = DS().top(sc, p.scores || {})[0] || {}; return `<tr><td><b>${esc(p.name)}</b></td>${ext ? `<td>${esc((p.meta || {}).school || '')}</td><td>${esc((p.meta || {}).grade || '')}</td>` : ''}${keys.map(k => { const v = (p.scores || {})[k] ?? 0; return `<td style="font-weight:800;color:${DS().BAND(v).c}">${AR(v)}٪</td>`; }).join('')}<td><span class="cp-pill" style="background:${tp.c || '#999'}">${esc(tp.n || '')}</span></td><td data-noexp><button class="btn ghost sm" data-ind="${i}">التقرير</button></td></tr>`; }).join('')}</tbody></table></div></div>
+        <p class="small muted" style="margin:0">مرتفع ≥ ٧٥٪ · متوسط ٥٠–٧٤٪ · يحتاج تنمية &lt; ٥٠٪. نتائج إرشادية للتوجيه وتنويع التدريس، وليست تشخيصاً.</p></div></div>`, { cls: 'wide' });
+    if (m.el.querySelector('#rpS')) m.el.querySelector('#rpS').onclick = () => share(r);
+    if (m.el.querySelector('#rpT')) m.el.querySelector('#rpT').onclick = e => A.run(e.currentTarget, async () => { r.state = r.state === 'open' ? 'closed' : 'open'; await api.upd('scale_runs', r.id, { state: r.state }); m.close(); after && after(); });
+    const body = () => m.el.querySelector('#rpBody');
+    m.el.querySelector('#rpD').onclick = e => A.run(e.currentTarget, async () => { const b = body(); b.querySelectorAll('[data-noexp]').forEach(x => x.style.display = 'none'); try { await A.elToPdf(b, `${sc.name} - ${clsName(r.class_id)}`); } finally { b.querySelectorAll('[data-noexp]').forEach(x => x.style.display = ''); } });
+    m.el.querySelector('#rpP').onclick = () => A.printDoc(`${sc.name} — ${clsName(r.class_id)}`, `${AR(rs.length)} طالباً`, `<div style="display:flex;gap:16px;align-items:center"><div style="width:260px">${DS().radar(sc, avg, { size: 260 })}</div><table><tr><th>البعد</th><th>متوسط الفصل</th></tr>${t.map(x => `<tr><td>${esc(x.n)}</td><td>${AR(x.v)}٪</td></tr>`).join('')}</table></div><p><b>توصية تدريسية:</b> ${esc(t[0] ? t[0].t : '')}</p><h3>الطلاب</h3><table><tr><th>الطالب</th>${Object.values(sc.dims).map(d => `<th>${esc(d[0])}</th>`).join('')}<th>الأبرز</th></tr>${rs.map(p => `<tr><td>${esc(p.name)}</td>${keys.map(k => `<td>${AR((p.scores || {})[k] ?? 0)}٪</td>`).join('')}<td>${esc((DS().top(sc, p.scores || {})[0] || {}).n || '')}</td></tr>`).join('')}</table>`, true);
+    m.el.querySelector('#rpX').onclick = () => { if (!window.XLSX) return; const ws = XLSX.utils.json_to_sheet(rs.map(p => { const o = { 'الطالب': p.name }; if (ext) { o['المدرسة'] = (p.meta || {}).school || ''; o['الصف'] = (p.meta || {}).grade || ''; o['جوال ولي الأمر'] = (p.meta || {}).ph || ''; } Object.entries(sc.dims).forEach(([k, d]) => { const v = (p.scores || {})[k] ?? 0; o[d[0]] = v; o[d[0] + ' — المستوى'] = DS().BAND(v).ar; }); o['الأبرز'] = (DS().top(sc, p.scores || {})[0] || {}).n || ''; return o; })); ws['!views'] = [{ RTL: true }]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'النتائج'); const ws2 = XLSX.utils.json_to_sheet(t.map(x => ({ 'البعد': x.n, 'متوسط الفصل ٪': x.v, 'المستوى': x.band.ar, 'توصية': x.t }))); ws2['!views'] = [{ RTL: true }]; XLSX.utils.book_append_sheet(wb, ws2, 'ملف الفصل'); XLSX.writeFile(wb, `${sc.name}.xlsx`); };
+    m.el.querySelector('#rpW').onclick = async () => { const ph = await phones(r, rs); waAll(r, rs, ph); };
+    $$('[data-ind]', m.el).forEach(b => b.onclick = async () => { const ph = await phones(r, rs); student(r, rs[+b.dataset.ind], avg, ph); });
+    if (m.el.querySelector('#rpSh')) m.el.querySelector('#rpSh').onclick = () => shareTeachers(r, () => { m.close(); after && after(); });
+    m.el.querySelector('#rpC').onclick = () => creative(r, rs, sc, avg);
+  }
+  // ---------- التصدير الإبداعي ----------
+  const loadJs = src => new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  // صفحات مستقلة (كل عنصر صفحة) → PDF واحد
+  async function pagesToPdf(pages, name, land) {
+    if (!window.html2canvas || !window.jspdf) return A.toast('تعذّر التصدير', 'err');
+    const pdf = new window.jspdf.jsPDF({ orientation: land ? 'l' : 'p', unit: 'mm', format: 'a4' }), W = pdf.internal.pageSize.getWidth(), H = pdf.internal.pageSize.getHeight();
+    const host = document.createElement('div'); host.style.cssText = 'position:fixed;inset-inline-start:-99999px;top:0;direction:rtl'; document.body.appendChild(host);
+    try { for (let i = 0; i < pages.length; i++) { host.innerHTML = pages[i]; const el = host.firstElementChild; const c = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true }); if (i) pdf.addPage(); const r = Math.min(W / c.width, H / c.height); pdf.addImage(c.toDataURL('image/jpeg', .92), 'JPEG', (W - c.width * r) / 2, (H - c.height * r) / 2, c.width * r, c.height * r); } pdf.save(name + '.pdf'); }
+    finally { host.remove(); }
+  }
+  async function htmlToPng(html, name) { const host = document.createElement('div'); host.style.cssText = 'position:fixed;inset-inline-start:-99999px;top:0;direction:rtl'; host.innerHTML = html; document.body.appendChild(host); try { await A.elToPng(host.firstElementChild, name); } finally { host.remove(); } }
+  const FONT = "font-family:'GE SS Two',Tahoma,sans-serif;color:#082B5A";
+  function poster(r, rs, sc, avg) {
+    const t = DS().top(sc, avg), keys = Object.keys(sc.dims);
+    const best = k => rs.slice().sort((a, b) => ((b.scores || {})[k] || 0) - ((a.scores || {})[k] || 0)).slice(0, 3).filter(p => ((p.scores || {})[k] || 0) >= 50);
+    const grp = {}; rs.forEach(p => { const x = DS().top(sc, p.scores || {})[0]; if (x) grp[x.k] = (grp[x.k] || 0) + 1; });
+    return `<div style="width:1400px;${FONT};background:#fff">
+      <div style="background:radial-gradient(600px 300px at 0 0,rgba(58,177,219,.5),transparent),linear-gradient(135deg,#082B5A,#005499);color:#fff;padding:34px 44px;display:flex;align-items:center;gap:24px;border-bottom:8px solid #3AB1DB">
+        <img src="assets/logo_white.svg" style="height:70px" alt=""><div style="flex:1"><div style="font-size:18px;color:#BFE3F4">إنفوجرافيك نتائج الفصل</div><div style="font-size:40px;font-weight:900">${sc.icon} ${esc(r.title)}</div><div style="font-size:18px;color:#D6E6F5">${esc(clsName(r.class_id) || 'رابط عام')} · ${AR(rs.length)} طالباً · ${esc(A.arDate ? A.arDate(new Date().toISOString().slice(0, 10)) : '')}</div></div>
+        <div style="text-align:center;background:rgba(255,255,255,.12);border-radius:22px;padding:14px 22px"><div style="font-size:16px;color:#BFE3F4">الأبرز في الفصل</div><div style="font-size:30px;font-weight:900">${esc(t[0] ? t[0].n : '')}</div><div style="font-size:22px">${AR(t[0] ? t[0].v : 0)}٪</div></div></div>
+      <div style="display:grid;grid-template-columns:460px 1fr;gap:30px;padding:30px 44px;align-items:center">
+        <div>${DS().radar(sc, avg, { size: 460 })}</div>
+        <div style="display:grid;grid-template-columns:repeat(${keys.length > 4 ? 4 : 2},1fr);gap:14px">${t.map(x => `<div style="border-radius:22px;padding:16px;background:linear-gradient(180deg,#fff,#F3F8FD);border:2px solid #E4EBF5;border-bottom:6px solid ${x.c}"><div style="font-size:34px;font-weight:900;color:${x.c}">${AR(x.v)}٪</div><div style="font-size:19px;font-weight:800">${esc(x.n)}</div><div style="font-size:14px;color:#4D6A8F;margin-top:4px">👥 ${AR(grp[x.k] || 0)} طالباً أبرز ما لديهم</div></div>`).join('')}</div></div>
+      <div style="padding:0 44px 18px"><div style="font-size:24px;font-weight:900;margin-bottom:12px">🏆 نجوم كل بُعد</div><div style="display:grid;grid-template-columns:repeat(${Math.min(4, keys.length)},1fr);gap:12px">${keys.map(k => `<div style="border-radius:18px;padding:12px 14px;background:${sc.dims[k][1]}12;border-inline-start:6px solid ${sc.dims[k][1]}"><b style="font-size:17px">${esc(sc.dims[k][0])}</b><div style="font-size:15px;line-height:1.8;margin-top:4px">${best(k).map((p, i) => `${['🥇', '🥈', '🥉'][i]} ${esc(p.name)}`).join('<br>') || '—'}</div></div>`).join('')}</div></div>
+      <div style="margin:10px 44px 30px;border-radius:20px;padding:16px 20px;background:linear-gradient(135deg,#F3FAEC,#EAF6FB);font-size:17px;line-height:1.9"><b>💡 توصية تدريسية:</b> ${esc(t[0] ? t[0].t : '')}${t[1] ? ' — ' + esc(t[1].t) : ''}${t.length > 2 ? `<br><b>🌱 فرصة للتنمية:</b> ${esc(t[t.length - 1].n)} — ${esc(t[t.length - 1].t)}` : ''}</div>
+      <div style="background:#082B5A;color:#BFD6EE;padding:12px 44px;font-size:14px;display:flex;justify-content:space-between"><span>مدارس دينا العالمية — البوصلة</span><span>نتائج إرشادية للتوجيه وتنويع التدريس</span></div></div>`;
+  }
+  function cardsPages(r, rs, sc) {
+    const card = p => { const tp = DS().top(sc, p.scores || {}), b = tp[0] || {}; return `<div style="border-radius:20px;overflow:hidden;background:linear-gradient(145deg,#082B5A,#005499 60%,#3AB1DB);color:#fff;padding:16px;display:flex;flex-direction:column;gap:6px;height:100%;box-sizing:border-box">
+      <div style="display:flex;justify-content:space-between;align-items:center"><img src="assets/logo_white.svg" style="height:26px" alt=""><span style="font-size:11px;opacity:.85">بطاقة التعلم · ${esc(sc.name)}</span></div>
+      <div style="font-size:21px;font-weight:900;margin-top:4px">${esc(p.name)}</div><div style="display:flex;gap:10px;align-items:center"><span style="font-size:38px">${sc.icon}</span><div><div style="font-size:12px;opacity:.85">أبرز ما يميزك</div><div style="font-size:18px;font-weight:800">${esc(b.n || '')} · ${AR(b.v || 0)}٪</div></div></div>
+      <div style="display:grid;gap:3px">${tp.slice(0, 4).map(x => `<div style="display:grid;grid-template-columns:90px 1fr;gap:6px;align-items:center;font-size:11.5px"><span>${esc(x.n)}</span><i style="display:block;height:7px;border-radius:5px;background:rgba(255,255,255,.2)"><u style="display:block;height:100%;width:${x.v}%;border-radius:5px;background:#BADF93"></u></i></div>`).join('')}</div>
+      <div style="margin-top:auto;font-size:12px;line-height:1.7;background:rgba(255,255,255,.13);border-radius:12px;padding:7px 10px">💡 ${esc(b.h || '')}</div></div>`; };
+    const pages = []; for (let i = 0; i < rs.length; i += 6) pages.push(`<div style="width:794px;height:1123px;padding:30px;box-sizing:border-box;${FONT};background:#fff;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,1fr);gap:18px">${rs.slice(i, i + 6).map(card).join('')}</div>`);
+    return pages;
+  }
+  function certPages(r, rs, sc) {
+    return rs.map(p => { const b = DS().top(sc, p.scores || {})[0] || {}; return `<div style="width:1123px;height:794px;box-sizing:border-box;padding:36px;${FONT};background:#fff">
+      <div style="height:100%;box-sizing:border-box;border:3px solid #082B5A;border-radius:26px;outline:8px solid #E4EBF5;outline-offset:-16px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;position:relative;background:radial-gradient(500px 260px at 50% 0,rgba(58,177,219,.12),transparent)">
+        <img src="assets/logo.svg" style="height:86px" alt=""><div style="font-size:20px;color:#005499;font-weight:800">شهادة تميّز</div>
+        <div style="font-size:22px">تُمنح هذه الشهادة إلى</div><div style="font-size:48px;font-weight:900">${esc(p.name)}</div>
+        <div style="font-size:22px;line-height:1.8;max-width:760px">تقديراً لتميّزه في <b style="color:${b.c || '#005499'}">${esc(b.n || '')}</b> ضمن مقياس «${esc(sc.name)}»${clsName(r.class_id) ? ' — ' + esc(clsName(r.class_id)) : ''}</div>
+        <div style="font-size:60px">${sc.icon} ⭐</div><div style="font-size:16px;color:#4D6A8F;max-width:700px">${esc(b.d || '')}</div>
+        <div style="position:absolute;bottom:40px;inset-inline:70px;display:flex;justify-content:space-between;font-size:16px"><span>التاريخ: ${esc(A.arDate ? A.arDate(new Date().toISOString().slice(0, 10)) : '')}</span><span>مدارس دينا العالمية</span></div></div></div>`; });
+  }
+  async function pptx(r, rs, sc, avg) {
+    if (!window.PptxGenJS) await loadJs('vendor/pptxgen.bundle.js');
+    const P = new window.PptxGenJS(); P.layout = 'LAYOUT_WIDE'; P.rtlMode = true; const t = DS().top(sc, avg), keys = Object.keys(sc.dims), F = 'Arial';
+    const head = (s, txt) => { s.background = { color: 'FFFFFF' }; s.addShape(P.ShapeType.rect, { x: 0, y: 0, w: 13.33, h: 1.1, fill: { color: '082B5A' } }); s.addShape(P.ShapeType.rect, { x: 0, y: 1.1, w: 13.33, h: .07, fill: { color: '3AB1DB' } }); s.addText(txt, { x: .4, y: .15, w: 12.5, h: .8, fontFace: F, fontSize: 26, bold: true, color: 'FFFFFF', align: 'right', rtlMode: true }); };
+    let s = P.addSlide(); s.background = { color: '082B5A' }; s.addText(sc.icon + ' ' + r.title, { x: .5, y: 2.3, w: 12.3, h: 1.2, fontFace: F, fontSize: 44, bold: true, color: 'FFFFFF', align: 'center', rtlMode: true }); s.addText(`${clsName(r.class_id) || 'رابط عام'} · ${rs.length} طالباً`, { x: .5, y: 3.6, w: 12.3, h: .6, fontFace: F, fontSize: 22, color: 'BFE3F4', align: 'center', rtlMode: true }); s.addText('مدارس دينا العالمية — البوصلة', { x: .5, y: 6.6, w: 12.3, h: .5, fontFace: F, fontSize: 14, color: '84B7E3', align: 'center', rtlMode: true });
+    s = P.addSlide(); head(s, 'ملف الفصل');
+    s.addChart(keys.length >= 3 ? P.ChartType.radar : P.ChartType.bar, [{ name: 'متوسط الفصل', labels: keys.map(k => sc.dims[k][0]), values: keys.map(k => avg[k]) }], { x: .4, y: 1.4, w: 6.4, h: 5.6, chartColors: ['005499'], catAxisLabelFontFace: F, catAxisLabelFontSize: 12, valAxisMaxVal: 100, valAxisMinVal: 0, showLegend: false, radarStyle: 'filled' });
+    s.addChart(P.ChartType.bar, [{ name: '٪', labels: t.map(x => x.n), values: t.map(x => x.v) }], { x: 7, y: 1.4, w: 6, h: 5.6, barDir: 'bar', chartColors: t.map(x => x.c.replace('#', '')), catAxisLabelFontFace: F, valAxisMaxVal: 100, showValue: true, dataLabelFontSize: 11, showLegend: false });
+    s = P.addSlide(); head(s, 'التوصيات ومجموعات العمل');
+    const grp = {}; rs.forEach(p => { const x = DS().top(sc, p.scores || {})[0]; if (x) (grp[x.k] = grp[x.k] || []).push(p.name); });
+    s.addText([{ text: 'توصية تدريسية: ', options: { bold: true, color: '005499' } }, { text: (t[0] ? t[0].t : '') + (t[1] ? ' — ' + t[1].t : ''), options: { color: '082B5A' } }], { x: .5, y: 1.4, w: 12.3, h: .8, fontFace: F, fontSize: 18, align: 'right', rtlMode: true });
+    Object.entries(grp).slice(0, 8).forEach(([k, L], i) => { const x = .5 + (i % 4) * 3.1, y = 2.4 + Math.floor(i / 4) * 2.4; s.addShape(P.ShapeType.roundRect, { x, y, w: 2.9, h: 2.2, fill: { color: 'F3F8FD' }, line: { color: sc.dims[k][1].replace('#', ''), width: 2 }, rectRadius: .15 }); s.addText(`${sc.dims[k][0]} (${L.length})`, { x, y: y + .1, w: 2.9, h: .5, fontFace: F, fontSize: 16, bold: true, color: sc.dims[k][1].replace('#', ''), align: 'center', rtlMode: true }); s.addText(L.slice(0, 8).join('، '), { x: x + .1, y: y + .6, w: 2.7, h: 1.5, fontFace: F, fontSize: 11, color: '082B5A', align: 'right', valign: 'top', rtlMode: true }); });
+    for (let i = 0; i < rs.length; i += 12) { s = P.addSlide(); head(s, 'نتائج الطلاب' + (rs.length > 12 ? ` (${Math.floor(i / 12) + 1})` : ''));
+      const rows = [[...['الطالب', ...keys.map(k => sc.dims[k][0]), 'الأبرز'].map(h => ({ text: h, options: { bold: true, color: 'FFFFFF', fill: { color: '005499' } } }))], ...rs.slice(i, i + 12).map(p => [p.name, ...keys.map(k => ({ text: ((p.scores || {})[k] ?? 0) + '%', options: { color: DS().BAND((p.scores || {})[k] || 0).c.replace('#', '') } })), (DS().top(sc, p.scores || {})[0] || {}).n || ''])];
+      s.addTable(rows.map(r => r.map(c => typeof c === 'string' ? { text: c } : c)), { x: .4, y: 1.4, w: 12.5, fontFace: F, fontSize: keys.length > 6 ? 10 : 12, align: 'center', border: { type: 'solid', color: 'D5E1F0', pt: .7 }, rtlMode: true }); }
+    await P.writeFile({ fileName: `${sc.name} - ${clsName(r.class_id) || 'نتائج'}.pptx` });
+  }
+  function creative(r, rs, sc, avg) {
+    if (!rs.length) return A.toast('لا استجابات بعد', 'err');
+    const nm = `${sc.name} - ${clsName(r.class_id) || 'نتائج'}`;
+    const O = [['poster', '🖼️', 'إنفوجرافيك الفصل', 'لوحة بصرية واحدة: الرادار، نسب الأبعاد، نجوم كل بُعد، والتوصية — صورة أو PDF للعرض والطباعة.', '#3AB1DB', '#005499'],
+      ['cards', '🪪', 'بطاقات التعلم لكل الطلاب', 'بطاقة ملونة لكل طالب (٦ في الصفحة) بأبرز ما يميزه ونصيحته — PDF جاهز للقص والتوزيع.', '#5BC48A', '#2E8B57'],
+      ['cert', '🏅', 'شهادات تميّز', 'شهادة لكل طالب بأبرز بُعد لديه — PDF أفقي صفحة لكل طالب.', '#F2C66D', '#C98A12'],
+      ['pptx', '📊', 'عرض تقديمي PowerPoint', 'شرائح بمخطط رادار وأعمدة قابلة للتعديل، والتوصيات والمجموعات وجدول الطلاب.', '#C2AEEB', '#7E62C2'],
+      ['csv', '📄', 'CSV لجداول Google', 'ملف نصي يُفتح في Google Sheets أو أي نظام آخر.', '#84B7E3', '#082B5A']];
+    const m = A.modal(`<h3>✨ تصدير إبداعي — ${esc(r.title)}</h3><div class="wn">${O.map(o => `<div class="wn-it"><span class="g" style="--a:${o[4]};--b:${o[5]}" aria-hidden="true">${o[1]}</span><div class="grow"><b>${o[2]}</b><small>${o[3]}</small></div><div class="row" style="gap:4px;flex:none">${o[0] === 'poster' ? `<button class="btn ghost sm" data-ce="poster-png">صورة</button><button class="btn sm" data-ce="poster-pdf">PDF</button>` : `<button class="btn sm" data-ce="${o[0]}">تنزيل</button>`}</div></div>`).join('')}</div>`, { cls: 'wide' });
+    $$('[data-ce]', m.el).forEach(b => b.onclick = e => A.run(e.currentTarget, async () => {
+      const k = b.dataset.ce;
+      if (k === 'poster-png') await htmlToPng(poster(r, rs, sc, avg), 'إنفوجرافيك ' + nm);
+      if (k === 'poster-pdf') await pagesToPdf([poster(r, rs, sc, avg)], 'إنفوجرافيك ' + nm, true);
+      if (k === 'cards') await pagesToPdf(cardsPages(r, rs, sc), 'بطاقات التعلم ' + nm);
+      if (k === 'cert') await pagesToPdf(certPages(r, rs, sc), 'شهادات ' + nm, true);
+      if (k === 'pptx') await pptx(r, rs, sc, avg);
+      if (k === 'csv') { const keys = Object.keys(sc.dims), q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"'; const lines = [['الطالب', 'المدرسة', 'الصف', ...keys.map(k => sc.dims[k][0]), 'الأبرز'].map(q).join(','), ...rs.map(p => [p.name, (p.meta || {}).school || '', (p.meta || {}).grade || '', ...keys.map(k => (p.scores || {})[k] ?? 0), (DS().top(sc, p.scores || {})[0] || {}).n || ''].map(q).join(','))]; const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' })); a.download = nm + '.csv'; a.click(); }
+      A.toast('تم التصدير', 'ok');
+    }));
+  }
+  A.compassPoster = poster;
+  function waAll(r, rs, ph) {
+    let lang = 'ar';
+    const m = A.modal(`<div class="head" style="margin:0;padding-inline-end:44px"><div class="grow"><h3 style="margin:0">إرسال النتائج لأولياء الأمور</h3><span class="small muted">يفتح واتساب برسالة جاهزة لكل ولي أمر (رقمه من بيانات الطالب، أو اكتبه).</span></div><select class="in" id="waG" style="width:auto">${Object.entries(LANGS).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select></div>
+      <div class="cp-wa" style="margin-top:10px">${rs.map((p, i) => { const s = ph[p.student_id || p.id] || {}; return `<div><div class="grow"><b>${esc(p.name)}</b><div class="small muted">${esc((DS().top(viewOf(r), p.scores || {})[0] || {}).n || '')}</div></div><input class="in" style="width:150px" dir="ltr" inputmode="tel" data-ph="${i}" value="${esc(s.guardian_phone || '')}" placeholder="05xxxxxxxx" aria-label="جوال ولي أمر ${esc(p.name)}"><button class="btn sm cp-wab" data-ws="${i}">إرسال</button></div>`; }).join('') || A.emptyBox('لا استجابات')}</div>`);
+    $('#waG', m.el).onchange = e => lang = e.target.value;
+    $$('[data-ws]', m.el).forEach(b => b.onclick = () => { const i = +b.dataset.ws, p = rs[i], sc = viewOf(r, lang); A.waOpen($(`[data-ph="${i}"]`, m.el).value, DS().waText(sc, p.scores || {}, p.name, lang)); b.textContent = '✓ أُرسل'; b.classList.remove('cp-wab'); b.classList.add('ghost'); });
+  }
+  function student(r, p, avg, ph) {
+    let lang = 'ar';
+    const draw = () => {
+      const sc = viewOf(r, lang), tp = DS().top(sc, p.scores || {}), T = DS().T[lang], best = tp[0] || {}, low = tp[tp.length - 1] || {};
+      const L = { ar: { t: 'تقرير الطالب', s: 'نتائج المقياس', st: 'نصائح للطالب', pa: 'لولي الأمر', te: 'للمعلم', low: 'مجال للتنمية', dim: 'البعد', sc: 'الدرجة', lvl: 'المستوى', d: 'الوصف' }, en: { t: 'Student report', s: 'Scale results', st: 'Tips for the student', pa: 'For parents', te: 'For the teacher', low: 'Area to develop', dim: 'Dimension', sc: 'Score', lvl: 'Level', d: 'Description' }, fr: { t: "Rapport de l'élève", s: "Résultats de l'échelle", st: "Conseils pour l'élève", pa: 'Pour les parents', te: 'Pour le professeur', low: 'Axe à développer', dim: 'Dimension', sc: 'Score', lvl: 'Niveau', d: 'Description' } }[lang];
+      return `<div class="cp-rep" id="stR" dir="${sc.dir}"><div class="cp-rh"><img src="assets/logo_white.svg" alt=""><div class="grow"><b>${sc.icon} ${esc(sc.name)} — ${esc(p.name)}</b><span>${L.t} · ${esc(clsName(r.class_id))} · ${esc(new Date().toLocaleDateString(lang === 'ar' ? 'ar-SA-u-ca-gregory' : lang))}</span></div></div><div class="cp-rb">
+        <div class="cp-two"><div>${DS().radar(sc, p.scores || {}, { cmp: avg, size: 290 })}<div class="cp-legend"><span><i style="background:#005499"></i>${esc(p.name)}</span><span><i style="background:#9AA9BC"></i>${T.classAvg}</span></div></div>
+          <div>${barsH(sc, p.scores || {}, avg, lang)}<div class="cp-star" style="margin-top:12px"><span class="small">${T.top}</span><div><b style="font-size:17px">⭐ ${esc(best.n || '')}</b> <span class="cp-pill" style="background:${(best.band || {}).c}">${esc((best.band || {})[lang] || '')}</span></div><div class="small">${esc(best.d || '')}</div></div></div></div>
+        <table class="tbl"><thead><tr><th>${L.dim}</th><th>${L.sc}</th><th>${L.lvl}</th><th>${L.d}</th></tr></thead><tbody>${tp.map(x => `<tr><td><b>${esc(x.n)}</b></td><td>${NUM(x.v, lang)}${lang !== 'ar' ? '%' : '٪'}</td><td><span class="cp-pill" style="background:${x.band.c}">${esc(x.band[lang])}</span></td><td class="small">${esc(x.d)}</td></tr>`).join('')}</tbody></table>
+        <div class="cp-tips"><div><h4>🎒 ${L.st}</h4><ul>${tp.slice(0, 2).map(x => `<li>${esc(x.h)}</li>`).join('')}</ul></div><div><h4>🏠 ${L.pa}</h4><ul><li>${esc(best.h || '')}</li>${low.k && low.k !== best.k ? `<li><b>${L.low}:</b> ${esc(low.n)} — ${esc(low.h)}</li>` : ''}</ul></div>${lang === 'ar' ? `<div><h4>👩‍🏫 ${L.te}</h4><ul>${tp.slice(0, 2).map(x => `<li>${esc(x.t)}</li>`).join('')}${low.t ? `<li>تنمية «${esc(low.n)}»: ${esc(low.t)}</li>` : ''}</ul></div>` : ''}</div>
+        <p class="small muted" style="margin:0">${T.note} — ${T.school}</p></div></div>`;
+    };
+    const s = ph[p.student_id || p.id] || {};
+    const m = A.modal(`<div class="head" style="margin:0;padding-inline-end:44px"><div class="grow"><h3 style="margin:0">تقرير ${esc(p.name)}</h3></div><select class="in" id="stG" style="width:auto">${Object.entries(LANGS).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
+      <div class="cp-tools"><button class="btn ghost sm" id="stI">صورة</button><button class="btn ghost sm" id="stD">PDF</button><button class="btn ghost sm" id="stP">${A.I.print || ''} طباعة</button>${r.scale_key === 'gifted' && A.giftedNominate ? '<button class="btn ghost sm" id="stGf">⭐ ملف الموهوبين</button>' : ''}</div></div>
+      <div id="stB" style="margin-top:10px">${draw()}</div>
+      <div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><input class="in" id="stPh" style="width:180px" dir="ltr" inputmode="tel" value="${esc(s.guardian_phone || '')}" placeholder="جوال ولي الأمر 05xxxxxxxx" aria-label="جوال ولي الأمر"><button class="btn sm cp-wab" id="stW">إرسال لولي الأمر واتساب</button></div>`, { cls: 'wide' });
+    $('#stG', m.el).onchange = e => { lang = e.target.value; $('#stB', m.el).innerHTML = draw(); };
+    $('#stI', m.el).onclick = e => A.run(e.currentTarget, () => A.elToPng($('#stR', m.el), p.name));
+    $('#stD', m.el).onclick = e => A.run(e.currentTarget, () => A.elToPdf($('#stR', m.el), p.name));
+    $('#stP', m.el).onclick = () => A.printDoc(`${viewOf(r, lang).name} — ${p.name}`, clsName(r.class_id), $('#stR', m.el).outerHTML, false);
+    $('#stW', m.el).onclick = () => A.waOpen($('#stPh', m.el).value, DS().waText(viewOf(r, lang), p.scores || {}, p.name, lang));
+    if ($('#stGf', m.el)) $('#stGf', m.el).onclick = e => A.run(e.currentTarget, async () => { await A.giftedNominate({ student_id: p.student_id, name: p.name, class_id: r.class_id, source: 'self', self: p.scores }); A.toast('أُضيف إلى ملفات رعاية الموهوبين', 'ok'); });
   }
 
   // ---------- مؤشرات الأداء (للمالك) ----------
@@ -16908,6 +17399,326 @@ ${S.me.full_name}`;
   }
 })();
 }catch(e){console.error('[dina] src/attendance/compass.js',e)}
+
+/* ==== src/attendance/gifted.js ==== */
+;try{
+/* منصة دينا — رعاية الموهوبين (برنامج الكشف والرعاية — إدارة الجودة والتطوير التربوي)
+   مرجع متكامل: الفلسفة والحلقات الثلاث، البوابات الخمس، خطة كل مرحلة، مكتبة المقاييس المعتمدة وجدول التفسير، البرامج والأدوار والجودة.
+   ملف لكل طالب (gifted_files — sql/100) يتقدم عبر البوابات الخمس: ١٤ نموذجاً واستمارة وخطة قابلة للتعبئة والطباعة،
+   وقرار اللجنة بالأوزان والتصنيف، ولوحة مؤشرات وتصدير. الترشيح الذاتي يُربط بمقياس «سمات الموهبة» في البوصلة.
+   ملاحظة مهنية: المقاييس المقننة تُطبق وتُفسر من مختصين مرخصين وبنسخ أصلية؛ هنا تُسجَّل نتائجها فقط. */
+(function () {
+  const A = window.APP, V = window.VIEWS; if (!A) return;
+  const { S, api, $, $$, esc, AR } = A;
+  const DEMO = !!api.demo;
+  A.I.gifted = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 15.5 6.7 18.4l1.2-6L3.4 8.3l6-.7z"/><path d="M8 22h8"/></svg>';
+  const admin = () => !!S.me && (S.me.is_owner || (A.hasModule && (A.hasModule('gifted') || A.hasModule('counselor'))));
+  if (A.NAV && !A.NAV.some(n => n[0] === 'gifted')) { const i = A.NAV.findIndex(n => n[0] === 'compass'); A.NAV.splice(i < 0 ? A.NAV.length : i + 1, 0, ['gifted', 'رعاية الموهوبين', () => !!S.me && !S.realMe && (S.me.is_owner || A.tfeat('gifted'))]); }
+
+  // ================= المرجع =================
+  const PRINC = [['⚖️', 'تكافؤ الفرص', 'كل طالب يُتاح له الترشيح بغض النظر عن خلفيته أو لغته أو تحصيله.'], ['🧰', 'تعدد الأدوات', 'لا يُبنى القرار على أداة واحدة؛ نهج المعايير المتعددة.'], ['🌐', 'الشمولية', 'الموهبة متعددة المجالات: عقلية، أكاديمية، إبداعية، قيادية، فنية، حركية.'], ['🔁', 'الاستمرارية', 'الكشف عملية مستمرة عبر المراحل لا حدث واحد.'], ['🤝', 'الشراكة', 'المدرسة والأسرة والمجتمع شركاء في الكشف والرعاية.'], ['🔒', 'السرية والتوثيق', 'ملف موثق لكل طالب، ونتائج تُحفظ بسرية ولا تُستخدم للوصم.']];
+  const RINGS = [['قدرة فوق المتوسط', '#005499', 'عامة (الاستدلال، الذاكرة، الطلاقة اللغوية) أو خاصة في مجال.'], ['الالتزام بالمهمة', '#2E8B57', 'المثابرة والانغماس ومعايير الأداء العالية.'], ['الإبداع', '#AE95DA', 'الطلاقة والمرونة والأصالة وحب الاستطلاع.']];
+  const GATES = [
+    ['📣', 'الترشيح والوعي', 'نشر الوعي بخصائص الموهوبين، وترشيح المعلم وولي الأمر والترشيح الذاتي.', 'الفصل الأول', ['nomT', 'nomP', 'nomS']],
+    ['🔎', 'الفرز والتقييم', 'مقياس السمات السلوكية (تقدير المعلم)، ونشاط التفكير الإبداعي، والمقاييس الجمعية.', 'الفصل الأول – الثاني', ['rating', 'torr']],
+    ['🧪', 'التشخيص النهائي', 'مقاييس فردية مقننة يطبقها مختص، ومقابلة الطالب، وملف الإنجاز، ثم لجنة الكشف.', 'الفصل الثاني', ['tests', 'intv', 'port']],
+    ['📄', 'التقرير الفردي', 'قرار اللجنة بالأوزان وتصنيف الموهبة وإبلاغ ولي الأمر وموافقته.', 'الفصل الثاني', ['dec', 'consent']],
+    ['🚀', 'الإلحاق والمتابعة', 'الخطة الفردية (IGP)، وبرامج الإثراء أو التسريع، والرصد الفصلي والموارد.', 'الفصل الثالث وما بعده', ['igp', 'enr', 'res', 'mon']]];
+  const STAGES = [
+    ['رياض الأطفال (٤–٦ سنوات)', 'فضول عالٍ، حصيلة لغوية مبكرة، ذاكرة قوية، لعب تخيلي.', 'مقياس ستانفورد بينيه (الصورة الخامسة)، وكسلر لما قبل المدرسة WPPSI، مقياس تقدير السمات السلوكية', 'نهاية الفصل الأول', 'معلمة الصف + الأخصائي'],
+    ['الابتدائية الدنيا (١–٣)', 'تعلم سريع للقراءة والحساب، أسئلة عميقة، اهتمامات متخصصة.', 'مقياس موهبة للقدرات العقلية المتعددة (م١)، مصفوفات رافن الملونة، عينات أعمال الطالب', 'الفصل الأول – الثاني', 'معلم الصف + منسق البرنامج'],
+    ['الابتدائية العليا (٤–٦)', 'تفكير مجرد ناشئ، مثابرة، إبداع واضح، حس قيادي.', 'مقياس موهبة (م٢)، اختبار تورانس للتفكير الإبداعي TTCT، وكسلر WISC-V', 'الفصل الأول – الثاني', 'معلمو المواد + الموجه + اللجنة'],
+    ['المتوسطة (٧–٩)', 'تفكير ناقد، ميول متخصصة، حاجة لتحديات وهوية.', 'مقياس موهبة (م٢/م٣)، مصفوفات رافن المتقدمة، مقابلة فردية وتوصيات المعلمين', 'الفصل الأول – الثاني', 'منسق البرنامج + الموجه'],
+    ['الثانوية (١٠–١٢)', 'تخصص عميق، بحث مستقل، توجه أكاديمي ومهني.', 'اختبار القدرات العقلية الأولية PMA، واتسون–جليسر للتفكير الناقد، مقياس ستيرنبرغ للذكاء الناجح', 'الفصل الأول', 'منسق البرنامج + المرشد الأكاديمي']];
+  const TOOLS = [
+    ['ستانفورد بينيه — الصورة الخامسة', 'SB5', 'القدرة المعرفية العامة لفظياً وغير لفظي', 'الروضة فما فوق', 'فردي مقنن', 'iq'],
+    ['وكسلر لذكاء ما قبل المدرسة', 'WPPSI', 'القدرات الذهنية قبل الالتحاق بالمدرسة', 'الروضة', 'فردي مقنن', 'iq'],
+    ['وكسلر لذكاء الأطفال — الخامسة', 'WISC-V', 'الذكاء العام والقدرات المعرفية المحددة', '٦–١٦ سنة', 'فردي مقنن', 'iq'],
+    ['كوفمان لتقييم الأطفال', 'K-ABC', 'أساليب معالجة المعلومات والقدرة العامة', '٣–١٨ سنة', 'فردي مقنن', 'iq'],
+    ['مقياس موهبة للقدرات العقلية المتعددة', 'م١/م٢/م٣', 'الاستدلال اللغوي والرياضي والمكاني والعلمي والميكانيكي بتدرج الصعوبة', 'الابتدائية – المتوسطة', 'جمعي مقنن (موهبة)', 'pct'],
+    ['مصفوفات رافن (الملونة/المتقدمة)', 'Raven CPM/APM', 'الاستدلال غير اللفظي — مناسب للأصغر أو ضعاف اللغة', 'كل المراحل', 'جمعي/فردي', 'pct'],
+    ['اختبار تورانس للتفكير الإبداعي', 'TTCT', 'الطلاقة والمرونة والأصالة والتفاصيل (لفظي وشكلي)', 'كل المراحل', 'جمعي', 'std'],
+    ['القدرات العقلية الأولية', 'PMA', 'القدرات اللغوية والمكانية والعددية والاستدلالية أبعاداً منفصلة', 'الثانوية', 'جمعي', 'pct'],
+    ['واتسون–جليسر للتفكير الناقد', 'W-GCTA', 'التحليل والاستنتاج والتقييم المنطقي', 'الثانوية', 'جمعي', 'pct'],
+    ['ستيرنبرغ للذكاء الناجح', 'STAT', 'الذكاء التحليلي والإبداعي والعملي', 'الثانوية', 'جمعي', 'pct'],
+    ['مقياس تقدير السمات السلوكية (المعلم)', '—', 'ملاحظة المعلم المنظمة لمؤشرات الحلقات الثلاث (النموذج ٤)', 'كل المراحل', 'تقدير', 'form'],
+    ['ملف الإنجاز والتقييم الديناميكي', 'Portfolio', 'أعمال وشهادات وتوصيات وانعكاس ذاتي وأداء في مهام متدرجة', 'كل المراحل', 'تكميلي', 'form']];
+  const IQ = [[130, 999, 'موهوب / متفوق جداً', '#2E8B57'], [120, 129, 'متفوق', '#3F7D2A'], [110, 119, 'فوق المتوسط', '#005499'], [90, 109, 'متوسط', '#5E9BD3'], [70, 89, 'دون المتوسط', '#C9A44C'], [0, 69, 'منخفض جداً', '#B83A3A']];
+  const iqBand = v => IQ.find(b => v >= b[0] && v <= b[1]);
+  const CARE = [['🏫', 'الإثراء الصفي', 'تمايز ومهام مفتوحة وضغط المنهج داخل الفصل.'], ['🧩', 'البرامج اللاصفية', 'أندية ومسابقات وبرامج صيفية ومشاريع.'], ['⏩', 'التسريع', 'تسريع مادة أو صف وفق ضوابط اللجنة وموافقة الأسرة.'], ['🧭', 'الإرشاد', 'إرشاد نفسي وأكاديمي ومهني وإدارة الكمالية.'], ['🔗', 'نموذج المنهج المتكامل ICM', 'محتوى متقدم + عمليات تفكير عليا + قضايا ومفاهيم كبرى.']];
+  const PROGS = [['الابتدائية', ['مستكشف المستقبل', 'نادي المبدع الصغير', 'أكاديمية الخوارزمي', 'مختبر الابتكار الرقمي']], ['المتوسطة', ['الباحث الناشئ', 'رواد الغد', 'تحدي الذكاء الاصطناعي', 'الإثراء الأكاديمي المكثف']], ['الثانوية', ['عالم المستقبل', 'حاضنة المبتكرين والمخترعين', 'الاستعداد للجامعات العالمية', 'منتدى القيادة العالمية']]];
+  const ROLES = [['منسق البرنامج', 'يخطط ويتابع البوابات والجدول ويدير الملفات والتقارير.'], ['معلم الصف/المادة', 'يرشّح ويعبّئ مقياس السمات ويطبق الإثراء الصفي.'], ['الموجه الطلابي/الأخصائي', 'المقابلات والمقاييس الفردية والإرشاد.'], ['لجنة الكشف', 'تدرس الملف وتصدر القرار والتصنيف والتوصيات.'], ['ولي الأمر', 'يرشّح ويوافق ويتابع الأنشطة المنزلية.'], ['منسق البرامج الإثرائية', 'ينفذ الخطط والبرامج ويقيس الأثر.']];
+  const QUAL = [['نسبة الكشف', 'الموهوبون المصنفون ÷ طلاب المدرسة'], ['نسبة الاحتفاظ', 'المستمرون في البرامج ÷ الملتحقين'], ['رضا أولياء الأمور', 'استبانة نصف سنوية'], ['تنوع مصادر الترشيح', 'معلم/ولي أمر/ذاتي/نتائج'], ['اكتمال الملفات', 'الملفات المكتملة النماذج ÷ الكل'], ['الالتزام الزمني', 'إنجاز البوابات في مواعيدها']];
+  const TIMELINE = [['الفصل الأول', ['التوعية والترشيح', 'الفرز: مقياس السمات ونشاط الإبداع', 'المقاييس الجمعية']], ['الفصل الثاني', ['التقييم المتخصص الفردي', 'المقابلات وملفات الإنجاز', 'لجنة القرار والتقارير والموافقات']], ['الفصل الثالث', ['الإلحاق بالبرامج والخطط الفردية', 'الرصد الفصلي', 'التقييم السنوي للبرنامج']]];
+
+  // ================= النماذج =================
+  const DOMS = ['قدرة عقلية عامة', 'تفوق أكاديمي تخصصي', 'تفكير إبداعي', 'قيادة', 'موهبة فنية أو أدائية', 'قدرة حركية / رياضية'];
+  const RATE = [['قدرة عقلية', ['يتعلم بسرعة ويحتفظ بالمعلومة لفترة طويلة.', 'يمتلك حصيلة لغوية متقدمة لعمره.', 'يدرك العلاقات والأسباب ويستنتج بسهولة.', 'يطرح أسئلة عميقة غير متوقعة لعمره.', 'يحل المشكلات بطرق متعددة.']], ['التزام بالمهمة', ['ينغمس في الموضوعات التي تهمه لفترات طويلة.', 'يثابر لإكمال المهام الصعبة.', 'يسعى للإتقان وينتقد عمله ذاتياً.', 'يعمل باستقلالية ويحتاج إلى قليل من التوجيه.']], ['الإبداع', ['يقدم أفكاراً وحلولاً كثيرة.', 'يأتي بأفكار أصيلة غير مألوفة.', 'يتمتع بخيال واسع وروح دعابة.', 'يغامر فكرياً ولا يخشى الاختلاف.', 'يطوّر الأفكار ويضيف إليها تفاصيل.']]];
+  const R4 = ['نادراً', 'أحياناً', 'غالباً', 'دائماً'];
+  const INTV = { 'الابتدائية': ['ما الشيء الذي تحب أن تتعلمه أكثر من أي شيء؟ لماذا؟', 'احكِ لي عن شيء صنعته أو اخترعته.', 'لو كان لديك يوم كامل تفعل فيه ما تشاء، ماذا ستفعل؟', 'ما السؤال الذي تتمنى أن تعرف إجابته؟', 'كيف تتصرف عندما يكون الواجب صعباً؟', 'ما الكتاب أو اللعبة التي تحبها؟ ماذا يعجبك فيها؟'],
+    'المتوسطة والثانوية': ['ما المجال الذي تشعر أنك متميز فيه؟ وما الدليل؟', 'صف مشروعاً أو إنجازاً تفخر به، وما التحديات التي واجهتك؟', 'ما القضية أو المشكلة التي تشغل تفكيرك وكيف تقترح حلها؟', 'كيف تتعلم شيئاً جديداً بنفسك خارج المدرسة؟', 'ما طموحك الأكاديمي والمهني بعد عشر سنوات؟', 'متى شعرت بالملل في الصف؟ وما الذي كان سيجعله أكثر تحدياً؟'] };
+  const PORT = ['أعمال ومنتجات الطالب', 'شهادات وجوائز ومشاركات', 'توصيات المعلمين والمختصين', 'توثيق بصري (صور/فيديو) للأداء', 'سجل القراءة والاهتمامات', 'الانعكاس والتقييم الذاتي'];
+  // أنواع الحقول: t نص، a نص طويل، n رقم، d تاريخ، ch خيارات متعددة، sel خيار، r تقدير (بنود)، rows جدول، info نص إرشادي
+  const F = {
+    nomT: { g: 1, ic: '👩‍🏫', n: 'ترشيح المعلم', sub: 'النموذج ١', fs: [['by', 't', 'اسم المعلم المرشِّح'], ['subj', 't', 'المادة'], ['dom', 'ch', 'مجال التميز الملحوظ', DOMS], ['sit', 'a', 'صف موقفاً ملحوظاً يدل على التميز (متى، ماذا فعل الطالب، كيف كان أداؤه مقارنة بأقرانه)'], ['note', 'a', 'ملاحظات إضافية']] },
+    nomP: { g: 1, ic: '🏠', n: 'ترشيح ولي الأمر', sub: 'النموذج ٢', fs: [['by', 't', 'اسم ولي الأمر'], ['ph', 't', 'الجوال'], ['age', 't', 'في أي عمر لاحظتم تميزه؟'], ['dom', 'ch', 'المجالات', DOMS], ['act', 'a', 'الأنشطة والهوايات التي ينجذب إليها'], ['q', 'a', 'أمثلة على أسئلة أو أفكار تفوق عمره'], ['note', 'a', 'ملاحظات']] },
+    nomS: { g: 1, ic: '🙋', n: 'الترشيح الذاتي', sub: 'النموذج ٣ (المتوسطة والثانوية)', fs: [['dom', 'ch', 'المجال الذي أشعر بتميزي فيه', DOMS], ['ach', 'a', 'إنجاز أفخر به'], ['wish', 'a', 'ما أتمنى أن أتعلمه أو أطوره'], ['info', 'info', 'يمكن أيضاً تطبيق مقياس «سمات الموهبة» من البوصلة وإضافة نتيجته لهذا الملف تلقائياً.']] },
+    rating: { g: 2, ic: '📋', n: 'مقياس تقدير السمات السلوكية', sub: 'النموذج ٤ — يعبّئه المعلم بعد ملاحظة ٤ أسابيع على الأقل', fs: [['by', 't', 'المعلم المقيّم'], ['weeks', 'n', 'مدة الملاحظة (أسابيع)'], ['r', 'r', 'البنود', RATE], ['note', 'a', 'ملاحظات']] },
+    torr: { g: 2, ic: '🎨', n: 'نشاط التفكير الإبداعي المصغّر', sub: 'النموذج ٥ — الاستخدامات البديلة', fs: [['info', 'info', 'التعليمات: «اذكر أكبر عدد ممكن من الاستخدامات غير المألوفة لعلبة كرتون فارغة» — ٨ دقائق. سجّل الاستجابات سطراً لكل استجابة.'], ['task', 't', 'المثير المستخدم', null, 'علبة كرتون فارغة'], ['resp', 'a', 'استجابات الطالب (سطر لكل استجابة) — الطلاقة تُحسب تلقائياً'], ['flex', 'n', 'المرونة: عدد الفئات المختلفة للاستجابات'], ['orig', 'n', 'الأصالة: عدد الاستجابات النادرة (غير المتكررة بين الأقران)'], ['elab', 'n', 'التفاصيل: عدد الإضافات والتوضيحات'], ['note', 'a', 'ملاحظات المطبِّق']] },
+    tests: { g: 3, ic: '🧪', n: 'نتائج المقاييس المقننة', sub: 'تُطبَّق من مختص مرخص — تُسجَّل النتائج هنا', fs: [['rows', 'rows', 'النتائج', [['tool', 'المقياس', 'sel', TOOLS.filter(x => x[5] !== 'form').map(x => x[0] + (x[1] !== '—' ? ' (' + x[1] + ')' : ''))], ['date', 'التاريخ', 'd'], ['ss', 'الدرجة المعيارية', 'n'], ['pr', 'الرتبة المئينية', 'n'], ['by', 'المطبِّق', 't'], ['note', 'ملاحظة', 't']]], ['mawh', 'n', 'نتيجة مقياس القدرات العقلية المتعددة (٪ أو مئيني) — تدخل في قرار اللجنة بوزن ٣٠٪']] },
+    intv: { g: 3, ic: '🗣️', n: 'دليل مقابلة الطالب', sub: 'النموذج ٦', fs: [['stage', 'sel', 'المرحلة', Object.keys(INTV)], ['qs', 'info', ''], ['ans', 'a', 'أبرز إجابات الطالب'], ['r', 'r', 'تقدير القائم بالمقابلة', [['المقابلة', ['الحماس والدافعية', 'عمق التفكير والاستدلال', 'سعة الاهتمامات والمعرفة', 'التواصل والتعبير']]]], ['by', 't', 'القائم بالمقابلة'], ['note', 'a', 'ملاحظات']] },
+    port: { g: 3, ic: '🗂️', n: 'قائمة تدقيق ملف الإنجاز', sub: 'النموذج ٧', fs: [['r', 'r', 'جودة محتوى الملف', [['الملف', PORT]]], ['note', 'a', 'ملاحظات اللجنة على الملف']] },
+    dec: { g: 4, ic: '⚖️', n: 'قرار لجنة الكشف وتصنيف الموهبة', sub: 'النموذج ٩ — درجة مرجّحة', fs: [['calc', 'info', ''], ['dom', 'ch', 'مجال الموهبة المعتمد', DOMS], ['rec', 'a', 'توصيات اللجنة (البرنامج المقترح، نوع الرعاية)'], ['care', 'ch', 'نوع الرعاية', CARE.map(c => c[1])], ['mem', 'a', 'أعضاء اللجنة'], ['date', 'd', 'تاريخ القرار']] },
+    consent: { g: 4, ic: '✍️', n: 'إشعار وموافقة ولي الأمر', sub: 'خطة ٤', fs: [['info', 'info', 'نحيطكم علماً بأن ابنكم/ابنتكم اجتاز مراحل الكشف في برنامج رعاية الموهوبين، ونرجو الاطلاع والموافقة على الالتحاق بالبرنامج.'], ['ok', 'ch', 'الموافقة', ['أوافق على التحاقه بالبرنامج', 'أتعهد بمتابعة الأنشطة المنزلية', 'أرغب في جلسة توجيهية للأسرة']], ['by', 't', 'اسم ولي الأمر'], ['date', 'd', 'التاريخ']] },
+    igp: { g: 5, ic: '🎯', n: 'الخطة الفردية لرعاية الموهوب (IGP)', sub: 'خطة ١', fs: [['str', 'a', 'نقاط القوة'], ['need', 'a', 'الاحتياجات المصاحبة (أكاديمية، اجتماعية، انفعالية)'], ['rows', 'rows', 'الأهداف', [['goal', 'الهدف', 't'], ['strat', 'الاستراتيجية', 't'], ['who', 'المسؤول', 't'], ['ind', 'مؤشر التحقق', 't'], ['due', 'الموعد', 'd']]]] },
+    enr: { g: 5, ic: '🌟', n: 'خطة الإثراء الفصلية (٦ أسابيع)', sub: 'خطة ٢', fs: [['prog', 't', 'البرنامج الإثرائي'], ['rows', 'rows', 'الأسابيع', [['wk', 'الأسبوع', 't'], ['goal', 'الهدف', 't'], ['act', 'النشاط', 't'], ['tool', 'الأداة', 't'], ['who', 'المسؤول', 't'], ['ind', 'مؤشر الإنجاز', 't']], 6], ['eval', 'a', 'آلية التقويم الختامي']] },
+    res: { g: 5, ic: '📦', n: 'طلب الموارد', sub: 'خطة ٣', fs: [['rows', 'rows', 'الموارد', [['type', 'النوع', 'sel', ['بشرية', 'مادية', 'تقنية', 'مالية']], ['item', 'البند', 't'], ['why', 'المبرر', 't'], ['cost', 'التكلفة', 'n'], ['pri', 'الأولوية', 'sel', ['عالية', 'متوسطة', 'منخفضة']]]], ['sig', 'info', 'التوقيعات: منسق البرامج — الإدارة المالية — الإدارة العليا']] },
+    mon: { g: 5, ic: '📈', n: 'سجل الرصد الفصلي', sub: 'النموذج ٨', fs: [['rows', 'rows', 'الرصد', [['term', 'الفصل', 'sel', ['الأول', 'الثاني', 'الثالث']], ['prog', 'البرنامج', 't'], ['prg', 'مؤشر التقدم', 'sel', ['متقدم', 'مُرضٍ', 'يحتاج دعماً']], ['rec', 'توصية اللجنة', 't']]]] },
+  };
+  const ORDER = ['nomT', 'nomP', 'nomS', 'rating', 'torr', 'tests', 'intv', 'port', 'dec', 'consent', 'igp', 'enr', 'res', 'mon'];
+  const CFG = () => Object.assign({ w: { rating: 25, mawh: 30, torr: 20, pi: 25 }, cut: { x: 85, g: 70, p: 55 } }, ((S.school || {}).settings || {}).gifted || {});
+  const LEVELS = { x: ['موهبة استثنائية', '#082B5A'], g: ['موهوب', '#2E8B57'], p: ['واعد بالموهبة', '#C9A44C'], n: ['يستمر الرصد', '#8A97A8'] };
+
+  // ================= الحساب =================
+  const rateTot = d => { const r = (d.rating || {}).r || {}; let s = 0, n = 0; RATE.forEach((g, gi) => g[1].forEach((_, i) => { const v = +r[gi + '-' + i]; if (v) { s += v; n++; } })); return { s, n, max: 56 }; };
+  const rateRec = s => s >= 36 ? ['إحالة مباشرة للتقييم المتخصص', '#2E8B57'] : s >= 26 ? ['متابعة ورصد إضافي لفصل دراسي', '#C9A44C'] : ['لا يُحال حالياً — يُعاد التقدير لاحقاً', '#8A97A8'];
+  const torrScore = d => { const t = d.torr || {}; const flu = String(t.resp || '').split('\n').map(x => x.trim()).filter(Boolean).length; const v = Math.round(Math.min(flu, 20) / 20 * 25 + Math.min(+t.flex || 0, 10) / 10 * 25 + Math.min(+t.orig || 0, 8) / 8 * 25 + Math.min(+t.elab || 0, 10) / 10 * 25); return { flu, v, has: flu > 0 }; };
+  const avgR = (x, n) => { const r = (x || {}).r || {}; const v = Object.values(r).map(Number).filter(Boolean); return v.length ? v.reduce((a, b) => a + b, 0) / v.length / n * 100 : null; };
+  function weighted(d) {
+    const c = CFG(), rt = rateTot(d), parts = [];
+    if (rt.n) parts.push(['rating', 'مقياس السمات السلوكية', Math.round(rt.s / 56 * 100), c.w.rating]);
+    const mw = (d.tests || {}).mawh; if (mw !== undefined && mw !== '' && mw !== null) parts.push(['mawh', 'القدرات العقلية المتعددة', Math.min(100, +mw), c.w.mawh]);
+    const ts = torrScore(d); if (ts.has) parts.push(['torr', 'التفكير الإبداعي', ts.v, c.w.torr]);
+    const pi = [avgR(d.port, 4), avgR(d.intv, 4)].filter(x => x != null); if (pi.length) parts.push(['pi', 'ملف الإنجاز والمقابلة', Math.round(pi.reduce((a, b) => a + b, 0) / pi.length), c.w.pi]);
+    const wsum = parts.reduce((a, p) => a + p[3], 0); const total = wsum ? Math.round(parts.reduce((a, p) => a + p[2] * p[3], 0) / wsum) : null;
+    const lv = total == null ? '' : total >= c.cut.x ? 'x' : total >= c.cut.g ? 'g' : total >= c.cut.p ? 'p' : 'n';
+    return { parts, total, lv, complete: parts.length === 4 };
+  }
+  const filled = (d, k) => { const x = d[k]; if (!x) return false; return Object.entries(x).some(([key, v]) => key !== '_at' && (Array.isArray(v) ? v.some(r => r && Object.values(r).some(Boolean)) : v && typeof v === 'object' ? Object.keys(v).length : String(v || '').trim())); };
+  const gateOf = d => { for (let g = 5; g >= 1; g--) if (GATES[g - 1][4].some(k => filled(d, k))) return g; return 1; };
+  const pct = d => Math.round(ORDER.filter(k => filled(d, k)).length / ORDER.length * 100);
+
+  // ================= الأنماط =================
+  if (!document.getElementById('gfcss')) { const st = document.createElement('style'); st.id = 'gfcss'; st.textContent = `
+.gf-hero{border-radius:22px;padding:18px 20px;color:#fff;background:radial-gradient(500px 200px at 10% 0,rgba(58,177,219,.45),transparent),linear-gradient(135deg,#082B5A,#005499);position:relative;overflow:hidden;margin-bottom:14px}
+.gf-hero h3{margin:0 0 4px;font-size:20px}.gf-hero p{margin:0;color:#D6E6F5;line-height:1.8}
+.gf-hero::after{content:"";position:absolute;inset-inline-end:-20px;bottom:-40px;width:180px;height:180px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 15.5 6.7 18.4l1.2-6L3.4 8.3l6-.7z' fill='%233AB1DB' opacity='.25'/%3E%3C/svg%3E") no-repeat center/contain}
+.gf-sec{margin:18px 0 8px;font-size:17px;color:#082B5A;display:flex;gap:8px;align-items:center}.gf-sec::after{content:"";flex:1;height:2px;background:linear-gradient(90deg,#DCE7F3,transparent)}
+.gf-g{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr))}
+.gf-c{border:1px solid #DCE7F3;border-radius:16px;padding:12px 14px;background:linear-gradient(180deg,#fff,#F6FAFD);box-shadow:0 12px 24px -22px rgba(8,43,90,.7)}
+.gf-c b{color:#082B5A;display:block}.gf-c .ic{font-size:24px}.gf-c p{margin:4px 0 0;font-size:13px;color:#4D6A8F;line-height:1.7}
+.gf-rings{display:flex;justify-content:center;align-items:center;min-height:210px;position:relative}
+.gf-rings span{position:absolute;width:150px;height:150px;border-radius:50%;display:grid;place-items:center;text-align:center;font-weight:800;font-size:13px;padding:30px;mix-blend-mode:multiply;border:2px solid #fff}
+.gf-gates{display:grid;gap:10px;grid-template-columns:repeat(5,1fr);counter-reset:g}
+.gf-gate{position:relative;border-radius:18px;padding:14px 12px;background:#fff;border:1px solid #DCE7F3;box-shadow:0 14px 26px -22px rgba(8,43,90,.8);text-align:center}
+.gf-gate .n{width:44px;height:44px;margin:0 auto 6px;border-radius:14px;display:grid;place-items:center;font-size:22px;background:linear-gradient(145deg,#EAF6FB,#D6E8F6);box-shadow:inset 0 -3px 0 rgba(8,43,90,.1)}
+.gf-gate b{display:block;color:#082B5A}.gf-gate small{display:block;color:#4D6A8F;line-height:1.6;margin-top:4px}.gf-gate em{display:inline-block;margin-top:6px;font-style:normal;font-size:11px;font-weight:800;color:#005499;background:#E8F1F9;border-radius:20px;padding:1px 8px}
+.gf-steps{display:flex;gap:4px;align-items:center}.gf-steps i{width:22px;height:8px;border-radius:6px;background:#E1E9F2}.gf-steps i.on{background:linear-gradient(90deg,#3AB1DB,#005499)}
+.gf-lv{display:inline-block;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:800;color:#fff}
+.gf-forms{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr))}
+.gf-f{display:flex;gap:10px;align-items:center;border:1.5px solid #DCE7F3;border-radius:16px;padding:10px 12px;background:#fff;cursor:pointer;text-align:start;font:inherit;color:inherit;width:100%}
+.gf-f:hover{border-color:#3AB1DB;transform:translateY(-1px)}.gf-f:focus-visible{outline:3px solid #3AB1DB;outline-offset:2px}
+.gf-f .ic{font-size:22px;width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:#F0F6FC;flex:none}
+.gf-f.done{border-color:#BADF93;background:#F7FCF2}.gf-f.done .ic{background:#E5F4EA}
+.gf-f b{display:block;font-size:14px;color:#082B5A}.gf-f small{color:#5F7896}
+.gf-gh{display:flex;gap:8px;align-items:center;margin:14px 0 8px;font-weight:800;color:#082B5A}.gf-gh .n{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:#E8F1F9}
+.gf-gh.cur .n{background:#005499;color:#fff}
+.gf-rt{width:100%;border-collapse:collapse}.gf-rt td,.gf-rt th{border-bottom:1px solid #E4EBF5;padding:7px 6px;text-align:start;font-size:13.5px}
+.gf-rt .opt{display:flex;gap:4px}.gf-rt .opt label{display:grid;place-items:center;min-width:52px;min-height:38px;border:1.5px solid #DCE7F3;border-radius:10px;cursor:pointer;font-size:12px;font-weight:700;padding:2px 4px}
+.gf-rt .opt input{position:absolute;opacity:0}.gf-rt .opt label:has(input:checked){border-color:#2E8B57;background:#EDF7E4;color:#1F6B44}.gf-rt .opt label:has(input:focus-visible){outline:3px solid #3AB1DB}
+.gf-chk{display:flex;gap:6px;flex-wrap:wrap}.gf-chk label{display:flex;gap:6px;align-items:center;border:1.5px solid #DCE7F3;border-radius:12px;padding:6px 10px;cursor:pointer}.gf-chk label:has(input:checked){border-color:#005499;background:#EEF5FC}
+.gf-calc{border-radius:16px;padding:12px 14px;background:linear-gradient(135deg,#F3FAEC,#EAF6FB);border:1px solid #CFE7F2}
+.gf-kpi{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.gf-kpi>div{border-radius:18px;padding:14px;background:linear-gradient(180deg,#fff,#F5F9FD);border:1px solid #DCE7F3;box-shadow:inset 0 -4px 0 var(--c,#3AB1DB)}.gf-kpi b{display:block;font-size:28px;color:#082B5A}.gf-kpi span{font-size:12.5px;color:#4D6A8F}
+@media (max-width:860px){.gf-gates{grid-template-columns:1fr 1fr}.gf-gates .gf-gate:last-child{grid-column:1/-1}}
+@media (max-width:520px){.gf-gates{grid-template-columns:1fr}.gf-rt .opt label{min-width:40px;font-size:11px}}
+`; document.head.appendChild(st); }
+
+  // ================= البيانات =================
+  async function load() { try { return await api.list('gifted_files', { school_id: S.school.id }, { order: 'updated_at', desc: true }); } catch (_) { return []; } }
+  async function save(f) { f.updated_at = new Date().toISOString(); f.gate = gateOf(f.data); const w = weighted(f.data); f.level = w.lv || ''; await api.upd('gifted_files', f.id, { data: f.data, gate: f.gate, level: f.level, updated_at: f.updated_at }); }
+  async function create(o) {
+    const row = { school_id: S.school.id, student_id: o.student_id || null, name: o.name || '', class_id: o.class_id || null, source: o.source || 'teacher', gate: 1, level: '', data: o.data || {}, ...(DEMO ? { id: 'gf' + Date.now() + Math.random().toString(36).slice(2, 6), created_by: S.me.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString() } : {}) };
+    const r = await api.ins('gifted_files', [row]); return (Array.isArray(r) ? r[0] : r) || row;
+  }
+  // من البوصلة: الترشيح الذاتي بمقياس سمات الموهبة
+  A.giftedNominate = async o => {
+    const L = await load(); let f = o.student_id && L.find(x => x.student_id === o.student_id);
+    if (!f) f = await create({ ...o, data: {} });
+    f.data = f.data || {}; f.data.nomS = Object.assign({}, f.data.nomS, { scale: o.self, _at: new Date().toISOString() });
+    if (!/self/.test(f.source || '')) f.source = [f.source, 'self'].filter(Boolean).join(',');
+    await save(f); try { await api.upd('gifted_files', f.id, { source: f.source }); } catch (_) { }
+    return f;
+  };
+  const SRC = { teacher: 'معلم', parent: 'ولي أمر', self: 'ذاتي', results: 'نتائج' };
+  const srcChips = s => String(s || '').split(',').filter(Boolean).map(x => `<span class="pill">${esc(SRC[x] || x)}</span>`).join(' ');
+  const lvPill = lv => lv && LEVELS[lv] ? `<span class="gf-lv" style="background:${LEVELS[lv][1]}">${LEVELS[lv][0]}</span>` : '<span class="small muted">—</span>';
+  const steps = g => `<span class="gf-steps" aria-label="البوابة ${AR(g)} من ٥">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= g ? 'on' : ''}"></i>`).join('')}</span>`;
+  const clsName = id => (A.cls && A.cls(id) || {}).name || '';
+
+  // ================= الصفحة =================
+  const st = { tab: 'guide' };
+  V.gifted = function (root) {
+    const ad = admin();
+    const T = [['guide', 'الدليل المرجعي'], ['files', ad ? 'ملفات الطلاب' : 'ترشيحاتي'], ['forms', 'النماذج والاستمارات'], ...(ad ? [['dash', 'المؤشرات والتقارير']] : [])];
+    if (!T.some(t => t[0] === st.tab)) st.tab = 'guide';
+    root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>رعاية الموهوبين</h2><p class="sub" style="margin:2px 0 0">برنامج الكشف عن الموهوبين ورعايتهم من الروضة حتى الثانوية — مرجع متكامل وملف لكل طالب عبر البوابات الخمس.</p></div>${st.tab !== 'guide' ? '<button class="btn" id="gfNew">+ ترشيح طالب</button>' : ''}</div>
+      <div class="fm-tabs">${T.map(([k, l]) => `<button data-t="${k}" class="${st.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div><div id="gfB"></div></div>`;
+    $$('[data-t]', root).forEach(b => b.onclick = () => { st.tab = b.dataset.t; V.gifted(root); });
+    if ($('#gfNew', root)) $('#gfNew', root).onclick = () => nominate(() => { st.tab = 'files'; V.gifted(root); });
+    ({ guide, files, forms, dash })[st.tab]($('#gfB', root), root);
+  };
+
+  function guide(B) {
+    B.innerHTML = `<div class="gf-hero"><h3>⭐ برنامج الكشف عن الموهوبين ورعايتهم</h3><p>الموهبة متعددة المجالات، والكشف عملية مستمرة تعتمد تعدد الأدوات والمعايير وتشارك فيها المدرسة والأسرة. يتقدم ملف كل طالب عبر خمس بوابات تنتهي بخطة رعاية فردية وبرامج إثراء أو تسريع ومتابعة فصلية.</p></div>
+      <div class="gf-sec">المبادئ الستة</div><div class="gf-g">${PRINC.map(p => `<div class="gf-c"><span class="ic" aria-hidden="true">${p[0]}</span><b>${p[1]}</b><p>${p[2]}</p></div>`).join('')}</div>
+      <div class="gf-sec">نموذج الحلقات الثلاث</div><div class="grid g2" style="align-items:center"><div class="gf-rings" aria-hidden="true">${RINGS.map((r, i) => `<span style="background:${r[1]}22;color:${r[1]};transform:translate(${[-55, 55, 0][i]}px,${[-30, -30, 50][i]}px)">${r[0]}</span>`).join('')}</div><div class="gf-g" style="grid-template-columns:1fr">${RINGS.map(r => `<div class="gf-c" style="border-inline-start:5px solid ${r[1]}"><b>${r[0]}</b><p>${r[2]}</p></div>`).join('')}<p class="small muted">تتكوّن الموهبة من تفاعل الحلقات الثلاث، ويُتخذ القرار النهائي بنهج المعايير المتعددة لا بأداة واحدة.</p></div></div>
+      <div class="gf-sec">البوابات الخمس للكشف</div><div class="gf-gates">${GATES.map((g, i) => `<div class="gf-gate"><div class="n" aria-hidden="true">${g[0]}</div><b>${AR(i + 1)}. ${g[1]}</b><small>${g[2]}</small><em>${g[3]}</em></div>`).join('')}</div>
+      <div class="gf-sec">خطة العمل حسب المرحلة</div><div class="scroll"><table class="tbl"><thead><tr><th>المرحلة</th><th>الخصائص النمائية</th><th>الأدوات المقترحة</th><th>التوقيت</th><th>المسؤول</th></tr></thead><tbody>${STAGES.map(s => `<tr>${s.map((x, i) => `<td>${i ? esc(x) : `<b>${esc(x)}</b>`}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+      <div class="gf-sec">مكتبة المقاييس المعتمدة</div><div class="scroll"><table class="tbl"><thead><tr><th>المقياس</th><th>الرمز</th><th>ماذا يقيس</th><th>الفئة</th><th>النوع</th></tr></thead><tbody>${TOOLS.map(t => `<tr><td><b>${esc(t[0])}</b></td><td dir="ltr">${esc(t[1])}</td><td>${esc(t[2])}</td><td>${esc(t[3])}</td><td>${esc(t[4])}</td></tr>`).join('')}</tbody></table></div>
+      <div class="gf-calc small" style="margin-top:8px">⚠️ المقاييس المقننة تتطلب ترخيصاً مهنياً ونسخاً أصلية من الناشرين، وتُطبَّق وتُفسَّر من مختصين مدربين فقط. تُستخدم المنصة لتوثيق نتائجها ضمن ملف الطالب، والنماذج التوثيقية لا تغني عن الترخيص.</div>
+      <div class="gf-sec">تفسير الدرجة المعيارية (IQ)</div><div class="gf-g">${IQ.map(b => `<div class="gf-c" style="border-inline-start:5px solid ${b[3]}"><b>${b[1] > 900 ? AR(b[0]) + ' فأكثر' : AR(b[0]) + ' – ' + AR(b[1])}</b><p>${b[2]}</p></div>`).join('')}</div><p class="small muted">المقاييس الأخرى تُفسَّر وفق جداول معاييرها الخاصة.</p>
+      <div class="gf-sec">قرار اللجنة والتصنيف</div><div class="gf-g">${[['مقياس السمات السلوكية', CFG().w.rating], ['القدرات العقلية المتعددة', CFG().w.mawh], ['التفكير الإبداعي', CFG().w.torr], ['ملف الإنجاز والمقابلة', CFG().w.pi]].map(x => `<div class="gf-c"><b>${AR(x[1])}٪</b><p>${x[0]}</p></div>`).join('')}</div>
+      <p class="small">التصنيف: ${Object.entries(LEVELS).filter(e => e[0] !== 'n').map(([k, l]) => `${lvPill(k)} ${k === 'x' ? '≥ ' + AR(CFG().cut.x) : k === 'g' ? '≥ ' + AR(CFG().cut.g) : '≥ ' + AR(CFG().cut.p)}`).join(' · ')} — مقياس السمات: ٣٦ فأعلى إحالة مباشرة، ٢٦–٣٥ متابعة فصل دراسي.</p>
+      <div class="gf-sec">أنواع الرعاية</div><div class="gf-g">${CARE.map(c => `<div class="gf-c"><span class="ic" aria-hidden="true">${c[0]}</span><b>${c[1]}</b><p>${c[2]}</p></div>`).join('')}</div>
+      <div class="gf-sec">البرامج المقترحة لكل مرحلة</div><div class="gf-g">${PROGS.map(p => `<div class="gf-c"><b>${p[0]}</b><p>${p[1].map(esc).join(' · ')}</p></div>`).join('')}</div>
+      <div class="gf-sec">الجدول الزمني</div><div class="gf-g">${TIMELINE.map(t => `<div class="gf-c"><b>📅 ${t[0]}</b><p>${t[1].map(esc).join('<br>')}</p></div>`).join('')}</div>
+      <div class="gf-sec">الأدوار والمسؤوليات</div><div class="gf-g">${ROLES.map(r => `<div class="gf-c"><b>${r[0]}</b><p>${r[1]}</p></div>`).join('')}</div>
+      <div class="gf-sec">معايير الجودة والمتابعة</div><div class="gf-g">${QUAL.map(q => `<div class="gf-c"><b>${q[0]}</b><p>${q[1]}</p></div>`).join('')}</div>
+      <p class="small muted" style="margin-top:12px">المرجع: برنامج الكشف عن الموهوبين ورعايتهم — إدارة الجودة والتطوير التربوي، مدارس دينا العالمية ١٤٤٨هـ، والأطر النظرية (رينزولي، غانييه، المعايير المتعددة).</p>
+      <div class="acts"><button class="btn ghost" id="gdP">${A.I.print || ''} طباعة الدليل</button></div>`;
+    $('#gdP', B).onclick = () => A.printDoc('برنامج الكشف عن الموهوبين ورعايتهم', 'الدليل المرجعي', B.innerHTML.replace(/<div class="acts">[\s\S]*$/, ''), false);
+  }
+
+  async function files(B, root) {
+    B.innerHTML = '<div class="spinner"></div>'; const L = await load();
+    if (!L.length) { B.innerHTML = A.emptyBox('لا ملفات بعد', 'ابدأ بترشيح طالب: معلم أو ولي أمر أو ترشيح ذاتي من مقياس «سمات الموهبة» في البوصلة.'); return; }
+    B.innerHTML = `<div class="row" style="gap:6px;margin-bottom:8px;flex-wrap:wrap"><input class="in" id="gfQ" placeholder="بحث بالاسم" style="max-width:240px"><select class="in" id="gfG" style="width:auto"><option value="">كل البوابات</option>${GATES.map((g, i) => `<option value="${i + 1}">${AR(i + 1)}. ${g[1]}</option>`).join('')}</select><select class="in" id="gfLv" style="width:auto"><option value="">كل التصنيفات</option>${Object.entries(LEVELS).map(([k, l]) => `<option value="${k}">${l[0]}</option>`).join('')}</select></div>
+      <div class="scroll"><table class="tbl"><thead><tr><th>الطالب</th><th>الفصل</th><th>مصدر الترشيح</th><th>البوابة</th><th>اكتمال الملف</th><th>التصنيف</th></tr></thead><tbody id="gfT"></tbody></table></div>`;
+    const draw = () => { const q = $('#gfQ', B).value.trim(), g = $('#gfG', B).value, lv = $('#gfLv', B).value;
+      $('#gfT', B).innerHTML = L.filter(f => (!q || (f.name || '').includes(q)) && (!g || +f.gate === +g) && (!lv || f.level === lv)).map(f => `<tr data-f="${f.id}" tabindex="0" style="cursor:pointer"><td><b>${esc(f.name)}</b></td><td>${esc(clsName(f.class_id))}</td><td>${srcChips(f.source)}</td><td>${steps(f.gate || 1)} <span class="small">${esc(GATES[(f.gate || 1) - 1][1])}</span></td><td><div class="nf-meter" style="max-width:120px"><i style="width:${pct(f.data || {})}%"></i></div><span class="small">${AR(pct(f.data || {}))}٪</span></td><td>${lvPill(f.level)}</td></tr>`).join('');
+      $$('[data-f]', B).forEach(tr => { const go = () => openFile(L.find(f => f.id === tr.dataset.f), () => files(B, root)); tr.onclick = go; tr.onkeydown = e => { if (e.key === 'Enter') go(); }; }); };
+    ['gfQ', 'gfG', 'gfLv'].forEach(id => $('#' + id, B).oninput = draw); draw();
+  }
+
+  async function nominate(after) {
+    const cls = (S.allClasses || S.classes || []).filter(c => c.active !== false).sort((a, b) => (a.sort || 0) - (b.sort || 0));
+    const m = A.modal(`<h3>⭐ ترشيح طالب لبرنامج الموهوبين</h3><div class="grid g2"><div class="field"><label for="nmC">الفصل</label><select class="in" id="nmC">${cls.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></div><div class="field"><label for="nmS">الطالب</label><select class="in" id="nmS"></select></div>
+      <div class="field"><label for="nmR">مصدر الترشيح</label><select class="in" id="nmR">${Object.entries(SRC).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select></div></div>
+      <p class="small muted">يُنشأ ملف الطالب ويبدأ من البوابة الأولى، ثم تعبّئ نموذج الترشيح المناسب.</p><div class="acts"><button class="btn" id="nmGo">إنشاء الملف</button></div>`);
+    const loadS = async () => { let L = []; try { L = await api.list('students', { class_id: $('#nmC', m.el).value, active: true }, { order: 'full_name', select: 'id,full_name' }); } catch (_) { } $('#nmS', m.el).innerHTML = L.map(s => `<option value="${s.id}">${esc(s.full_name)}</option>`).join('') || '<option value="">لا طلاب</option>'; };
+    $('#nmC', m.el).onchange = loadS; await loadS();
+    $('#nmGo', m.el).onclick = e => A.run(e.currentTarget, async () => {
+      const sel = $('#nmS', m.el); if (!sel.value) return A.toast('اختر الطالب', 'err');
+      const ex = (await load()).find(f => f.student_id === sel.value); if (ex) { m.close(); A.toast('للطالب ملف قائم — فُتح', 'ok'); return openFile(ex, after); }
+      const src = $('#nmR', m.el).value; const f = await create({ student_id: sel.value, name: sel.options[sel.selectedIndex].text, class_id: $('#nmC', m.el).value, source: src });
+      m.close(); after && after(); openFile(f, after, { teacher: 'nomT', parent: 'nomP', self: 'nomS', results: 'tests' }[src]);
+    });
+  }
+
+  function openFile(f, after, openForm) {
+    f.data = f.data || {};
+    const draw = () => { const g = gateOf(f.data), w = weighted(f.data);
+      return `<div class="gf-hero" style="margin:0 0 10px"><h3>⭐ ${esc(f.name)}</h3><p>${esc(clsName(f.class_id))} · مصدر الترشيح: ${esc(String(f.source || '').split(',').map(x => SRC[x] || x).join('، '))} · اكتمال الملف ${AR(pct(f.data))}٪</p><div style="margin-top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">${steps(g)} <b>البوابة ${AR(g)}: ${esc(GATES[g - 1][1])}</b> ${w.total != null ? `<span>الدرجة المرجّحة: <b>${AR(w.total)}٪</b></span> ${lvPill(w.lv)}` : ''}</div></div>
+      ${GATES.map((G, i) => `<div class="gf-gh ${i + 1 === g ? 'cur' : ''}"><span class="n">${G[0]}</span>${AR(i + 1)}. ${G[1]} <span class="small muted" style="font-weight:500">— ${G[3]}</span></div><div class="gf-forms">${G[4].map(k => `<button class="gf-f ${filled(f.data, k) ? 'done' : ''}" data-fm="${k}"><span class="ic" aria-hidden="true">${F[k].ic}</span><span><b>${F[k].n}</b><small>${filled(f.data, k) ? '✓ مكتمل' : F[k].sub}</small></span></button>`).join('')}</div>`).join('')}`; };
+    const m = A.modal(`<div class="head" style="margin:0 0 8px;padding-inline-end:44px"><div class="grow"><h3 style="margin:0">ملف رعاية الموهوب</h3></div><div class="cp-tools" style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn ghost sm" id="ofP">${A.I.print || ''} التقرير الشامل</button><button class="btn ghost sm" id="ofD">PDF</button><button class="btn ghost sm" id="ofW">واتساب لولي الأمر</button>${admin() ? '<button class="btn ghost sm" id="ofX" style="color:var(--bad)">حذف</button>' : ''}</div></div><div id="ofB">${draw()}</div>`, { cls: 'wide' });
+    const bind = () => $$('[data-fm]', m.el).forEach(b => b.onclick = () => form(f, b.dataset.fm, async () => { await save(f); $('#ofB', m.el).innerHTML = draw(); bind(); after && after(); }));
+    bind();
+    $('#ofP', m.el).onclick = () => A.printDoc('ملف رعاية الموهوب — ' + f.name, clsName(f.class_id), fullReport(f), false);
+    $('#ofD', m.el).onclick = e => A.run(e.currentTarget, async () => { const d = document.createElement('div'); d.style.cssText = 'position:fixed;inset-inline-start:-9999px;top:0;width:900px;background:#fff;padding:20px;direction:rtl'; d.innerHTML = `<div class="cp-rep"><div class="cp-rh"><img src="assets/logo_white.svg" alt=""><div class="grow"><b>ملف رعاية الموهوب — ${esc(f.name)}</b><span>${esc(clsName(f.class_id))} · ${esc(A.arDate ? A.arDate(new Date().toISOString().slice(0, 10)) : '')}</span></div></div><div class="cp-rb">${fullReport(f)}</div></div>`; document.body.appendChild(d); try { await A.elToPdf(d, 'ملف الموهوب - ' + f.name); } finally { d.remove(); } });
+    $('#ofW', m.el).onclick = async () => { let ph = ((f.data.nomP || {}).ph) || ''; if (!ph && f.student_id) { try { const s = (await api.list('students', { id: f.student_id }, { select: 'guardian_phone' }))[0]; ph = (s || {}).guardian_phone || ''; } catch (_) { } } const w = weighted(f.data);
+      const txt = `ولي أمر الطالب/ة ${f.name} الكريم،\nنفيدكم بأن ابنكم/ابنتكم ضمن برنامج الكشف عن الموهوبين ورعايتهم في مدارس دينا العالمية.\nالمرحلة الحالية: البوابة ${gateOf(f.data)} — ${GATES[gateOf(f.data) - 1][1]}${w.lv && w.lv !== 'n' ? `\nالتصنيف: ${LEVELS[w.lv][0]}` : ''}\nنتطلع لشراكتكم في رعاية موهبته.\nمنسق برنامج الموهوبين`; (A.waOpen || ((p, t) => window.open('https://wa.me/?text=' + encodeURIComponent(t))))(ph, txt); };
+    if ($('#ofX', m.el)) $('#ofX', m.el).onclick = async () => { if (!await A.confirmBox('حذف ملف <b>' + esc(f.name) + '</b> نهائياً؟', 'حذف', true)) return; await api.del('gifted_files', f.id); m.close(); after && after(); };
+    if (openForm) setTimeout(() => { const b = $(`[data-fm="${openForm}"]`, m.el); b && b.click(); }, 50);
+  }
+
+  // ---------- محرّر نموذج عام ----------
+  function fieldHtml(fk, f, val, k) {
+    const [id, ty, label, opts, ph] = f, v = val[id];
+    if (ty === 'info') { if (fk === 'intv' && id === 'qs') return `<div class="gf-calc small" id="intQ"></div>`; if (fk === 'dec' && id === 'calc') return `<div class="gf-calc" id="decC"></div>`; return label ? `<div class="gf-calc small">${esc(label)}</div>` : ''; }
+    const L = `<label for="g-${id}">${esc(label)}</label>`;
+    if (ty === 't' || ty === 'n' || ty === 'd') return `<div class="field">${L}<input class="in" id="g-${id}" data-k="${id}" type="${ty === 'n' ? 'number' : ty === 'd' ? 'date' : 'text'}" value="${esc(v ?? ph ?? '')}" ${ty === 'n' ? 'min="0" inputmode="numeric"' : ''}></div>`;
+    if (ty === 'a') return `<div class="field">${L}<textarea class="in" id="g-${id}" data-k="${id}" rows="${id === 'resp' ? 7 : 3}">${esc(v || '')}</textarea></div>`;
+    if (ty === 'sel') return `<div class="field">${L}<select class="in" id="g-${id}" data-k="${id}">${opts.map(o => `<option ${v === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></div>`;
+    if (ty === 'ch') return `<div class="field"><label>${esc(label)}</label><div class="gf-chk" data-ch="${id}">${opts.map(o => `<label><input type="checkbox" value="${esc(o)}" ${(v || []).includes(o) ? 'checked' : ''}>${esc(o)}</label>`).join('')}</div></div>`;
+    if (ty === 'r') { const sc = fk === 'rating' ? R4 : ['ضعيف', 'مقبول', 'جيد', 'متميز']; const r = v || {};
+      return `<div class="field"><label>${esc(label)}</label><table class="gf-rt">${opts.map((g, gi) => `<tr><th colspan="2" style="background:#F2F7FC">${esc(g[0])}</th></tr>${g[1].map((it, i) => `<tr><td>${esc(it)}</td><td><div class="opt" role="radiogroup" aria-label="${esc(it)}">${sc.map((l, x) => `<label><input type="radio" name="r-${gi}-${i}" value="${x + 1}" ${+r[gi + '-' + i] === x + 1 ? 'checked' : ''} data-r="${gi}-${i}">${esc(l)}</label>`).join('')}</div></td></tr>`).join('')}`).join('')}</table>${fk === 'rating' ? '<div class="gf-calc" id="rtC" style="margin-top:8px"></div>' : ''}</div>`; }
+    if (ty === 'rows') { const cols = opts, rows = (v && v.length ? v : Array.from({ length: k || 2 }, () => ({})));
+      return `<div class="field"><label>${esc(label)}</label><div class="scroll"><table class="gf-rt" data-rows="${id}"><thead><tr>${cols.map(c => `<th>${esc(c[1])}</th>`).join('')}<th></th></tr></thead><tbody>${rows.map(r => rowHtml(cols, r)).join('')}</tbody></table></div><button class="btn ghost sm" data-add="${id}" type="button">+ صف</button></div>`; }
+    return '';
+  }
+  const rowHtml = (cols, r) => `<tr>${cols.map(c => `<td>${c[2] === 'sel' ? `<select class="in" data-c="${c[0]}">${['', ...c[3]].map(o => `<option ${r[c[0]] === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>` : `<input class="in" data-c="${c[0]}" type="${c[2] === 'n' ? 'number' : c[2] === 'd' ? 'date' : 'text'}" value="${esc(r[c[0]] || '')}" aria-label="${esc(c[1])}">`}</td>`).join('')}<td><button class="btn ghost sm" data-delr type="button" aria-label="حذف الصف">✕</button></td></tr>`;
+  function collect(el, def) {
+    const o = {};
+    $$('[data-k]', el).forEach(i => o[i.dataset.k] = i.value);
+    $$('[data-ch]', el).forEach(g => o[g.dataset.ch] = $$('input:checked', g).map(i => i.value));
+    const r = {}; $$('[data-r]:checked', el).forEach(i => r[i.dataset.r] = +i.value); if ($$('[data-r]', el).length) o.r = r;
+    $$('[data-rows]', el).forEach(t => o[t.dataset.rows] = $$('tbody tr', t).map(tr => { const x = {}; $$('[data-c]', tr).forEach(i => x[i.dataset.c] = i.value); return x; }).filter(x => Object.values(x).some(Boolean)));
+    return Object.assign({}, def, o, { _at: new Date().toISOString() });
+  }
+  function form(file, fk, after) {
+    const D = F[fk], val = file.data[fk] || {};
+    const m = A.modal(`<div class="head" style="margin:0;padding-inline-end:44px"><div class="grow"><h3 style="margin:0">${D.ic} ${D.n}</h3><span class="small muted">${esc(D.sub)} · ${esc(file.name)}</span></div><button class="btn ghost sm" id="fmP">${A.I.print || ''} طباعة</button></div>
+      <div id="fmB" style="margin-top:10px">${D.fs.map(f => fieldHtml(fk, f, val, f[1] === 'rows' ? f[4] : 0)).join('')}${fk === 'nomS' && val.scale ? `<div class="gf-calc"><b>نتيجة مقياس «سمات الموهبة» (البوصلة):</b> ${Object.entries(val.scale).map(([k, v]) => { const sc = window.DinaScales && DinaScales.view('gifted'); return `${esc(sc ? sc.dims[k][0] : k)} ${AR(v)}٪`; }).join(' · ')}</div>` : ''}</div>
+      <div class="acts"><button class="btn" id="fmS">حفظ</button></div>`, { cls: 'wide' });
+    const el = $('#fmB', m.el);
+    const live = () => {
+      if (fk === 'rating') { const d = { rating: collect(el, val) }, t = rateTot(d), rec = rateRec(t.s); $('#rtC', el).innerHTML = `المجموع: <b>${AR(t.s)}</b> من ${AR(56)} (${AR(t.n)}/١٤ بنداً) — <b style="color:${rec[1]}">${rec[0]}</b>`; }
+      if (fk === 'torr') { /* الطلاقة تلقائية */ }
+      if (fk === 'intv') { const s = ($('[data-k="stage"]', el) || {}).value || Object.keys(INTV)[0]; $('#intQ', el).innerHTML = `<b>أسئلة موجهة (${esc(s)}):</b><ol style="margin:6px 0 0;line-height:1.9">${INTV[s].map(q => `<li>${esc(q)}</li>`).join('')}</ol>`; }
+      if (fk === 'dec') { const w = weighted(file.data); $('#decC', el).innerHTML = `<b>الدرجة المرجّحة (تُحسب من نماذج الملف):</b><table class="gf-rt" style="margin-top:6px"><tr><th>المكوّن</th><th>الدرجة</th><th>الوزن</th></tr>${[['rating', 'مقياس السمات السلوكية'], ['mawh', 'القدرات العقلية المتعددة'], ['torr', 'التفكير الإبداعي'], ['pi', 'ملف الإنجاز والمقابلة']].map(([k, n]) => { const p = w.parts.find(x => x[0] === k); return `<tr><td>${n}</td><td>${p ? AR(p[2]) + '٪' : '<span class="muted">لم يُعبّأ</span>'}</td><td>${AR(CFG().w[k])}٪</td></tr>`; }).join('')}</table><div style="margin-top:8px">الدرجة: <b style="font-size:20px">${w.total == null ? '—' : AR(w.total) + '٪'}</b> ${lvPill(w.lv)} ${w.complete ? '' : '<span class="small muted">(تُعاد موازنة الأوزان على المكونات المتاحة حتى يكتمل الملف)</span>'}</div>`; }
+      if (fk === 'torr') { const t = torrScore({ torr: collect(el, val) }); let x = $('#trC', el); if (!x) { x = document.createElement('div'); x.className = 'gf-calc'; x.id = 'trC'; el.appendChild(x); } x.innerHTML = `الطلاقة: <b>${AR(t.flu)}</b> استجابة — الدرجة المدرسية المبسّطة: <b>${AR(t.v)}٪</b> <span class="small muted">(٢٥٪ لكل من الطلاقة حتى ٢٠، المرونة حتى ١٠، الأصالة حتى ٨، التفاصيل حتى ١٠)</span>`; }
+    };
+    el.addEventListener('input', live); el.addEventListener('change', live); live();
+    el.addEventListener('click', e => { const a = e.target.closest('[data-add]'); if (a) { const fd = D.fs.find(x => x[0] === a.dataset.add); $(`[data-rows="${a.dataset.add}"] tbody`, el).insertAdjacentHTML('beforeend', rowHtml(fd[3], {})); } const d = e.target.closest('[data-delr]'); if (d) d.closest('tr').remove(); });
+    $('#fmS', m.el).onclick = e => A.run(e.currentTarget, async () => { file.data[fk] = collect(el, val); if (fk === 'nomP' && !/parent/.test(file.source || '')) { file.source = [file.source, 'parent'].filter(Boolean).join(','); try { await api.upd('gifted_files', file.id, { source: file.source }); } catch (_) { } } await after(); m.close(); A.toast('حُفظ', 'ok'); });
+    $('#fmP', m.el).onclick = () => A.printDoc(D.n, file.name + ' · ' + clsName(file.class_id), formPrint(fk, collect(el, val)), false);
+  }
+  function formPrint(fk, v) {
+    const D = F[fk]; v = v || {};
+    return D.fs.map(([id, ty, label, opts]) => {
+      if (ty === 'info') { if (fk === 'intv' && id === 'qs') { const s = v.stage || Object.keys(INTV)[0]; return `<p><b>أسئلة موجهة:</b></p><ol>${INTV[s].map(q => `<li>${esc(q)}</li>`).join('')}</ol>`; } if (fk === 'dec' && id === 'calc') return ''; return label ? `<p>${esc(label)}</p>` : ''; }
+      if (ty === 'ch') return `<p><b>${esc(label)}:</b> ${opts.map(o => `${(v[id] || []).includes(o) ? '☑' : '☐'} ${esc(o)}`).join('&nbsp;&nbsp; ')}</p>`;
+      if (ty === 'r') { const sc = fk === 'rating' ? R4 : ['ضعيف', 'مقبول', 'جيد', 'متميز']; const r = v.r || {}; return `<table><tr><th>البند</th>${sc.map(s => `<th>${s}</th>`).join('')}</tr>${opts.map((g, gi) => `<tr><th colspan="${sc.length + 1}">${esc(g[0])}</th></tr>${g[1].map((it, i) => `<tr><td>${esc(it)}</td>${sc.map((_, x) => `<td style="text-align:center">${+r[gi + '-' + i] === x + 1 ? '●' : '○'}</td>`).join('')}</tr>`).join('')}`).join('')}</table>${fk === 'rating' ? `<p>المجموع: ${AR(rateTot({ rating: v }).s)} / ٥٦ — ${rateRec(rateTot({ rating: v }).s)[0]}</p>` : ''}`; }
+      if (ty === 'rows') { const rows = (v[id] && v[id].length ? v[id] : Array.from({ length: 5 }, () => ({}))); return `<p><b>${esc(label)}</b></p><table><tr>${opts.map(c => `<th>${esc(c[1])}</th>`).join('')}</tr>${rows.map(r => `<tr>${opts.map(c => `<td>${esc(r[c[0]] || '')}&nbsp;</td>`).join('')}</tr>`).join('')}</table>`; }
+      return `<p><b>${esc(label)}:</b> ${esc(v[id] || '') || '<span style="display:inline-block;min-width:60%;border-bottom:1px dotted #999">&nbsp;</span>'}</p>`;
+    }).join('') + (fk === 'torr' && v.resp ? `<p>الطلاقة: ${AR(torrScore({ torr: v }).flu)} — الدرجة: ${AR(torrScore({ torr: v }).v)}٪</p>` : '') + '<p style="margin-top:24px">التوقيع: ....................................  التاريخ: ....................</p>';
+  }
+  function fullReport(f) {
+    const d = f.data || {}, w = weighted(d), rt = rateTot(d);
+    return `<table><tr><th>الطالب</th><td>${esc(f.name)}</td><th>الفصل</th><td>${esc(clsName(f.class_id))}</td></tr><tr><th>البوابة</th><td>${AR(gateOf(d))} — ${GATES[gateOf(d) - 1][1]}</td><th>التصنيف</th><td>${w.lv ? LEVELS[w.lv][0] : '—'} ${w.total != null ? '(' + AR(w.total) + '٪)' : ''}</td></tr></table>
+      <h3>مكونات القرار</h3><table><tr><th>المكوّن</th><th>الدرجة</th><th>الوزن</th></tr>${w.parts.map(p => `<tr><td>${p[1]}</td><td>${AR(p[2])}٪</td><td>${AR(p[3])}٪</td></tr>`).join('') || '<tr><td colspan="3">لم تكتمل النماذج بعد</td></tr>'}</table>
+      ${rt.n ? `<p>مقياس السمات السلوكية: ${AR(rt.s)} / ٥٦ — ${rateRec(rt.s)[0]}</p>` : ''}
+      ${ORDER.filter(k => filled(d, k)).map(k => `<h3>${F[k].ic} ${F[k].n}</h3>${formPrint(k, d[k]).replace(/<p style="margin-top:24px">[\s\S]*$/, '')}`).join('')}
+      <p style="margin-top:24px">منسق البرنامج: ....................   رئيس اللجنة: ....................   التاريخ: ....................</p>`;
+  }
+
+  function forms(B) {
+    B.innerHTML = `<p class="small muted">النماذج والاستمارات والخطط معتمدة من برنامج المدرسة. اطبع النموذج فارغاً للتعبئة الورقية، أو افتح ملف الطالب لتعبئته إلكترونياً (يُحسب المجموع والتصنيف تلقائياً).</p>
+      ${GATES.map((G, i) => `<div class="gf-gh"><span class="n">${G[0]}</span>${AR(i + 1)}. ${G[1]}</div><div class="gf-forms">${G[4].map(k => `<button class="gf-f" data-pf="${k}"><span class="ic" aria-hidden="true">${F[k].ic}</span><span><b>${F[k].n}</b><small>${F[k].sub} · طباعة فارغ</small></span></button>`).join('')}</div>`).join('')}
+      <div class="gf-gh"><span class="n">⭐</span>أدوات مرتبطة</div><div class="gf-forms"><button class="gf-f" id="pfS"><span class="ic">🧭</span><span><b>مقياس «سمات الموهبة» للطالب</b><small>ترشيح ذاتي إلكتروني برابط/QR من البوصلة</small></span></button><button class="gf-f" id="pfAll"><span class="ic">🖨️</span><span><b>حزمة النماذج كاملة</b><small>طباعة كل النماذج فارغة</small></span></button></div>`;
+    $$('[data-pf]', B).forEach(b => b.onclick = () => A.printDoc(F[b.dataset.pf].n, F[b.dataset.pf].sub + ' — الطالب: ........................ الفصل: ............', formPrint(b.dataset.pf, {}), false));
+    $('#pfAll', B).onclick = () => A.printDoc('نماذج برنامج الكشف عن الموهوبين ورعايتهم', 'الطالب: ........................ الفصل: ............', ORDER.map(k => `<h2>${F[k].ic} ${F[k].n}</h2><p class="small">${esc(F[k].sub)}</p>${formPrint(k, {})}<div style="page-break-after:always"></div>`).join(''), false);
+    $('#pfS', B).onclick = () => { location.hash = '#/compass'; };
+  }
+
+  async function dash(B) {
+    B.innerHTML = '<div class="spinner"></div>'; const L = await load(); let nStu = 0; try { nStu = (await api.list('students', { school_id: S.school.id, active: true }, { select: 'id' })).length; } catch (_) { }
+    const byG = [1, 2, 3, 4, 5].map(g => L.filter(f => (f.gate || 1) === g).length), byL = Object.keys(LEVELS).map(k => [k, L.filter(f => f.level === k).length]);
+    const src = {}; L.forEach(f => String(f.source || '').split(',').filter(Boolean).forEach(s => src[s] = (src[s] || 0) + 1));
+    const gifted = L.filter(f => f.level === 'g' || f.level === 'x').length, comp = L.filter(f => pct(f.data || {}) >= 70).length;
+    const c = CFG();
+    B.innerHTML = `<div class="gf-kpi">${[['ملفات الترشيح', AR(L.length), '#005499'], ['المصنفون موهوبين', AR(gifted), '#2E8B57'], ['نسبة الكشف', nStu ? AR(Math.round(gifted / nStu * 1000) / 10) + '٪' : '—', '#3AB1DB'], ['تنوع مصادر الترشيح', AR(Object.keys(src).length) + ' / ٤', '#C9A44C'], ['اكتمال الملفات (≥٧٠٪)', L.length ? AR(Math.round(comp / L.length * 100)) + '٪' : '—', '#AE95DA']].map(k => `<div style="--c:${k[2]}"><b>${k[1]}</b><span>${k[0]}</span></div>`).join('')}</div>
+      <div class="grid g2" style="margin-top:12px;align-items:start"><div class="card" style="margin:0"><h3 style="margin-top:0">الطلاب عبر البوابات</h3>${GATES.map((g, i) => `<div style="display:grid;grid-template-columns:150px 1fr 30px;gap:8px;align-items:center;margin-bottom:6px"><span class="small"><b>${AR(i + 1)}.</b> ${g[1]}</span><div class="nf-meter"><i style="width:${L.length ? byG[i] / L.length * 100 : 0}%"></i></div><b>${AR(byG[i])}</b></div>`).join('')}</div>
+        <div class="card" style="margin:0"><h3 style="margin-top:0">التصنيف ومصادر الترشيح</h3><p>${byL.map(([k, n]) => `${lvPill(k)} ${AR(n)}`).join('&nbsp;&nbsp; ')}</p><p>${Object.entries(SRC).map(([k, l]) => `<span class="pill">${l}: ${AR(src[k] || 0)}</span>`).join(' ')}</p></div></div>
+      <div class="card" style="margin-top:12px"><h3 style="margin-top:0">إعدادات القرار (للمالك)</h3><div class="grid g2"><div class="field"><label>الأوزان ٪ (السمات، القدرات، الإبداع، الإنجاز والمقابلة)</label><div class="row" style="gap:6px">${['rating', 'mawh', 'torr', 'pi'].map(k => `<input class="in" type="number" data-w="${k}" value="${c.w[k]}" style="width:80px" aria-label="${k}">`).join('')}</div></div><div class="field"><label>حدود التصنيف (استثنائي، موهوب، واعد)</label><div class="row" style="gap:6px">${['x', 'g', 'p'].map(k => `<input class="in" type="number" data-cut="${k}" value="${c.cut[k]}" style="width:80px" aria-label="${LEVELS[k][0]}">`).join('')}</div></div></div>
+        <div class="acts">${S.me.is_owner ? '<button class="btn ghost" id="gsS">حفظ الإعدادات</button>' : ''}<button class="btn ghost" id="gsX">Excel</button><button class="btn" id="gsP">${A.I.print || ''} تقرير البرنامج</button></div></div>`;
+    if ($('#gsS', B)) $('#gsS', B).onclick = e => A.run(e.currentTarget, async () => { const g = { w: {}, cut: {} }; $$('[data-w]', B).forEach(i => g.w[i.dataset.w] = +i.value || 0); $$('[data-cut]', B).forEach(i => g.cut[i.dataset.cut] = +i.value || 0); const settings = { ...(S.school.settings || {}), gifted: g }; const r = await api.updateSchool(S.school.id, { settings }); S.school.settings = (r && r.settings) || settings; A.toast('حُفظ', 'ok'); });
+    $('#gsX', B).onclick = () => { if (!window.XLSX) return; const ws = XLSX.utils.json_to_sheet(L.map(f => { const w = weighted(f.data || {}); return { 'الطالب': f.name, 'الفصل': clsName(f.class_id), 'المصدر': String(f.source || '').split(',').map(x => SRC[x] || x).join('، '), 'البوابة': f.gate, 'اكتمال الملف ٪': pct(f.data || {}), 'السمات /٥٦': rateTot(f.data || {}).s, 'الدرجة المرجحة': w.total ?? '', 'التصنيف': w.lv ? LEVELS[w.lv][0] : '' }; })); ws['!views'] = [{ RTL: true }]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'الموهوبون'); XLSX.writeFile(wb, 'رعاية الموهوبين.xlsx'); };
+    $('#gsP', B).onclick = () => A.printDoc('تقرير برنامج رعاية الموهوبين', A.arDate ? A.arDate(new Date().toISOString().slice(0, 10)) : '', `<table><tr><th>ملفات الترشيح</th><th>المصنفون</th><th>نسبة الكشف</th><th>اكتمال الملفات</th></tr><tr><td>${AR(L.length)}</td><td>${AR(gifted)}</td><td>${nStu ? AR(Math.round(gifted / nStu * 1000) / 10) + '٪' : '—'}</td><td>${L.length ? AR(Math.round(comp / L.length * 100)) + '٪' : '—'}</td></tr></table><h3>الطلاب</h3><table><tr><th>الطالب</th><th>الفصل</th><th>البوابة</th><th>الدرجة</th><th>التصنيف</th></tr>${L.map(f => { const w = weighted(f.data || {}); return `<tr><td>${esc(f.name)}</td><td>${esc(clsName(f.class_id))}</td><td>${AR(f.gate || 1)}</td><td>${w.total == null ? '—' : AR(w.total) + '٪'}</td><td>${w.lv ? LEVELS[w.lv][0] : '—'}</td></tr>`; }).join('')}</table>`, true);
+  }
+})();
+}catch(e){console.error('[dina] src/attendance/gifted.js',e)}
 
 /* ==== src/plan/assistant.js ==== */
 ;try{
@@ -17144,3 +17955,192 @@ ${S.me.full_name}`;
   if (prev) V.labs = function (root) { const r = prev.apply(this, arguments); if (A.tfeat('models3d')) { const c = document.createElement('div'); c.className = 'card'; c.style.marginBottom = '12px'; c.innerHTML = `<div class="head" style="margin:0"><div class="grow"><h3 style="margin:0">المجسمات التفاعلية</h3><p class="sub" style="margin:4px 0 0">مجسمات هندسية بأبعاد قابلة للتغيير، ونموذج الذرة، والمجموعة الشمسية — تعمل دون إنترنت ومناسبة للسبورة الذكية.</p></div><div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn sm" data-m3="solids">المجسمات الهندسية</button><button class="btn ghost sm" data-m3="atom">الذرة</button><button class="btn ghost sm" data-m3="solar">المجموعة الشمسية</button></div></div>`; root.prepend(c); $$('[data-m3]', c).forEach(b => b.onclick = () => open(b.dataset.m3)); } return r; };
 })();
 }catch(e){console.error('[dina] src/assess/models3d.js',e)}
+
+/* ==== src/core/ui-pro.js ==== */
+;try{
+/* منصة دينا — الواجهة الاحترافية:
+   (١) السمات: كلاسيكي، عمق ثلاثي الأبعاد، زجاجي، زخارف دينا — متاحة لكل المستخدمين (بقرار المالك)، مع سمة افتراضية للمدرسة.
+   (٢) لوحة صفحة المعلم «home2»: الأسبوع الحالي أعلى الصفحة وأيامه ونسبة الإنجاز وأيقونات تفاعلية، ثم «جدولي الأسبوعي» مباشرة.
+   (٣) الإشعارات: أيقونة ملونة لكل نوع، نوع «جديد في المنصة» (new)، بطاقة منبثقة محسّنة، وإعلان «ما الجديد» للمعلم عند تفعيل ميزة له.
+   كل ما يظهر للمعلمين مقيّد بـ A.tfeat. */
+(function () {
+  const A = window.APP, V = window.VIEWS; if (!A) return;
+  const { S, api, $, $$, esc, AR } = A;
+
+  // ======================= (١) السمات =======================
+  const THEMES = {
+    classic: { n: 'كلاسيكي دينا', d: 'الهوية الأساسية بخلفية منقطة هادئة', sw: 'linear-gradient(135deg,#EEF3FA,#fff)' },
+    depth: { n: 'عمق ثلاثي الأبعاد', d: 'بطاقات بارزة بظلال متدرجة وأزرار مجسّمة', sw: 'linear-gradient(145deg,#fff 0,#DCE8F5 55%,#9DB9D8)' },
+    glass: { n: 'زجاجي', d: 'خلفية متدرجة وبطاقات شفافة ضبابية', sw: 'linear-gradient(135deg,#3AB1DB,#AE95DA 60%,#082B5A)' },
+    pattern: { n: 'زخارف دينا', d: 'نجوم وزهور الهوية بألوانها الرسمية', sw: 'radial-gradient(circle at 30% 30%,#3AB1DB 0 3px,transparent 4px) 0 0/14px 14px,#E4EBF5' },
+  };
+  const STAR = c => `<path d='M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z' fill='${c}'/>`;
+  const PAT = encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'><g opacity='.16'><g transform='translate(10 12) scale(.9)'>${STAR('%233AB1DB')}</g><g transform='translate(72 64) scale(.7)'>${STAR('%23005499')}</g><g transform='translate(78 10)' fill='none' stroke='%23AE95DA' stroke-width='2'><circle cx='8' cy='8' r='4'/><circle cx='16' cy='8' r='4'/><circle cx='8' cy='16' r='4'/><circle cx='16' cy='16' r='4'/></g><g transform='translate(14 74)' fill='%2384B7E3'><circle cx='2' cy='2' r='2'/><circle cx='10' cy='2' r='2'/><circle cx='18' cy='2' r='2'/><circle cx='2' cy='10' r='2'/><circle cx='10' cy='10' r='2'/><circle cx='18' cy='10' r='2'/></g></g></svg>`).replace(/%2523/g, '%23');
+  const css = document.createElement('style'); css.id = 'uiProCss';
+  css.textContent = `
+/* أيقونات القائمة التفاعلية (كل السمات عدا الكلاسيكي) */
+body[data-th]:not([data-th=classic]) .nav a svg{box-sizing:content-box;padding:6px;border-radius:11px;color:#fff;background:linear-gradient(145deg,var(--ic1,#3AB1DB),var(--ic2,#005499));box-shadow:0 6px 12px -6px var(--ic2,#005499),inset 0 1px 0 rgba(255,255,255,.35);transition:transform .25s cubic-bezier(.3,1.6,.5,1)}
+body[data-th]:not([data-th=classic]) .nav a:hover svg{transform:translateY(-2px) rotate(-6deg) scale(1.08)}
+body[data-th]:not([data-th=classic]) .nav a.on svg{background:linear-gradient(145deg,#fff,#E4EBF5);color:var(--navy)}
+body[data-th]:not([data-th=classic]) .nav a:nth-child(6n+1){--ic1:#3AB1DB;--ic2:#005499}body[data-th]:not([data-th=classic]) .nav a:nth-child(6n+2){--ic1:#5BC48A;--ic2:#2E8B57}
+body[data-th]:not([data-th=classic]) .nav a:nth-child(6n+3){--ic1:#C2AEEB;--ic2:#7E62C2}body[data-th]:not([data-th=classic]) .nav a:nth-child(6n+4){--ic1:#F2C66D;--ic2:#C98A12}
+body[data-th]:not([data-th=classic]) .nav a:nth-child(6n+5){--ic1:#F09A8E;--ic2:#D0564A}body[data-th]:not([data-th=classic]) .nav a:nth-child(6n+6){--ic1:#84B7E3;--ic2:#082B5A}
+body.ui-side.side-icons[data-th]:not([data-th=classic]) .nav a svg,body.ui-side.side-auto[data-th]:not([data-th=classic]) .nav a svg{width:20px;height:20px}
+/* عمق ثلاثي الأبعاد */
+body[data-th=depth]{background:radial-gradient(1200px 500px at 80% -10%,rgba(58,177,219,.18),transparent),radial-gradient(900px 500px at 0 110%,rgba(174,149,218,.14),transparent),linear-gradient(180deg,#F3F7FC,#E4ECF6)}
+body[data-th=depth] .card{border:1px solid rgba(255,255,255,.9);box-shadow:0 1px 0 #fff inset,0 -1px 0 rgba(8,43,90,.04) inset,0 2px 4px rgba(8,43,90,.05),0 12px 24px -10px rgba(8,43,90,.16),0 34px 60px -30px rgba(8,43,90,.35);background:linear-gradient(180deg,#fff,#FBFDFF)}
+body[data-th=depth] .btn:not(.ghost){box-shadow:0 4px 0 #04203F,0 10px 18px -8px rgba(8,43,90,.6),inset 0 1px 0 rgba(255,255,255,.25);transform:translateY(-1px);transition:transform .12s,box-shadow .12s}
+body[data-th=depth] .btn:not(.ghost):active{transform:translateY(3px);box-shadow:0 1px 0 #04203F,0 4px 8px -4px rgba(8,43,90,.6)}
+body[data-th=depth] .btn.ghost{box-shadow:0 3px 0 #C9D8EA,0 8px 14px -10px rgba(8,43,90,.5)}
+body[data-th=depth] .kpi,body[data-th=depth] .cp-k,body[data-th=depth] .gf-c{transition:transform .2s}body[data-th=depth] .kpi:hover,body[data-th=depth] .cp-k:hover{transform:translateY(-3px)}
+body[data-th=depth].ui-side .nav{background:linear-gradient(180deg,#fff,#F3F7FC);box-shadow:8px 0 30px -18px rgba(8,43,90,.45)}
+body[data-th=depth].ui-side .nav a.on{background:linear-gradient(135deg,#0A3A75,#082B5A);box-shadow:0 10px 18px -10px rgba(8,43,90,.9),inset 0 1px 0 rgba(255,255,255,.18)}
+/* زجاجي */
+body[data-th=glass]{background:radial-gradient(800px 500px at 90% 0,rgba(58,177,219,.45),transparent 60%),radial-gradient(700px 500px at 0 30%,rgba(174,149,218,.35),transparent 60%),radial-gradient(700px 500px at 60% 100%,rgba(186,223,147,.35),transparent 60%),#E9F0F9;background-attachment:fixed}
+body[data-th=glass] .card,body[data-th=glass].ui-side .nav{background:rgba(255,255,255,.66);-webkit-backdrop-filter:blur(16px) saturate(1.4);backdrop-filter:blur(16px) saturate(1.4);border:1px solid rgba(255,255,255,.75);box-shadow:0 20px 40px -24px rgba(8,43,90,.45)}
+body[data-th=glass] .top{background:linear-gradient(180deg,rgba(10,50,104,.92),rgba(8,43,90,.88));-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+body[data-th=glass] .tbl th{background:rgba(228,235,245,.7)}
+/* زخارف دينا */
+body[data-th=pattern]{background:url("data:image/svg+xml,${PAT}") 0 0/120px 120px,linear-gradient(180deg,#F5F8FC,#EAF0F8);background-attachment:fixed}
+body[data-th=pattern] .card{border-top:4px solid transparent;border-image:linear-gradient(90deg,#3AB1DB,#005499,#AE95DA,#BADF93) 1;border-image-slice:1 0 0 0}
+body[data-th=pattern] .card>.head h2::after,body[data-th=pattern] .card>h2::after{content:"✦";color:#3AB1DB;margin-inline-start:8px;font-size:.7em;vertical-align:middle}
+@media print{body[data-th]{background:#fff!important}}
+@media (prefers-reduced-motion:reduce){body[data-th] .nav a svg,body[data-th=depth] .btn{transition:none!important}}
+
+/* (٢) لوحة المعلم */
+.tq{position:relative;border-radius:24px;padding:18px 20px;margin-bottom:16px;color:#fff;overflow:hidden;background:radial-gradient(700px 260px at 0 0,rgba(58,177,219,.5),transparent 60%),radial-gradient(500px 260px at 100% 100%,rgba(174,149,218,.35),transparent 60%),linear-gradient(135deg,#082B5A,#005499);box-shadow:0 30px 60px -34px rgba(8,43,90,.9),inset 0 1px 0 rgba(255,255,255,.18)}
+.tq::after{content:"";position:absolute;inset:0;background:url("data:image/svg+xml,${PAT}") 0 0/140px 140px;opacity:.5;pointer-events:none;mix-blend-mode:screen}
+.tq>*{position:relative;z-index:1}
+.tq-top{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.tq-wk{flex:1;min-width:220px}.tq-wk small{color:#BFE3F4;font-weight:700}.tq-wk h2{margin:2px 0;font-size:24px;color:#fff}.tq-wk span{color:#D6E6F5;font-size:13.5px}
+.tq-ring{--p:0;width:96px;height:96px;border-radius:50%;background:conic-gradient(#BADF93 calc(var(--p)*1%),rgba(255,255,255,.18) 0);display:grid;place-items:center;flex:none;box-shadow:0 10px 24px -10px rgba(0,0,0,.5)}
+.tq-ring div{width:74px;height:74px;border-radius:50%;background:#082B5A;display:grid;place-items:center;text-align:center;line-height:1.1}.tq-ring b{font-size:22px}.tq-ring small{font-size:10.5px;color:#BFD6EE}
+.tq-days{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:14px}
+.tq-d{font:inherit;color:#fff;cursor:pointer;border:1px solid rgba(255,255,255,.22);border-radius:16px;padding:9px 6px;background:rgba(255,255,255,.08);text-align:center;transition:transform .2s,background .2s;min-height:44px}
+.tq-d:hover{transform:translateY(-2px);background:rgba(255,255,255,.16)}.tq-d:focus-visible{outline:3px solid #BADF93;outline-offset:2px}
+.tq-d b{display:block;font-size:14px}.tq-d span{font-size:11.5px;color:#CFE3F5}.tq-d i{display:block;height:4px;border-radius:4px;margin-top:6px;background:rgba(255,255,255,.2);overflow:hidden}.tq-d i u{display:block;height:100%;background:#BADF93}
+.tq-d.today{background:#fff;color:#082B5A;border-color:#fff;box-shadow:0 12px 20px -12px rgba(0,0,0,.6)}.tq-d.today span{color:#005499}.tq-d.today i{background:#E4EBF5}.tq-d.today i u{background:#2E8B57}
+.tq-d.hol{opacity:.55}
+.tq-ics{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:10px;margin-top:16px}
+.tq-ic{font:inherit;color:#fff;text-decoration:none;cursor:pointer;border:0;background:none;display:grid;justify-items:center;gap:6px;padding:4px;border-radius:16px;font-size:12.5px;font-weight:700;text-align:center;line-height:1.3}
+.tq-ic .g{position:relative;width:56px;height:56px;border-radius:18px;display:grid;place-items:center;background:linear-gradient(145deg,var(--a),var(--b));box-shadow:0 12px 20px -10px var(--b),0 3px 0 rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.45);transition:transform .3s cubic-bezier(.3,1.6,.5,1)}
+.tq-ic .g::before{content:"";position:absolute;inset:3px 3px 50% 3px;border-radius:15px 15px 40% 40%;background:linear-gradient(180deg,rgba(255,255,255,.45),rgba(255,255,255,0))}
+.tq-ic .g svg{width:26px;height:26px;color:#fff;filter:drop-shadow(0 2px 2px rgba(0,0,0,.25))}
+.tq-ic:hover .g{transform:translateY(-4px) rotate(-5deg) scale(1.06)}.tq-ic:active .g{transform:scale(.94)}
+.tq-ic:focus-visible{outline:3px solid #BADF93;outline-offset:2px}
+.tq-ic .bd{position:absolute;top:-5px;inset-inline-end:-5px;min-width:20px;height:20px;border-radius:10px;background:#E0675A;color:#fff;font-size:11px;display:grid;place-items:center;padding:0 5px;border:2px solid #082B5A}
+.tgrid.tq-flash{animation:tqF 1.4s ease}@keyframes tqF{0%,100%{box-shadow:var(--sh2)}30%{box-shadow:0 0 0 4px #3AB1DB}}
+.tg tr.tq-row th{background:#DCEFFA!important}
+@media (max-width:600px){.tq{padding:14px}.tq-wk h2{font-size:20px}.tq-ring{width:80px;height:80px}.tq-ring div{width:62px;height:62px}.tq-days{gap:5px}.tq-d{padding:7px 2px}.tq-d b{font-size:12px}.tq-ics{grid-template-columns:repeat(4,1fr);gap:6px}.tq-ic{font-size:11px}.tq-ic .g{width:48px;height:48px;border-radius:15px}}
+@media (prefers-reduced-motion:reduce){.tq-ic .g,.tq-d{transition:none}.tgrid.tq-flash{animation:none}}
+
+/* (٣) الإشعارات */
+.nf-ic{width:38px;height:38px;border-radius:12px;flex:none;display:grid;place-items:center;background:linear-gradient(145deg,var(--a,#3AB1DB),var(--b,#005499));box-shadow:0 8px 14px -8px var(--b,#005499),inset 0 1px 0 rgba(255,255,255,.4);font-size:18px;line-height:1}
+.nf-it{align-items:center!important}.nf-it .nf-dot{order:9}
+.nf-it.un{box-shadow:inset 3px 0 0 #005499}
+.nf-k.k-new{background:linear-gradient(90deg,#3AB1DB,#AE95DA);color:#fff}
+.nf-toastpush:not(#nfSoft){background:rgba(255,255,255,.96)!important;color:#082B5A!important;border:1px solid #DCE7F3;box-shadow:0 24px 50px -20px rgba(8,43,90,.55)!important;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);padding:12px 14px!important;border-inline-start:5px solid #3AB1DB!important;align-items:center!important}
+.nf-toastpush:not(#nfSoft)>svg{flex:none;width:38px;height:38px;padding:8px;border-radius:12px;color:#fff;background:linear-gradient(145deg,#3AB1DB,#005499);box-sizing:border-box}
+.nf-toastpush:not(#nfSoft) span{color:#4D6A8F}
+@media (prefers-reduced-motion:no-preference){#notifBtn:has(#notifN:not(.hidden)) svg{animation:bellR 2.4s ease-in-out infinite;transform-origin:50% 10%}@keyframes bellR{0%,70%,100%{transform:rotate(0)}75%{transform:rotate(14deg)}80%{transform:rotate(-12deg)}85%{transform:rotate(8deg)}90%{transform:rotate(-5deg)}}}
+.wn{display:grid;gap:10px}.wn-it{display:flex;gap:12px;align-items:flex-start;border:1px solid #DCE7F3;border-radius:16px;padding:12px;background:linear-gradient(180deg,#fff,#F6FAFD)}
+.wn-it .g{width:48px;height:48px;border-radius:15px;display:grid;place-items:center;font-size:24px;flex:none;background:linear-gradient(145deg,var(--a),var(--b));box-shadow:0 10px 18px -10px var(--b),inset 0 1px 0 rgba(255,255,255,.45)}
+.wn-it b{display:block;color:#082B5A}.wn-it a.btn{text-decoration:none;flex:none}.wn-it small{color:#4D6A8F;line-height:1.7}
+.wn-hd{border-radius:18px;padding:16px;margin-bottom:10px;color:#fff;background:linear-gradient(135deg,#082B5A,#005499 60%,#3AB1DB);display:flex;gap:12px;align-items:center}.wn-hd .big{font-size:36px}
+`;
+  document.head.appendChild(css);
+
+  const LSK = 'dina_theme';
+  const schoolTheme = () => (((S.school || {}).settings || {}).uitheme) || 'classic';
+  const allowed = () => !!S.me; // السمات متاحة للجميع بقرار المالك (لا تضيف شيئاً لصفحة المعلم)
+  const myTheme = () => { if (!allowed()) return 'classic'; let t = null; try { t = localStorage.getItem(LSK); } catch (_) { } return THEMES[t] ? t : THEMES[schoolTheme()] ? schoolTheme() : 'classic'; };
+  function applyTheme() { if (!document.body) return; const t = S.me ? myTheme() : 'classic'; if (document.body.dataset.th !== t) document.body.dataset.th = t; }
+  A.applyTheme = applyTheme; A.THEMES = THEMES;
+  window.addEventListener('hashchange', applyTheme); setInterval(applyTheme, 1500); setTimeout(applyTheme, 0);
+  // اختيار السمة داخل نافذة «إعدادات المظهر»
+  function themePicker(box) {
+    if (!allowed() || $('#thPick', box)) return;
+    const own = S.me.is_owner && !S.realMe, cur = myTheme();
+    const d = document.createElement('div'); d.className = 'field'; d.id = 'thPick';
+    d.innerHTML = `<label>السمة</label><div class="ui-opt">${Object.entries(THEMES).map(([k, t]) => `<button data-th="${k}" class="${cur === k ? 'on' : ''}" aria-pressed="${cur === k}" title="${esc(t.d)}"><span class="sw" style="height:26px;background:${t.sw}"></span>${esc(t.n)}</button>`).join('')}</div>${own ? `<label class="small" style="display:flex;gap:6px;align-items:center;margin-top:6px"><input type="checkbox" id="thDef"> اجعلها السمة الافتراضية لكل المستخدمين (لمن فُعّلت لهم السمات)</label>` : ''}`;
+    const p = $('p', box); (p ? p.after(d) : box.prepend(d));
+    $$('[data-th]', d).forEach(b => b.onclick = async () => {
+      try { localStorage.setItem(LSK, b.dataset.th); } catch (_) { } applyTheme(); $$('[data-th]', d).forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); });
+      const def = $('#thDef', d); if (def && def.checked) { const settings = { ...(S.school.settings || {}), uitheme: b.dataset.th }; try { const r = await api.updateSchool(S.school.id, { settings }); S.school.settings = (r && r.settings) || settings; A.toast('أصبحت السمة الافتراضية للمدرسة', 'ok'); } catch (e) { A.toast(e.message, 'err'); } }
+    });
+  }
+
+  // ======================= (٣) الإشعارات =======================
+  const K = A.NOTIF_KINDS; if (K && !K.new) K.new = ['جديد في المنصة', 'إضافة ميزة أو محتوى جديد إليك'];
+  const KIC = { notice: ['📢', '#3AB1DB', '#005499'], reminder: ['⏰', '#F2C66D', '#C98A12'], message: ['💬', '#84B7E3', '#005499'], form_assigned: ['📝', '#5E9BD3', '#082B5A'], form_sign: ['✍️', '#C2AEEB', '#7E62C2'], form_submitted: ['📤', '#84B7E3', '#005499'], form_returned: ['↩️', '#F09A8E', '#D0564A'], form_approved: ['✅', '#5BC48A', '#2E8B57'], form_done: ['🏁', '#5BC48A', '#2E8B57'], standby: ['🕒', '#F2C66D', '#C98A12'], new: ['✨', '#3AB1DB', '#7E62C2'] };
+  function decorate(root) {
+    $$('.nf-it', root).forEach(it => { if ($('.nf-ic', it)) return; const k = (($('.nf-k', it) || {}).className || '').match(/k-([\w_]+)/); const c = KIC[k && k[1]] || KIC.notice; const s = document.createElement('span'); s.className = 'nf-ic'; s.setAttribute('aria-hidden', 'true'); s.style.cssText = `--a:${c[1]};--b:${c[2]}`; s.textContent = c[0]; it.prepend(s); });
+    $$('.ovl', root).forEach(o => { const h = $('h3', o); if (h && /إعدادات المظهر/.test(h.textContent)) themePicker(h.parentNode); });
+  }
+  new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) decorate(n.parentNode || n); }).observe(document.documentElement, { childList: true, subtree: true });
+
+  // ما الجديد: إعلان للمعلم عن الميزات المفعّلة له حديثاً (مرة لكل جهاز)، وللمالك عن إضافات المنصة
+  const NEWS = [
+    ['compass', '🧭', 'البوصلة ٢', '٩ مقاييس بثلاث لغات ولكل المراحل، وتقارير احترافية وإرسال لولي الأمر واتساب.', '#/compass', '#3AB1DB', '#005499'],
+    ['gifted', '⭐', 'رعاية الموهوبين', 'دليل مرجعي وبوابات الكشف الخمس ونماذج الترشيح والتقدير وقرار اللجنة.', '#/gifted', '#F2C66D', '#C98A12'],
+    ['home2', '🏠', 'واجهة المعلم الجديدة', 'أسبوعك وأيامه ونسبة إنجازك وأيقونات وصول سريع أعلى صفحتك.', '#/my', '#5BC48A', '#2E8B57'],
+    ['themes', '🎨', 'السمات الاحترافية', 'اختر سمة المنصة من «المظهر»: عمق ثلاثي الأبعاد، زجاجي، زخارف دينا.', '', '#C2AEEB', '#7E62C2'],
+  ];
+  const seenKey = () => 'wn_seen_' + ((S.me || {}).id || '');
+  function whatsNew() {
+    if (!S.me || S.realMe || document.querySelector('.ovl') || (navigator.webdriver && !window.__wnTest)) return;
+    let seen = null; try { seen = JSON.parse(localStorage.getItem(seenKey()) || 'null'); } catch (_) { }
+    const tf = (((S.school || {}).settings || {}).tfeat) || {}, F = (A.TFEAT || []);
+    const items = S.me.is_owner ? NEWS.map(n => n.slice()) : [NEWS.find(x => x[0] === 'themes').slice(), ...F.filter(f => tf[f[0]] === true).map(f => { const n = NEWS.find(x => x[0] === f[0]); return n ? n.slice() : [f[0], '✨', f[1], f[2], '', '#3AB1DB', '#005499']; })];
+    const fresh = items.filter(n => !(seen || []).includes(n[0]));
+    if (!fresh.length) return;
+    try { localStorage.setItem(seenKey(), JSON.stringify(items.map(n => n[0]).concat(seen || []))); } catch (_) { }
+    const m = A.modal(`<div class="wn-hd"><span class="big" aria-hidden="true">✨</span><div><b style="font-size:19px">جديد في منصة دينا</b><div class="small" style="color:#D6E6F5">أُضيف إلى حسابك ${AR(fresh.length)} ${fresh.length > 2 ? 'ميزات' : 'ميزة'}</div></div></div>
+      <div class="wn">${fresh.map(n => `<div class="wn-it"><span class="g" style="--a:${n[5]};--b:${n[6]}" aria-hidden="true">${n[1]}</span><div class="grow"><b>${esc(n[2])}</b><small>${esc(n[3])}</small></div>${n[4] ? `<a class="btn sm" href="${n[4]}" data-wn>فتح</a>` : ''}</div>`).join('')}</div><div class="acts"><button class="btn" id="wnOk">رائع</button></div>`);
+    $('#wnOk', m.el).onclick = () => m.close(); $$('[data-wn]', m.el).forEach(a => a.addEventListener('click', () => m.close()));
+  }
+  let wnT = 0; const wnTry = () => { if (wnT++ > 20) return; if (S.me && S.school && $('#nav')) setTimeout(whatsNew, 1800); else setTimeout(wnTry, 1000); };
+  setTimeout(wnTry, 1500);
+  // إشعار «تمت إضافة…» لكل المعلمين عند تفعيل المالك ميزة جديدة لهم
+  A.announceNew = async keys => {
+    const F = A.TFEAT || []; const L = keys.map(k => F.find(f => f[0] === k)).filter(Boolean); if (!L.length) return 0;
+    const n = NEWS.find(x => x[0] === keys[0]);
+    try { return await api.rpc('notify_send', { p_ids: null, p_title: '✨ تمت إضافة: ' + L.map(f => f[1]).join('، '), p_body: L.map(f => '• ' + f[1] + ' — ' + f[2]).join('\n'), p_link: (n && n[4]) || '', p_kind: 'new', p_show_at: null }); } catch (_) { return 0; }
+  };
+
+  // ======================= (٢) لوحة المعلم =======================
+  const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+  const QUICK = { prep: ['#5E9BD3', '#082B5A'], assess: ['#C2AEEB', '#7E62C2'], records: ['#F2C66D', '#C98A12'], refer: ['#F09A8E', '#D0564A'], forms: ['#84B7E3', '#005499'], games: ['#5BC48A', '#2E8B57'], wboard: ['#3AB1DB', '#005499'], labs: ['#BADF93', '#3F7D2A'], poll: ['#F2C66D', '#C98A12'], slides: ['#C2AEEB', '#7E62C2'], compass: ['#3AB1DB', '#082B5A'], gifted: ['#F2C66D', '#B07A10'], assistant: ['#5BC48A', '#2E8B57'], notify: ['#84B7E3', '#082B5A'] };
+  const PAL = [['#3AB1DB', '#005499'], ['#5BC48A', '#2E8B57'], ['#C2AEEB', '#7E62C2'], ['#F2C66D', '#C98A12'], ['#F09A8E', '#D0564A'], ['#84B7E3', '#082B5A']];
+  const parse = s => { const [y, mo, d] = String(s || '').split('-').map(Number); return new Date(y, (mo || 1) - 1, d || 1); };
+  function hero() {
+    const w = (A.week && A.week()) || {}, me = S.me.id;
+    const mine = (S.entries || []).filter(e => e.teacher_id === me && e.subject_id);
+    const fil = e => e.status && e.status !== 'empty'; const done = mine.filter(fil).length, p = mine.length ? Math.round(done * 100 / mine.length) : 0;
+    const st = w.start_date ? parse(w.start_date) : null, today = new Date(); today.setHours(0, 0, 0, 0);
+    const hol = (w.holidays || []).map(h => h.day);
+    const days = DAYS.map((n, i) => { const d = st ? new Date(st.getFullYear(), st.getMonth(), st.getDate() + i) : null; const L = mine.filter(e => e.day === i); return { i, n, d, cnt: L.length, ok: L.filter(fil).length, today: d && d.getTime() === today.getTime(), hol: hol.includes(i) }; });
+    const fmt = d => d ? AR(d.getDate()) + '/' + AR(d.getMonth() + 1) : '';
+    const nav = (A.NAV || []).filter(n => n[0] !== 'my' && n[0] !== 'dash' && (typeof n[2] !== 'function' || (() => { try { return n[2](); } catch (_) { return false; } })())).slice(0, 10);
+    const unread = +((($('#notifN') || {}).textContent || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))) || 0;
+    const icons = [...nav.map(n => [n[0], n[1], '#/' + n[0]]), ...(A.tfeat('notif') && $('#notifBtn') ? [['notify', 'الإشعارات', '#/notify']] : [])];
+    const ring = `<div class="tq-ring" style="--p:${p}" role="img" aria-label="إنجاز الخطة ${p}٪"><div><b>${AR(p)}٪</b><small>${AR(done)} من ${AR(mine.length)}</small></div></div>`;
+    return `<section class="tq" id="myHero" aria-label="أسبوعي">
+      <div class="tq-top"><div class="tq-wk"><small>أهلاً ${esc((S.me.full_name || S.me.name || '').split(' ').slice(0, 2).join(' '))} 👋</small><h2>${esc(w.word ? 'الأسبوع ' + w.word : (w.label || 'الأسبوع الحالي'))}</h2><span>${days[0].d ? `من ${fmt(days[0].d)} إلى ${fmt(days[4].d)} · ` : ''}${AR(mine.length)} حصة في جدولك</span></div>${ring}</div>
+      <div class="tq-days" role="list">${days.map(d => `<button class="tq-d ${d.today ? 'today' : ''} ${d.hol ? 'hol' : ''}" data-hd="${d.i}" role="listitem" aria-label="${d.n} ${d.hol ? 'إجازة' : AR(d.cnt) + ' حصص'}"><b>${d.n}</b><span>${d.hol ? 'إجازة' : `${fmt(d.d)} · ${AR(d.cnt)} حصص`}</span><i><u style="width:${d.cnt ? d.ok * 100 / d.cnt : 0}%"></u></i></button>`).join('')}</div>
+      ${icons.length ? `<div class="tq-ics">${icons.map(([k, l, h], i) => { const c = QUICK[k] || PAL[i % PAL.length]; return `<a class="tq-ic" href="${h}"><span class="g" style="--a:${c[0]};--b:${c[1]}">${A.I[k] || A.I.book || ''}${k === 'notify' && unread ? `<span class="bd">${AR(unread)}</span>` : ''}</span>${esc(l)}</a>`; }).join('')}</div>` : ''}
+    </section>`;
+  }
+  ['my'].forEach(k => { const v0 = V[k]; if (!v0) return; V[k] = function (root) {
+    const r = v0.apply(this, arguments);
+    const go = () => { try {
+      if (!S.me || !A.tfeat('home2') || !root || !root.isConnected) return; const old = $('#myHero', root); if (old) old.remove();
+      root.insertAdjacentHTML('afterbegin', hero()); const h = $('#myHero', root);
+      const g = $('details.tgrid', root); if (g) { h.after(g); g.open = true; }
+      $$('[data-hd]', h).forEach(b => b.onclick = () => { const t = $('details.tgrid', root); if (!t) return; t.open = true; t.scrollIntoView({ behavior: 'smooth', block: 'start' }); t.classList.remove('tq-flash'); void t.offsetWidth; t.classList.add('tq-flash'); $$('.tg tbody tr', t).forEach((tr, i) => tr.classList.toggle('tq-row', i === +b.dataset.hd)); });
+    } catch (e) { console.warn('hero', e); } };
+    if (r && typeof r.then === 'function') r.then(go); else setTimeout(go, 0);
+    return r;
+  }; });
+})();
+}catch(e){console.error('[dina] src/core/ui-pro.js',e)}

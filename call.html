@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>شاشة النداء — مدارس دينا العالمية</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#082B5A">
+<link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+<style>
+@font-face{font-family:'GE SS Two';font-weight:400 500;src:url(fonts/gess-two-medium.woff2) format('woff2');font-display:swap}
+@font-face{font-family:'GE SS Two';font-weight:600 900;src:url(fonts/gess-two-bold.woff2) format('woff2');font-display:swap}
+:root{--navy:#082B5A;--blue:#005499;--sky:#3AB1DB;--green:#2E8B57;--lime:#BADF93}
+*{box-sizing:border-box}html,body{margin:0;height:100%}
+body{font-family:'GE SS Two',Tahoma,sans-serif;color:#fff;background:radial-gradient(1200px 600px at 80% -10%,#0d4a8f 0,transparent 60%),linear-gradient(160deg,#061f42,#082B5A 55%,#0a3a73);min-height:100vh;overflow-x:hidden}
+button,select{font:inherit}
+:focus-visible{outline:3px solid var(--sky);outline-offset:3px}
+header{display:flex;align-items:center;gap:16px;padding:14px 22px;border-bottom:4px solid var(--sky);background:rgba(4,20,44,.45);backdrop-filter:blur(6px)}
+header img{height:52px}header .t{font-size:22px;font-weight:800}header .s{color:#BFD7EE;font-size:14px}
+header .grow{flex:1;min-width:0}
+.clock{font-size:34px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:1px}
+.sel{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:12px;padding:8px 10px;min-height:44px}
+.sel option{color:#082B5A}
+main{padding:22px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));gap:18px}
+.call{position:relative;border-radius:26px;padding:22px 24px;background:linear-gradient(160deg,#fff,#eef6ff);color:var(--navy);box-shadow:0 22px 40px -18px rgba(0,0,0,.6),inset 0 -6px 0 rgba(8,43,90,.08);border-inline-start:12px solid var(--green);overflow:hidden}
+.call.new{animation:pulse 1.4s ease-in-out 6}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.025);box-shadow:0 0 0 10px rgba(186,223,147,.55),0 22px 40px -18px rgba(0,0,0,.6)}}
+.call .tag{display:inline-flex;align-items:center;gap:6px;background:#e3f5ea;color:#17814a;border-radius:99px;padding:4px 14px;font-weight:800;font-size:18px}
+.call.rel{border-inline-start-color:var(--sky)}.call.rel .tag{background:#e5f3fb;color:#06648f}
+.call.done{opacity:.55;border-inline-start-color:#8fa1ba}.call.done .tag{background:#eef1f5;color:#40526a}
+.call .nm{font-size:clamp(30px,4.2vw,52px);font-weight:900;line-height:1.25;margin:10px 0 4px}
+.call .cl{font-size:clamp(20px,2.4vw,28px);color:var(--blue);font-weight:800}
+.call .mt{font-size:18px;color:#56657f;margin-top:6px}
+.call .go{margin-top:14px;width:100%;border:0;border-radius:18px;padding:16px;font-size:22px;font-weight:900;color:#fff;background:linear-gradient(180deg,#34a26a,#2E8B57);box-shadow:0 7px 0 -1px #1b5a37;cursor:pointer;min-height:64px}
+.call .go:active{transform:translateY(3px);box-shadow:0 3px 0 -1px #1b5a37}
+.empty{display:grid;place-items:center;text-align:center;min-height:60vh;color:#BFD7EE}
+.empty b{font-size:64px;display:block}
+.empty p{font-size:26px;margin:8px 0 0}
+.ov{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:rgba(4,20,44,.88);text-align:center;padding:20px}
+.ov .bx{max-width:560px}.ov h1{font-size:30px;margin:0 0 8px}.ov p{color:#BFD7EE;font-size:18px}
+.ov button{margin-top:16px;border:0;border-radius:18px;padding:16px 28px;font-size:22px;font-weight:900;color:var(--navy);background:linear-gradient(180deg,#fff,#dbe9f8);box-shadow:0 7px 0 -1px #8fb1d6;cursor:pointer;min-height:60px}
+.err{color:#ffd0cb;font-size:20px}
+.foot{position:fixed;bottom:8px;inset-inline:0;text-align:center;color:#8fb1d6;font-size:12px}
+@media (max-width:600px){header{flex-wrap:wrap}.clock{font-size:26px}}
+@media (prefers-reduced-motion:reduce){.call.new{animation:none}}
+</style>
+<script src="digits.js?v=1794678738"></script>
+</head>
+<body>
+<header><img src="assets/logo_white.svg" alt="مدارس دينا العالمية"><div class="grow"><div class="t" id="ht">شاشة النداء</div><div class="s" id="hs">مدارس دينا العالمية</div></div><select class="sel" id="cls" aria-label="الفصل" hidden></select><div class="clock" id="ck" aria-live="off"></div></header>
+<main id="m" aria-live="polite"></main>
+<div class="foot" id="ft">يتحدّث تلقائياً</div>
+<script src="config.js?v=1794678738"></script>
+<script>
+(function () {
+  'use strict';
+  const C = window.APP_CONFIG, m = document.getElementById('m'), QS = new URLSearchParams(location.search);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const AR = s => String(s).replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+  const LS = { get: k => { try { return localStorage.getItem(k); } catch (_) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (_) { } } };
+  const token = QS.get('t') || '';
+  let cls = QS.get('c') || LS.get('dina_call_c') || '', D = null, seen = new Set(JSON.parse(LS.get('dina_call_seen_' + new Date().toDateString()) || '[]')), audio = null, voice = true, first = true;
+  async function rpc(fn, body) { const r = await fetch(`${C.supabaseUrl}/rest/v1/rpc/${fn}`, { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); const j = await r.json().catch(() => null); if (!r.ok) throw new Error((j && j.message) || 'تعذّر الاتصال'); return j; }
+  const hm = d => new Date(d).toLocaleTimeString('ar-SA', { hour: 'numeric', minute: '2-digit' });
+  setInterval(() => { document.getElementById('ck').textContent = new Date().toLocaleTimeString('ar-SA', { hour: 'numeric', minute: '2-digit', second: '2-digit' }); }, 1000);
+  function chime() { if (!audio) return; try { const t = audio.currentTime; [784, 1047, 1319].forEach((f, i) => { const o = audio.createOscillator(), g = audio.createGain(); o.type = 'sine'; o.frequency.value = f; o.connect(g); g.connect(audio.destination); g.gain.setValueAtTime(0, t + i * .28); g.gain.linearRampToValueAtTime(.25, t + i * .28 + .03); g.gain.exponentialRampToValueAtTime(.001, t + i * .28 + .9); o.start(t + i * .28); o.stop(t + i * .28 + 1); }); } catch (_) { } }
+  function say(t) { if (!voice || !('speechSynthesis' in window)) return; try { const u = new SpeechSynthesisUtterance(t); u.lang = 'ar-SA'; const v = speechSynthesis.getVoices().find(x => /^ar/i.test(x.lang)); if (v) u.voice = v; u.rate = .9; speechSynthesis.speak(u); } catch (_) { } }
+  function start() {
+    const ov = document.createElement('div'); ov.className = 'ov'; ov.innerHTML = `<div class="bx"><h1>شاشة النداء</h1><p>اضغط لتشغيل الشاشة مع الصوت. تبقى مفتوحة وتتحدّث تلقائياً، ويظهر اسم الطالب ويُنادى عند وصول ولي أمره.</p><button id="go">▶ تشغيل الشاشة</button></div>`;
+    document.body.appendChild(ov); const b = ov.querySelector('#go'); b.focus();
+    b.onclick = () => { try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) { } ov.remove(); if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => { }); load(); setInterval(() => { if (document.visibilityState === 'visible') load(); }, 5000); };
+  }
+  async function load() {
+    try { D = await rpc('pickup_screen', { p_token: token, p_class: cls || null, p_section: null }); } catch (e) { m.innerHTML = `<div class="empty"><div><b>⚠️</b><p class="err">${esc(e.message)}</p></div></div>`; return; }
+    if (D.error) { m.innerHTML = `<div class="empty"><div><b>🔒</b><p>${D.error === 'OFF' ? 'النداء غير مفعّل حالياً' : 'رابط الشاشة غير صالح — اطلب رابطاً جديداً من الإدارة'}</p></div></div>`; return; }
+    voice = D.voice !== false;
+    document.getElementById('hs').textContent = D.school || '';
+    const sel = document.getElementById('cls');
+    if (sel.hidden) { sel.innerHTML = `<option value="">كل الفصول (البوابة)</option>` + D.classes.map(c => `<option value="${c.id}" ${c.id === cls ? 'selected' : ''}>${esc(c.name)}</option>`).join(''); sel.hidden = false; sel.onchange = () => { cls = sel.value; LS.set('dina_call_c', cls); load(); }; }
+    const c0 = D.classes.find(c => c.id === cls); document.getElementById('ht').textContent = c0 ? 'شاشة النداء — ' + c0.name : 'شاشة النداء';
+    const calls = D.calls || [], fresh = calls.filter(x => x.status === 'called' && !seen.has(x.id));
+    m.innerHTML = calls.length ? `<div class="grid">${calls.map(x => `<article class="call ${x.status === 'released' ? 'rel' : ['done', 'handed'].includes(x.status) ? 'done' : ''} ${fresh.includes(x) ? 'new' : ''}" aria-label="نداء ${esc(x.name)}">
+        <span class="tag">${x.status === 'called' ? '📣 نداء' : x.status === 'released' ? '🚶 في الطريق للبوابة' : '🤝 سُلّم'}</span>
+        <div class="nm">${esc(x.name)}</div><div class="cl">${esc(x.class || '')}</div><div class="mt">ولي الأمر بانتظاره${x.person ? ' — ' + esc(x.person) : ''} · ${esc(hm(x.at))}</div>
+        ${x.status === 'called' ? `<button class="go" data-r="${x.id}">✓ أُرسل الطالب إلى البوابة</button>` : ''}</article>`).join('')}</div>`
+      : `<div class="empty"><div><b>🕊️</b><p>لا نداءات الآن</p></div></div>`;
+    m.querySelectorAll('[data-r]').forEach(b => b.onclick = async () => { b.disabled = true; b.textContent = 'جارٍ…'; try { await rpc('pickup_screen_release', { p_token: token, p_id: b.dataset.r }); } catch (_) { } load(); });
+    if (fresh.length) { chime(); fresh.forEach((x, i) => setTimeout(() => say(`نداء. الطالب ${x.name}${x.class ? '، ' + x.class : ''}. ولي أمرك بانتظارك عند البوابة.`), (first ? 0 : 1200) + i * 5000)); fresh.forEach(x => seen.add(x.id)); LS.set('dina_call_seen_' + new Date().toDateString(), JSON.stringify([...seen])); }
+    first = false;
+    document.getElementById('ft').textContent = 'آخر تحديث ' + hm(new Date()) + ' · يتحدّث تلقائياً كل ٥ ثوانٍ';
+  }
+  if (!token) { m.innerHTML = '<div class="empty"><div><b>🔒</b><p>افتح الشاشة من الرابط الذي تنشئه الإدارة في «النداء والاستئذان ← الإعدادات».</p></div></div>'; return; }
+  start();
+})();
+</script>
+</body>
+</html>

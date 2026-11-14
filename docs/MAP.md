@@ -57,37 +57,40 @@
 | 49 | `src/plan/resources-store.js` | app39.js | 39 | المصادر: مخزن المدرسة V.resources | resources | lessonResources pickResource resVisible syncPrepRes |
 | 50 | `src/schedule/sketch-editor.js` | app40.js | 9 | محرر الكروكي لمواقع المدرسة | — | sketchEditor |
 | 51 | `src/attendance/student-codes.js` | app41.js | 10 | حسابات الطلاب برمز دخول (me.html) | stucodes | — |
-| 52 | `src/assess/games.js` | app42.js | 21 | الألعاب التعليمية V.games (play.html) | games | — |
-| 53 | `src/assess/whiteboard-labs.js` | app43.js | 15 | السبورة التفاعلية والمعامل الافتراضية | labs wboard | — |
-| 54 | `src/core/teacher-ui.js` | app44.js | 17 | تخصيص صفحة المعلم (للمالك) V.tui | tui | TUI_BASIC tuiApply tuiWrapNav |
-| 55 | `src/core/test-teacher.js` | app45.js | 10 | المعلم التجريبي (للمالك) | testt | isTestMode isTestStaff |
-| 56 | `src/schedule/remote-template.js` | app46.js | 23 | قالب التعليم عن بعد | live | remoteOptimize remoteQuick remoteSettings |
-| 57 | `src/plan/homework-cell.js` | app47.js | 27 | خانة الواجب المخصصة في الخطة | reports | HW_QTYPES HW_TYPES hwBind hwBox repPrep |
-| 58 | `src/plan/homework-follow.js` | app48.js | 19 | متابعة الواجبات V.hwf | hwf | — |
-| 59 | `src/plan/approval-requests.js` | app49.js | 37 | طلبات الاعتماد والمهام الأدائية | dash reports | chgRow exExtras langHint langOf repAce |
-| 60 | `src/attendance/monitor-attendance.js` | app50.js | 54 | رصد الحضور لمراقب الدور | — | attAlerts attPicker attRecord attReports |
-| 61 | `src/attendance/live-attendance-board.js` | app51.js | 14 | لوحة الحضور اللحظية | — | _attFabBound _attFabEl attDash attMerge |
-| 62 | `src/core/ui-helpers.js` | app52.js | 14 | أدوات عرض مشتركة (تواريخ عربية…) | — | arDate arDateShort attChart attDrill |
-| 63 | `src/attendance/students-db.js` | app53.js | 5 | قاعدة الطلاب الموحّدة A.studentsAll | analysis | studentsAll studentsPayload syncStudentsNow |
-| 64 | `src/core/owner-controls.js` | app54.js | 4 | تحكم المالك في الشاشات اللحظية | tui | liveOK |
-| 65 | `src/core/kpi-drill.js` | app55.js | 3 | الأرقام التفاعلية A.attDrill | — | — |
-| 66 | `src/assess/noor-analysis.js` | app56.js | 68 | تحليل درجات نظام نور V.noor (استيراد ملفات نور) | noor | _noor |
-| 67 | `src/supervision/forms.js` | app57.js | 70 | النماذج والاستمارات بالتوقيع الإلكتروني V.forms (مع tools/supervision.html) | forms | _forms formsLoadLib formsSlots formsTeacherSlot formsWithSig |
-| 68 | `src/assess/ehomework.js` | app58.js | 4 | الواجب الإلكتروني برابط: أزرار ونافذة المشاركة QR | assess hwf | — |
-| 69 | `src/core/report-studio.js` | app59.js | 31 | استوديو التقارير A.printDoc بهوية المدرسة | — | printDoc printDocDirect printStyle |
-| 70 | `src/attendance/counseling.js` | app60.js | 94 | الإرشاد الطلابي: الإحالات والحالات والوكيل V.refer/V.counsel/V.deputy | counsel deputy refer | _counsel refData refDrill refLive refStats |
-| 71 | `src/attendance/students-browser.js` | app61.js | 17 | تبويب الطلاب: قوائم وإحصاءات تفاعلية A.stuBrowser | — | stuBrowser |
-| 72 | `src/assess/school-bank.js` | app62.js | 32 | بنك أسئلة المدرسة V.qbank + إتاحة الواجب الإلكتروني + واجهات الطالب + تصدير Excel | qbank | QTHEMES canAssess canAssessFull canEhw canHw ehwCfg ehwOnly qExport themePick |
-| 73 | `src/assess/bank-booklet.js` | — | 27 | كراسة التدريب PDF من بنك الأسئلة A.bankBooklet: غلاف بهوية المدرسة، ثلاثة أنماط (تدريب/اختبار تجريبي/مراجعة بالحل)، تقسيم آلي لصفحات A4، مفتاح الإجابة وورقة إجابة، QR، طباعة/حفظ PDF وتنزيل مباشر | — | bankBooklet |
-| 74 | `src/plan/terms.js` | — | 24 | الفصول الدراسية: مؤشر الفصل في الشريط وقائمة المستخدم، تبويب الإدارة لإضافة الفصل الثاني وتجهيزه وتفعيله (sql/094) | admin | termCur termFilter termOf termPickHtml termSwitch |
-| 75 | `src/attendance/hr.js` | — | 33 | الموارد البشرية V.hr: حضور الموظفين بالموقع ورمز QR المتغير والرصد اليدوي، السجل والتصدير، المساءلات، الإعدادات، وربط الغياب بتأمين الحصص وعدم احتساب واجب الغائب (sql/096) | home hr | dropAbsent |
-| 76 | `src/supervision/myforms.js` | — | 30 | نماذجي V.myforms: نماذج المستخدم من الصفر أو نص أو ملف (تحويل ذكي A.textToTpl) بهوية المدرسة، تعبئة وحفظ وترتيب ومجلدات ومشاركة (sql/097) | myforms | textToTpl |
-| 77 | `src/core/teacher-features.js` | — | 21 | التحكم في الميزات الجديدة داخل حسابات المعلمين (للمالك) — schools.settings.tfeat ويقرؤه A.tfeat | tui | TFEAT |
-| 78 | `src/assess/live-poll.js` | — | 23 | السؤال اللحظي V.poll + A.livePoll (مثل ClassPoint): رمز/QR للطلاب على poll.html، نتائج لحظية، إدراج النتائج في السبورة (sql/098) | poll | livePoll livePollStart |
-| 79 | `src/assess/slides.js` | — | 34 | العروض التقديمية V.slides: من بنك الأسئلة أو نص/ملف، ست هويات مشتقة من دينا، محرر، عرض بملء الشاشة مع السؤال اللحظي، تصدير PowerPoint (vendor/pptxgen) وPDF (sql/098 decks) | slides | presentDeck slideHTML textToSlides |
-| 80 | `scales.js` | — | 65 | تعريف مقاييس البوصلة DinaScales (مشترك مع scale.html) | — | — |
-| 81 | `src/attendance/compass.js` | — | 57 | البوصلة ٢ V.compass: ٩ مقاييس بثلاث لغات وأربعة مستويات (scales.js) برابط scale.html، تقارير احترافية للفصل والطالب (رادار، مقارنة، توصيات)، PDF/صورة/Excel وواتساب لولي الأمر، ومؤشرات الأداء للمالك (sql/099–100). يصدّر A.elToPdf/elToPng/waOpen | compass | compassPoster elToPdf elToPng waOpen |
-| 82 | `src/attendance/gifted.js` | — | 65 | رعاية الموهوبين V.gifted: الدليل المرجعي، البوابات الخمس، ١٤ نموذجاً وخطة، قرار اللجنة بالأوزان والتصنيف، المؤشرات — gifted_files (sql/100)، A.giftedNominate | gifted | giftedNominate |
-| 83 | `src/plan/assistant.js` | — | 18 | مساعد المعلم V.assistant (مجاني داخل المتصفح): أهداف بلوم، ملخص، سير الحصة، استراتيجيات، أسئلة (A.genFromText)، واجب، تمايز، طباعة، تحويل لعرض/سؤال لحظي | assistant | lessonAssist |
-| 84 | `src/assess/models3d.js` | — | 20 | المجسمات التفاعلية A.models3d داخل المعامل: مجسمات هندسية بمحرك Canvas، نموذج الذرة، المجموعة الشمسية | labs | models3d |
-| 85 | `src/core/ui-pro.js` | — | 27 | الواجهة الاحترافية: السمات (كلاسيكي/عمق ثلاثي الأبعاد/زجاجي/زخارف دينا) وأيقونات القائمة التفاعلية، لوحة المعلم home2 (الأسبوع أعلى الصفحة + أيقونات)، أيقونات الإشعارات ونوع new، «ما الجديد»، A.announceNew عند تفعيل ميزة — يجب أن تبقى آخر وحدة (تغلّف V.my) | — | THEMES announceNew applyTheme |
+| 52 | `src/attendance/family-accounts.js` | — | 39 | حسابات أولياء الأمور برمز عائلة + التصدير الشامل + ما يراه ولي الأمر (sql/103) | stucodes | — |
+| 53 | `src/attendance/family-staff.js` | — | 35 | أولياء الأمور لجهة المدرسة V.pmsg: رسائل خاصة، تقارير واعتمادها، تدريب من البنك، أعذار (sql/104، family.html) | pmsg | __famDemo sendToParents |
+| 54 | `src/attendance/pickup.js` | — | 32 | النداء الآلي للاستئذان V.pcall: لوحة حية بالمراحل، السجل وExcel، الإعدادات (التفعيل لحسابات مختارة، موقع المدرسة من رابط خرائط جوجل، النطاق، الأدوار، شاشة call.html) — sql/106 | pcall | __pickDemo parseLatLng |
+| 55 | `src/assess/games.js` | app42.js | 21 | الألعاب التعليمية V.games (play.html) | games | — |
+| 56 | `src/assess/whiteboard-labs.js` | app43.js | 15 | السبورة التفاعلية والمعامل الافتراضية | labs wboard | — |
+| 57 | `src/core/teacher-ui.js` | app44.js | 17 | تخصيص صفحة المعلم (للمالك) V.tui | tui | TUI_BASIC tuiApply tuiWrapNav |
+| 58 | `src/core/test-teacher.js` | app45.js | 10 | المعلم التجريبي (للمالك) | testt | isTestMode isTestStaff |
+| 59 | `src/schedule/remote-template.js` | app46.js | 23 | قالب التعليم عن بعد | live | remoteOptimize remoteQuick remoteSettings |
+| 60 | `src/plan/homework-cell.js` | app47.js | 27 | خانة الواجب المخصصة في الخطة | reports | HW_QTYPES HW_TYPES hwBind hwBox repPrep |
+| 61 | `src/plan/homework-follow.js` | app48.js | 19 | متابعة الواجبات V.hwf | hwf | — |
+| 62 | `src/plan/approval-requests.js` | app49.js | 37 | طلبات الاعتماد والمهام الأدائية | dash reports | chgRow exExtras langHint langOf repAce |
+| 63 | `src/attendance/monitor-attendance.js` | app50.js | 54 | رصد الحضور لمراقب الدور | — | attAlerts attPicker attRecord attReports |
+| 64 | `src/attendance/live-attendance-board.js` | app51.js | 14 | لوحة الحضور اللحظية | — | _attFabBound _attFabEl attDash attMerge |
+| 65 | `src/core/ui-helpers.js` | app52.js | 14 | أدوات عرض مشتركة (تواريخ عربية…) | — | arDate arDateShort attChart attDrill |
+| 66 | `src/attendance/students-db.js` | app53.js | 5 | قاعدة الطلاب الموحّدة A.studentsAll | analysis | studentsAll studentsPayload syncStudentsNow |
+| 67 | `src/core/owner-controls.js` | app54.js | 4 | تحكم المالك في الشاشات اللحظية | tui | liveOK |
+| 68 | `src/core/kpi-drill.js` | app55.js | 3 | الأرقام التفاعلية A.attDrill | — | — |
+| 69 | `src/assess/noor-analysis.js` | app56.js | 68 | تحليل درجات نظام نور V.noor (استيراد ملفات نور) | noor | _noor |
+| 70 | `src/supervision/forms.js` | app57.js | 70 | النماذج والاستمارات بالتوقيع الإلكتروني V.forms (مع tools/supervision.html) | forms | _forms formsLoadLib formsSlots formsTeacherSlot formsWithSig |
+| 71 | `src/assess/ehomework.js` | app58.js | 4 | الواجب الإلكتروني برابط: أزرار ونافذة المشاركة QR | assess hwf | — |
+| 72 | `src/core/report-studio.js` | app59.js | 31 | استوديو التقارير A.printDoc بهوية المدرسة | — | printDoc printDocDirect printStyle |
+| 73 | `src/attendance/counseling.js` | app60.js | 94 | الإرشاد الطلابي: الإحالات والحالات والوكيل V.refer/V.counsel/V.deputy | counsel deputy refer | _counsel refData refDrill refLive refStats |
+| 74 | `src/attendance/students-browser.js` | app61.js | 17 | تبويب الطلاب: قوائم وإحصاءات تفاعلية A.stuBrowser | — | stuBrowser |
+| 75 | `src/assess/school-bank.js` | app62.js | 32 | بنك أسئلة المدرسة V.qbank + إتاحة الواجب الإلكتروني + واجهات الطالب + تصدير Excel | qbank | QTHEMES canAssess canAssessFull canEhw canHw ehwCfg ehwOnly qExport themePick |
+| 76 | `src/assess/bank-booklet.js` | — | 27 | كراسة التدريب PDF من بنك الأسئلة A.bankBooklet: غلاف بهوية المدرسة، ثلاثة أنماط (تدريب/اختبار تجريبي/مراجعة بالحل)، تقسيم آلي لصفحات A4، مفتاح الإجابة وورقة إجابة، QR، طباعة/حفظ PDF وتنزيل مباشر | — | bankBooklet |
+| 77 | `src/plan/terms.js` | — | 24 | الفصول الدراسية: مؤشر الفصل في الشريط وقائمة المستخدم، تبويب الإدارة لإضافة الفصل الثاني وتجهيزه وتفعيله (sql/094) | admin | termCur termFilter termOf termPickHtml termSwitch |
+| 78 | `src/attendance/hr.js` | — | 33 | الموارد البشرية V.hr: حضور الموظفين بالموقع ورمز QR المتغير والرصد اليدوي، السجل والتصدير، المساءلات، الإعدادات، وربط الغياب بتأمين الحصص وعدم احتساب واجب الغائب (sql/096) | home hr | dropAbsent |
+| 79 | `src/supervision/myforms.js` | — | 30 | نماذجي V.myforms: نماذج المستخدم من الصفر أو نص أو ملف (تحويل ذكي A.textToTpl) بهوية المدرسة، تعبئة وحفظ وترتيب ومجلدات ومشاركة (sql/097) | myforms | textToTpl |
+| 80 | `src/core/teacher-features.js` | — | 22 | التحكم في الميزات الجديدة داخل حسابات المعلمين (للمالك) — schools.settings.tfeat ويقرؤه A.tfeat | tui | TFEAT |
+| 81 | `src/assess/live-poll.js` | — | 23 | السؤال اللحظي V.poll + A.livePoll (مثل ClassPoint): رمز/QR للطلاب على poll.html، نتائج لحظية، إدراج النتائج في السبورة (sql/098) | poll | livePoll livePollStart |
+| 82 | `src/assess/slides.js` | — | 34 | العروض التقديمية V.slides: من بنك الأسئلة أو نص/ملف، ست هويات مشتقة من دينا، محرر، عرض بملء الشاشة مع السؤال اللحظي، تصدير PowerPoint (vendor/pptxgen) وPDF (sql/098 decks) | slides | presentDeck slideHTML textToSlides |
+| 83 | `scales.js` | — | 65 | تعريف مقاييس البوصلة DinaScales (مشترك مع scale.html) | — | — |
+| 84 | `src/attendance/compass.js` | — | 57 | البوصلة ٢ V.compass: ٩ مقاييس بثلاث لغات وأربعة مستويات (scales.js) برابط scale.html، تقارير احترافية للفصل والطالب (رادار، مقارنة، توصيات)، PDF/صورة/Excel وواتساب لولي الأمر، ومؤشرات الأداء للمالك (sql/099–100). يصدّر A.elToPdf/elToPng/waOpen | compass | compassPoster elToPdf elToPng waOpen |
+| 85 | `src/attendance/gifted.js` | — | 65 | رعاية الموهوبين V.gifted: الدليل المرجعي، البوابات الخمس، ١٤ نموذجاً وخطة، قرار اللجنة بالأوزان والتصنيف، المؤشرات — gifted_files (sql/100)، A.giftedNominate | gifted | giftedNominate |
+| 86 | `src/plan/assistant.js` | — | 18 | مساعد المعلم V.assistant (مجاني داخل المتصفح): أهداف بلوم، ملخص، سير الحصة، استراتيجيات، أسئلة (A.genFromText)، واجب، تمايز، طباعة، تحويل لعرض/سؤال لحظي | assistant | lessonAssist |
+| 87 | `src/assess/models3d.js` | — | 20 | المجسمات التفاعلية A.models3d داخل المعامل: مجسمات هندسية بمحرك Canvas، نموذج الذرة، المجموعة الشمسية | labs | models3d |
+| 88 | `src/core/ui-pro.js` | — | 27 | الواجهة الاحترافية: السمات (كلاسيكي/عمق ثلاثي الأبعاد/زجاجي/زخارف دينا) وأيقونات القائمة التفاعلية، لوحة المعلم home2 (الأسبوع أعلى الصفحة + أيقونات)، أيقونات الإشعارات ونوع new، «ما الجديد»، A.announceNew عند تفعيل ميزة — يجب أن تبقى آخر وحدة (تغلّف V.my) | — | THEMES announceNew applyTheme |

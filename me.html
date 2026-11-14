@@ -49,13 +49,13 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:20px}
 .code{font-family:'Myriad Pro',monospace;letter-spacing:3px;text-transform:uppercase;text-align:center;font-size:22px;direction:ltr}
 .empty{text-align:center;color:var(--muted);padding:16px}
 </style>
-<script src="digits.js?v=1794669319"></script>
+<script src="digits.js?v=1794678738"></script>
 </head>
 <body>
 <header><img src="assets/logo_white.svg" alt="مدارس دينا العالمية"><div><div class="t" id="ht">حسابي</div><div class="s" id="hs">مدارس دينا العالمية — بوابة الطالب</div></div></header>
 <main id="m"><div class="card">جارٍ التحميل…</div></main>
 <footer>مدارس دينا العالمية · Dinaaedu · 920035881</footer>
-<script src="config.js?v=1794669319"></script>
+<script src="config.js?v=1794678738"></script>
 <script>
 (function () {
   const C = window.APP_CONFIG, m = document.getElementById('m');
@@ -72,10 +72,10 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:20px}
 
   function login(msg) {
     m.innerHTML = `<div class="card"><h1>دخول الطالب</h1><p class="muted small">اكتب رمز الدخول الموجود في بطاقتك (يعطيك إياه معلمك أو يُرسل لولي أمرك).</p>
-      <label for="cd">رمز الدخول</label><input id="cd" class="code" autocomplete="one-time-code" maxlength="9" placeholder="XXXX-XXXX" value="${esc(code)}" inputmode="text">
-      <div style="margin-top:14px"><button class="btn" id="go" style="width:100%">دخول</button></div><p class="small" id="er" role="alert" style="color:var(--bad)">${esc(msg || '')}</p></div>`;
-    const i = document.getElementById('cd'); i.oninput = () => { let v = i.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8); if (v.length > 4) v = v.slice(0, 4) + '-' + v.slice(4); i.value = v; };
-    document.getElementById('go').onclick = () => { code = i.value.trim(); if (code.length < 9) { document.getElementById('er').textContent = 'الرمز ٨ خانات'; return; } load(); };
+      <label for="cd">رمز الدخول</label><input id="cd" class="code" autocomplete="one-time-code" maxlength="11" placeholder="XXXX-XXXX" value="${esc(code)}" inputmode="text" autocapitalize="characters" spellcheck="false">
+      <div style="margin-top:14px"><button class="btn" id="go" style="width:100%">دخول</button></div><p class="small" id="er" role="alert" style="color:var(--bad)">${esc(msg || '')}</p><p class="small muted" style="margin:8px 0 0">ولي الأمر؟ <a href="family.html">ادخل من بوابة ولي الأمر</a></p></div>`;
+    const i = document.getElementById('cd'); i.oninput = () => { let v = i.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10); v = v.length > 8 ? v.slice(0, 5) + '-' + v.slice(5) : v.length > 4 ? v.slice(0, 4) + '-' + v.slice(4) : v; i.value = v; };
+    document.getElementById('go').onclick = () => { code = i.value.trim(); const n = code.replace('-', '').length; if (n === 10) { location.href = 'family.html?a=' + encodeURIComponent(code); return; } if (n !== 8) { document.getElementById('er').textContent = 'الرمز ٨ خانات'; return; } load(); };
     i.onkeydown = e => { if (e.key === 'Enter') document.getElementById('go').click(); };
   }
   async function load() {
@@ -108,6 +108,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:20px}
     }
   }
   const linkify = t => esc(t).replace(/(https?:\/\/[^\s<]+)/g, u => `<a href="${u}" target="_blank" rel="noopener">${u.includes('student.html?q=') ? 'افتح الاختبار' : 'رابط'}</a>`);
+  const pq = new URLSearchParams(location.search).get('p'); if (pq) { location.replace('family.html?a=' + encodeURIComponent(pq)); return; }
   code ? load() : login();
 })();
 </script>

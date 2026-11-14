@@ -55,3 +55,15 @@
 - `gifted_files` (school_id, student_id, name, class_id, gate 1–5, level x|g|p|n, source teacher,parent,self,results, data JSON لكل نموذج، created_by): القراءة/التعديل للمالك و`has_module('gifted'|'counselor')` ومنشئ الترشيح؛ الحذف للمالك و`gifted`.
 - `schools.settings.gifted` {w:{rating,mawh,torr,pi}, cut:{x,g,p}}، `schools.settings.uitheme`.
 - 101: `scale_runs.shared uuid[]` (معلمون يقرؤون التطبيق ونتائجه)، `scale_resp.meta` JSON {school, grade, ph, lang} لطلاب الرابط الخارجي، RPC `scale_submit_ext(p_code,p_device,p_name,p_meta,p_answers,p_scores)` للعموم.
+
+### 103–104 حسابات أولياء الأمور وبوابة ولي الأمر (family.html)
+- `parent_codes` (code رمز تفعيل ١٠ خانات، school_id، phone = `norm_phone`، active، used_at) — `parent_codes_gen(p_section, p_phone)` (مع p_phone: رمز جديد يلغي كلمة المرور والجلسات)، `parent_codes_list(p_section)`، `parent_code_toggle`، المدير `parent_codes_manager()`.
+- `parent_accounts` (bcrypt في pass، fails/locked_until) و`parent_sessions` (th = sha256 للرمز) — لا وصول مباشر لأي دور؛ فقط عبر الدوال.
+- للعموم بالرمز: `fam_activate`, `fam_login`, `fam_logout`, `fam_password`, `fam_home`, `fam_child`, `fam_report`, `fam_practice`, `fam_excuse`, `fam_contacts`, `fam_thread`, `fam_send`. الحماية `portal_blocked` + `portal_fails`.
+- `parent_msgs` (قراءة: `staff_id = me()` فقط)، `parent_excuses`, `parent_reports`, `parent_practice` (قراءة حسب `family_manager()`/المنشئ/المدرسة؛ الكتابة بالدوال): `pmsg_inbox/thread/send`, `excuse_list/file/decide`, `preport_send/decide/del`, `ppractice_save/decide/del`.
+- `schools.settings.portal` بقيم افتراضية في `fam_cfg(school)`.
+
+### 105 ربط الأبناء المرن و106 النداء الآلي
+- `family_links` + `fam_kids(school, phone)` / `fam_phones(school)` — `family_link`, `family_change_phone`, `family_requests`, ولولي الأمر `fam_link_req`.
+- `pickup_calls` (trail jsonb) + `pickup_cfg(school)` (= `schools.settings.pickup` بقيم افتراضية) + `pickup_staff()` + `pickup_allowed(account)` + `pickup_step` (داخلية: الحالة والتوثيق والإشعار).
+- ولي الأمر: `fam_pickup_list/req/arrive/cancel/confirm`. الموظف: `pickup_list(from,to)`, `pickup_act(id, approve|reject|call|release|done|cancel, note)`, `pickup_new`. الشاشة: `pickup_screen(token, class, section)`, `pickup_screen_release(token, id)`.

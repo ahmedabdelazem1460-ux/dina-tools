@@ -73,6 +73,7 @@
   // نموذج بلا خانات توقيع: تُضاف خانتا المعلم والاعتماد
   const withSig = tpl => { const t = JSON.parse(JSON.stringify(tpl)); if (!slotsOf(t).length) t.blocks = (t.blocks || []).concat([{ id: 'bsig', type: 'signatures', withSign: true, roles: [{ id: 's0', label: 'المعلم', name: '' }, { id: 's1', label: 'المدير الأكاديمي', name: '@academic' }] }]); return t; };
 
+  A.formsLoadLib = loadLib; A.formsWithSig = withSig; A.formsTeacherSlot = teacherSlot; A.formsSlots = slotsOf;
   // ---------- التوقيع الإلكتروني ----------
   let MYSIG, SIGUSER; // التوقيع المحفوظ مرتبط بالحساب الحالي فقط
   async function mySig() { if (SIGUSER !== S.me.id) { MYSIG = undefined; SIGUSER = S.me.id; } if (MYSIG !== undefined) return MYSIG; try { const [r] = await api.list('staff_signatures', { staff_id: S.me.id }); MYSIG = r ? r.img : null; } catch (_) { MYSIG = null; } return MYSIG; }

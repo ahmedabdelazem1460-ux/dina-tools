@@ -16,6 +16,7 @@
 | الاختبارات | `curriculum` (الدروس), `questions` (البنك: qtype, options JSON, answer, level, difficulty, shared, source), `spec_tables`, `quizzes` (kind: quiz/worksheet/homework/remedial، settings JSON، code), `quiz_attempts`, `paper_exams`, `paper_results`, `exam_committees`, `remedial_plans`, `noor_imports`, `noor_scores`, `record_books`, `games`, `game_sets`, `game_players`, `game_answers` |
 | الإشراف والنماذج | `sup_templates`, `sup_records`, `sup_docs`, `form_tasks`, `staff_signatures` |
 | الفصول الدراسية | `terms` (094) + `weeks.term_id` — RPC: `term_save`, `term_ensure_first`, `term_create_weeks`, `term_set_status` |
+| الموارد البشرية | `staff_att` (096) — RPC: `hr_checkin`, `hr_mark`, `hr_auto_absent`, `hr_token`؛ `hr_admin()`؛ الإعدادات `schools.settings.hr` |
 | النظام | `notifications`, `notif_prefs` (093), `messages`, `audit_log`, `login_events`, `trash` (سلة المحذوفات عبر trigger `trash_capture`), `sync_cfg`, `sheet_queue` |
 
 **Realtime** مفعّل على: assignment_requests, attendance, behaviors, counsel_msgs, daily_boards, display_schedules, duty_log, extra_pages, form_tasks, messages, notes, period_attendance, plan_entries, quiz_attempts, resources, sections, students, substitutions, sup_records, timetable_slots, weeks.

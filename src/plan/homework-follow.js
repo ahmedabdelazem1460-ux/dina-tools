@@ -27,7 +27,8 @@
     const isT = id => A.isTestStaff && A.isTestStaff(id);
     const CL = (S.classes || (S.allClasses || []).filter(c => c.section_id === S.sectionId)).filter(c => c.active !== false && !c.is_test).sort((a, b) => (a.sort || 0) - (b.sort || 0));
     const days = Array.from({ length: (A.section() || {}).days || 5 }, (_, i) => i).filter(d => !(wk.holidays || []).some(h => +h.day === d));
-    const [ES, PR, QZ] = await Promise.all([api.entriesForWeeks([wk.id]).catch(() => []), api.list('lesson_preps', { school_id: S.school.id }).catch(() => []), api.list('quizzes', { week_id: wk.id }).catch(() => [])]);
+    const [ES0, PR, QZ] = await Promise.all([api.entriesForWeeks([wk.id]).catch(() => []), api.list('lesson_preps', { school_id: S.school.id }).catch(() => []), api.list('quizzes', { week_id: wk.id }).catch(() => [])]);
+    const ES = A.dropAbsent ? await A.dropAbsent(ES0, wk) : ES0; // لا يُحتسب واجب المعلم الغائب
     const QA = (QZ || []).length ? ((await api.list('quiz_attempts', { quiz_id: QZ.map(z => z.id) }).catch(() => [])) || []) : [];
     const E = (ES || []).filter(e => e.subject_id && e.teacher_id && !isT(e.teacher_id) && CL.some(c => c.id === e.class_id) && days.includes(e.day));
     const prepOf = new Map(); (PR || []).forEach(p => ((p.data || {}).links || []).forEach(l => { if (l.w === wk.id && l.e) prepOf.set(l.e, p); }));

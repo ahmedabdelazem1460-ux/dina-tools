@@ -1,0 +1,15 @@
+const { chromium } = require('playwright');
+const BELL = {def:'r',acts:[],holidays:[],schedules:[{id:'r',np:7,dur:45,name:'الحضوري',pass:0,start:'07:00',show:true,breaks:[{id:'b1',after:3,dur:20,label:'الفسحة',classes:[]}]},{id:'q',np:6,dur:45,name:'ست حصص',pass:0,start:'07:00',show:true,breaks:[]}]};
+(async () => { const b = await chromium.launch(); const errs = [];
+  const p = await (await b.newContext({ viewport: { width: 1366, height: 900 } })).newPage(); p.on('pageerror', e => errs.push(e.message));
+  await p.goto('http://localhost:8766/index.html?demo=1'); await p.click('[data-demo="a.abdelazim@dinaschool.com"]'); await p.waitForTimeout(2200);
+  await p.evaluate(b => { const s = APP.section(); s.bell = b; s.periods = 7; APP.bell.loadDisp = async () => []; APP.LS.set('studio_t', 'bell'); APP.LS.set('bell_s_' + s.id, 'r'); location.hash = '#/studio'; }, BELL); await p.waitForTimeout(2500);
+  console.log('after options', await p.$$eval('[data-br] [data-k="after"] option', a => a.map(o => o.textContent).join(',')));
+  await p.click('#eAddPr'); await p.waitForTimeout(800);
+  console.log('breaks', JSON.stringify(await p.evaluate(() => APP.bell.bellOf().schedules[0].breaks.map(x => [x.label, x.after]))));
+  console.log('poster rows', await p.$$eval('#blPv .bp-row', a => a.map(x => x.textContent.replace(/\s+/g, ' ').trim()).slice(-3)));
+  console.log('sum', (await p.textContent('.bl-sum')).trim());
+  console.log('today plan', await p.evaluate(() => { const pl = APP.bell.dayPlan(null, '2026-11-09'); return pl.items.filter(x=>x.k!=='t').map(x => (x.k === 'p' ? 'P' + (x.i + 1) : x.label) + '@' + DinaBell.hhmm(x.from)).join(' '); }));
+  await p.evaluate(() => document.querySelector('#blPv').scrollIntoView()); await p.screenshot({ path: 'p0/t168_poster.png' });
+  await p.click('[data-sc="q"]'); await p.waitForTimeout(600); console.log('6p hint', (await p.textContent('#blEd')).includes('لإظهار الحصة'), await p.textContent('#eAddPr'));
+  console.log('ERRS', errs); await b.close(); })();

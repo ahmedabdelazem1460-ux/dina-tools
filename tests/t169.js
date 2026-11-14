@@ -1,0 +1,28 @@
+const { chromium } = require('playwright');
+const today = new Date(Date.now()+3*36e5).toISOString().slice(0,10);
+(async () => { const b = await chromium.launch(); const errs = [];
+  const p = await (await b.newContext({ viewport: { width: 1366, height: 900 } })).newPage(); p.on('pageerror', e => errs.push(e.message));
+  await p.goto('http://localhost:8766/index.html?demo=1'); await p.click('[data-demo="a.abdelazim@dinaschool.com"]'); await p.waitForTimeout(2200);
+  const cls = await p.evaluate(() => (APP.S.allClasses && APP.S.allClasses.length ? APP.S.allClasses : APP.S.classes).map(c => ({ id: c.id, name: c.name })));
+  console.log('classes', cls.length);
+  const A3 = cls.slice(0, 3).map(c => c.id), B6 = cls.slice(3).map(c => c.id);
+  const BELL = {def:'r',acts:[],holidays:[],schedules:[{id:'r',np:7,dur:45,name:'الحضوري',pass:0,start:'07:30',show:true,breaks:[{id:'b1',after:2,dur:20,label:'الفسحة',classes:A3},{id:'b2',after:3,dur:20,label:'الفسحة',classes:B6},{id:'b3',after:7,dur:15,label:'الصلاة',classes:[]}]}]};
+  await p.evaluate(b => { const s = APP.section(); s.bell = b; s.periods = 7; APP.bell.loadDisp = async () => []; APP.LS.set('studio_t', 'bell'); APP.LS.set('bell_s_' + s.id, 'r'); location.hash = '#/studio'; }, BELL); await p.waitForTimeout(2500);
+  console.log('matrix head', await p.$$eval('#blPv .bp-mx thead th', a => a.map(x => x.textContent.replace(/\s+/g,' ').trim().slice(0,60))));
+  console.log('matrix rows', await p.$$eval('#blPv .bp-mx tbody tr', a => a.map(x => x.textContent.replace(/\s+/g,' ').trim()).join(' || ')));
+  await p.evaluate(() => document.querySelector('#blPv').scrollIntoView()); await p.waitForTimeout(300); await p.screenshot({ path: 'p0/t169_poster.png', fullPage: false });
+  console.log('save bar', await p.textContent('.bl-sv'));
+  await p.fill('[data-br="b3"] [data-k="dur"]', '20'); await p.waitForTimeout(200); console.log('after edit', await p.textContent('.bl-sv-st'));
+  await p.click('#eSave'); await p.waitForTimeout(1200); console.log('after save', await p.textContent('.bl-sv-st'), '| head', await p.textContent('#blSt'));
+  await p.evaluate(() => document.querySelector('.bl-sv').scrollIntoView({block:'center'})); await p.screenshot({ path: 'p0/t169_save.png' });
+  // simulate remote change
+  await p.evaluate(() => { APP.section().bell.schedules[0].start = '07:00'; APP.bell.changed(APP.S.sectionId, 'sec'); }); await p.waitForTimeout(1500);
+  console.log('after remote re-render start field', await p.inputValue('#eSt'));
+  await p.setViewportSize({ width: 375, height: 820 }); await p.waitForTimeout(800); console.log('375 overflow', await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1));
+  await p.evaluate(() => document.querySelector('.bl-sv').scrollIntoView({block:'center'})); await p.screenshot({ path: 'p0/t169_375.png' });
+  const q = await (await b.newContext({ viewport: { width: 1600, height: 900 } })).newPage(); q.on('pageerror', e => errs.push('board: ' + e.message));
+  await q.route('**/rpc/board_view', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ school: 'دينا', section: 'قسم البنين', day: today, board: { hide: [] }, bell: BELL, periods: 7, days: 7, classes: cls, disp: [], standby: [], cover: [], absentStaff: [], att: {}, duty: [], staffOff: [] }) }));
+  await q.goto('http://localhost:8766/board.html?t=x'); await q.waitForTimeout(2000);
+  console.log('board', await q.evaluate(() => { const s = [...document.querySelectorAll('.slide')].find(x => /مواعيد/.test(x.textContent)); return s ? s.textContent.replace(/\s+/g, ' ').slice(0, 500) : 'none'; }));
+  await q.evaluate(() => { const ss=[...document.querySelectorAll('.slide')]; ss.forEach(x=>x.classList.remove('on')); const s = ss.find(x => /مواعيد/.test(x.textContent)); s && s.classList.add('on'); }); await q.waitForTimeout(600); await q.screenshot({ path: 'p0/t169_board.png' });
+  console.log('ERRS', errs); await b.close(); })();

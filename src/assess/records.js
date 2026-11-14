@@ -15,7 +15,7 @@
 
   V.records = async function (root) {
     if (cleanup) cleanup();
-    const me = S.me.id, ver = (document.querySelector('script[src^="app14.js"]') || {}).src || '';
+    const me = S.me.id, ver = '?v=' + (window.DINA_V || '');
     root.innerHTML = '<div class="spinner"></div>';
     let row = null, students = [];
     try { row = (await api.list('record_books', { staff_id: me }))[0] || null; } catch (e) { root.innerHTML = `<div class="card">${A.emptyBox('تعذّر تحميل السجل', esc(e.message))}</div>`; return; }

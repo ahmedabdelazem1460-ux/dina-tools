@@ -23,7 +23,7 @@
   const overdue = t => t.due_date && t.due_date < today() && !['submitted', 'approved'].includes(t.status);
   const dt = d => d ? (A.arDate ? A.arDate(String(d).slice(0, 10)) : String(d).slice(0, 10)) : '—';
   const nm = id => (A.personName && A.personName(id)) || ((S.staff || []).find(p => p.id === id) || {}).full_name || '—';
-  const FRAME = 'tools/supervision.html?formEmbed=1&v=' + ((document.querySelector('script[src*="app57.js"]') || {}).src || '').split('v=')[1];
+  const FRAME = 'tools/supervision.html?formEmbed=1&v=' + (window.DINA_V || '');
 
   // ---------- الأيقونة والتنقل ----------
   A.I.forms = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8.5 16.5c1.2-1.6 2.2-1.6 3 0s1.8 1.6 3.5-.5"/></svg>';

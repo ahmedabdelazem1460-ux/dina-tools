@@ -83,6 +83,7 @@ body[data-th=pattern] .card>.head h2::after,body[data-th=pattern] .card>h2::afte
 .nf-toastpush:not(#nfSoft)>svg{flex:none;width:38px;height:38px;padding:8px;border-radius:12px;color:#fff;background:linear-gradient(145deg,#3AB1DB,#005499);box-sizing:border-box}
 .nf-toastpush:not(#nfSoft) span{color:#4D6A8F}
 @media (prefers-reduced-motion:no-preference){#notifBtn:has(#notifN:not(.hidden)) svg{animation:bellR 2.4s ease-in-out infinite;transform-origin:50% 10%}@keyframes bellR{0%,70%,100%{transform:rotate(0)}75%{transform:rotate(14deg)}80%{transform:rotate(-12deg)}85%{transform:rotate(8deg)}90%{transform:rotate(-5deg)}}}
+.th-btn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;width:38px;height:38px;border-radius:12px;display:inline-grid;place-items:center;cursor:pointer;margin-inline:4px;flex:none}.th-btn:hover{background:rgba(255,255,255,.22)}.th-btn:focus-visible{outline:3px solid #3AB1DB;outline-offset:2px}
 .wn{display:grid;gap:10px}.wn-it{display:flex;gap:12px;align-items:flex-start;border:1px solid #DCE7F3;border-radius:16px;padding:12px;background:linear-gradient(180deg,#fff,#F6FAFD)}
 .wn-it .g{width:48px;height:48px;border-radius:15px;display:grid;place-items:center;font-size:24px;flex:none;background:linear-gradient(145deg,var(--a),var(--b));box-shadow:0 10px 18px -10px var(--b),inset 0 1px 0 rgba(255,255,255,.45)}
 .wn-it b{display:block;color:#082B5A}.wn-it a.btn{text-decoration:none;flex:none}.wn-it small{color:#4D6A8F;line-height:1.7}
@@ -91,10 +92,18 @@ body[data-th=pattern] .card>.head h2::after,body[data-th=pattern] .card>h2::afte
   document.head.appendChild(css);
 
   const LSK = 'dina_theme';
-  const schoolTheme = () => (((S.school || {}).settings || {}).uitheme) || 'classic';
+  const DEF_TH = 'depth'; // السمة الافتراضية لمن لم يختر (قرار المالك: تظهر السمات الاحترافية للجميع مباشرة)
+  const schoolTheme = () => (((S.school || {}).settings || {}).uitheme) || DEF_TH;
   const allowed = () => !!S.me; // السمات متاحة للجميع بقرار المالك (لا تضيف شيئاً لصفحة المعلم)
-  const myTheme = () => { if (!allowed()) return 'classic'; let t = null; try { t = localStorage.getItem(LSK); } catch (_) { } return THEMES[t] ? t : THEMES[schoolTheme()] ? schoolTheme() : 'classic'; };
-  function applyTheme() { if (!document.body) return; const t = S.me ? myTheme() : 'classic'; if (document.body.dataset.th !== t) document.body.dataset.th = t; }
+  const myTheme = () => { if (!allowed()) return 'classic'; let t = null; try { t = localStorage.getItem(LSK); } catch (_) { } return THEMES[t] ? t : THEMES[schoolTheme()] ? schoolTheme() : DEF_TH; };
+  function applyTheme() { if (!document.body) return; const t = S.me ? myTheme() : 'classic'; if (document.body.dataset.th !== t) document.body.dataset.th = t; thBtn(); }
+  // زر «السمات» ظاهر في الشريط العلوي لكل مستخدم (بدل أن يبقى مخفياً داخل إعدادات المظهر)
+  function thBtn() {
+    const ub = document.getElementById('ub'); if (!S.me || !ub || document.getElementById('thBtn') || !A.uiSettings) return;
+    const b = document.createElement('button'); b.id = 'thBtn'; b.type = 'button'; b.className = 'th-btn'; b.title = 'السمات'; b.setAttribute('aria-label', 'تغيير سمة المنصة');
+    b.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.2" fill="currentColor"/><circle cx="10.5" cy="7.3" r="1.2" fill="currentColor"/><circle cx="15" cy="7.5" r="1.2" fill="currentColor"/></svg>';
+    b.onclick = () => A.uiSettings(); ub.parentNode.insertBefore(b, ub);
+  }
   A.applyTheme = applyTheme; A.THEMES = THEMES;
   window.addEventListener('hashchange', applyTheme); setInterval(applyTheme, 1500); setTimeout(applyTheme, 0);
   // اختيار السمة داخل نافذة «إعدادات المظهر»

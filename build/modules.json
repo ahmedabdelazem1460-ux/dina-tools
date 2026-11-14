@@ -77,6 +77,9 @@
     {"src": "src/supervision/myforms.js", "about": "نماذجي V.myforms: نماذج المستخدم من الصفر أو نص أو ملف (تحويل ذكي A.textToTpl) بهوية المدرسة، تعبئة وحفظ وترتيب ومجلدات ومشاركة (sql/097)"},
     {"src": "src/core/teacher-features.js", "about": "التحكم في الميزات الجديدة داخل حسابات المعلمين (للمالك) — schools.settings.tfeat ويقرؤه A.tfeat"},
     {"src": "src/assess/live-poll.js", "about": "السؤال اللحظي V.poll + A.livePoll (مثل ClassPoint): رمز/QR للطلاب على poll.html، نتائج لحظية، إدراج النتائج في السبورة (sql/098)"},
-    {"src": "src/assess/slides.js", "about": "العروض التقديمية V.slides: من بنك الأسئلة أو نص/ملف، ست هويات مشتقة من دينا، محرر، عرض بملء الشاشة مع السؤال اللحظي، تصدير PowerPoint (vendor/pptxgen) وPDF (sql/098 decks)"}
+    {"src": "src/assess/slides.js", "about": "العروض التقديمية V.slides: من بنك الأسئلة أو نص/ملف، ست هويات مشتقة من دينا، محرر، عرض بملء الشاشة مع السؤال اللحظي، تصدير PowerPoint (vendor/pptxgen) وPDF (sql/098 decks)"},
+    {"src": "scales.js", "about": "تعريف مقاييس البوصلة DinaScales (مشترك مع scale.html)"},
+    {"src": "src/attendance/compass.js", "about": "البوصلة V.compass: مقاييس الطلاب برابط scale.html ونتائج الفصل والطالب، ومؤشرات الأداء للمالك (sql/099)"},
+    {"src": "src/plan/assistant.js", "about": "مساعد المعلم V.assistant (مجاني داخل المتصفح): أهداف بلوم، ملخص، سير الحصة، استراتيجيات، أسئلة (A.genFromText)، واجب، تمايز، طباعة، تحويل لعرض/سؤال لحظي"}
   ]
 }

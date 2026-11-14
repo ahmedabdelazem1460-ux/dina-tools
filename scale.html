@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>البوصلة — مقياس الطالب</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#082B5A">
+<link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+<style>
+@font-face{font-family:'GE SS Two';font-weight:400 500;src:url(fonts/gess-two-medium.woff2) format('woff2');font-display:swap}
+@font-face{font-family:'GE SS Two';font-weight:600 900;src:url(fonts/gess-two-bold.woff2) format('woff2');font-display:swap}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;font-family:'GE SS Two',Tahoma,sans-serif;color:#082B5A;background:radial-gradient(1000px 420px at 50% -10%,#DCEFFA,transparent),#EEF3F9}
+header{display:flex;align-items:center;gap:10px;padding:12px 16px;background:#082B5A;color:#fff;border-bottom:4px solid #3AB1DB}
+header img{height:34px}header .t{font-weight:800}header .s{font-size:12px;color:#BFD6EE}
+main{padding:16px 12px;display:grid;place-items:start center}
+.card{width:min(620px,100%);background:#fff;border-radius:22px;padding:18px;box-shadow:0 24px 50px -30px rgba(8,43,90,.6)}
+h1{font-size:20px;margin:0 0 6px}.small{font-size:13px;color:#5b6b7f}
+.in{width:100%;font:inherit;font-size:17px;border:2px solid #CFE0F2;border-radius:14px;padding:11px 13px;color:#082B5A}
+.btn{font:inherit;font-weight:800;font-size:17px;border:0;border-radius:14px;padding:13px 18px;background:linear-gradient(135deg,#005499,#082B5A);color:#fff;cursor:pointer;width:100%;margin-top:12px}
+.btn:focus-visible,.ch:focus-visible{outline:3px solid #3AB1DB;outline-offset:2px}
+.prog{height:8px;border-radius:8px;background:#E6EDF4;overflow:hidden;margin:10px 0 14px}.prog i{display:block;height:100%;background:linear-gradient(90deg,#2E8B57,#BADF93)}
+.it{border:1px solid #E4EBF5;border-radius:16px;padding:12px;margin-bottom:10px}
+.it p{margin:0 0 10px;font-weight:800;font-size:17px;line-height:1.6}
+.chs{display:grid;gap:6px;grid-template-columns:repeat(5,1fr)}.chs.k3{grid-template-columns:repeat(3,1fr)}
+.ch{font:inherit;font-size:12.5px;font-weight:700;border:2px solid #DCE7F3;border-radius:12px;padding:9px 4px;background:#fff;color:#43597A;cursor:pointer;min-height:48px}
+.ch.on{border-color:#2E8B57;background:#EDF7E4;color:#1F6B44}
+.k3 .ch{font-size:17px}
+.res{display:grid;gap:10px;margin-top:10px}.res div{display:grid;grid-template-columns:110px 1fr 46px;gap:8px;align-items:center;font-weight:800}
+.res i{display:block;height:14px;border-radius:8px}
+.err{color:#B42318;font-weight:700;margin-top:8px}
+@media (max-width:420px){.chs{grid-template-columns:repeat(5,1fr)}.ch{font-size:10.5px;padding:8px 2px}}
+</style>
+</head>
+<body>
+<header><img src="assets/logo_white.svg" alt="مدارس دينا العالمية"><div><div class="t">البوصلة</div><div class="s" id="sch">مقياس الطالب</div></div></header>
+<main><div class="card" id="m" aria-live="polite">جارٍ التحميل…</div></main>
+<script src="config.js?v=1794629656"></script>
+<script src="scales.js?v=1794629656"></script>
+<script>
+(function () {
+  const C = window.APP_CONFIG, m = document.getElementById('m'), DS = window.DinaScales;
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const AR = s => String(s).replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+  const LS = { get: k => { try { return localStorage.getItem(k); } catch (_) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (_) { } } };
+  async function rpc(fn, body) { const r = await fetch(`${C.supabaseUrl}/rest/v1/rpc/${fn}`, { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); const j = await r.json().catch(() => null); if (!r.ok) throw new Error((j && (j.message || j.hint)) || 'تعذّر الاتصال'); return j; }
+  let dev = LS.get('scale_dev'); if (!dev) { dev = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now()); LS.set('scale_dev', dev); }
+  const code = (new URLSearchParams(location.search).get('c') || '').toUpperCase();
+  let R = null, sc = null, who = null, ans = [];
+  async function start() {
+    if (!code) { m.innerHTML = '<h1>رابط غير مكتمل</h1><p class="small">افتح الرابط أو امسح الرمز الذي أرسله معلمك.</p>'; return; }
+    try { R = await rpc('scale_get', { p_code: code }); } catch (e) { R = null; }
+    if (!R) { m.innerHTML = '<h1>المقياس غير متاح</h1><p class="small">قد يكون أُغلق. تواصل مع معلمك.</p>'; return; }
+    sc = DS.get(R.key); document.getElementById('sch').textContent = (R.school || '') + (R.cls ? ' · ' + R.cls : '');
+    ans = new Array(sc.items.length).fill(null);
+    m.innerHTML = `<h1>${sc.icon} ${esc(R.title || sc.name)}</h1><p class="small">${esc(sc.about)} لا توجد إجابة صحيحة أو خاطئة، أجب بما ينطبق عليك.</p>
+      ${R.students.length ? `<label class="small" for="st">اختر اسمك</label><select class="in" id="st"><option value="">— اختر —</option>${R.students.map(s => `<option value="${s.id}">${esc(s.n)}</option>`).join('')}</select>` : `<label class="small" for="nm">اسمك</label><input class="in" id="nm" maxlength="60">`}
+      <button class="btn" id="go">ابدأ</button><div class="err" id="er"></div>`;
+    m.querySelector('#go').onclick = () => { const st = m.querySelector('#st'), nm = m.querySelector('#nm'); if (st && !st.value) { m.querySelector('#er').textContent = 'اختر اسمك'; return; } if (nm && !nm.value.trim()) { m.querySelector('#er').textContent = 'اكتب اسمك'; return; } who = st ? { id: st.value, n: st.options[st.selectedIndex].text } : { id: null, n: nm.value.trim() }; items(); };
+  }
+  function items() {
+    const k3 = sc.scale.length === 3, done = ans.filter(x => x != null).length;
+    m.innerHTML = `<h1>${sc.icon} ${esc(sc.name)}</h1><div class="small">${esc(who.n)} · أجبت ${AR(done)} من ${AR(sc.items.length)}</div><div class="prog"><i style="width:${Math.round(done / sc.items.length * 100)}%"></i></div>
+      ${sc.items.map((it, i) => `<div class="it"><p>${AR(i + 1)}. ${esc(it[1])}</p><div class="chs ${k3 ? 'k3' : ''}" role="radiogroup" aria-label="${esc(it[1])}">${sc.scale.map((l, v) => `<button class="ch ${ans[i] === v + 1 ? 'on' : ''}" data-i="${i}" data-v="${v + 1}" role="radio" aria-checked="${ans[i] === v + 1}">${esc(l)}</button>`).join('')}</div></div>`).join('')}
+      <button class="btn" id="sd">إرسال</button><div class="err" id="er"></div>`;
+    m.querySelectorAll('.ch').forEach(b => b.onclick = () => { const i = +b.dataset.i; ans[i] = +b.dataset.v; b.parentNode.querySelectorAll('.ch').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', x === b); }); const d = ans.filter(x => x != null).length; m.querySelector('.prog i').style.width = Math.round(d / sc.items.length * 100) + '%'; m.querySelector('.small').textContent = `${who.n} · أجبت ${AR(d)} من ${AR(sc.items.length)}`; });
+    m.querySelector('#sd').onclick = async () => { const miss = ans.findIndex(x => x == null); if (miss >= 0) { m.querySelector('#er').textContent = `بقي ${AR(ans.filter(x => x == null).length)} عبارة دون إجابة`; m.querySelectorAll('.it')[miss].scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+      const scores = DS.score(sc, ans); try { await rpc('scale_submit', { p_code: code, p_device: dev, p_student: who.id, p_name: who.n, p_answers: ans, p_scores: scores }); result(scores); } catch (e) { m.querySelector('#er').textContent = e.message; } };
+  }
+  function result(scores) {
+    const t = DS.top(sc, scores);
+    m.innerHTML = `<h1>شكراً ${esc(who.n)} 🌟</h1><p class="small">هذه صورة أولية عن ${esc(sc.name)} لديك، ستساعد معلمك على دعمك بما يناسبك.</p><div class="res">${t.map(x => `<div><span>${esc(x.n)}</span><i style="width:${Math.max(4, x.v)}%;background:${x.c}"></i><span>${AR(x.v)}٪</span></div>`).join('')}</div>
+      <p style="margin-top:14px"><b>أبرز ما يميزك:</b> ${esc(t[0].n)}${t[0].d ? ' — ' + esc(t[0].d) : ''}</p>`;
+  }
+  start();
+})();
+</script>
+</body>
+</html>

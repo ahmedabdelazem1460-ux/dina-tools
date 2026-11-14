@@ -19,6 +19,7 @@
 | الموارد البشرية | `staff_att` (096) — RPC: `hr_checkin`, `hr_mark`, `hr_auto_absent`, `hr_token`؛ `hr_admin()`؛ الإعدادات `schools.settings.hr` |
 | نماذجي | `user_forms` (097) — قراءة: صاحبه أو المشارَك أو المالك؛ كتابة: صاحبه |
 | السؤال اللحظي والعروض | `live_polls`, `live_votes`, `decks` (098) — RPC للطلاب بلا حساب: `poll_get`, `poll_vote` |
+| البوصلة | `scale_runs`, `scale_resp` (099) — RPC للطلاب بلا حساب: `scale_get`, `scale_submit` |
 | النظام | `notifications`, `notif_prefs` (093), `messages`, `audit_log`, `login_events`, `trash` (سلة المحذوفات عبر trigger `trash_capture`), `sync_cfg`, `sheet_queue` |
 
 **Realtime** مفعّل على: assignment_requests, attendance, behaviors, counsel_msgs, daily_boards, display_schedules, duty_log, extra_pages, form_tasks, messages, notes, period_attendance, plan_entries, quiz_attempts, resources, sections, students, substitutions, sup_records, timetable_slots, weeks.

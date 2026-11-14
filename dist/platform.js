@@ -16298,6 +16298,8 @@ ${S.me.full_name}`;
     ['terms', 'مؤشر الفصل الدراسي', 'تنقّل المعلم بين الفصل الأول والثاني لمراجعة خطط الفصل السابق (الفصل الحالي يظهر دائماً).'],
     ['poll', 'السؤال اللحظي', 'صفحة «السؤال اللحظي» وزرّه في السبورة والعروض: يجيب الطلاب من جوالاتهم برمز.'],
     ['slides', 'العروض التقديمية', 'تحويل بنوك الأسئلة والدروس والملفات لعروض احترافية بهويات مشتقة من دينا.'],
+    ['compass', 'البوصلة', 'تطبيق المقاييس التربوية على الطلاب وعرض نتائجها (مؤشرات الأداء تبقى للمالك).'],
+    ['assistant', 'مساعد المعلم', 'تجهيز الدرس تلقائياً: أهداف، سير الحصة، أنشطة، أسئلة، واجب، تمايز.'],
     ['app', 'زر «تطبيق الجوال»', 'تعليمات تثبيت المنصة على أندرويد وآيفون في قائمة المستخدم.'],
   ];
   A.TFEAT = F;
@@ -16752,3 +16754,260 @@ ${S.me.full_name}`;
   }
 })();
 }catch(e){console.error('[dina] src/assess/slides.js',e)}
+
+/* ==== scales.js ==== */
+;try{
+/* البوصلة — تعريف المقاييس التربوية (مشترك بين المنصة وصفحة الطالب scale.html).
+   عبارات مؤلفة للاستخدام المدرسي الإرشادي (ليست اختبارات تشخيصية مقننة). كل بُعد = متوسط عباراته على مقياس ليكرت. */
+(function () {
+  const L5 = ['لا تنطبق أبداً', 'نادراً', 'أحياناً', 'غالباً', 'تنطبق تماماً'];
+  const L3 = ['😟 لا', '😐 أحياناً', '😀 نعم'];
+  const S = [
+    { key: 'styles', name: 'أنماط التعلم', icon: '🧭', stages: ['ابتدائي', 'متوسط', 'ثانوي'], scale: L5, about: 'يكشف الطريقة التي يفضّل الطالب التعلم بها ليُنوّع المعلم استراتيجياته.',
+      dims: { v: ['بصري', '#005499', 'الصور والمخططات والألوان والخرائط الذهنية'], a: ['سمعي', '#3AB1DB', 'الشرح والنقاش والتسجيلات الصوتية'], r: ['قرائي/كتابي', '#2E8B57', 'القراءة وتدوين الملاحظات والملخصات'], k: ['حركي/عملي', '#E0675A', 'التجارب والأنشطة والتمثيل والحركة'] },
+      items: [['v', 'أفهم الدرس أكثر عندما أرى صوراً أو رسوماً.'], ['a', 'أتذكر ما أسمعه من المعلم أكثر مما أقرؤه.'], ['r', 'أحب أن أكتب ملخصاً بعد كل درس.'], ['k', 'أتعلم أفضل عندما أجرب بيدي.'],
+        ['v', 'أستخدم الألوان لتنظيم ملاحظاتي.'], ['a', 'أحب أن أشرح لزملائي بصوت عالٍ.'], ['r', 'أفضّل قراءة الكتاب على مشاهدة فيديو.'], ['k', 'يصعب عليّ الجلوس طويلاً دون حركة.'],
+        ['v', 'أتخيل الأشياء في ذهني كأنها صورة.'], ['a', 'أستفيد من النقاش الجماعي.'], ['r', 'أحب القوائم والنقاط المكتوبة.'], ['k', 'أحب الأنشطة والألعاب التعليمية.']] },
+    { key: 'mi', name: 'الذكاءات المتعددة', icon: '💡', stages: ['ابتدائي', 'متوسط', 'ثانوي'], scale: L5, about: 'يُبرز مواطن القوة لدى الطالب في ثمانية ذكاءات لتوجيه الأنشطة والمشاريع.',
+      dims: { ling: ['لغوي', '#005499', 'القراءة والكتابة والتعبير'], logic: ['منطقي رياضي', '#082B5A', 'الأرقام والتحليل وحل المسائل'], spat: ['بصري مكاني', '#3AB1DB', 'الرسم والتصميم والخرائط'], body: ['جسمي حركي', '#E0675A', 'الرياضة والعمل اليدوي'], mus: ['إيقاعي', '#AE95DA', 'الإيقاع والأناشيد والأصوات'], inter: ['اجتماعي', '#C9A44C', 'التعاون وقيادة المجموعات'], intra: ['ذاتي', '#2F855A', 'التأمل ومعرفة الذات وتحديد الأهداف'], nat: ['طبيعي', '#1F6B44', 'الطبيعة والكائنات والتصنيف'] },
+      items: [['ling', 'أستمتع بالقراءة والقصص.'], ['logic', 'أحب الألغاز والمسائل الحسابية.'], ['spat', 'أرسم أو أصمم بسهولة.'], ['body', 'أحب الرياضة والأعمال اليدوية.'], ['mus', 'أتذكر الأناشيد والإيقاعات بسرعة.'], ['inter', 'أحب العمل مع مجموعة.'], ['intra', 'أعرف نقاط قوتي وضعفي.'], ['nat', 'أهتم بالنباتات والحيوانات.'],
+        ['ling', 'أعبّر عن أفكاري بالكلمات جيداً.'], ['logic', 'أسأل «لماذا» و«كيف» كثيراً.'], ['spat', 'أفهم الخرائط والمخططات بسهولة.'], ['body', 'أفكر أفضل وأنا أتحرك.'], ['mus', 'ألاحظ الأصوات من حولي.'], ['inter', 'يلجأ إليّ زملائي للمساعدة.'], ['intra', 'أضع أهدافاً لنفسي وأتابعها.'], ['nat', 'أحب تصنيف الأشياء ومقارنتها.']] },
+    { key: 'riasec', name: 'الميول المهنية', icon: '🎯', stages: ['متوسط', 'ثانوي'], scale: L5, about: 'يساعد في التوجيه المهني واختيار المسارات بستة أنماط للميول.',
+      dims: { R: ['واقعي', '#E0675A', 'الأعمال التقنية والميدانية'], I: ['بحثي', '#005499', 'العلوم والبحث والتحليل'], A: ['فني', '#AE95DA', 'الإبداع والتصميم والفنون'], S: ['اجتماعي', '#2E8B57', 'التعليم والمساعدة والصحة'], E: ['ريادي', '#C9A44C', 'القيادة والأعمال والإقناع'], C: ['تنظيمي', '#082B5A', 'التنظيم والبيانات والإدارة'] },
+      items: [['R', 'أحب إصلاح الأجهزة أو تركيبها.'], ['I', 'أستمتع بإجراء التجارب العلمية.'], ['A', 'أحب التصميم أو الكتابة الإبداعية.'], ['S', 'أحب مساعدة الآخرين وتعليمهم.'], ['E', 'أحب قيادة المشاريع وإقناع الآخرين.'], ['C', 'أحب ترتيب الملفات والبيانات بدقة.'],
+        ['R', 'أفضّل العمل الميداني على العمل المكتبي.'], ['I', 'أقرأ عن الاكتشافات العلمية.'], ['A', 'أحب الرسم أو التصوير أو المونتاج.'], ['S', 'أهتم بمشاعر الآخرين ومشكلاتهم.'], ['E', 'أفكر في بدء مشروعي الخاص.'], ['C', 'أتبع الخطوات والتعليمات بدقة.']] },
+    { key: 'study', name: 'مهارات الدراسة', icon: '📚', stages: ['متوسط', 'ثانوي'], scale: L5, about: 'يقيس عادات الطالب الدراسية ليُبنى عليها برنامج دعم وإرشاد.',
+      dims: { time: ['إدارة الوقت', '#005499', 'التخطيط والالتزام بالمواعيد'], focus: ['التركيز', '#3AB1DB', 'الانتباه وتجنب المشتتات'], notes: ['التدوين', '#2E8B57', 'تنظيم الملاحظات والمراجعة'], exam: ['الاستعداد للاختبار', '#E0675A', 'المراجعة وضبط القلق'] },
+      items: [['time', 'أضع جدولاً أسبوعياً للمذاكرة.'], ['focus', 'أبعد الجوال عني وقت المذاكرة.'], ['notes', 'أدوّن ملاحظات منظمة في الحصة.'], ['exam', 'أبدأ المراجعة قبل الاختبار بوقت كافٍ.'],
+        ['time', 'أسلّم واجباتي في موعدها.'], ['focus', 'أستطيع التركيز ٣٠ دقيقة متصلة.'], ['notes', 'أراجع ملاحظاتي في اليوم نفسه.'], ['exam', 'أتحكم في توتري أثناء الاختبار.']] },
+    { key: 'motive', name: 'الدافعية للتعلم', icon: '🔥', stages: ['ابتدائي', 'متوسط', 'ثانوي'], scale: L5, about: 'يقيس دافعية الطالب الداخلية والخارجية ومثابرته.',
+      dims: { inner: ['دافعية داخلية', '#2E8B57', 'حب التعلم والفضول'], outer: ['دافعية خارجية', '#C9A44C', 'الدرجات والتقدير'], pers: ['المثابرة', '#005499', 'الاستمرار أمام الصعوبة'] },
+      items: [['inner', 'أتعلم لأنني أستمتع بمعرفة الجديد.'], ['outer', 'أجتهد لأحصل على درجات عالية.'], ['pers', 'لا أستسلم عندما يصعب عليّ الحل.'], ['inner', 'أبحث عن معلومات إضافية بنفسي.'], ['outer', 'يحفزني ثناء المعلم ووالديّ.'], ['pers', 'أعيد المحاولة حتى أنجح.']] },
+    { key: 'wellbeing', name: 'الرضا والمناخ الصفي', icon: '🌱', stages: ['ابتدائي'], scale: L3, about: 'مقياس مبسط بالوجوه للصفوف الأولى عن شعور الطالب في المدرسة والصف.',
+      dims: { happy: ['السعادة بالمدرسة', '#2E8B57', ''], safe: ['الأمان', '#005499', ''], friends: ['العلاقة بالزملاء', '#3AB1DB', ''], teacher: ['العلاقة بالمعلم', '#C9A44C', ''] },
+      items: [['happy', 'أحب المجيء إلى المدرسة.'], ['safe', 'أشعر بالأمان في المدرسة.'], ['friends', 'لدي أصدقاء في صفي.'], ['teacher', 'معلمي يسمعني ويساعدني.'], ['happy', 'أستمتع بالحصص.'], ['friends', 'زملائي يلعبون معي.']] },
+  ];
+  // الدرجات: متوسط كل بُعد ٪
+  function score(sc, ans) { const max = sc.scale.length; const out = {}; Object.keys(sc.dims).forEach(d => { const v = sc.items.map((it, i) => it[0] === d ? +ans[i] : null).filter(x => x != null && !isNaN(x)); out[d] = v.length ? Math.round((v.reduce((a, b) => a + b, 0) / v.length - 1) / (max - 1) * 100) : 0; }); return out; }
+  function top(sc, sco) { return Object.entries(sco).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ k, v, n: sc.dims[k][0], c: sc.dims[k][1], d: sc.dims[k][2] })); }
+  window.DinaScales = { list: S, get: k => S.find(x => x.key === k), score, top };
+})();
+}catch(e){console.error('[dina] scales.js',e)}
+
+/* ==== src/attendance/compass.js ==== */
+;try{
+/* منصة دينا — البوصلة: (١) مقاييس تربوية للطلاب (أنماط التعلم، الذكاءات المتعددة، الميول المهنية، مهارات الدراسة، الدافعية، الرضا)
+   تُطبَّق على فصل برابط/QR (scale.html) وتُعرض نتائجها للفصل ولكل طالب مع توصيات تدريسية وتصدير.
+   (٢) مؤشرات الأداء للمالك: إنجاز الخطط، الواجبات، النماذج، الحضور — لكل معلم وللمدرسة. sql/099 + scales.js */
+(function () {
+  const A = window.APP, V = window.VIEWS; if (!A) return;
+  const { S, api, $, $$, esc, AR } = A;
+  const DEMO = !!api.demo, DS = () => window.DinaScales;
+  A.I.compass = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>';
+  if (A.NAV && !A.NAV.some(n => n[0] === 'compass')) { const i = A.NAV.findIndex(n => n[0] === 'analysis'); A.NAV.splice(i < 0 ? A.NAV.length : i + 1, 0, ['compass', 'البوصلة', () => !!S.me && !S.realMe && A.tfeat('compass')]); }
+  const TIPS = {
+    styles: { v: 'استخدم الخرائط الذهنية والمخططات والفيديو.', a: 'نوّع بالشرح المسموع والنقاش والتسميع.', r: 'وفّر نصوصاً وملخصات ومهام كتابية.', k: 'أدخل التجارب والأنشطة الحركية ولعب الأدوار.' },
+    mi: { ling: 'مشاريع كتابة وإلقاء.', logic: 'مسائل تحدٍّ وتحليل بيانات.', spat: 'تصميم ملصقات وإنفوجرافيك.', body: 'نماذج يدوية وأنشطة ميدانية.', mus: 'أناشيد وإيقاع للحفظ.', inter: 'تعلم تعاوني وأدوار قيادية.', intra: 'سجل تعلم ذاتي وأهداف شخصية.', nat: 'تصنيف ورحلات واستكشاف.' },
+    riasec: { R: 'المسارات التقنية والهندسية التطبيقية.', I: 'المسارات العلمية والصحية والبحثية.', A: 'التصميم والإعلام والفنون.', S: 'التعليم والإرشاد والخدمات الصحية.', E: 'إدارة الأعمال والريادة والقانون.', C: 'المحاسبة والإدارة ونظم المعلومات.' },
+    study: { time: 'تدريب على الجدولة الأسبوعية.', focus: 'استراتيجيات تقليل المشتتات (بومودورو).', notes: 'تعليم طريقة كورنيل للتدوين.', exam: 'برنامج إرشادي لقلق الاختبار.' },
+    motive: { inner: 'ربط الدروس باهتماماته وتحديات إثرائية.', outer: 'نظام تعزيز ونقاط واضح.', pers: 'أهداف قصيرة ومتابعة تقدّم مرئية.' },
+    wellbeing: { happy: 'أنشطة ترحيبية وتحفيز يومي.', safe: 'تواصل مع الموجه الطلابي.', friends: 'دمج في مجموعات تعاونية.', teacher: 'لقاء فردي قصير مع المعلم.' },
+  };
+  if (!document.getElementById('cpcss')) { const st = document.createElement('style'); st.id = 'cpcss'; st.textContent = `
+.cp-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr))}
+.cp-sc{border:1px solid #DCE7F3;border-radius:18px;padding:14px;background:linear-gradient(180deg,#fff,#F5F9FD);display:grid;gap:6px;box-shadow:0 12px 26px -22px rgba(8,43,90,.6)}
+.cp-sc .ic{font-size:28px}.cp-sc b{color:#082B5A;font-size:16px}.cp-sc .chips{display:flex;gap:4px;flex-wrap:wrap}.cp-sc .chips span{font-size:11px;border-radius:20px;padding:1px 8px;color:#fff}
+.cp-bars{display:grid;gap:8px}.cp-bars div{display:grid;grid-template-columns:130px 1fr 48px;gap:8px;align-items:center;font-size:13.5px;font-weight:700}
+.cp-bars i{display:block;height:14px;border-radius:8px}
+.cp-kpi{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin:10px 0}
+.cp-k{border:1px solid #DCE7F3;border-radius:18px;padding:14px;background:linear-gradient(180deg,#fff,#F5F9FD);box-shadow:inset 0 -4px 0 var(--c,#3AB1DB)}
+.cp-k b{display:block;font-size:30px;color:#082B5A}.cp-k span{font-size:12.5px;color:#4D6A8F}
+.cp-ring{--p:0;width:64px;height:64px;border-radius:50%;background:conic-gradient(var(--c) calc(var(--p)*1%),#E6EDF4 0);display:grid;place-items:center;float:inline-end}
+.cp-ring::after{content:attr(data-v);width:48px;height:48px;border-radius:50%;background:#fff;display:grid;place-items:center;font-weight:900;color:#082B5A;font-size:13px}
+.cp-pill{display:inline-block;border-radius:20px;padding:1px 9px;font-size:12px;font-weight:800;color:#fff}
+`; document.head.appendChild(st); }
+  const genCode = () => { const ab = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; let s = ''; for (let i = 0; i < 6; i++) s += ab[Math.floor(Math.random() * ab.length)]; return s; };
+  const link = c => location.origin + location.pathname.replace(/[^/]*$/, '') + 'scale.html?c=' + c;
+  const bars = (sc, sco) => `<div class="cp-bars">${DS().top(sc, sco).map(x => `<div><span>${esc(x.n)}</span><i style="width:${Math.max(3, x.v)}%;background:${x.c}"></i><span>${AR(x.v)}٪</span></div>`).join('')}</div>`;
+  const avgScores = (sc, rs) => { const o = {}; Object.keys(sc.dims).forEach(k => { const v = rs.map(r => (r.scores || {})[k]).filter(x => x != null); o[k] = v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : 0; }); return o; };
+
+  const st = { tab: null };
+  V.compass = async function (root) {
+    const own = S.me.is_owner && !S.realMe;
+    st.tab = st.tab || 'scales'; if (st.tab === 'kpi' && !own) st.tab = 'scales';
+    const T = [['scales', 'المقاييس'], ['runs', 'التطبيقات والنتائج'], ...(own ? [['kpi', 'مؤشرات الأداء']] : [])];
+    root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>البوصلة</h2><p class="sub" style="margin:2px 0 0">مقاييس تربوية تكشف أنماط تعلم الطلاب وقدراتهم وميولهم لتوجيه التدريس والإرشاد${own ? '، ومؤشرات أداء المدرسة والمعلمين' : ''}.</p></div></div>
+      <div class="fm-tabs">${T.map(([k, l]) => `<button data-t="${k}" class="${st.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div><div id="cpB"></div></div>`;
+    $$('[data-t]', root).forEach(b => b.onclick = () => { st.tab = b.dataset.t; V.compass(root); });
+    const B = $('#cpB', root); ({ scales, runs, kpi })[st.tab](B, root);
+  };
+  function scales(B, root) {
+    B.innerHTML = `<div class="cp-grid">${DS().list.map(s => `<div class="cp-sc"><span class="ic" aria-hidden="true">${s.icon}</span><b>${esc(s.name)}</b><span class="small muted">${esc(s.about)}</span><span class="small">المراحل: ${s.stages.join('، ')} · ${AR(s.items.length)} عبارة</span><div class="chips">${Object.values(s.dims).map(d => `<span style="background:${d[1]}">${esc(d[0])}</span>`).join('')}</div><button class="btn sm" data-run="${s.key}">تطبيق على فصل</button></div>`).join('')}</div>
+      <p class="small muted" style="margin-top:10px">العبارات أُعدّت للاستخدام المدرسي الإرشادي، وليست اختبارات تشخيصية مقننة؛ تُستخدم نتائجها لتنويع التدريس والتوجيه لا للحكم على الطالب.</p>`;
+    $$('[data-run]', B).forEach(b => b.onclick = () => runDialog(DS().get(b.dataset.run), () => { st.tab = 'runs'; V.compass(root); }));
+  }
+  function runDialog(sc, after) {
+    const cls = (S.allClasses || S.classes || []).filter(c => c.active !== false).sort((a, b) => (a.sort || 0) - (b.sort || 0));
+    const m = A.modal(`<h3>${sc.icon} تطبيق «${esc(sc.name)}»</h3><div class="grid g2"><div class="field"><label for="crC">الفصل</label><select class="in" id="crC">${cls.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></div><div class="field"><label for="crT">العنوان</label><input class="in" id="crT" value="${esc(sc.name)}"></div></div>
+      <p class="small muted">يختار الطالب اسمه من قائمة فصله ثم يجيب. يمكنك إغلاق التطبيق متى شئت.</p><div class="acts"><button class="btn" id="crGo">إنشاء الرابط</button></div>`);
+    m.el.querySelector('#crGo').onclick = e => A.run(e.currentTarget, async () => {
+      const row = { school_id: S.school.id, scale_key: sc.key, title: m.el.querySelector('#crT').value.trim() || sc.name, class_id: m.el.querySelector('#crC').value, code: genCode(), ...(DEMO ? { id: 'sr' + Date.now(), owner: S.me.id, state: 'open', created_at: new Date().toISOString() } : {}) };
+      await api.ins('scale_runs', [row]); m.close(); share(row); after && after();
+    });
+  }
+  function share(r) {
+    let qr = ''; try { const q = window.qrcode(0, 'M'); q.addData(link(r.code)); q.make(); qr = q.createSvgTag({ cellSize: 5, margin: 1, scalable: true }); } catch (_) { }
+    const m = A.modal(`<h3>رابط المقياس للطلاب</h3><div style="display:grid;place-items:center;gap:8px;text-align:center"><div style="width:220px">${qr}</div><b style="font-size:28px;letter-spacing:.2em" dir="ltr">${esc(r.code)}</b><input class="in" readonly value="${esc(link(r.code))}" dir="ltr" onclick="this.select()"><div class="row" style="gap:6px"><button class="btn sm" id="shC">نسخ الرابط</button><a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent('مقياس ' + r.title + ': ' + link(r.code))}">واتساب</a></div></div>`);
+    m.el.querySelector('#shC').onclick = async () => { try { await navigator.clipboard.writeText(link(r.code)); A.toast('نُسخ', 'ok'); } catch (_) { } };
+  }
+  async function runs(B) {
+    B.innerHTML = '<div class="spinner"></div>';
+    let R = [], P = []; try { R = await api.list('scale_runs', { school_id: S.school.id }, { order: 'created_at', desc: true }); P = R.length ? await api.list('scale_resp', { run_id: R.map(r => r.id) }) : []; } catch (_) { }
+    if (DEMO) R.forEach(r => { if (!P.some(p => p.run_id === r.id)) { const sc = DS().get(r.scale_key); (S.allClasses ? [] : []); const st = (A.studentsAll ? [] : []); for (let k = 0; k < 18; k++) { const ans = sc.items.map(() => 1 + Math.floor(Math.random() * sc.scale.length)); P.push({ id: 'p' + k + r.id, run_id: r.id, name: 'طالب ' + AR(k + 1), answers: ans, scores: DS().score(sc, ans) }); } } });
+    B.innerHTML = R.length ? `<div class="fm-list">${R.map(r => { const sc = DS().get(r.scale_key) || { icon: '', name: r.scale_key }; const n = P.filter(p => p.run_id === r.id).length; return `<div class="fm-row" data-r="${r.id}" tabindex="0" role="button"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:26px">${sc.icon}</span><div><b>${esc(r.title)}</b><div class="meta"><span>${esc((A.cls(r.class_id) || {}).name || '')}</span><span>${AR(n)} استجابة</span><span class="pill ${r.state === 'open' ? 'st-approved' : ''}">${r.state === 'open' ? 'مفتوح' : 'مغلق'}</span></div></div></div><span class="small muted">${esc(A.arDate ? A.arDate(String(r.created_at).slice(0, 10)) : '')}</span></div>`; }).join('')}</div>` : A.emptyBox('لا تطبيقات بعد', 'من تبويب «المقاييس» اختر مقياساً وطبّقه على فصل.');
+    $$('[data-r]', B).forEach(x => { const go = () => { const r = R.find(y => y.id === x.dataset.r); report(r, P.filter(p => p.run_id === r.id), () => runs(B)); }; x.onclick = go; x.onkeydown = e => { if (e.key === 'Enter') go(); }; });
+  }
+  function report(r, rs, after) {
+    const sc = DS().get(r.scale_key); const avg = avgScores(sc, rs); const t = DS().top(sc, avg); const tips = TIPS[sc.key] || {};
+    const grp = {}; rs.forEach(p => { const k = DS().top(sc, p.scores || {})[0]; if (k) (grp[k.k] = grp[k.k] || []).push(p); });
+    const m = A.modal(`<div class="head" style="margin:0;padding-inline-end:44px"><div class="grow"><h3 style="margin:0">${sc.icon} ${esc(r.title)} — ${esc((A.cls(r.class_id) || {}).name || '')}</h3><span class="small muted">${AR(rs.length)} استجابة</span></div>
+        <button class="btn ghost sm" id="rpS">الرابط</button><button class="btn ghost sm" id="rpT">${r.state === 'open' ? 'إغلاق' : 'إعادة فتح'}</button><button class="btn ghost sm" id="rpX">Excel</button><button class="btn sm" id="rpP">${A.I.print || ''} تقرير الفصل</button></div>
+      <div class="grid g2" style="align-items:start;margin-top:10px"><div class="card" style="margin:0"><h3 style="margin-top:0">ملف الفصل</h3>${bars(sc, avg)}<p class="small" style="margin-top:10px"><b>توصية تدريسية:</b> ${esc(tips[t[0].k] || '')}${t[1] ? ' و' + esc(tips[t[1].k] || '') : ''}</p></div>
+        <div class="card" style="margin:0"><h3 style="margin-top:0">مجموعات حسب البُعد الأبرز</h3>${Object.entries(grp).sort((a, b) => b[1].length - a[1].length).map(([k, L]) => `<div style="margin-bottom:8px"><span class="cp-pill" style="background:${sc.dims[k][1]}">${esc(sc.dims[k][0])} · ${AR(L.length)}</span> <span class="small">${L.map(p => esc(p.name)).join('، ')}</span></div>`).join('') || A.emptyBox('لا استجابات بعد')}</div></div>
+      <h3>الطلاب</h3><div class="scroll"><table class="tbl"><thead><tr><th>الطالب</th>${Object.values(sc.dims).map(d => `<th>${esc(d[0])}</th>`).join('')}<th>الأبرز</th><th></th></tr></thead><tbody>${rs.map((p, i) => { const tp = DS().top(sc, p.scores || {})[0] || {}; return `<tr><td><b>${esc(p.name)}</b></td>${Object.keys(sc.dims).map(k => `<td>${AR((p.scores || {})[k] ?? 0)}٪</td>`).join('')}<td><span class="cp-pill" style="background:${tp.c || '#999'}">${esc(tp.n || '')}</span></td><td><button class="btn ghost sm" data-ind="${i}">تقرير</button></td></tr>`; }).join('')}</tbody></table></div>`, { cls: 'wide' });
+    m.el.querySelector('#rpS').onclick = () => share(r);
+    m.el.querySelector('#rpT').onclick = e => A.run(e.currentTarget, async () => { r.state = r.state === 'open' ? 'closed' : 'open'; await api.upd('scale_runs', r.id, { state: r.state }); m.close(); after && after(); });
+    m.el.querySelector('#rpP').onclick = () => A.printDoc(`${sc.name} — ${(A.cls(r.class_id) || {}).name || ''}`, `${AR(rs.length)} طالباً`, `<h3>ملف الفصل</h3><table><tr>${t.map(x => `<th>${esc(x.n)}</th>`).join('')}</tr><tr>${t.map(x => `<td>${AR(x.v)}٪</td>`).join('')}</tr></table><p><b>توصية تدريسية:</b> ${esc(tips[t[0].k] || '')}</p><h3>الطلاب</h3><table><tr><th>الطالب</th>${Object.values(sc.dims).map(d => `<th>${esc(d[0])}</th>`).join('')}<th>الأبرز</th></tr>${rs.map(p => `<tr><td>${esc(p.name)}</td>${Object.keys(sc.dims).map(k => `<td>${AR((p.scores || {})[k] ?? 0)}٪</td>`).join('')}<td>${esc((DS().top(sc, p.scores || {})[0] || {}).n || '')}</td></tr>`).join('')}</table>`, true);
+    m.el.querySelector('#rpX').onclick = () => { if (!window.XLSX) return; const ws = XLSX.utils.json_to_sheet(rs.map(p => { const o = { 'الطالب': p.name }; Object.entries(sc.dims).forEach(([k, d]) => o[d[0]] = (p.scores || {})[k] ?? 0); o['الأبرز'] = (DS().top(sc, p.scores || {})[0] || {}).n || ''; return o; })); ws['!views'] = [{ RTL: true }]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'النتائج'); XLSX.writeFile(wb, `${sc.name}.xlsx`); };
+    $$('[data-ind]', m.el).forEach(b => b.onclick = () => { const p = rs[+b.dataset.ind]; const tp = DS().top(sc, p.scores || {}); A.printDoc(`${sc.name} — ${p.name}`, (A.cls(r.class_id) || {}).name || '', `<table><tr><th>البُعد</th><th>الدرجة</th><th>الوصف</th></tr>${tp.map(x => `<tr><td><b>${esc(x.n)}</b></td><td>${AR(x.v)}٪</td><td>${esc(x.d || '')}</td></tr>`).join('')}</table><p><b>أبرز ما يميز الطالب:</b> ${esc(tp[0].n)}.</p><p><b>توصيات:</b> ${esc(tips[tp[0].k] || '')} ${tp[1] ? esc(tips[tp[1].k] || '') : ''}</p>`, false); });
+  }
+
+  // ---------- مؤشرات الأداء (للمالك) ----------
+  async function kpi(B) {
+    B.innerHTML = '<div class="spinner"></div>';
+    const E = (S.allEntries || S.entries || []).filter(e => e.subject_id && e.teacher_id);
+    const month = new Date(Date.now() + 3 * 36e5).toISOString().slice(0, 7);
+    const [F, H] = await Promise.all([api.list('form_tasks', { school_id: S.school.id }, { select: 'id,assignee,status,mode' }).catch(() => []), api.list('staff_att', { school_id: S.school.id }, { gte: { day: month + '-01' } }).catch(() => [])]);
+    const filled = e => e.status && e.status !== 'empty', hasHw = e => { const h = (e.homework || '').trim(); return !!h && !/^لا يوجد|^بدون|^[-–—.\s]+$/.test(h); };
+    const pct = (a, b) => b ? Math.round(a * 100 / b) : null;
+    const T = [...new Set(E.map(e => e.teacher_id))].map(id => { const es = E.filter(e => e.teacher_id === id), fl = es.filter(filled); const fs = F.filter(f => f.assignee === id && f.mode !== 'sign'); const hs = H.filter(h => h.staff_id === id);
+      const o = { id, plan: pct(fl.length, es.length), hw: pct(fl.filter(hasHw).length, fl.length), forms: fs.length ? pct(fs.filter(f => ['submitted', 'approved'].includes(f.status)).length, fs.length) : null, att: hs.length ? pct(hs.filter(h => ['present', 'excused', 'leave'].includes(h.status)).length, hs.length) : null };
+      const v = [o.plan, o.hw, o.forms, o.att].filter(x => x != null); o.idx = v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : 0; return o; }).sort((a, b) => b.idx - a.idx);
+    const avg = k => { const v = T.map(t => t[k]).filter(x => x != null); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null; };
+    const ring = (v, c) => `<span class="cp-ring" style="--p:${v || 0};--c:${c}" data-v="${v == null ? '—' : AR(v) + '٪'}"></span>`;
+    const tone = v => v == null ? '' : v >= 85 ? 'color:#1F6B44' : v >= 60 ? 'color:#8a5a00' : 'color:#B42318';
+    B.innerHTML = `<div class="cp-kpi">${[['plan', 'إنجاز خطة الأسبوع', '#005499'], ['hw', 'حصص فيها واجب', '#3AB1DB'], ['forms', 'إنجاز النماذج', '#2E8B57'], ['att', 'انضباط الحضور (الشهر)', '#C9A44C'], ['idx', 'المؤشر العام', '#082B5A']].map(([k, l, c]) => `<div class="cp-k" style="--c:${c}">${ring(avg(k), c)}<b>${avg(k) == null ? '—' : AR(avg(k)) + '٪'}</b><span>${l}</span></div>`).join('')}</div>
+      <div class="scroll"><table class="tbl"><thead><tr><th>المعلم</th><th>الخطة</th><th>الواجبات</th><th>النماذج</th><th>الحضور</th><th>المؤشر العام</th></tr></thead><tbody>${T.map(t => `<tr><td><b>${esc(A.personName(t.id) || '')}</b></td>${['plan', 'hw', 'forms', 'att', 'idx'].map(k => `<td style="font-weight:800;${tone(t[k])}">${t[k] == null ? '—' : AR(t[k]) + '٪'}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="6">${A.emptyBox('لا بيانات للأسبوع المحدد')}</td></tr>`}</tbody></table></div>
+      <p class="small muted">الخطة والواجبات من الأسبوع المعروض حالياً، والنماذج من كل النماذج المرسلة، والحضور من الموارد البشرية هذا الشهر. المؤشر العام متوسط المتاح منها. — المؤشرات وسيلة متابعة وتحسين لا حكم نهائي.</p>
+      <div class="acts"><button class="btn ghost" id="kpP">${A.I.print || ''} طباعة</button></div>`;
+    $('#kpP', B).onclick = () => A.printDoc('مؤشرات الأداء', (A.week() ? 'الأسبوع ' + A.week().word : '') + ' · ' + month, `<table><tr><th>المعلم</th><th>الخطة</th><th>الواجبات</th><th>النماذج</th><th>الحضور</th><th>المؤشر</th></tr>${T.map(t => `<tr><td>${esc(A.personName(t.id) || '')}</td>${['plan', 'hw', 'forms', 'att', 'idx'].map(k => `<td>${t[k] == null ? '—' : AR(t[k]) + '٪'}</td>`).join('')}</tr>`).join('')}</table>`, true);
+  }
+})();
+}catch(e){console.error('[dina] src/attendance/compass.js',e)}
+
+/* ==== src/plan/assistant.js ==== */
+;try{
+/* منصة دينا — مساعد المعلم الذكي (أدوات مجانية تعمل داخل المتصفح، بلا خدمة ذكاء اصطناعي مدفوعة):
+   من عنوان الدرس أو نصه أو ملف (Word/PDF/صورة) يُنتج: خطة درس كاملة بأهداف مصنفة على بلوم واستراتيجيات وزمن،
+   أسئلة تقويم (محرك البنك الذكي A.genFromText)، أنشطة صفية متنوعة، واجباً، ملخصاً، وخطة تمايز —
+   مع الطباعة بهوية المدرسة، والنسخ، وتحويلها لعرض تقديمي أو سؤال لحظي. */
+(function () {
+  const A = window.APP, V = window.VIEWS; if (!A) return;
+  const { S, api, $, $$, esc, AR } = A;
+  A.I.assistant = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg>';
+  if (A.NAV && !A.NAV.some(n => n[0] === 'assistant')) { const i = A.NAV.findIndex(n => n[0] === 'prep'); A.NAV.splice(i < 0 ? A.NAV.length : i + 1, 0, ['assistant', 'مساعد المعلم', () => !!S.me && !S.realMe && A.tfeat('assistant')]); }
+  if (!document.getElementById('ascss')) { const st = document.createElement('style'); st.id = 'ascss'; st.textContent = `
+.as-in{display:grid;gap:10px}
+.as-out{display:grid;gap:12px;margin-top:14px}
+.as-sec{border:1px solid #DCE7F3;border-radius:18px;padding:14px 16px;background:linear-gradient(180deg,#fff,#F7FAFD);box-shadow:0 12px 26px -22px rgba(8,43,90,.6)}
+.as-sec h3{margin:0 0 8px;color:#082B5A;display:flex;gap:8px;align-items:center}.as-sec h3 .n{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;color:#fff;background:linear-gradient(135deg,#005499,#082B5A);font-size:14px}
+.as-sec ul,.as-sec ol{margin:0;padding-inline-start:22px;line-height:1.9}
+.as-tl{display:grid;gap:6px}.as-tl div{display:grid;grid-template-columns:90px 70px 1fr;gap:8px;align-items:start;border-inline-start:3px solid #3AB1DB;padding:6px 10px;background:#fff;border-radius:10px}
+.as-lv{display:inline-block;font-size:11px;font-weight:800;border-radius:20px;padding:1px 8px;margin-inline-start:6px;background:#E8F1F9;color:#005499}
+.as-acts{display:flex;gap:6px;flex-wrap:wrap}
+.as-cards{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}.as-cards div{border:1px dashed #9CC4E4;border-radius:14px;padding:10px;background:#fff}.as-cards b{color:#005499}
+`; document.head.appendChild(st); }
+
+  // ---------- أدوات النص ----------
+  const STOP = new Set('في من إلى على عن أن إن كان كانت التي الذي الذين هذه هذا ذلك تلك ثم أو و ما لا لم لن هو هي هم هن نحن قد كل بعض بين عند حتى إذا كما مع أي غير بها له لها به منها فيها عليه عليها التى الى ان او اذا'.split(' '));
+  const sentences = t => String(t || '').replace(/\r/g, '').split(/(?<=[.؟?!؛])\s+|\n+/).map(s => s.trim()).filter(s => s.split(' ').length >= 4);
+  function keyTerms(text, n) { const f = {}; String(text || '').replace(/[^؀-ۿa-zA-Z\s]/g, ' ').split(/\s+/).filter(w => w.length > 3 && !STOP.has(w)).forEach(w => { const k = w.replace(/^(وال|بال|كال|فال|لل|ال)/, ''); if (k.length > 2) f[k] = (f[k] || 0) + 1; });
+    return Object.entries(f).sort((a, b) => b[1] - a[1]).slice(0, n || 10).map(x => x[0]); }
+  function summary(text, n) { const ss = sentences(text); if (ss.length <= n) return ss; const kt = new Set(keyTerms(text, 25)); const sc = ss.map((s, i) => ({ s, i, v: s.split(/\s+/).filter(w => kt.has(w.replace(/^(وال|بال|كال|فال|لل|ال)/, ''))).length / Math.sqrt(s.split(' ').length) + (i === 0 ? .5 : 0) }));
+    return sc.sort((a, b) => b.v - a.v).slice(0, n).sort((a, b) => a.i - b.i).map(x => x.s); }
+  const BLOOM = { remember: ['تذكر', ['يعدد', 'يذكر', 'يعرّف', 'يسمي']], understand: ['فهم', ['يوضح', 'يفسر', 'يصف', 'يميز بين']], apply: ['تطبيق', ['يطبق', 'يستخدم', 'يحل', 'يمثّل']], analyze: ['تحليل', ['يقارن بين', 'يحلل', 'يصنف', 'يستنتج']], evaluate: ['تقويم', ['يحكم على', 'يبرر', 'ينقد']], create: ['إبداع', ['يصمم', 'يقترح', 'يبتكر']] };
+  function objectives(title, text) {
+    const terms = keyTerms(text || title, 6); const t = title || terms[0] || 'الدرس'; const pick = (lv, i) => BLOOM[lv][1][i % BLOOM[lv][1].length];
+    const out = [];
+    const given = sentences(text).filter(s => /^(أن\s+)?(يتعرف|يذكر|يعدد|يوضح|يفسر|يطبق|يحل|يقارن|يميز|يستنتج|يصمم|يكتب|يقرأ|يحسب)/.test(s.replace(/^[-•\d.\s]+/, ''))).slice(0, 5);
+    if (given.length) given.forEach(s => out.push({ t: s.replace(/^[-•\d.\s]+/, '').replace(/^(?!أن)/, 'أن '), lv: lvOf(s) }));
+    else {
+      out.push({ t: `أن ${pick('remember', 0)} الطالب المفاهيم الأساسية في ${t}${terms[1] ? ' مثل: ' + terms.slice(1, 3).join(' و') : ''}.`, lv: 'remember' });
+      out.push({ t: `أن ${pick('understand', 0)} الطالب ${terms[1] ? 'مفهوم ' + terms[1] : 'فكرة الدرس'} بأسلوبه الخاص.`, lv: 'understand' });
+      out.push({ t: `أن ${pick('apply', 0)} الطالب ما تعلمه في ${t} على مواقف وأمثلة جديدة.`, lv: 'apply' });
+      out.push({ t: `أن ${pick('analyze', 0)} الطالب ${terms[2] && terms[3] ? terms[2] + ' و' + terms[3] : 'عناصر الدرس'}.`, lv: 'analyze' });
+      out.push({ t: `أن ${pick('create', 1)} الطالب حلاً أو نموذجاً يوظّف ${t}.`, lv: 'create' });
+    }
+    return out;
+  }
+  const lvOf = s => /يتعرف|يذكر|يعدد|يعرف|يسمي/.test(s) ? 'remember' : /يوضح|يفسر|يصف|يميز/.test(s) ? 'understand' : /يطبق|يحل|يستخدم|يحسب/.test(s) ? 'apply' : /يقارن|يحلل|يصنف|يستنتج/.test(s) ? 'analyze' : /يصمم|يبتكر|يقترح|يكتب/.test(s) ? 'create' : 'understand';
+  const STRAT = [['فكر – زاوج – شارك', 'يفكر كل طالب فردياً في سؤال مفتوح عن {t} دقيقة، ثم يتناقش مع زميله، ثم تشارك الأزواج إجاباتها.'], ['التعلم التعاوني (جيكسو)', 'تُقسم أجزاء الدرس ({k}) على مجموعات خبراء، ثم يعود كل خبير لمجموعته الأم ليشرح جزأه.'],
+    ['الخرائط الذهنية', 'يرسم الطلاب خريطة ذهنية مركزها «{t}» وفروعها: {k}.'], ['التعلم بالمحطات', 'أربع محطات: قراءة وتلخيص، حل تمارين، نشاط عملي، سؤال تحدٍّ — تتنقل المجموعات كل ٥ دقائق.'],
+    ['بطاقة الخروج', 'في آخر الحصة يكتب الطالب: شيئاً تعلّمه، وسؤالاً ما زال لديه، ومثالاً من حياته عن {t}.'], ['لعب الأدوار', 'يمثل الطلاب موقفاً يوظّف مفهوم {k1} أمام زملائهم.'], ['العصف الذهني', 'سؤال مثير: «ماذا لو لم يوجد {k1}؟» تُجمع الأفكار على السبورة وتُصنف.'], ['السؤال اللحظي', 'سؤال اختيار من متعدد عن {k1} يجيب عنه الطلاب من جوالاتهم لقياس الفهم فوراً.']];
+  const fill = (s, t, ks) => s.replace(/\{t\}/g, t).replace(/\{k\}/g, ks.slice(0, 4).join('، ') || t).replace(/\{k1\}/g, ks[0] || t);
+
+  function build(inp) {
+    const text = inp.text || '', title = inp.title || (sentences(text)[0] || '').slice(0, 60) || 'الدرس';
+    const ks = keyTerms(text || title, 10), obj = objectives(title, text), sm = text ? summary(text, 5) : [];
+    let qs = []; try { if (text && A.genFromText) qs = A.genFromText(text, { max: 10, types: ['mcq', 'tf', 'blank', 'short'] }).qs || []; } catch (_) { qs = []; }
+    const strat = STRAT.map((s, i) => ({ n: s[0], d: fill(s[1], title, ks) })).sort(() => Math.random() - .5).slice(0, 4);
+    const dur = +inp.dur || 45; const tl = [['التمهيد', Math.round(dur * .1), `سؤال مثير أو صورة/موقف حياتي عن ${title} ومراجعة التعلم السابق.`], ['العرض والشرح', Math.round(dur * .35), `عرض المفاهيم (${ks.slice(0, 3).join('، ') || title}) بالأمثلة والوسائل، مع أسئلة تفاعلية.`], ['النشاط', Math.round(dur * .3), `${strat[0].n}: ${strat[0].d}`], ['التقويم', Math.round(dur * .15), 'أسئلة تقويم بنائي وسؤال لحظي لقياس الفهم.'], ['الغلق', dur - Math.round(dur * .1) - Math.round(dur * .35) - Math.round(dur * .3) - Math.round(dur * .15), 'تلخيص الطلاب لأهم ما تعلموه وبطاقة خروج، وإعلان الواجب.']];
+    const hw = qs.slice(0, 3).map(q => q.body).concat(qs.length ? [] : [`اكتب فقرة من ٥ أسطر تشرح فيها ${title} بمثال من حياتك.`, `ارسم خريطة مفاهيم لـ ${title}.`]);
+    const diff = { low: [`بطاقة مفاهيم مصورة لـ ${ks.slice(0, 3).join('، ') || title}.`, 'أسئلة تذكر وفهم بخطوات موجهة، وعمل مع زميل داعم.'], high: [`مهمة إثرائية: ابحث عن تطبيق واقعي لـ ${title} وقدّمه في دقيقتين.`, 'سؤال تحليل/إبداع مفتوح وقيادة مجموعة.'] };
+    return { title, subject: inp.subject, grade: inp.grade, ks, obj, sm, qs, strat, tl, hw, diff, mats: ['السبورة التفاعلية', 'عرض تقديمي للدرس', 'الكتاب المدرسي', 'بطاقات العمل', 'السؤال اللحظي'] };
+  }
+
+  function render(R) {
+    const L = (BLOOM[R.lv] || [''])[0];
+    const sec = (n, h, b) => `<div class="as-sec"><h3><span class="n">${AR(n)}</span>${h}</h3>${b}</div>`;
+    const qHTML = q => `<li>${esc(q.body)}${(q.options || []).length ? `<div class="small muted">${q.options.map((o, i) => (o.ok ? '✓ ' : '') + esc(o.t)).join(' · ')}</div>` : q.answer ? `<div class="small muted">الإجابة: ${esc(q.answer)}</div>` : ''}<span class="as-lv">${esc((BLOOM[q.level] || [q.level || ''])[0] || '')}</span></li>`;
+    return [sec(1, 'الأهداف السلوكية', `<ol>${R.obj.map(o => `<li>${esc(o.t)}<span class="as-lv">${BLOOM[o.lv][0]}</span></li>`).join('')}</ol>`),
+      R.sm.length ? sec(2, 'ملخص الدرس', `<ul>${R.sm.map(s => `<li>${esc(s)}</li>`).join('')}</ul>${R.ks.length ? `<p class="small" style="margin:6px 0 0"><b>المفاهيم المفتاحية:</b> ${R.ks.slice(0, 8).map(esc).join('، ')}</p>` : ''}`) : '',
+      sec(3, 'سير الحصة والزمن', `<div class="as-tl">${R.tl.map(([a, m, d]) => `<div><b>${a}</b><span class="small">${AR(m)} دقيقة</span><span>${esc(d)}</span></div>`).join('')}</div>`),
+      sec(4, 'الاستراتيجيات والأنشطة', `<div class="as-cards">${R.strat.map(s => `<div><b>${esc(s.n)}</b><div class="small">${esc(s.d)}</div></div>`).join('')}</div>`),
+      sec(5, 'أسئلة التقويم', R.qs.length ? `<ol>${R.qs.map(qHTML).join('')}</ol>` : '<p class="small muted">أضف نص الدرس أو ملفه لتوليد أسئلة تقويم تلقائية منه.</p>'),
+      sec(6, 'الواجب المنزلي', `<ul>${R.hw.map(h => `<li>${esc(h)}</li>`).join('')}</ul>`),
+      sec(7, 'التمايز', `<div class="grid g2"><div><b>للطلاب المحتاجين لدعم</b><ul>${R.diff.low.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div><div><b>للمتقدمين</b><ul>${R.diff.high.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div></div>`),
+      sec(8, 'الوسائل ومصادر التعلم', `<p>${R.mats.map(esc).join(' · ')}</p>`)].join('');
+  }
+  const asText = R => [`${R.title}`, '', 'الأهداف:', ...R.obj.map(o => '- ' + o.t), '', ...(R.sm.length ? ['ملخص الدرس:', ...R.sm.map(s => '- ' + s), ''] : []), 'سير الحصة:', ...R.tl.map(([a, m, d]) => `- ${a} (${m} د): ${d}`), '', 'الاستراتيجيات:', ...R.strat.map(s => `- ${s.n}: ${s.d}`), '', 'أسئلة التقويم:', ...R.qs.map((q, i) => `${i + 1}- ${q.body}`), '', 'الواجب:', ...R.hw.map(h => '- ' + h)].join('\n');
+
+  V.assistant = function (root) {
+    const subs = (S.subjects || []).filter(s => !s.is_activity);
+    root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>مساعد المعلم</h2><p class="sub" style="margin:2px 0 0">اكتب عنوان الدرس أو الصق نصه أو ارفع ملفه، فيجهّز لك: الأهداف، والملخص، وسير الحصة بالزمن، والاستراتيجيات والأنشطة، وأسئلة التقويم، والواجب، والتمايز — يعمل مجاناً داخل المتصفح.</p></div></div>
+      <div class="as-in"><div class="grid g3"><div class="field"><label for="asT">عنوان الدرس</label><input class="in" id="asT" placeholder="مثال: دورة الماء في الطبيعة"></div><div class="field"><label for="asS">المادة</label><select class="in" id="asS"><option value="">—</option>${subs.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></div><div class="field"><label for="asD">زمن الحصة (دقيقة)</label><input class="in" type="number" id="asD" value="45" min="20" max="120"></div></div>
+        <div class="field"><label for="asX">نص الدرس (اختياري — يحسّن الأهداف والأسئلة والملخص)</label><textarea class="in" id="asX" rows="7" placeholder="الصق فقرات الدرس من الكتاب أو ملخصك…"></textarea></div>
+        <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><label class="btn ghost sm" style="cursor:pointer">رفع ملف (Word/PDF/صورة)<input type="file" id="asF" accept=".docx,.pdf,.txt,image/*" hidden></label><span class="small muted" id="asFs"></span><span class="grow"></span><button class="btn" id="asGo">${A.I.assistant} جهّز الدرس</button></div></div>
+      <div id="asO"></div></div>`;
+    $('#asF', root).onchange = async e => { const f = e.target.files[0]; if (!f) return; const s = $('#asFs', root); s.textContent = 'جارٍ القراءة…';
+      try { const l = /^image\//.test(f.type) && A._imageLines ? await A._imageLines(f, p => { s.textContent = 'التعرف الضوئي ' + Math.round((p || 0) * 100) + '٪'; }) : A._fileLines ? await A._fileLines(f) : null; if (!l) throw new Error('صيغة غير مدعومة');
+        $('#asX', root).value = (Array.isArray(l) ? l : String(l).split('\n')).map(x => typeof x === 'string' ? x : (x.text || x.t || '')).join('\n'); if (!$('#asT', root).value) $('#asT', root).value = f.name.replace(/\.[^.]+$/, ''); s.textContent = 'قُرئ الملف'; } catch (er) { s.textContent = 'تعذّرت القراءة: ' + er.message; } };
+    $('#asGo', root).onclick = () => {
+      const inp = { title: $('#asT', root).value.trim(), text: $('#asX', root).value.trim(), subject: $('#asS', root).value, dur: $('#asD', root).value };
+      if (!inp.title && !inp.text) return A.toast('اكتب عنوان الدرس أو الصق نصه', 'err');
+      const R = build(inp); const O = $('#asO', root);
+      O.innerHTML = `<div class="as-out"><div class="head" style="margin:0"><div class="grow"><h2 style="margin:0">${esc(R.title)}</h2><span class="small muted">${inp.subject ? esc(A.subjName(inp.subject)) + ' · ' : ''}${AR(inp.dur)} دقيقة</span></div>
+        <div class="as-acts"><button class="btn ghost sm" id="aoR">إعادة التوليد</button><button class="btn ghost sm" id="aoC">نسخ</button>${A.tfeat('slides') && A.textToSlides ? '<button class="btn ghost sm" id="aoS">تحويل لعرض تقديمي</button>' : ''}${A.tfeat('poll') && A.livePollStart && R.qs.length ? '<button class="btn ghost sm" id="aoP">سؤال لحظي</button>' : ''}<button class="btn sm" id="aoPr">${A.I.print || ''} طباعة بهوية المدرسة</button></div></div>${render(R)}</div>`;
+      O.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      $('#aoR', O).onclick = () => $('#asGo', root).click();
+      $('#aoC', O).onclick = async () => { try { await navigator.clipboard.writeText(asText(R)); A.toast('نُسخ', 'ok'); } catch (_) { A.toast('تعذّر النسخ', 'err'); } };
+      $('#aoPr', O).onclick = () => A.printDoc('تحضير درس: ' + R.title, (inp.subject ? A.subjName(inp.subject) + ' · ' : '') + (S.me.full_name || ''), render(R).replace(/class="as-sec"/g, 'style="margin-bottom:10px"'), false);
+      const sb = $('#aoS', O); if (sb) sb.onclick = e => A.run(e.currentTarget, async () => { const slides = A.textToSlides(R.title, ['الأهداف:', ...R.obj.map(o => '- ' + o.t), ...(R.sm.length ? ['ملخص الدرس:', ...R.sm.map(s => '- ' + s)] : []), 'المفاهيم المفتاحية:', ...R.ks.slice(0, 6).map(k => '- ' + k), 'نشاط:', '- ' + R.strat[0].n + ': ' + R.strat[0].d].join('\n'));
+        R.qs.slice(0, 5).forEach((q, i) => slides.splice(slides.length - 1, 0, { id: 'q' + i + Date.now(), t: 'question', title: 'سؤال ' + AR(i + 1), q: { kind: q.qtype === 'tf' ? 'tf' : (q.options || []).length ? 'mcq' : 'short', body: q.body, options: (q.options || []).map(o => o.t), correct: q.qtype === 'tf' ? (q.answer === 'صواب' ? '0' : '1') : String(Math.max(0, (q.options || []).findIndex(o => o.ok))), answer: q.answer || '' } }));
+        await api.ins('decks', [{ school_id: S.school.id, title: R.title, theme: 'wave', slides, ...(api.demo ? { id: 'dk' + Date.now(), owner: S.me.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString() } : {}) }]); A.toast('أُنشئ العرض — تجده في «العروض التقديمية»', 'ok'); });
+      const pb = $('#aoP', O); if (pb) pb.onclick = () => { const q = R.qs.find(x => (x.options || []).length || x.qtype === 'tf') || R.qs[0]; A.livePoll({ kind: q.qtype === 'tf' ? 'tf' : (q.options || []).length ? 'mcq' : 'short', question: q.body, options: (q.options || []).map(o => o.t), correct: q.qtype === 'tf' ? (q.answer === 'صواب' ? '0' : '1') : String(Math.max(0, (q.options || []).findIndex(o => o.ok))) }); };
+    };
+  };
+  A.lessonAssist = build;
+})();
+}catch(e){console.error('[dina] src/plan/assistant.js',e)}

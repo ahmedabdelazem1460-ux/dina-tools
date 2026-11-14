@@ -83,3 +83,6 @@
 | 75 | `src/core/teacher-features.js` | — | 4 | التحكم في الميزات الجديدة داخل حسابات المعلمين (للمالك) — schools.settings.tfeat ويقرؤه A.tfeat | tui | TFEAT |
 | 76 | `src/assess/live-poll.js` | — | 22 | السؤال اللحظي V.poll + A.livePoll (مثل ClassPoint): رمز/QR للطلاب على poll.html، نتائج لحظية، إدراج النتائج في السبورة (sql/098) | poll | livePoll livePollStart |
 | 77 | `src/assess/slides.js` | — | 34 | العروض التقديمية V.slides: من بنك الأسئلة أو نص/ملف، ست هويات مشتقة من دينا، محرر، عرض بملء الشاشة مع السؤال اللحظي، تصدير PowerPoint (vendor/pptxgen) وPDF (sql/098 decks) | slides | presentDeck slideHTML textToSlides |
+| 78 | `scales.js` | — | 9 | تعريف مقاييس البوصلة DinaScales (مشترك مع scale.html) | — | — |
+| 79 | `src/attendance/compass.js` | — | 19 | البوصلة V.compass: مقاييس الطلاب برابط scale.html ونتائج الفصل والطالب، ومؤشرات الأداء للمالك (sql/099) | compass | — |
+| 80 | `src/plan/assistant.js` | — | 18 | مساعد المعلم V.assistant (مجاني داخل المتصفح): أهداف بلوم، ملخص، سير الحصة، استراتيجيات، أسئلة (A.genFromText)، واجب، تمايز، طباعة، تحويل لعرض/سؤال لحظي | assistant | lessonAssist |

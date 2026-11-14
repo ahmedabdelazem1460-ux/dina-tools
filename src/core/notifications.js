@@ -15,8 +15,19 @@
     form_approved: ['اعتماد نموذج', 'اعتماد نموذجك'],
     form_done: ['اكتمال عمل', 'اكتمال تعبئة وتوقيع الجميع على نموذج'],
     standby: ['حصص الانتظار', 'تكليفك بحصة انتظار'],
+    system: ['تنبيهات العمل', 'التقارير والتكليفات والتذكيرات وإحالات الطلاب'],
   };
   A.NOTIF_KINDS = KINDS;
+  /* التنبيهات الآلية (تقرير، تذكير، تكليف، تعديل جدول…) تصل إشعاراً في الجرس، ولا تدخل صندوق الرسائل إلا باختيار المرسِل (asMessage).
+     من لم تُفعَّل له «الإشعارات» (مفتاح notif) تصله رسالة حتى لا يضيع التنبيه. sql/102 notice_send */
+  const seesBell = id => { const p = (S.staff || []).find(x => x.id === id); if (p && p.is_owner) return true; const st = (S.school || {}).settings || {}, v = (st.tfeat || {}).notif; return v === true || (v === 'some' && ((st.tfeatTo || {}).notif || []).includes(id)); };
+  A.noticeMsgBox = (id, label) => `<label class="chk small"><input type="checkbox" id="${id}"> ${label || 'إرسال كرسالة أيضاً في صندوق الرسائل'}</label>`;
+  A.notice = async (ids, title, body, o) => { o = o || {}; ids = [...new Set((ids || []).filter(Boolean))]; if (!ids.length) return { bell: 0, msg: 0 };
+    const bell = ids.filter(seesBell), msg = o.asMessage ? ids : ids.filter(id => !seesBell(id));
+    if (bell.length) { try { if (api.demo) await api.ins('notifications', bell.map(id => ({ id: 'nt' + Date.now() + id, school_id: S.school.id, staff_id: id, kind: o.kind || 'system', title, body: body || '', link: o.link || '', created_by: myId(), show_at: nowIso(), created_at: nowIso() })));
+      else await api.rpc('notice_send', { p_ids: bell, p_title: title, p_body: body || '', p_link: o.link || '', p_kind: o.kind || 'system' }); } catch (e) { if (!o.asMessage) msg.push(...bell.filter(id => !msg.includes(id))); } }
+    if (msg.length && api.sendMessages) await api.sendMessages(msg.map(id => ({ recipient_id: id, subject: title, body: body || '', kind: 'system' })));
+    return { bell: bell.length, msg: msg.length }; };
   const ICO = {
     bell: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>',
     gear: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',

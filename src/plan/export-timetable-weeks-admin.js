@@ -373,7 +373,7 @@
         <div class="field"><label>المواد</label><label class="chk"><input type="checkbox" id="dgAll" checked> كل مواده (${AR(pairs.length)})</label><div class="perm-grid hidden" id="dgP" style="margin-top:6px">${pairs.map(pr => `<label class="chk"><input type="checkbox" value="${pr.c}|${pr.s}" checked> ${esc(A.subjName(pr.s))} — ${esc((A.cls(pr.c) || {}).name || '')}</label>`).join('')}</div></div>
         <div class="field"><label>الأسابيع</label><div class="perm-grid" id="dgW">${wks.map(w => `<label class="chk"><input type="checkbox" value="${w.id}" ${w.id === S.weekId ? 'checked' : ''}> الأسبوع ${esc(w.word)}</label>`).join('') || '<span class="small muted">لا توجد أسابيع مفتوحة</span>'}</div></div>
         <div class="field"><label for="dgN">السبب (اختياري)</label><input class="in" id="dgN" placeholder="مثال: إجازة مرضية"></div>
-        <label class="chk"><input type="checkbox" id="dgM" checked> إرسال رسالة للمعلم المكلَّف والمعلم الأصلي</label>
+        <label class="chk"><input type="checkbox" id="dgM" checked> تنبيه المعلم المكلَّف والمعلم الأصلي</label>${A.noticeMsgBox ? A.noticeMsgBox('dgMM', 'وكرسالة أيضاً') : ''}
         <div class="acts"><button class="btn" id="dgGo">تكليف</button></div>`, { cls: 'wide' });
       m.el.querySelector('#dgAll').onchange = e => m.el.querySelector('#dgP').classList.toggle('hidden', e.target.checked);
       m.el.querySelector('#dgGo').onclick = e => A.run(e.currentTarget, async () => {
@@ -385,7 +385,9 @@
         await api.addDelegation({ section_id: S.sectionId, from_teacher: fid, to_teacher: to, pairs: all ? null : ps, week_ids: ws, note });
         if (m.el.querySelector('#dgM').checked) {
           const wl = ws.map(id => 'الأسبوع ' + ((S.weeks.find(w => w.id === id) || {}).word || '')).join('، '); const scope = all ? 'كل مواده' : ps.map(x => `${A.subjName(x.s)} — ${(A.cls(x.c) || {}).name || ''}`).join('، ');
-          await api.sendMessages([{ recipient_id: to, subject: 'تكليف مؤقت بإدخال خطط', body: `كُلِّفت بإدخال خطط ${A.personName(fid)} (${scope}) في ${wl}${note ? ' — ' + note : ''}. ستجدها في صفحتك «خطتي» بعلامة «نيابة».`, kind: 'system' }, { recipient_id: fid, subject: 'تكليف مؤقت', body: `كُلِّف ${A.personName(to)} بإدخال خططك (${scope}) في ${wl}${note ? ' — ' + note : ''}.`, kind: 'system' }]).catch(() => { });
+          const b1 = `كُلِّفت بإدخال خطط ${A.personName(fid)} (${scope}) في ${wl}${note ? ' — ' + note : ''}. ستجدها في صفحتك «خطتي» بعلامة «نيابة».`, b2 = `كُلِّف ${A.personName(to)} بإدخال خططك (${scope}) في ${wl}${note ? ' — ' + note : ''}.`, am = !!(m.el.querySelector('#dgMM') || {}).checked;
+          if (A.notice) { await A.notice([to], 'تكليف مؤقت بإدخال خطط', b1, { link: '#/my', asMessage: am }).catch(() => { }); await A.notice([fid], 'تكليف مؤقت', b2, { asMessage: am }).catch(() => { }); }
+          else await api.sendMessages([{ recipient_id: to, subject: 'تكليف مؤقت بإدخال خطط', body: b1, kind: 'system' }, { recipient_id: fid, subject: 'تكليف مؤقت', body: b2, kind: 'system' }]).catch(() => { });
         }
         m.close(); dl = await api.delegations(S.sectionId); await A.loadWeek(); draw(); A.toast(`كُلِّف ${A.personName(to)} بالإدخال نيابةً عن ${A.personName(fid)}`, 'ok');
       });

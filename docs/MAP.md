@@ -13,7 +13,7 @@
 | 5 | `bellcore.js` | — | 17 | نواة التوقيت الموحّدة DinaBell (المنصة + board.html) | — | — |
 | 6 | `src/core/core.js` | app.js | 104 | الأساس: الحالة S، الدخول، التنقل NAV/route، «خطتي» V.my، لوحة المتابعة V.dash، المساعدات A.* | — | — |
 | 7 | `src/core/order.js` | — | 2 | ترتيب منطقي موحّد للمراحل والصفوف والفصول والمواد: A.cmpCls / A.cmpSubj / A.cmpEntrySG (عرض فقط) | — | clsRank cmpCls cmpEntrySG cmpSubj gradeOrd stageIdx subjRank |
-| 8 | `src/plan/export-timetable-weeks-admin.js` | app2.js | 111 | التصدير، الجدول الدراسي، الأسابيع، الإدارة | admin export timetable weeks | _ttLoadRefresh _ttReqRefresh slotDialog |
+| 8 | `src/plan/export-timetable-weeks-admin.js` | app2.js | 112 | التصدير، الجدول الدراسي، الأسابيع، الإدارة | admin export timetable weeks | _ttLoadRefresh _ttReqRefresh slotDialog |
 | 9 | `src/core/tools-dev.js` | app3.js | 18 | أداتا النصاب والجدول الآلي داخل المنصة + لوحة المطوّر | builder dev nisab | — |
 | 10 | `src/plan/extra-pages-join.js` | app4.js | 23 | الصفحات الإضافية في الخطة + روابط انضمام المعلمين | — | — |
 | 11 | `lang.js` | — | 25 | التدقيق اللغوي للخطة | — | — |
@@ -21,7 +21,7 @@
 | 13 | `src/core/reports-archive-staff.js` | app6.js | 54 | التقارير، الأرشيف، استيراد الموظفين، هوية كل قسم | archive reports | printDoc |
 | 14 | `src/plan/sheets-sync.js` | app7.js | 20 | مزامنة Google Sheets | classes dash dev weeks | _dashReq pullFromSheet syncLabel |
 | 15 | `src/core/sidebar-appearance.js` | app8.js | 17 | القائمة الجانبية، المظهر، من يعمل الآن | — | uiSettings |
-| 16 | `src/core/notifications.js` | — | 38 | الإشعارات: الجرس، إذن الجهاز، التنبيهات العامة والمجدولة، التفضيلات وتحكم المالك، مركز الإشعارات V.notify، التثبيت كتطبيق | notify | NOTIF_KINDS appDialog notifIssue notifMarkRead notifPanel tfeat |
+| 16 | `src/core/notifications.js` | — | 40 | الإشعارات: الجرس، إذن الجهاز، التنبيهات العامة والمجدولة، التفضيلات وتحكم المالك، مركز الإشعارات V.notify، التثبيت كتطبيق | notify | NOTIF_KINDS appDialog notice noticeMsgBox notifIssue notifMarkRead notifPanel tfeat |
 | 17 | `src/plan/parent-posts.js` | app9.js | 12 | إعلانات أولياء الأمور | posts | POST_KINDS |
 | 18 | `src/core/resources-analysis-roles.js` | app10.js | 29 | المصادر (قديم)، تحليل النتائج، المسميات والصلاحيات V.roles وإظهار البنود features | analysis resources roles | fetchResources hasModule pickResource |
 | 19 | `src/attendance/attendance-behavior-supervision.js` | app11.js | 62 | الحضور والغياب والسلوك V.attendance + الإشراف التربوي V.supervision | attendance myreports supervision | _attRefresh attWho |
@@ -39,7 +39,7 @@
 | 31 | `src/schedule/import-timetable.js` | app22.js | 20 | استيراد الجداول الجاهزة (Excel/CSV/PDF من aSc) | — | ttImport ttMatch ttParsePdf |
 | 32 | `src/schedule/approve-timetable.js` | app23.js | 10 | اعتماد الجدول مع معاينة الأثر | — | ttApprove |
 | 33 | `src/schedule/timetable-designer.js` | app24.js | 48 | مصمم الجداول للطباعة V.timetable | timetable | ttDesign |
-| 34 | `src/plan/timetable-mismatch.js` | app25.js | 7 | تنبيه «حصص مكتوبة تخالف الجدول» | dash | conflictsDialog |
+| 34 | `src/plan/timetable-mismatch.js` | app25.js | 8 | تنبيه «حصص مكتوبة تخالف الجدول» | dash | conflictsDialog |
 | 35 | `src/plan/unified-entry.js` | app26.js | 16 | الإدخال الموحّد لعدة فصول | my | unifiedEditor |
 | 36 | `live.js` | — | 44 | عرض الجدول الاستثنائي التفاعلي (مشترك مع صفحات العرض) | — | — |
 | 37 | `src/schedule/display-schedule.js` | app27.js | 67 | الجدول الاستثنائي للعرض display_schedules V.live | live my | _live _liveDetach _liveEntries _liveImport _livePlanMap _syncLiveTimes bindLive liveTable |

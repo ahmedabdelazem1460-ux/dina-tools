@@ -423,7 +423,7 @@
       <div class="sec-box"><b>إرسال التقرير للزملاء ومداولته</b><p class="small muted" style="margin:4px 0 8px">يصلهم الملخص في «الرسائل» داخل المنصة، ويمكن منحهم الاطلاع على الاختبار كاملاً بتحليلاته (يُضافون كمعلمين مشاركين).</p>
         <input class="in" id="rpQ" placeholder="بحث بالاسم" style="margin-bottom:6px"><div class="perm-grid" id="rpT" style="max-height:200px;overflow:auto">${S.staff.filter(p => p.active && p.id !== S.me.id).sort((a, b) => a.full_name.localeCompare(b.full_name, 'ar')).map(p => `<label class="chk small"><input type="checkbox" value="${p.id}"> ${esc(p.full_name)}${p.title ? ` <span class="faint">— ${esc(p.title)}</span>` : ''}</label>`).join('')}</div>
         <div class="field" style="margin-top:8px"><label for="rpN">ملاحظة مع التقرير (اختياري)</label><textarea class="in" id="rpN" rows="2" placeholder="مثال: نرجو مناقشة الأسئلة ٤ و٩ في اجتماع القسم"></textarea></div>
-        <label class="chk"><input type="checkbox" id="rpG" checked> منحهم الاطلاع على الاختبار وتحليلاته</label><div class="acts"><button class="btn ok" id="rpGo">إرسال</button></div></div></div>`;
+        <label class="chk"><input type="checkbox" id="rpG" checked> منحهم الاطلاع على الاختبار وتحليلاته</label>${A.noticeMsgBox ? A.noticeMsgBox('rpM', 'إرسال التقرير كرسالة أيضاً في صندوق الرسائل') : ''}<div class="acts"><button class="btn ok" id="rpGo">إرسال</button></div></div></div>`;
     $('#rpQ', box).oninput = ev => { const q = A.normKey(ev.target.value); $$('#rpT label', box).forEach(l => l.style.display = !q || A.normKey(l.textContent).includes(q) ? '' : 'none'); };
     $('#rpC', box).onclick = () => navigator.clipboard.writeText(summary()).then(() => A.toast('نُسخ الملخص', 'ok'));
     $('#rpX', box).onclick = () => exportXlsx(e, all, Z);
@@ -444,7 +444,7 @@
       const ids = $$('#rpT input:checked', box).map(i => i.value); if (!ids.length) throw new Error('اختر زميلاً واحداً على الأقل');
       const note = $('#rpN', box).value.trim(), grant = $('#rpG', box).checked;
       if (grant) { const t = [...new Set([...(e.teachers || []), ...ids.filter(id => id !== e.teacher_id)])]; await saveExam(e, { teachers: t }); }
-      await api.sendMessages(ids.map(id => ({ recipient_id: id, subject: 'تقرير اختبار: ' + e.title, body: summary() + (note ? '\n\nملاحظة: ' + note : '') + (grant ? '\n\nللاطلاع على التحليل الكامل: «الاختبارات ← الاختبارات الورقية» ← ' + e.title : ''), kind: 'system' })));
+      { const sb = 'تقرير اختبار: ' + e.title, bd = summary() + (note ? '\n\nملاحظة: ' + note : '') + (grant ? '\n\nللاطلاع على التحليل الكامل: «الاختبارات ← الاختبارات الورقية» ← ' + e.title : ''); if (A.notice) await A.notice(ids, sb, bd, { link: '#/assess', asMessage: !!($('#rpM', box) || {}).checked }); else await api.sendMessages(ids.map(id => ({ recipient_id: id, subject: sb, body: bd, kind: 'system' }))); }
       A.toast(`أُرسل التقرير إلى ${A.cnt(ids.length, 'زميل', 'زملاء')}`, 'ok'); $$('#rpT input', box).forEach(i => i.checked = false);
     });
   }

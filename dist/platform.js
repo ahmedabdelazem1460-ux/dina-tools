@@ -2360,7 +2360,7 @@ body.band .foot{background:#082B5A;color:#fff;border-top:0;height:56px}
         <div class="field"><label>المواد</label><label class="chk"><input type="checkbox" id="dgAll" checked> كل مواده (${AR(pairs.length)})</label><div class="perm-grid hidden" id="dgP" style="margin-top:6px">${pairs.map(pr => `<label class="chk"><input type="checkbox" value="${pr.c}|${pr.s}" checked> ${esc(A.subjName(pr.s))} — ${esc((A.cls(pr.c) || {}).name || '')}</label>`).join('')}</div></div>
         <div class="field"><label>الأسابيع</label><div class="perm-grid" id="dgW">${wks.map(w => `<label class="chk"><input type="checkbox" value="${w.id}" ${w.id === S.weekId ? 'checked' : ''}> الأسبوع ${esc(w.word)}</label>`).join('') || '<span class="small muted">لا توجد أسابيع مفتوحة</span>'}</div></div>
         <div class="field"><label for="dgN">السبب (اختياري)</label><input class="in" id="dgN" placeholder="مثال: إجازة مرضية"></div>
-        <label class="chk"><input type="checkbox" id="dgM" checked> إرسال رسالة للمعلم المكلَّف والمعلم الأصلي</label>
+        <label class="chk"><input type="checkbox" id="dgM" checked> تنبيه المعلم المكلَّف والمعلم الأصلي</label>${A.noticeMsgBox ? A.noticeMsgBox('dgMM', 'وكرسالة أيضاً') : ''}
         <div class="acts"><button class="btn" id="dgGo">تكليف</button></div>`, { cls: 'wide' });
       m.el.querySelector('#dgAll').onchange = e => m.el.querySelector('#dgP').classList.toggle('hidden', e.target.checked);
       m.el.querySelector('#dgGo').onclick = e => A.run(e.currentTarget, async () => {
@@ -2372,7 +2372,9 @@ body.band .foot{background:#082B5A;color:#fff;border-top:0;height:56px}
         await api.addDelegation({ section_id: S.sectionId, from_teacher: fid, to_teacher: to, pairs: all ? null : ps, week_ids: ws, note });
         if (m.el.querySelector('#dgM').checked) {
           const wl = ws.map(id => 'الأسبوع ' + ((S.weeks.find(w => w.id === id) || {}).word || '')).join('، '); const scope = all ? 'كل مواده' : ps.map(x => `${A.subjName(x.s)} — ${(A.cls(x.c) || {}).name || ''}`).join('، ');
-          await api.sendMessages([{ recipient_id: to, subject: 'تكليف مؤقت بإدخال خطط', body: `كُلِّفت بإدخال خطط ${A.personName(fid)} (${scope}) في ${wl}${note ? ' — ' + note : ''}. ستجدها في صفحتك «خطتي» بعلامة «نيابة».`, kind: 'system' }, { recipient_id: fid, subject: 'تكليف مؤقت', body: `كُلِّف ${A.personName(to)} بإدخال خططك (${scope}) في ${wl}${note ? ' — ' + note : ''}.`, kind: 'system' }]).catch(() => { });
+          const b1 = `كُلِّفت بإدخال خطط ${A.personName(fid)} (${scope}) في ${wl}${note ? ' — ' + note : ''}. ستجدها في صفحتك «خطتي» بعلامة «نيابة».`, b2 = `كُلِّف ${A.personName(to)} بإدخال خططك (${scope}) في ${wl}${note ? ' — ' + note : ''}.`, am = !!(m.el.querySelector('#dgMM') || {}).checked;
+          if (A.notice) { await A.notice([to], 'تكليف مؤقت بإدخال خطط', b1, { link: '#/my', asMessage: am }).catch(() => { }); await A.notice([fid], 'تكليف مؤقت', b2, { asMessage: am }).catch(() => { }); }
+          else await api.sendMessages([{ recipient_id: to, subject: 'تكليف مؤقت بإدخال خطط', body: b1, kind: 'system' }, { recipient_id: fid, subject: 'تكليف مؤقت', body: b2, kind: 'system' }]).catch(() => { });
         }
         m.close(); dl = await api.delegations(S.sectionId); await A.loadWeek(); draw(); A.toast(`كُلِّف ${A.personName(to)} بالإدخال نيابةً عن ${A.personName(fid)}`, 'ok');
       });
@@ -4241,8 +4243,19 @@ ${S.me.full_name}`;
     form_approved: ['اعتماد نموذج', 'اعتماد نموذجك'],
     form_done: ['اكتمال عمل', 'اكتمال تعبئة وتوقيع الجميع على نموذج'],
     standby: ['حصص الانتظار', 'تكليفك بحصة انتظار'],
+    system: ['تنبيهات العمل', 'التقارير والتكليفات والتذكيرات وإحالات الطلاب'],
   };
   A.NOTIF_KINDS = KINDS;
+  /* التنبيهات الآلية (تقرير، تذكير، تكليف، تعديل جدول…) تصل إشعاراً في الجرس، ولا تدخل صندوق الرسائل إلا باختيار المرسِل (asMessage).
+     من لم تُفعَّل له «الإشعارات» (مفتاح notif) تصله رسالة حتى لا يضيع التنبيه. sql/102 notice_send */
+  const seesBell = id => { const p = (S.staff || []).find(x => x.id === id); if (p && p.is_owner) return true; const st = (S.school || {}).settings || {}, v = (st.tfeat || {}).notif; return v === true || (v === 'some' && ((st.tfeatTo || {}).notif || []).includes(id)); };
+  A.noticeMsgBox = (id, label) => `<label class="chk small"><input type="checkbox" id="${id}"> ${label || 'إرسال كرسالة أيضاً في صندوق الرسائل'}</label>`;
+  A.notice = async (ids, title, body, o) => { o = o || {}; ids = [...new Set((ids || []).filter(Boolean))]; if (!ids.length) return { bell: 0, msg: 0 };
+    const bell = ids.filter(seesBell), msg = o.asMessage ? ids : ids.filter(id => !seesBell(id));
+    if (bell.length) { try { if (api.demo) await api.ins('notifications', bell.map(id => ({ id: 'nt' + Date.now() + id, school_id: S.school.id, staff_id: id, kind: o.kind || 'system', title, body: body || '', link: o.link || '', created_by: myId(), show_at: nowIso(), created_at: nowIso() })));
+      else await api.rpc('notice_send', { p_ids: bell, p_title: title, p_body: body || '', p_link: o.link || '', p_kind: o.kind || 'system' }); } catch (e) { if (!o.asMessage) msg.push(...bell.filter(id => !msg.includes(id))); } }
+    if (msg.length && api.sendMessages) await api.sendMessages(msg.map(id => ({ recipient_id: id, subject: title, body: body || '', kind: 'system' })));
+    return { bell: bell.length, msg: msg.length }; };
   const ICO = {
     bell: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>',
     gear: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
@@ -5141,7 +5154,7 @@ ${S.me.full_name}`;
         ${rec ? `<p class="small muted">المعلم: <b>${esc(A.personName(rec.teacher_id))}</b></p>` : `<div class="field"><label>المعلمون (يُنشأ تقرير خاص منفصل لكل معلم)</label><input class="in" id="rq" placeholder="بحث بالاسم" style="margin-bottom:6px"><div class="perm-grid" id="rts" style="max-height:200px;overflow:auto">${teachers.map(p => `<label class="chk"><input type="checkbox" value="${p.id}"> ${esc(p.full_name)}${p.title ? ` <span class="small muted">— ${esc(p.title)}</span>` : ''}</label>`).join('')}</div></div>`}
         <label class="chk"><input type="checkbox" id="rack" ${t.requires_ack !== false ? 'checked' : ''}> يتطلب إقرار المعلم بتوقيع إلكتروني</label>
         <div id="rform" style="margin-top:10px">${formHTML(t.fields, rec && rec.data, false)}</div>
-        <div class="acts"><button class="btn ghost" id="rdraft">حفظ مسودة</button><button class="btn" id="rsend">إرسال للمعلم</button></div>`, { cls: 'wide' });
+        <div class="acts">${A.noticeMsgBox ? A.noticeMsgBox('rMsg') : ''}<button class="btn ghost" id="rdraft">حفظ مسودة</button><button class="btn" id="rsend">إرسال للمعلم</button></div>`, { cls: 'wide' });
       bindForm(m.el, t.fields);
       if (!rec) { m.el.querySelector('#rtp').onchange = e => { m.close(); newRecord(e.target.value); }; m.el.querySelector('#rq').oninput = e => { const q = A.normKey(e.target.value); $$('#rts label', m.el).forEach(l => l.style.display = !q || A.normKey(l.textContent).includes(q) ? '' : 'none'); }; }
       const save = send => async ev => A.run(ev.currentTarget, async () => {
@@ -5150,7 +5163,7 @@ ${S.me.full_name}`;
         let ids = [];
         if (rec) { await api.upd('sup_records', rec.id, patch); ids = [rec.teacher_id]; }
         else { ids = $$('#rts input:checked', m.el).map(i => i.value); if (!ids.length) throw new Error('اختر معلماً واحداً على الأقل'); await api.ins('sup_records', ids.map(tid => ({ school_id: sch(), template_id: tpls.some(x => x.id === m.el.querySelector('#rtp').value) ? m.el.querySelector('#rtp').value : null, teacher_id: tid, kind: t.kind, status: 'draft', created_by: S.me.id, ...patch }))); }
-        if (send && api.sendMessages) await api.sendMessages(ids.map(tid => ({ recipient_id: tid, subject: 'تقرير إشرافي: ' + title, body: `وصلك ${KINDS[t.kind] || 'تقرير'} «${title}» في صفحة «تقاريري».${ack ? ' يرجى الاطلاع والإقرار بالتوقيع' + (due ? ' قبل ' + due : '') + '.' : ''}`, kind: 'system' }))).catch(() => { });
+        if (send) { const sb = 'تقرير إشرافي: ' + title, bd = `وصلك ${KINDS[t.kind] || 'تقرير'} «${title}» في صفحة «تقاريري».${ack ? ' يرجى الاطلاع والإقرار بالتوقيع' + (due ? ' قبل ' + due : '') + '.' : ''}`, am = !!(m.el.querySelector('#rMsg') || {}).checked; if (A.notice) await A.notice(ids, sb, bd, { link: '#/myreports', asMessage: am }).catch(() => { }); else if (api.sendMessages) await api.sendMessages(ids.map(tid => ({ recipient_id: tid, subject: sb, body: bd, kind: 'system' }))).catch(() => { }); }
         m.close(); await reload(); A.toast(send ? `أُرسل إلى ${A.cnt(ids.length, 'معلم', 'معلمين')}` : 'حُفظت المسودة', 'ok');
       });
       m.el.querySelector('#rdraft').onclick = save(false); m.el.querySelector('#rsend').onclick = save(true);
@@ -5186,14 +5199,14 @@ ${S.me.full_name}`;
       const now = today(); const late = r => r.status === 'sent' && r.due_date && r.due_date < now;
       const k = { sent: recs.filter(r => r.status === 'sent').length, ack: recs.filter(r => r.status === 'acknowledged').length, draft: recs.filter(r => r.status === 'draft').length, late: recs.filter(late).length };
       box.innerHTML = `<div class="grid g4" style="margin:12px 0"><button type="button" class="kpi navy btnlike" data-sk="sent"><div class="k">بانتظار الإقرار</div><div class="v">${AR(k.sent)}</div></button><button type="button" class="kpi btnlike" data-sk="ack"><div class="k">أُقِرّ بها</div><div class="v">${AR(k.ack)}</div></button><button type="button" class="kpi btnlike" data-sk="late"><div class="k">متأخر عن الموعد</div><div class="v" style="${k.late ? 'color:var(--bad)' : ''}">${AR(k.late)}</div></button><button type="button" class="kpi btnlike" data-sk="draft"><div class="k">مسودات</div><div class="v">${AR(k.draft)}</div></button></div>
-        ${k.late ? `<div class="notice warn" style="display:block;margin-bottom:10px">${A.cnt(k.late, 'تقرير', 'تقارير')} تجاوزت موعد الإقرار. <button class="btn ghost sm" id="spRem">${I.mail} تذكير المتأخرين</button></div>` : ''}
+        ${k.late ? `<div class="notice warn" style="display:block;margin-bottom:10px">${A.cnt(k.late, 'تقرير', 'تقارير')} تجاوزت موعد الإقرار. <button class="btn ghost sm" id="spRem">${I.mail} تذكير المتأخرين</button> ${A.noticeMsgBox ? A.noticeMsgBox('spRemM', 'وكرسالة أيضاً') : ''}</div>` : ''}
         <div class="scroll"><table class="tbl"><thead><tr><th>العنوان</th><th>النوع</th><th>المعلم</th><th>الحالة</th><th>الإرسال</th><th>الإقرار</th><th></th></tr></thead><tbody>${recs.map(r => `<tr><td><b>${esc(r.title)}</b></td><td>${KINDS[r.kind] || ''}</td><td>${esc(A.personName(r.teacher_id))}</td><td><span class="pill ${r.status === 'acknowledged' ? 'st-approved' : r.status === 'sent' ? (late(r) ? 'st-returned' : 'st-submitted') : 'st-empty'}">${r.status === 'acknowledged' ? 'أُقِرّ' : r.status === 'sent' ? (late(r) ? 'متأخر' : 'مرسل') : r.status === 'closed' ? 'مغلق' : 'مسودة'}</span></td><td class="small">${r.sent_at ? A.fmtDT(r.sent_at) : '—'}</td><td class="small">${r.ack_at ? A.fmtDT(r.ack_at) + ' · ' + esc(r.ack_name || '') : r.due_date ? 'قبل ' + AR(r.due_date) : '—'}</td><td class="row" style="flex-wrap:nowrap;gap:4px">${r.status === 'draft' ? `<button class="btn ghost sm" data-ed="${r.id}">تعديل</button>` : ''}<button class="btn ghost sm" data-pr="${r.id}">${I.print}</button>${r.status !== 'acknowledged' ? `<button class="btn bad sm" data-dl="${r.id}" aria-label="حذف">×</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="7">${A.emptyBox('لا توجد تقارير بعد', 'ابدأ من «تقرير جديد» أو من القوالب.')}</td></tr>`}</tbody></table></div>`;
       $$('[data-sk]', box).forEach(b => b.onclick = () => { if (!A.attDrill) return; const f = b.dataset.sk, L = recs.filter(f === 'late' ? late : r => r.status === (f === 'ack' ? 'acknowledged' : f)), d = v => v ? (A.arDate ? A.arDate(String(v).slice(0, 10)) : AR(String(v).slice(0, 10))) : '—';
         A.attDrill({ title: b.querySelector('.k').textContent, cols: ['العنوان', 'النوع', 'المعلم', 'الإرسال', 'موعد الإقرار', 'الإقرار'], rows: L.map(r => ({ q: r.title + ' ' + A.personName(r.teacher_id), cells: ['<b>' + esc(r.title) + '</b>', KINDS[r.kind] || '', esc(A.personName(r.teacher_id)), d(r.sent_at), d(r.due_date), d(r.ack_at)] })) }); });
       $$('[data-ed]', box).forEach(b => b.onclick = () => newRecord(null, recs.find(r => r.id === b.dataset.ed)));
       $$('[data-pr]', box).forEach(b => b.onclick = () => printRecord(recs.find(r => r.id === b.dataset.pr)));
       $$('[data-dl]', box).forEach(b => b.onclick = async () => { if (!(await A.confirmBox('حذف هذا التقرير؟', 'حذف', true))) return; A.run(null, async () => { await api.del('sup_records', b.dataset.dl); await reload(); }); });
-      const rm = $('#spRem', box); if (rm) rm.onclick = e => A.run(e.currentTarget, async () => { const l = recs.filter(late); await api.sendMessages(l.map(r => ({ recipient_id: r.teacher_id, subject: 'تذكير: إقرار تقرير إشرافي', body: `نذكّركم بالاطلاع على «${r.title}» والإقرار به في صفحة «تقاريري».`, kind: 'system' }))); A.toast(`أُرسل التذكير إلى ${A.cnt(l.length, 'معلم', 'معلمين')}`, 'ok'); });
+      const rm = $('#spRem', box); if (rm) rm.onclick = e => A.run(e.currentTarget, async () => { const l = recs.filter(late), am = !!($('#spRemM', box) || {}).checked; if (A.notice) { for (const r of l) await A.notice([r.teacher_id], 'تذكير: إقرار تقرير إشرافي', `نذكّركم بالاطلاع على «${r.title}» والإقرار به في صفحة «تقاريري».`, { link: '#/myreports', kind: 'reminder', asMessage: am }); } else await api.sendMessages(l.map(r => ({ recipient_id: r.teacher_id, subject: 'تذكير: إقرار تقرير إشرافي', body: `نذكّركم بالاطلاع على «${r.title}» والإقرار به في صفحة «تقاريري».`, kind: 'system' }))); A.toast(`أُرسل التذكير إلى ${A.cnt(l.length, 'معلم', 'معلمين')}`, 'ok'); });
     };
     $('#spNew', root).onclick = () => newRecord(allT()[0].id);
     draw();
@@ -6941,7 +6954,7 @@ ${S.me.full_name}`;
       <div class="sec-box"><b>إرسال التقرير للزملاء ومداولته</b><p class="small muted" style="margin:4px 0 8px">يصلهم الملخص في «الرسائل» داخل المنصة، ويمكن منحهم الاطلاع على الاختبار كاملاً بتحليلاته (يُضافون كمعلمين مشاركين).</p>
         <input class="in" id="rpQ" placeholder="بحث بالاسم" style="margin-bottom:6px"><div class="perm-grid" id="rpT" style="max-height:200px;overflow:auto">${S.staff.filter(p => p.active && p.id !== S.me.id).sort((a, b) => a.full_name.localeCompare(b.full_name, 'ar')).map(p => `<label class="chk small"><input type="checkbox" value="${p.id}"> ${esc(p.full_name)}${p.title ? ` <span class="faint">— ${esc(p.title)}</span>` : ''}</label>`).join('')}</div>
         <div class="field" style="margin-top:8px"><label for="rpN">ملاحظة مع التقرير (اختياري)</label><textarea class="in" id="rpN" rows="2" placeholder="مثال: نرجو مناقشة الأسئلة ٤ و٩ في اجتماع القسم"></textarea></div>
-        <label class="chk"><input type="checkbox" id="rpG" checked> منحهم الاطلاع على الاختبار وتحليلاته</label><div class="acts"><button class="btn ok" id="rpGo">إرسال</button></div></div></div>`;
+        <label class="chk"><input type="checkbox" id="rpG" checked> منحهم الاطلاع على الاختبار وتحليلاته</label>${A.noticeMsgBox ? A.noticeMsgBox('rpM', 'إرسال التقرير كرسالة أيضاً في صندوق الرسائل') : ''}<div class="acts"><button class="btn ok" id="rpGo">إرسال</button></div></div></div>`;
     $('#rpQ', box).oninput = ev => { const q = A.normKey(ev.target.value); $$('#rpT label', box).forEach(l => l.style.display = !q || A.normKey(l.textContent).includes(q) ? '' : 'none'); };
     $('#rpC', box).onclick = () => navigator.clipboard.writeText(summary()).then(() => A.toast('نُسخ الملخص', 'ok'));
     $('#rpX', box).onclick = () => exportXlsx(e, all, Z);
@@ -6962,7 +6975,7 @@ ${S.me.full_name}`;
       const ids = $$('#rpT input:checked', box).map(i => i.value); if (!ids.length) throw new Error('اختر زميلاً واحداً على الأقل');
       const note = $('#rpN', box).value.trim(), grant = $('#rpG', box).checked;
       if (grant) { const t = [...new Set([...(e.teachers || []), ...ids.filter(id => id !== e.teacher_id)])]; await saveExam(e, { teachers: t }); }
-      await api.sendMessages(ids.map(id => ({ recipient_id: id, subject: 'تقرير اختبار: ' + e.title, body: summary() + (note ? '\n\nملاحظة: ' + note : '') + (grant ? '\n\nللاطلاع على التحليل الكامل: «الاختبارات ← الاختبارات الورقية» ← ' + e.title : ''), kind: 'system' })));
+      { const sb = 'تقرير اختبار: ' + e.title, bd = summary() + (note ? '\n\nملاحظة: ' + note : '') + (grant ? '\n\nللاطلاع على التحليل الكامل: «الاختبارات ← الاختبارات الورقية» ← ' + e.title : ''); if (A.notice) await A.notice(ids, sb, bd, { link: '#/assess', asMessage: !!($('#rpM', box) || {}).checked }); else await api.sendMessages(ids.map(id => ({ recipient_id: id, subject: sb, body: bd, kind: 'system' }))); }
       A.toast(`أُرسل التقرير إلى ${A.cnt(ids.length, 'زميل', 'زملاء')}`, 'ok'); $$('#rpT input', box).forEach(i => i.checked = false);
     });
   }
@@ -8322,10 +8335,10 @@ ${S.me.full_name}`;
     const m = A.modal(`<h3>حصص مكتوبة تخالف الجدول الحالي</h3>
       <p class="sub">عُدِّل الجدول بعد أن كتب المعلم هذه الحصص، فلم تُغيَّر تلقائياً حفاظاً على عمله. اختر لكل حصة:</p>
       <ul class="small" style="margin:0 0 10px;line-height:1.9"><li><b>تطبيق الجدول</b>: تصبح الخلية لمادة الجدول ومعلمه فارغةً للكتابة، ويُحفظ المحتوى السابق كاملاً في سجل التعديلات (قابل للاسترجاع)، ويصل المعلم إشعار.</li><li><b>اعتماد المادة وإبقاء النص</b>: تتغير المادة والمعلم فقط ويبقى النص المكتوب.</li><li><b>إبقاء</b>: إن كان الصحيح ما في الخطة — صحّح الجدول بدلاً من ذلك.</li></ul>
-      <label class="chk" style="margin-bottom:8px"><input type="checkbox" id="cfN" checked> إبلاغ المعلم برسالة عند تطبيق الجدول على حصته</label>
+      <div class="row" style="gap:12px;margin-bottom:8px"><label class="chk"><input type="checkbox" id="cfN" checked> تنبيه المعلم عند تطبيق الجدول على حصته</label>${A.noticeMsgBox ? A.noticeMsgBox('cfNM', 'وكرسالة أيضاً') : ''}</div>
       <div id="cfL"></div>`, { cls: 'wide' });
     const L = m.el.querySelector('#cfL');
-    const notify = async (x, r) => { if (!m.el.querySelector('#cfN').checked || !r || !r.old_teacher || !api.sendMessages) return; try { await api.sendMessages([{ recipient_id: r.old_teacher, subject: 'تعديل في جدولك', body: `عُدِّل الجدول: حصة ${DAYS[x.day]} — الحصة ${PER[x.period] || AR(x.period + 1)} في ${(A.cls(x.class_id) || {}).name || ''} (الأسبوع ${AR(x.week_number)}) أصبحت ${A.subjName(x.slot_subject) || 'بلا مادة'}${x.slot_teacher ? ' — ' + A.personName(x.slot_teacher) : ''}.\nما كُتب سابقاً («${(x.topic || '').slice(0, 80)}») محفوظ لدى الإدارة، ويمكن نقله لحصة أخرى عند الحاجة.`, kind: 'system' }]); } catch (_) {} };
+    const notify = async (x, r) => { if (!m.el.querySelector('#cfN').checked || !r || !r.old_teacher || !api.sendMessages) return; try { await (A.notice ? A.notice([r.old_teacher], 'تعديل في جدولك', `عُدِّل الجدول: حصة ${DAYS[x.day]} — الحصة ${PER[x.period] || AR(x.period + 1)} في ${(A.cls(x.class_id) || {}).name || ''} (الأسبوع ${AR(x.week_number)}) أصبحت ${A.subjName(x.slot_subject) || 'بلا مادة'}${x.slot_teacher ? ' — ' + A.personName(x.slot_teacher) : ''}.\nما كُتب سابقاً («${(x.topic || '').slice(0, 80)}») محفوظ لدى الإدارة، ويمكن نقله لحصة أخرى عند الحاجة.`, { link: '#/my', asMessage: !!(m.el.querySelector('#cfNM') || {}).checked }) : api.sendMessages([{ recipient_id: r.old_teacher, subject: 'تعديل في جدولك', body: `عُدِّل الجدول: حصة ${DAYS[x.day]} — الحصة ${PER[x.period] || AR(x.period + 1)} في ${(A.cls(x.class_id) || {}).name || ''} (الأسبوع ${AR(x.week_number)}) أصبحت ${A.subjName(x.slot_subject) || 'بلا مادة'}${x.slot_teacher ? ' — ' + A.personName(x.slot_teacher) : ''}.\nما كُتب سابقاً («${(x.topic || '').slice(0, 80)}») محفوظ لدى الإدارة، ويمكن نقله لحصة أخرى عند الحاجة.`, kind: 'system' }])); } catch (_) {} };
     const draw = () => {
       if (!list.length) { L.innerHTML = '<div class="notice ok">لا توجد حصص معلّقة — الخطط مطابقة للجدول ✓</div>'; return; }
       L.innerHTML = `<div class="scroll" style="max-height:55vh"><table class="tbl"><thead><tr><th>الأسبوع</th><th>الفصل · اليوم · الحصة</th><th>في الخطة (كتبه المعلم)</th><th>في الجدول الآن</th><th></th></tr></thead><tbody>${list.map(x => `<tr data-r="${x.entry_id}">

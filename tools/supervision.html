@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><script src="../digits.js?v=1794626074"></script>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><script src="../digits.js?v=1794626823"></script>
 </head><body>
 
 <title>نماذج الإشراف التربوي</title>
@@ -3006,6 +3006,7 @@ function feMount(){
   var ctx=buildCtx(tpl,rec,false,feMount);
   var t0=ctx.touch;ctx.touch=function(){t0();if(!FE.ro)feSendData();};
   host.appendChild(renderPaper(tpl,ctx));ctx.ups.forEach(function(f){f();});
+  if(FE.stamp){var pp=host.firstElementChild||host;pp.style.position=pp.style.position||'relative';pp.appendChild(h('div',{class:'fe-stamp',role:'img','aria-label':'ختم التعميد'},[h('b',{text:'معمّد'}),h('span',{text:FE.stamp.by||''}),h('small',{text:FE.stamp.at||''})]));}
   $$('textarea',host).forEach(grow);setTimeout(function(){$$('textarea',host).forEach(grow);},250);
   if(FE.ro){$$('input,textarea,select',host).forEach(function(e){e.readOnly=true;if(e.tagName==='SELECT'||e.type==='checkbox'||e.type==='radio')e.disabled=true;});$$('.addb,.ib,.cl-tools,.noprint:not(.fe-b)',host).forEach(function(e){if(!e.closest('.fe-sg'))e.style.display='none';});host.classList.add('fe-ro');
     $$('input,textarea',host).forEach(function(el){if(/checkbox|radio|hidden/.test(el.type)||!el.value)return;var v=el.value;if(el.type==='date'){try{v=new Date(v+'T00:00:00').toLocaleDateString('ar-SA-u-ca-gregory',{day:'numeric',month:'long',year:'numeric'});}catch(e){}}var d=h('div',{class:'pv-ro'+(el.classList.contains('sc')?' sc':''),text:v});el.style.display='none';el.parentNode.insertBefore(d,el.nextSibling);});}
@@ -3015,7 +3016,7 @@ function feMount(){
 function feFit(){var host=$('#feHost');if(!host)return;var w=window.innerWidth;if(w>=820){host.style.zoom='';host.style.minWidth='';return;}var z=Math.max(0.6,Math.min(1,(w-8)/800));host.style.minWidth='800px';host.style.zoom=z;}
 window.addEventListener('resize',debounce(function(){if(FE)feFit();},150));
 function feStart(){
-  var st=h('style',{text:'body>*:not(#feHost):not(style):not(script){display:none!important}#feHost{padding:10px 0 30px}.fe-sg{position:relative}.fe-img{max-height:2.4rem;max-width:100%;display:block;margin:auto}.fe-b{font:inherit;font-size:.8rem;font-weight:800;border:1px dashed #3AB1DB;background:#F1F8FD;color:#005499;border-radius:8px;padding:.15rem .55rem;cursor:pointer}.fe-b:hover{background:#E1F1FB}.fe-x{position:absolute;top:2px;inset-inline-start:2px;border:0;background:#fff;color:#D2463F;padding:0 .35rem;font-size:.9rem}.fe-w{font-size:.72rem;color:#B07A12;font-weight:700}.fe-ro .addb,#feHost .cl-bar{display:none!important}@media print{.fe-b{display:none!important}#feHost{padding:0}}'});
+  var st=h('style',{text:'.fe-stamp{position:absolute;bottom:5.5rem;left:2.2rem;width:7.6rem;height:7.6rem;border-radius:50%;border:3px double #082B5A;color:#082B5A;display:flex;flex-direction:column;align-items:center;justify-content:center;transform:rotate(-12deg);background:rgba(255,255,255,.55);text-align:center;line-height:1.25;pointer-events:none;-webkit-print-color-adjust:exact;print-color-adjust:exact}.fe-stamp b{font-size:1.15rem;letter-spacing:.05em}.fe-stamp span{font-size:.62rem;font-weight:800;max-width:6.2rem}.fe-stamp small{font-size:.58rem}body>*:not(#feHost):not(style):not(script){display:none!important}#feHost{padding:10px 0 30px}.fe-sg{position:relative}.fe-img{max-height:2.4rem;max-width:100%;display:block;margin:auto}.fe-b{font:inherit;font-size:.8rem;font-weight:800;border:1px dashed #3AB1DB;background:#F1F8FD;color:#005499;border-radius:8px;padding:.15rem .55rem;cursor:pointer}.fe-b:hover{background:#E1F1FB}.fe-x{position:absolute;top:2px;inset-inline-start:2px;border:0;background:#fff;color:#D2463F;padding:0 .35rem;font-size:.9rem}.fe-w{font-size:.72rem;color:#B07A12;font-weight:700}.fe-ro .addb,#feHost .cl-bar{display:none!important}@media print{.fe-b{display:none!important}#feHost{padding:0}}'});
   document.head.appendChild(st);
   document.body.appendChild(h('div',{id:'feHost'}));
   markDirty=function(){};flush=function(){};
@@ -3027,10 +3028,10 @@ function feStart(){
       if(m.cfg&&m.cfg.school)S.cfg.school=Object.assign({},S.cfg.school,m.cfg.school);
       if(m.cfg&&m.cfg.logos)S.logos=m.cfg.logos;
       S.tpls[tpl.id]=tpl;
-      FE={tpl:tpl,rec:{id:'fe',tid:tpl.id,d:clone(m.data||{}),transient:true,nosig:true,sigs:null},sigs:m.sigs||{},slots:m.slots||{},ro:!!m.ro};
+      FE={tpl:tpl,rec:{id:'fe',tid:tpl.id,d:clone(m.data||{}),transient:true,nosig:true,sigs:null},sigs:m.sigs||{},slots:m.slots||{},ro:!!m.ro,stamp:m.stamp||null};
       feMount();
     }
-    if(m.type==='dina-form-sigs'&&FE){FE.sigs=m.sigs||{};FE.slots=m.slots||{};if('ro' in m)FE.ro=!!m.ro;feMount();}
+    if(m.type==='dina-form-sigs'&&FE){FE.sigs=m.sigs||{};FE.slots=m.slots||{};if('ro' in m)FE.ro=!!m.ro;if('stamp' in m)FE.stamp=m.stamp||null;feMount();}
     if(m.type==='dina-form-get'&&FE)feSend({type:'dina-form-data',d:FE.rec.d,req:m.req});
     if(m.type==='dina-form-print')try{window.print();}catch(_){}
     if(m.type==='dina-form-lib'){

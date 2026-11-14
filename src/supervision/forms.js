@@ -14,8 +14,12 @@
   const STS = { assigned: ['جديد', ''], draft: ['قيد التعبئة', 'st-submitted'], submitted: ['بانتظار الاعتماد', 'st-submitted'], returned: ['مُعاد للتعديل', 'st-returned'], approved: ['معتمد', 'st-approved'] };
   const STE = { assigned: ['مسودة لدى المقيّم', ''], draft: ['مسودة لدى المقيّم', ''], submitted: ['بانتظار توقيع المعلم', 'st-submitted'], returned: ['مسودة لدى المقيّم', ''], approved: ['موقّعة ومكتملة', 'st-approved'] };
   const isEval = t => t && t.mode === 'sign';
+  const P = t => ({ a: 'edit', c: 'sign', share: 'all', endorse: false, ...((t && t.perms) || {}) });
+  const coEdit = t => !!(S.me && t.assignee !== S.me.id && (t.cosign || []).some(c => c.staff_id === S.me.id && (c.perm || P(t).c) === 'edit'));
+  const PERM_L = { edit: 'يعبّئ ويوقّع', sign: 'يوقّع فقط', view: 'اطلاع فقط' };
+  const ACT_L = { submit: 'أرسل للاعتماد', share: 'طلب توقيع', approve: 'اعتمد', return: 'أعاد', recommend: 'أوصى', endorse: 'عمّد', unendorse: 'ألغى التعميد' };
   const pill = (s, ev) => { const M = ev ? STE : STS; return `<span class="pill ${M[s] ? M[s][1] : ''}">${M[s] ? M[s][0] : esc(s)}</span>`; };
-  const pillT = t => pill(t.status, isEval(t)) + (isEval(t) ? ' <span class="pill fm-ev">استمارة تقييم</span>' : '');
+  const pillT = t => pill(t.status, isEval(t)) + (t.endorsed_at ? ' <span class="pill fm-end">✦ معمّد</span>' : '') + (isEval(t) ? ' <span class="pill fm-ev">استمارة تقييم</span>' : '');
   // خانة توقيع المعلم في استمارة التقييم
   const teacherSlot = tpl => { const L = slotsOf(tpl); return L.find(s => /المعلم|المعلمة|الموظف|المقيَّم|المُقيَّم|صاحب العلاقة/.test(s.label) && !/الزائر|المزور|المقيِّم|المشرف|المدير/.test(s.label) && !s.auto) || L.find(s => !s.auto) || L[0]; };
   const EVAL_RE = /تقييم|تقويم|بطاقة|زيارة صفية|ملاحظة صفية|مساءلة|لفت نظر|تنبيه/;
@@ -35,11 +39,19 @@
     const [t] = await api.list('form_tasks', { id: a.p_id }); if (!t) throw new Error('النموذج غير موجود');
     const me = S.me.id, adm = isAdmin(), cos = t.cosign || [];
     if (n === 'form_teacher_note') { if (t.assignee !== me) throw new Error('الملاحظة للمعلم صاحب الاستمارة'); await api.upd('form_tasks', t.id, { teacher_note: a.p_note }); return Object.assign(t, { teacher_note: a.p_note }); }
+    if (n === 'form_save' && !canEditAdmin(t) && t.assignee === me && P(t).a === 'sign' && a.p_submit) { await api.upd('form_tasks', t.id, { status: 'submitted', submitted_at: new Date().toISOString() }); return Object.assign(t, { status: 'submitted' }); }
+    if (n === 'form_save' && !canEditAdmin(t) && t.assignee === me && P(t).a !== 'edit') throw new Error(P(t).a === 'sign' ? 'صلاحيتك في هذا النموذج التوقيع فقط' : 'صلاحيتك في هذا النموذج الاطلاع فقط');
+    if (n === 'form_save' && coEdit(t)) { if (a.p_submit) throw new Error('الإرسال للاعتماد للمعلم المكلّف'); await api.upd('form_tasks', t.id, { data: a.p_data }); return Object.assign(t, { data: a.p_data }); }
     if (n === 'form_save') { if (isEval(t) && !canEditAdmin(t)) throw new Error('هذه الاستمارة يعبّئها المقيّم، ويكتفي المعلم بالاطلاع والتوقيع'); if (t.assignee !== me && !canEditAdmin(t)) throw new Error('لا تملك تعبئة هذا النموذج'); const p = { data: a.p_data || t.data, status: a.p_submit ? 'submitted' : (t.status === 'assigned' && !isEval(t)) ? 'draft' : t.status, updated_at: new Date().toISOString() }; if (a.p_submit) p.submitted_at = p.updated_at; return api.upd('form_tasks', t.id, p).then(() => Object.assign(t, p)); }
     if (n === 'form_sign') { const sigs = { ...(t.sigs || {}) }; if (a.p_remove) delete sigs[a.p_key]; else sigs[a.p_key] = { img: a.p_img, name: a.p_name, label: a.p_label, staff_id: me, at: new Date().toISOString() };
       const c2 = cos.map(c => c.key === a.p_key ? { ...c, status: a.p_remove ? 'pending' : (c.staff_id === me ? 'signed' : c.status) } : c); const p = { sigs, cosign: c2 }; if (isEval(t) && !a.p_remove && t.status === 'submitted' && c2.every(c => c.status === 'signed')) Object.assign(p, { status: 'approved', decided_at: new Date().toISOString(), decided_by: me }); await api.upd('form_tasks', t.id, p); return Object.assign(t, p); }
     if (n === 'form_share') { const c2 = cos.filter(c => c.key !== a.p_key).concat([{ staff_id: a.p_staff, key: a.p_key, label: a.p_label, status: 'pending', by: me, requested_at: new Date().toISOString() }]); await api.upd('form_tasks', t.id, { cosign: c2 }); return Object.assign(t, { cosign: c2 }); }
-    if (n === 'form_decide') { if (!adm) throw new Error('الاعتماد للمالك أو المشرف'); const p = { status: a.p_approve ? 'approved' : 'returned', review_note: a.p_note || '', decided_at: new Date().toISOString(), decided_by: me }; await api.upd('form_tasks', t.id, p); return Object.assign(t, p); }
+    if (n === 'form_return') { if (!adm) throw new Error('الإعادة للمالك أو المشرف'); const tr = (t.trail || []).concat([{ at: new Date().toISOString(), by: me, act: a.p_kind === 'recommend' ? 'recommend' : 'return', to: a.p_to, note: a.p_note }]); let p;
+      if (a.p_to === t.assignee) p = a.p_kind === 'recommend' ? { review_note: a.p_note, trail: tr } : { status: 'returned', review_note: a.p_note, endorsed_at: null, trail: tr };
+      else { const keys = cos.filter(c => c.staff_id === a.p_to).map(c => c.key); const sg = { ...(t.sigs || {}) }; keys.forEach(k => delete sg[k]); p = { sigs: sg, cosign: cos.map(c => c.staff_id === a.p_to ? { ...c, status: 'returned', note: a.p_note } : c), status: t.status === 'approved' ? 'submitted' : t.status, endorsed_at: null, trail: tr }; }
+      await api.upd('form_tasks', t.id, p); return Object.assign(t, p); }
+    if (n === 'form_endorse') { if (!S.me.is_owner) throw new Error('التعميد للمالك'); if (!a.p_undo && t.status !== 'approved') throw new Error('اعتمد النموذج أولاً ثم عمّده'); const p = { endorsed_at: a.p_undo ? null : new Date().toISOString(), endorsed_by: a.p_undo ? null : me, endorse_note: a.p_note || '', trail: (t.trail || []).concat([{ at: new Date().toISOString(), by: me, act: a.p_undo ? 'unendorse' : 'endorse', note: a.p_note || '' }]) }; await api.upd('form_tasks', t.id, p); return Object.assign(t, p); }
+    if (n === 'form_decide') { if (!adm) throw new Error('الاعتماد للمالك أو المشرف'); const p = { status: a.p_approve ? 'approved' : 'returned', review_note: a.p_note || '', decided_at: new Date().toISOString(), decided_by: me, trail: (t.trail || []).concat([{ at: new Date().toISOString(), by: me, act: a.p_approve ? 'approve' : 'return', to: a.p_approve ? null : t.assignee, note: a.p_note || '' }]) }; if (!a.p_approve) p.endorsed_at = null; await api.upd('form_tasks', t.id, p); return Object.assign(t, p); }
   }
   const notify = (ids, subject, body) => { if (!api.sendMessages) return; const rows = [...new Set(ids)].filter(id => id && id !== S.me.id).map(id => ({ recipient_id: id, subject, body })); if (rows.length) api.sendMessages(rows).catch(() => { }); };
 
@@ -96,11 +108,11 @@
       const sg = (t.sigs || {})[s.key], co = (t.cosign || []).find(c => c.key === s.key);
       if (sg) out[s.key] = { mine: !app && (sg.staff_id === me || adm) };
       else if (co && co.status !== 'signed') out[s.key] = co.staff_id === me ? { can: !app } : { wait: nm(co.staff_id), can: !app && adm };
-      else out[s.key] = { can: !app && (adm || (!isEval(t) && t.assignee === me && !s.auto && !['submitted'].includes(t.status))) };
+      else out[s.key] = { can: !app && (adm || (!isEval(t) && t.assignee === me && P(t).a !== 'view' && !s.auto && !['submitted'].includes(t.status))) };
     });
     return out;
   }
-  const editable = t => t.status !== 'approved' && (isEval(t) ? canEditAdmin(t) : (t.assignee === S.me.id && ['assigned', 'draft', 'returned'].includes(t.status)) || (canEditAdmin(t) && t.status !== 'approved'));
+  const editable = t => t.status !== 'approved' && (isEval(t) ? canEditAdmin(t) : (t.assignee === S.me.id && P(t).a === 'edit' && ['assigned', 'draft', 'returned'].includes(t.status)) || (coEdit(t) && ['assigned', 'draft', 'returned'].includes(t.status)) || (canEditAdmin(t) && t.status !== 'approved'));
 
   function openTask(t, after) {
     const me = S.me.id, adm = isAdmin(), mineTask = t.assignee === me;
@@ -110,6 +122,11 @@
         <div class="fm-acts" id="fmA"></div></div>
       ${t.note ? `<div class="notice info" style="display:block;margin:6px 0">ملاحظة المرسل: ${esc(t.note)}</div>` : ''}
       ${t.status === 'returned' && t.review_note ? `<div class="notice warn" style="display:block;margin:6px 0">ملاحظة الإعادة: ${esc(t.review_note)}</div>` : ''}
+      ${t.status !== 'returned' && t.review_note && (t.trail || []).some(x => x.act === 'recommend' && x.to === t.assignee) ? `<div class="notice info" style="display:block;margin:6px 0">توصية: ${esc(t.review_note)}</div>` : ''}
+      ${(() => { const rc = (t.cosign || []).find(c => c.staff_id === me && c.status === 'returned'); return rc && rc.note ? `<div class="notice warn" style="display:block;margin:6px 0">أُعيد إليك للتوقيع من جديد: ${esc(rc.note)}</div>` : ''; })()}
+      ${mineTask && !isEval(t) && P(t).a !== 'edit' ? `<div class="notice info" style="display:block;margin:6px 0">صلاحيتك في هذا النموذج: <b>${PERM_L[P(t).a]}</b>${P(t).a === 'sign' ? ' — وقّع في خانتك ثم أرسله.' : '.'}</div>` : ''}
+      ${coEdit(t) ? `<div class="notice info" style="display:block;margin:6px 0">يمكنك تعبئة النموذج والتوقيع في خانتك.</div>` : ''}
+      ${t.endorsed_at ? `<div class="notice ok fm-endb" style="display:block;margin:6px 0">✦ معمّد من ${esc(nm(t.endorsed_by))} — ${dt(t.endorsed_at)}${t.endorse_note ? ' · ' + esc(t.endorse_note) : ''}</div>` : ''}
       ${isEval(t) && mineTask && t.status === 'submitted' ? `<div class="notice info fm-evb" style="display:block;margin:6px 0"><b>استمارة تقييمك من ${esc(nm(t.created_by))}</b><br>اطّلع على التقييم، ثم اضغط «✍ توقيع» في خانة «${esc((myCo || {}).label || 'المعلم')}» داخل الاستمارة للعلم. يمكنك إضافة ملاحظتك قبل التوقيع أو بعده.</div>` : myCo ? `<div class="notice info" style="display:block;margin:6px 0">مطلوب توقيعك في خانة «${esc(myCo.label)}» — اضغط «✍ توقيع» داخل النموذج.</div>` : ''}
       <div id="fmTn"></div>
       <div class="fm-co" id="fmCo"></div>
@@ -117,11 +134,12 @@
     const f = $('#fmF', m.el); let D = t.data || {}, dirty = false, timer = null;
     const post = o => f.contentWindow && f.contentWindow.postMessage(o, location.origin);
     const setSv = s => { const e = $('#fmSv', m.el); if (e) e.textContent = s; };
-    const initMsg = () => ({ type: 'dina-form-init', style: A.printStyle ? A.printStyle() : null, tpl: t.tpl, cfg: t.cfg, data: D, sigs: t.sigs || {}, slots: slotState(t), ro: !editable(t) });
-    const resend = () => post({ type: 'dina-form-sigs', sigs: t.sigs || {}, slots: slotState(t), ro: !editable(t) });
+    const stamp = () => t.endorsed_at ? { by: nm(t.endorsed_by), at: String(t.endorsed_at).slice(0, 10) } : null;
+    const initMsg = () => ({ type: 'dina-form-init', style: A.printStyle ? A.printStyle() : null, tpl: t.tpl, cfg: t.cfg, data: D, sigs: t.sigs || {}, slots: slotState(t), ro: !editable(t), stamp: stamp() });
+    const resend = () => post({ type: 'dina-form-sigs', sigs: t.sigs || {}, slots: slotState(t), ro: !editable(t), stamp: stamp() });
     const save = async (submit) => { const r = await rpc('form_save', { p_id: t.id, p_data: D, p_submit: !!submit }); Object.assign(t, r || {}); dirty = false; setSv('· حُفظ'); return r; };
     const drawTn = () => { const el = $('#fmTn', m.el); if (el) el.innerHTML = isEval(t) && t.teacher_note ? `<div class="notice" style="display:block;margin:6px 0;background:#F4F8FC;border:1px solid #DCE7F3"><b>ملاحظة المعلم:</b> ${esc(t.teacher_note)}</div>` : ''; };
-    const drawCo = () => { drawTn(); const el = $('#fmCo', m.el); const L = isEval(t) ? (t.cosign || []).filter(c => c.staff_id !== t.assignee) : (t.cosign || []); el.innerHTML = L.length ? `<span class="small muted">توقيعات الزملاء:</span> ${L.map(c => `<span class="pill ${c.status === 'signed' ? 'st-approved' : 'st-submitted'}">${esc(nm(c.staff_id))} · ${esc(c.label)} · ${c.status === 'signed' ? 'وقّع' : 'بانتظار التوقيع'}</span>`).join(' ')}` : ''; };
+    const drawCo = () => { drawTn(); const el = $('#fmCo', m.el); const L = isEval(t) ? (t.cosign || []).filter(c => c.staff_id !== t.assignee) : (t.cosign || []); el.innerHTML = L.length ? `<span class="small muted">توقيعات الزملاء:</span> ${L.map(c => `<span class="pill ${c.status === 'signed' ? 'st-approved' : 'st-submitted'}">${esc(nm(c.staff_id))} · ${esc(c.label)} · ${c.status === 'signed' ? 'وقّع' : c.status === 'returned' ? 'أُعيد إليه' : 'بانتظار التوقيع'}${(c.perm || P(t).c) === 'edit' ? ' · يعبّئ' : ''}</span>`).join(' ')}` : ''; };
     function drawActs() {
       const a = $('#fmA', m.el); const ed = editable(t), b = []; const ps = $('#fmSt', m.el); if (ps) ps.innerHTML = pillT(t);
       if (t.id === 'preview') { a.innerHTML = `<button class="btn ghost sm" data-a="print">${A.I.print || ''} طباعة / PDF</button>`; $$('[data-a]', a).forEach(x => x.onclick = ev => act(x.dataset.a, ev.currentTarget)); return; }
@@ -132,11 +150,14 @@
         if (adm && t.status === 'submitted') b.push(`<button class="btn ghost sm" data-a="remind">تذكير المعلم</button>`);
         if (mineTask && t.status !== 'assigned') b.push(`<button class="btn ghost sm" data-a="tnote">${t.teacher_note ? 'تعديل ملاحظتي' : 'إضافة ملاحظتي'}</button>`);
       } else {
-      if (t.status !== 'approved' && (mineTask || adm)) b.push(`<button class="btn ghost sm" data-a="share">طلب توقيع زميل</button>`);
-      if (mineTask && ['assigned', 'draft', 'returned'].includes(t.status)) b.push(`<button class="btn sm" data-a="submit">إرسال للاعتماد</button>`);
+      if (t.status !== 'approved' && (adm || (mineTask && P(t).share !== 'admin' && P(t).a !== 'view'))) b.push(`<button class="btn ghost sm" data-a="share">طلب توقيع زميل</button>`);
+      if (mineTask && P(t).a !== 'view' && ['assigned', 'draft', 'returned'].includes(t.status)) b.push(`<button class="btn sm" data-a="submit">إرسال للاعتماد</button>`);
       }
-      if (!isEval(t) && adm && t.status === 'submitted') b.push(`<button class="btn ok sm" data-a="approve">اعتماد</button><button class="btn ghost sm" data-a="return">إعادة للمعلم</button>`);
-      if (!isEval(t) && adm && t.status === 'approved') b.push(`<button class="btn ghost sm" data-a="reopen">إلغاء الاعتماد</button>`);
+      if (!isEval(t) && adm && t.status === 'submitted') b.push(`<button class="btn ok sm" data-a="approve">اعتماد</button>`);
+      if (adm && t.status !== 'assigned') b.push(`<button class="btn ghost sm" data-a="retany">إعادة / توصية</button>`);
+      if (!isEval(t) && adm && t.status === 'approved' && !t.endorsed_at) b.push(`<button class="btn ghost sm" data-a="reopen">إلغاء الاعتماد</button>`);
+      if (S.me.is_owner && t.status === 'approved') b.push(t.endorsed_at ? `<button class="btn ghost sm" data-a="unendorse">إلغاء التعميد</button>` : `<button class="btn sm fm-endbtn" data-a="endorse">✦ تعميد</button>`);
+      if ((t.trail || []).length) b.push(`<button class="btn ghost sm" data-a="trail">السجل</button>`);
       b.push(`<button class="btn ghost sm" data-a="print">${A.I.print || ''} طباعة / PDF</button><button class="btn ghost sm" data-a="mysig">توقيعي</button>`);
       a.innerHTML = b.join('');
       $$('[data-a]', a).forEach(x => x.onclick = ev => act(x.dataset.a, ev.currentTarget));
@@ -167,6 +188,30 @@
       }
       if (k === 'reopen') return A.run(btn, async () => { const r = await rpc('form_decide', { p_id: t.id, p_approve: false, p_note: 'أُلغي الاعتماد' }); Object.assign(t, r || {}); drawActs(); resend(); after && after(); });
       if (k === 'share') return shareModal();
+      if (k === 'retany') return retModal();
+      if (k === 'trail') return A.modal(`<h3>سجل النموذج</h3><div class="fm-trail">${(t.trail || []).slice().reverse().map(x => `<div class="fm-tr"><span class="fm-trd"></span><div><b>${esc(nm(x.by))}</b> ${ACT_L[x.act] || esc(x.act)}${x.to ? ' ← ' + esc(nm(x.to)) : ''}<div class="small muted">${esc(A.fmtDT ? A.fmtDT(x.at) : x.at)}</div>${x.note ? `<div class="small" style="white-space:pre-line">${esc(x.note)}</div>` : ''}</div></div>`).join('')}</div>`);
+      if (k === 'endorse' || k === 'unendorse') {
+        let note = '';
+        if (k === 'endorse') { const ok = await A.confirmBox(`تعميد «${esc(t.title)}»؟<br><span class="small muted">التعميد ختمك النهائي بعد الاعتماد، ويُسجَّل باسمك وتاريخه، ويصل للمعلم إشعار.</span>`, 'تعميد'); if (!ok) return; }
+        return A.run(btn, async () => { const r = await rpc('form_endorse', { p_id: t.id, p_note: note, p_undo: k === 'unendorse' }); Object.assign(t, r || {}); A.toast(k === 'endorse' ? 'عُمِّد النموذج' : 'أُلغي التعميد', 'ok'); drawActs(); resend(); after && after(); });
+      }
+    }
+    function retModal() {
+      const parties = [{ id: t.assignee, l: nm(t.assignee) + ' — ' + (isEval(t) ? 'المعلم' : 'المكلّف بالنموذج') }].concat((t.cosign || []).filter(c => c.staff_id !== t.assignee).map(c => ({ id: c.staff_id, l: nm(c.staff_id) + ' — ' + c.label + (c.status === 'signed' ? ' (وقّع)' : '') })));
+      const mm = A.modal(`<h3>إعادة النموذج أو إرسال توصية</h3><p class="sub">اختر الطرف ونوع الإجراء. الإعادة لموقّع تحذف توقيعه ليوقّع من جديد بعد المراجعة.</p>
+        <div class="field"><label for="rtP">إلى</label><select class="in" id="rtP">${parties.map(p => `<option value="${p.id}">${esc(p.l)}</option>`).join('')}</select></div>
+        <div class="sm-modes" role="radiogroup" aria-label="نوع الإجراء"><label class="sm-mode"><input type="radio" name="rtK" value="return" checked><b>إعادة للتعديل</b><span class="small muted">يعود النموذج لهذا الطرف مع السبب.</span></label><label class="sm-mode"><input type="radio" name="rtK" value="recommend"><b>توصية</b><span class="small muted">ملاحظة أو توصية دون إيقاف النموذج.</span></label></div>
+        <div class="field"><label for="rtN">السبب أو التوصية</label><textarea class="in" id="rtN" rows="4" placeholder="مثال: نأمل استكمال قسم التوصيات وذكر الشواهد"></textarea></div>
+        <div class="chip-filter" id="rtQ"><button type="button">استكمال البيانات الناقصة</button><button type="button">إضافة الشواهد والأدلة</button><button type="button">مراجعة التوقيع والتاريخ</button><button type="button">توضيح التوصيات وخطة التحسين</button></div>
+        <button class="btn" id="rtGo">إرسال</button>`);
+      $$('#rtQ button', mm.el).forEach(b => b.onclick = () => { const x = $('#rtN', mm.el); x.value = (x.value ? x.value + '\n' : '') + b.textContent; });
+      $('#rtGo', mm.el).onclick = ev => A.run(ev.currentTarget, async () => {
+        const to = $('#rtP', mm.el).value, note = $('#rtN', mm.el).value.trim(), kind = ($('[name=rtK]:checked', mm.el) || {}).value || 'return';
+        if (!note) throw new Error('اكتب السبب أو التوصية');
+        if (dirty && canEditAdmin(t)) await save(false);
+        const r = await rpc('form_return', { p_id: t.id, p_to: to, p_note: note, p_kind: kind }); Object.assign(t, r || {});
+        mm.close(); A.toast(kind === 'recommend' ? 'أُرسلت التوصية' : 'أُعيد النموذج إلى ' + nm(to), 'ok'); drawActs(); drawCo(); resend(); after && after();
+      });
     }
     function shareModal() {
       const free = slotsOf(t.tpl).filter(s => !(t.sigs || {})[s.key]);
@@ -234,7 +279,14 @@
       <div class="sm-ppl" id="smP">${people.map(p => `<label class="chk" data-nm="${esc(A.normKey ? A.normKey(p.full_name + ' ' + (p.title || '')) : p.full_name)}"><input type="checkbox" value="${p.id}"> ${esc(p.full_name)}${p.title ? ` <span class="small muted">· ${esc(p.title)}</span>` : ''}</label>`).join('')}</div>
       <div class="sm-step" style="margin-top:14px"><b>٣</b> طريقة النموذج</div>
       <div class="sm-modes" role="radiogroup" aria-label="طريقة النموذج"><label class="sm-mode"><input type="radio" name="smMd" value="fill" checked><b>يعبّئه المعلم</b><span class="small muted">مثل تبادل الزيارات والدرس التطبيقي: يعبّئه ويوقّعه ويرسله لاعتمادك.</span></label><label class="sm-mode"><input type="radio" name="smMd" value="sign"><b>أعبّئه أنا ويوقّع المعلم</b><span class="small muted">استمارة تقييم أو زيارة صفية: تعبّئها وتوقّعها، ثم تصل للمعلم للاطلاع والتوقيع بالعلم مع ملاحظته، دون تعديل.</span></label></div>
-      <div class="sm-step" style="margin-top:14px"><b>٤</b> الإرسال</div>
+      <div id="smPerm"><div class="sm-step" style="margin-top:14px"><b>٤</b> الأطراف والصلاحيات</div>
+      <div class="fm-perm">
+        <label class="field"><span>المعلم المكلّف (مثل الزائر)</span><select class="in" id="spA"><option value="edit">يعبّئ ويوقّع ويرسل</option><option value="sign">يوقّع فقط</option><option value="view">اطلاع فقط</option></select></label>
+        <label class="field"><span>الزملاء الموقّعون (مثل المزور)</span><select class="in" id="spC"><option value="sign">توقيع فقط</option><option value="edit">يعبّئ ويوقّع</option></select></label>
+        <label class="field"><span>طلب توقيع الزملاء</span><select class="in" id="spS"><option value="all">المعلم والإدارة</option><option value="admin">الإدارة فقط</option></select></label>
+        <label class="chk fm-permchk"><input type="checkbox" id="spE"> يحتاج تعميدي بعد الاعتماد</label>
+      </div><p class="small muted" style="margin:4px 0 0">مثال تبادل الزيارات: الزائر «يعبّئ ويوقّع ويرسل»، والمزور «توقيع فقط». تُفرض هذه الصلاحيات في قاعدة البيانات، ويمكنك دائماً الإعادة لأي طرف أو التوصية أو التعديل.</p></div>
+      <div class="sm-step" style="margin-top:14px"><b>٥</b> الإرسال</div>
       <div class="nr-meta" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px"><div class="field"><label for="smD">موعد التسليم (اختياري)</label><input class="in" type="date" id="smD"></div><div class="field" style="grid-column:span 2"><label for="smNt">ملاحظة للمعلمين (اختياري)</label><input class="in" id="smNt" placeholder="مثال: تبادل زيارة مع زميل من نفس التخصص هذا الأسبوع"></div></div>
       <div class="row" style="gap:8px;margin-top:10px"><button class="btn" id="smGo">إرسال</button><span class="small muted" id="smSum"></span></div>`;
     let mdTouched = false; const autoMode = () => { if (mdTouched) return; const ev = [...pick].some(id => { const it = lib.list.find(t => t.id === id); return it && (it.cat === 'cards' || EVAL_RE.test(it.name)); }); const rb = $(`[name=smMd][value=${ev ? 'sign' : 'fill'}]`, m.el); if (rb) rb.checked = true; };
@@ -252,15 +304,17 @@
     $$('#smP input', m.el).forEach(i => i.onchange = () => { i.checked ? ppl.add(i.value) : ppl.delete(i.value); sum(); });
     $('#smAll', m.el).onclick = () => { $$('#smP label:not([hidden]) input', m.el).forEach(i => { i.checked = true; ppl.add(i.value); }); sum(); };
     $('#smNone', m.el).onclick = () => { $$('#smP input', m.el).forEach(i => { i.checked = false; }); ppl.clear(); sum(); };
-    $$('[name=smMd]', m.el).forEach(x => x.onchange = () => { mdTouched = true; });
+    const permVis = () => { const md = ($('[name=smMd]:checked', m.el) || {}).value; $('#smPerm', m.el).hidden = md === 'sign'; };
+    $$('[name=smMd]', m.el).forEach(x => x.addEventListener('change', () => { mdTouched = true; permVis(); })); m.el.addEventListener('click', () => setTimeout(permVis, 0)); permVis();
     $('#smGo', m.el).onclick = ev => A.run(ev.currentTarget, async () => {
       const mode = ($('[name=smMd]:checked', m.el) || {}).value || 'fill';
       if (!pick.size) throw new Error('اختر نموذجاً واحداً على الأقل'); if (!ppl.size) throw new Error('اختر معلماً واحداً على الأقل');
+      const perms = mode === 'sign' ? { a: 'sign', c: 'sign', share: 'admin', endorse: $('#spE', m.el).checked } : { a: $('#spA', m.el).value, c: $('#spC', m.el).value, share: $('#spS', m.el).value, endorse: $('#spE', m.el).checked };
       const batch = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()), due = $('#smD', m.el).value || null, note = $('#smNt', m.el).value.trim();
       const rows = []; [...pick].forEach(id => { const it = lib.list.find(t => t.id === id); [...ppl].forEach(sid => { const tp = withSig(it.tpl), ts = teacherSlot(tp), who = (S.staff || []).find(p => p.id === sid) || {};
         // تعبئة اسم المعلم تلقائياً في حقل «المعلم» إن وُجد
         const d0 = {}; if (mode === 'sign') (tp.blocks || []).forEach(b => { if (b.type !== 'fields') return; (b.fields || []).forEach(f => { if ((f.key === 'teacher' || f.type === 'teacher') && /المعلم|اسم/.test(f.label || '') && !/الزائر/.test(f.label || '')) { (d0[b.id] = d0[b.id] || {})[f.id] = who.full_name || ''; } }); });
-        rows.push({ school_id: S.school.id, batch_id: batch, tid: it.id, title: it.name, cat: it.cat, tpl: tp, cfg: lib.cfg || {}, assignee: sid, due_date: due, note, mode, data: d0, cosign: mode === 'sign' && ts ? [{ staff_id: sid, key: ts.key, label: ts.label, status: 'pending', by: S.me.id }] : [], ...(DEMO ? { created_by: S.me.id, status: 'assigned', sigs: {}, teacher_note: '', created_at: new Date().toISOString() } : {}) }); }); });
+        rows.push({ school_id: S.school.id, batch_id: batch, tid: it.id, title: it.name, cat: it.cat, tpl: tp, cfg: lib.cfg || {}, assignee: sid, due_date: due, note, mode, perms, data: d0, cosign: mode === 'sign' && ts ? [{ staff_id: sid, key: ts.key, label: ts.label, status: 'pending', by: S.me.id }] : [], ...(DEMO ? { created_by: S.me.id, status: 'assigned', sigs: {}, teacher_note: '', created_at: new Date().toISOString() } : {}) }); }); });
       for (let k = 0; k < rows.length; k += 50) await api.ins('form_tasks', rows.slice(k, k + 50));
       const names = [...pick].map(id => lib.list.find(t => t.id === id).name).join('، ');
       if (mode === 'sign') { m.close(); A.toast(`أُنشئت ${AR(rows.length)} استمارة تقييم — عبّئها ووقّعها من تبويب «استمارات التقييم» ثم أرسلها للمعلم`, 'ok'); st.tab = 'evals'; after && after(); return; }
@@ -291,6 +345,9 @@
   .sm-mode{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;align-items:start;border:1.5px solid #DCE7F3;border-radius:14px;padding:10px 12px;cursor:pointer;background:#fff}
   .sm-mode input{grid-row:span 2;width:20px;height:20px;margin-top:2px;accent-color:#005499}.sm-mode:has(input:checked){border-color:#005499;background:#F1F7FD;box-shadow:0 0 0 3px rgba(0,84,153,.1)}
   .fm-evb{border-inline-start:4px solid #3AB1DB}
+  .fm-perm{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;align-items:end;margin:6px 0}.fm-perm .field{margin:0;display:grid;gap:4px}.fm-perm .field span{font-size:12.5px;font-weight:700;color:#43597A}.fm-permchk{border:1.5px solid #DCE7F3;border-radius:12px;padding:9px 10px;background:#fff}
+  .fm-end{background:linear-gradient(135deg,#082B5A,#005499);color:#fff}.fm-endbtn{background:linear-gradient(135deg,#082B5A,#005499)!important}.fm-endb{border-inline-start:4px solid #2E8B57}
+  .fm-trail{display:grid;gap:0;position:relative;padding-inline-start:6px}.fm-tr{display:flex;gap:10px;padding:8px 0;border-inline-start:2px solid #DCE7F3;padding-inline-start:12px;position:relative}.fm-trd{position:absolute;inset-inline-start:-7px;top:12px;width:12px;height:12px;border-radius:50%;background:#3AB1DB;box-shadow:0 0 0 3px #fff}
   .fm-list{display:grid;gap:8px}.fm-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;border:1px solid #DCE7F3;border-radius:14px;padding:10px 12px;background:#fff;cursor:pointer;transition:box-shadow .15s,transform .15s}
   .fm-row:hover,.fm-row:focus-visible{box-shadow:0 6px 18px rgba(8,43,90,.1);transform:translateY(-1px);outline:none}.fm-row b{color:#082B5A}
   .fm-row .meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:3px;font-size:12.5px;color:#43597A}
@@ -306,7 +363,7 @@
     root.innerHTML = '<div class="spinner"></div>';
     const adm = isAdmin(), me = S.me.id;
     let all;
-    try { all = await api.list('form_tasks', { school_id: S.school.id }, { order: 'created_at', desc: true, select: 'id,school_id,batch_id,tid,title,cat,assignee,created_by,status,cosign,sigs,due_date,note,review_note,mode,teacher_note,submitted_at,decided_at,created_at,updated_at' }); }
+    try { all = await api.list('form_tasks', { school_id: S.school.id }, { order: 'created_at', desc: true, select: 'id,school_id,batch_id,tid,title,cat,assignee,created_by,status,cosign,sigs,due_date,note,review_note,mode,teacher_note,submitted_at,decided_at,created_at,updated_at,perms,endorsed_at,endorsed_by' }); }
     catch (e) { root.innerHTML = `<div class="card">${A.emptyBox('تعذّر التحميل', e.message)}</div>`; return; }
     await mySig();
     const mine = all.filter(t => t.assignee === me && !isEval(t)), toSign = all.filter(t => (t.cosign || []).some(c => c.staff_id === me && c.status !== 'signed') && t.status !== 'approved' && !(isEval(t) && t.status === 'assigned'));

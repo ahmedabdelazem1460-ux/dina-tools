@@ -28,7 +28,7 @@
 - **الخطة:** `create_week`, `edit_week_cell`, `submit_my_week`, `review_entries`, `bulk_review`, `week_summary`, `week_quizzes`, `import_week_entries`, `request_perf_task`, `decide_assignment_request`, `decide_entry_change`, `calendar_apply`.
 - **الجداول:** `approve_timetable`, `schedule_timetable_v2`, `unschedule_timetable`, `timetable_promote`, `apply_version_to_week`, `preview_schedule`, `edit_slot`, `slot_conflicts`, `relocate_entries`, `save_live_entry`, `save_duty`.
 - **الحضور والإرشاد:** `save_period_attendance`, `period_owner`, `att_to_referral`, `counsel_ack`, `class_teachers`.
-- **النماذج:** `form_save`, `form_sign`, `form_share`, `form_decide`, `form_teacher_note`.
+- **النماذج:** `form_save`, `form_sign`, `form_share`, `form_decide`, `form_teacher_note`, `form_return`, `form_endorse` (095: `perms`, `trail`, `endorsed_*`).
 - **البنك:** `qbank_usage` (عدد استخدام كل سؤال، للمالك/الإشراف).
 - **النظام:** `trash_list/restore/purge`, `log_login`, `set_staff_active`, `student_codes_gen/list/toggle`, `sheet_*` (مزامنة Google Sheets).
 

@@ -71,7 +71,7 @@
 | 63 | `src/core/owner-controls.js` | app54.js | 4 | تحكم المالك في الشاشات اللحظية | tui | liveOK |
 | 64 | `src/core/kpi-drill.js` | app55.js | 3 | الأرقام التفاعلية A.attDrill | — | — |
 | 65 | `src/assess/noor-analysis.js` | app56.js | 68 | تحليل درجات نظام نور V.noor (استيراد ملفات نور) | noor | _noor |
-| 66 | `src/supervision/forms.js` | app57.js | 58 | النماذج والاستمارات بالتوقيع الإلكتروني V.forms (مع tools/supervision.html) | forms | _forms |
+| 66 | `src/supervision/forms.js` | app57.js | 69 | النماذج والاستمارات بالتوقيع الإلكتروني V.forms (مع tools/supervision.html) | forms | _forms |
 | 67 | `src/assess/ehomework.js` | app58.js | 4 | الواجب الإلكتروني برابط: أزرار ونافذة المشاركة QR | assess hwf | — |
 | 68 | `src/core/report-studio.js` | app59.js | 31 | استوديو التقارير A.printDoc بهوية المدرسة | — | printDoc printDocDirect printStyle |
 | 69 | `src/attendance/counseling.js` | app60.js | 94 | الإرشاد الطلابي: الإحالات والحالات والوكيل V.refer/V.counsel/V.deputy | counsel deputy refer | _counsel refData refDrill refLive refStats |

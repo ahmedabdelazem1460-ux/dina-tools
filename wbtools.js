@@ -137,13 +137,20 @@
       B.innerHTML = `<p class="muted" style="margin:0">اختر فصلك مرة واحدة، فتستخدم أسماءه كل الأدوات: العجلة، والبطاقة، والنجوم، والأدوار، والمجموعات.</p>
         ${cls.length ? `<div class="grps">${cls.map(c => `<button class="bt" data-c="${esc(c.id)}" style="min-height:52px">${esc(c.name)}</button>`).join('')}</div>` : '<p class="muted" style="margin:0">تظهر فصولك هنا عند فتح السبورة من المنصة.</p>'}
         <div class="row"><label class="muted">أرقام من ١ إلى <input type="number" min="2" max="60" class="nn" style="width:72px" aria-label="عدد الطلاب"></label><button class="bt s nb">استخدم الأرقام</button></div>
-        <label class="muted" for="wbtNT">أو اكتب الأسماء (اسم في كل سطر)</label><textarea id="wbtNT" rows="5" class="nt">${esc(R.key === 'manual' ? names().join('\n') : '')}</textarea>
+        <label class="muted lb" for="wbtNT"></label><textarea id="wbtNT" rows="8" class="nt"></textarea>
         <div class="row"><button class="bt g sv">اعتماد الأسماء المكتوبة</button><span class="muted st" role="status" aria-live="polite">${esc(rosterLabel())}</span></div>`;
-      const st = B.querySelector('.st'), done = () => { st.textContent = '✓ ' + rosterLabel(); B.querySelectorAll('[data-c]').forEach(x => x.classList.toggle('p', x.dataset.c === R.key)); if (after) { const f = after; after = null; setTimeout(() => { const c = B.closest('.wbw'); if (c) c.querySelector('.cx').click(); f(); }, 450); } };
+      const st = B.querySelector('.st'), ta = B.querySelector('.nt'), lb = B.querySelector('.lb'), sv = B.querySelector('.sv');
+      let taKey = 'manual', taLabel = 'قائمتي';
+      const fillTa = () => { const fromCls = R.key && R.key !== 'manual' && R.key !== 'num'; taKey = fromCls ? R.key : 'manual'; taLabel = fromCls ? R.label : 'قائمتي';
+        ta.value = R.key === 'num' ? '' : names().join('\n');
+        lb.textContent = fromCls ? `أسماء «${R.label}» (${AR(names().length)}) — يمكنك حذف الغائبين أو إضافة اسم ثم الاعتماد` : 'أو اكتب الأسماء (اسم في كل سطر)';
+        sv.textContent = fromCls ? 'اعتماد التعديل على الأسماء' : 'اعتماد الأسماء المكتوبة'; };
+      fillTa();
+      const done = () => { fillTa(); st.textContent = '✓ ' + rosterLabel(); B.querySelectorAll('[data-c]').forEach(x => x.classList.toggle('p', x.dataset.c === R.key)); if (after) { const f = after; after = null; setTimeout(() => { const c = B.closest('.wbw'); if (c) c.querySelector('.cx').click(); f(); }, 450); } };
       B.querySelectorAll('[data-c]').forEach(b => { b.classList.toggle('p', b.dataset.c === R.key); b.onclick = () => { const c = cls.find(x => x.id === b.dataset.c); st.textContent = 'جارٍ تحميل أسماء «' + c.name + '»…';
         const cache = LJ('dina_wbt_cls_' + c.id, null); o.askNames(c.id, L => { L = (L || []).map(short).filter(Boolean); if (!L.length && cache) L = cache; if (!L.length) { st.textContent = 'لم أجد طلاباً في هذا الفصل'; return; } LSs('dina_wbt_cls_' + c.id, JSON.stringify(L)); setRoster({ key: c.id, label: c.name, names: L }); done(); }); }; });
       B.querySelector('.nb').onclick = () => { const n = Math.min(60, Math.max(2, +B.querySelector('.nn').value || 0)); if (n >= 2) { setRoster({ key: 'num', label: 'أرقام ١–' + AR(n), names: Array.from({ length: n }, (_, i) => 'طالب ' + AR(i + 1)) }); done(); } };
-      B.querySelector('.sv').onclick = () => { const L = B.querySelector('.nt').value.split(/\r?\n|،|,/).map(s => s.trim()).filter(Boolean); if (L.length < 2) { st.textContent = 'اكتب اسمين على الأقل'; return; } setRoster({ key: 'manual', label: 'قائمتي', names: L }); done(); };
+      sv.onclick = () => { const L = ta.value.split(/\r?\n|،|,/).map(s => s.trim()).filter(Boolean); if (L.length < 2) { st.textContent = 'اكتب اسمين على الأقل'; return; } setRoster({ key: taKey, label: taLabel, names: L }); done(); };
     }
     const needNames = k => { if (names().length >= 2) return false; rosterDialog(() => open(k)); return true; };
 

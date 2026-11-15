@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><script src="../digits.js?v=1794738376"></script>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><script src="../digits.js?v=1794747781"></script>
 </head><body>
 
 <title>نماذج الإشراف التربوي</title>
@@ -1621,7 +1621,7 @@ function go(name,o){
   view.name=name;if(o)Object.assign(view,o);
   render();window.scrollTo(0,0);
 }
-function tplList(){return Object.keys(S.tpls).map(function(k){return S.tpls[k];}).filter(function(t){return !t.deleted;}).sort(function(a,b){return (a.order==null?999:a.order)-(b.order==null?999:b.order)||String(a.name).localeCompare(String(b.name),'ar');});}
+function tplList(){return Object.keys(S.tpls).map(function(k){return S.tpls[k];}).filter(function(t){return !t.deleted&&!t.hidden;}).sort(function(a,b){return (a.order==null?999:a.order)-(b.order==null?999:b.order)||String(a.name).localeCompare(String(b.name),'ar');});}
 function recList(){return Object.keys(S.recs).map(function(k){return S.recs[k];}).filter(function(r){return !r.deleted;}).sort(function(a,b){return (b.updated||0)-(a.updated||0);});}
 function recTitle(r){var t=S.tpls[r.tid];var s=r.title||((t?t.name:'نموذج محذوف')+(r.teacher?' — '+r.teacher:''));return s;}
 function levelPill(l){return h('span',{class:'pill',style:'background:'+l.color+';color:'+textOn(l.color),text:l.name});}

@@ -69,3 +69,8 @@
 - ولي الأمر: `fam_pickup_list/req/arrive/cancel/confirm`. الموظف: `pickup_list(from,to)`, `pickup_act(id, approve|reject|call|release|done|cancel, note)`, `pickup_new`. الشاشة: `pickup_screen(token, class, section)`, `pickup_screen_release(token, id)`.
 - `behaviors.edits` (jsonb، يكتبه `behaviors_guard` فقط) و`behaviors.edit_reason` (مؤقت). صلاحية تعديل غير المالك: `bh_edit_cfg(school)` ← `schools.settings.bhedit` {rec, hours, cnsl, dep, reason} (sql/107).
 - `clar_requests` / `clar_replies` (طلبات التوضيح، sql/107): القراءة للطرفين والمالك؛ الإرسال `clar_ok()` (مالك أو منحة `clarify`)؛ `clar_can(req)`؛ مشغّلات `clar_guard`, `clar_after_req`, `clar_after_reply`.
+
+### 108 الزيارات الصفية
+- `form_tasks.visit` jsonb (بيانات الزيارة؛ null للنماذج العادية) + فهرس جزئي. `visit_ok()` = مالك أو supervision أو visits. `ft_ins` يسمح لمنحة `visits` بإدراج زيارات فقط (`visit is not null and mode='sign' and created_by = me()`).
+- الإعدادات `schools.settings.visits` {title, types[], defType, roles[], tpls[], defTpls[], tlabels{}, pace, head, autoPeriod, notifyOwner, att, maxAtt, presets[]}. المرفقات في `form_tasks.data._att`.
+- ملفات أداة الإشراف داخل المنصة: `sup_docs` (school_id, key = col/id, col cfg|tpl|rec, data, meta) — RLS `sd_rw` للمالك وsupervision.

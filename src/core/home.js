@@ -12,7 +12,7 @@
     ['التواصل', ['notify', 'x_notif', 'x_app', 'posts', 'board'], '#84B7E3', '#082B5A', '💬'],
     ['المتابعة والتخطيط', ['dash', 'classes', 'export', 'weeks', 'reports'], '#5E9BD3', '#082B5A', '📈'],
     ['الجداول والأنصبة', ['studio', 'timetable', 'ttviews', 'nisab', 'plan', 'builder'], '#3AB1DB', '#0B3F8A', '🧩'],
-    ['الإشراف والموارد البشرية', ['supervision', 'forms', 'duty', 'hr'], '#F09A8E', '#D0564A', '📋'],
+    ['الإشراف والموارد البشرية', ['supervision', 'visits', 'forms', 'duty', 'hr'], '#F09A8E', '#D0564A', '📋'],
     ['الإدارة', ['admin', 'roles', 'tui', 'testt', 'activity', 'archive', 'trash', 'dev'], '#9AA9BC', '#40526A', '⚙️'],
   ];
   A.HOME_GROUPS = GROUPS;

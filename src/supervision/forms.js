@@ -17,7 +17,7 @@
   const P = t => ({ a: 'edit', c: 'sign', share: 'all', endorse: false, ...((t && t.perms) || {}) });
   const coEdit = t => !!(S.me && t.assignee !== S.me.id && (t.cosign || []).some(c => c.staff_id === S.me.id && (c.perm || P(t).c) === 'edit'));
   const PERM_L = { edit: 'يعبّئ ويوقّع', sign: 'يوقّع فقط', view: 'اطلاع فقط' };
-  const ACT_L = { submit: 'أرسل للاعتماد', share: 'طلب توقيع', approve: 'اعتمد', return: 'أعاد', recommend: 'أوصى', endorse: 'عمّد', unendorse: 'ألغى التعميد' };
+  const ACT_L = { visit: 'سجّل الزيارة', vedit: 'عدّل بيانات الزيارة', submit: 'أرسل للاعتماد', share: 'طلب توقيع', approve: 'اعتمد', return: 'أعاد', recommend: 'أوصى', endorse: 'عمّد', unendorse: 'ألغى التعميد' };
   const pill = (s, ev) => { const M = ev ? STE : STS; return `<span class="pill ${M[s] ? M[s][1] : ''}">${M[s] ? M[s][0] : esc(s)}</span>`; };
   const pillT = t => pill(t.status, isEval(t)) + (t.endorsed_at ? ' <span class="pill fm-end">✦ معمّد</span>' : '') + (isEval(t) ? ' <span class="pill fm-ev">استمارة تقييم</span>' : '');
   // خانة توقيع المعلم في استمارة التقييم
@@ -104,7 +104,7 @@
 
   // ---------- فتح نموذج ----------
   function slotState(t) {
-    const me = S.me.id, adm = isAdmin(), out = {}, app = t.status === 'approved';
+    const me = S.me.id, adm = isAdmin() || (t.created_by && t.created_by === me), out = {}, app = t.status === 'approved';
     slotsOf(t.tpl).forEach(s => {
       const sg = (t.sigs || {})[s.key], co = (t.cosign || []).find(c => c.key === s.key);
       if (sg) out[s.key] = { mine: !app && (sg.staff_id === me || adm) };
@@ -116,7 +116,7 @@
   const editable = t => t.status !== 'approved' && (isEval(t) ? canEditAdmin(t) : (t.assignee === S.me.id && P(t).a === 'edit' && ['assigned', 'draft', 'returned'].includes(t.status)) || (coEdit(t) && ['assigned', 'draft', 'returned'].includes(t.status)) || (canEditAdmin(t) && t.status !== 'approved'));
 
   function openTask(t, after) {
-    const me = S.me.id, adm = isAdmin(), mineTask = t.assignee === me;
+    const me = S.me.id, adm = isAdmin() || (!!t.created_by && t.created_by === me), mineTask = t.assignee === me;
     const myCo = (t.cosign || []).find(c => c.staff_id === me && c.status !== 'signed');
     const m = A.modal(`<div class="fm-top"><div class="grow"><h3 style="margin:0">${esc(t.title)}</h3>
         ${t.id === 'preview' ? `<p class="sub" style="margin:2px 0 0">معاينة النموذج كما يصل للمعلم</p>` : ''}<p class="sub" style="margin:2px 0 0${t.id === 'preview' ? ';display:none' : ''}">المعلم: <b>${esc(nm(t.assignee))}</b> · <span id="fmSt">${pill(t.status)}</span>${t.due_date ? ` · الموعد ${dt(t.due_date)}${overdue(t) ? ' <span class="pill st-returned">متأخر</span>' : ''}` : ''} <span class="small muted" id="fmSv"></span></p></div>
@@ -129,7 +129,7 @@
       ${coEdit(t) ? `<div class="notice info" style="display:block;margin:6px 0">يمكنك تعبئة النموذج والتوقيع في خانتك.</div>` : ''}
       ${t.endorsed_at ? `<div class="notice ok fm-endb" style="display:block;margin:6px 0">✦ معمّد من ${esc(nm(t.endorsed_by))} — ${dt(t.endorsed_at)}${t.endorse_note ? ' · ' + esc(t.endorse_note) : ''}</div>` : ''}
       ${isEval(t) && mineTask && t.status === 'submitted' ? `<div class="notice info fm-evb" style="display:block;margin:6px 0"><b>استمارة تقييمك من ${esc(nm(t.created_by))}</b><br>اطّلع على التقييم، ثم اضغط «✍ توقيع» في خانة «${esc((myCo || {}).label || 'المعلم')}» داخل الاستمارة للعلم. يمكنك إضافة ملاحظتك قبل التوقيع أو بعده.</div>` : myCo ? `<div class="notice info" style="display:block;margin:6px 0">مطلوب توقيعك في خانة «${esc(myCo.label)}» — اضغط «✍ توقيع» داخل النموذج.</div>` : ''}
-      <div id="fmTn"></div>
+      ${t.visit && A.visitBanner ? A.visitBanner(t) : ''}<div id="fmTn"></div>
       <div class="fm-co" id="fmCo"></div>
       <iframe class="fm-frame" id="fmF" src="${FRAME}" title="${esc(t.title)}"></iframe>`, { cls: 'wide fm-modal' });
     const f = $('#fmF', m.el); let D = t.data || {}, dirty = false, timer = null;

@@ -74,6 +74,7 @@
     {"src": "src/assess/ehomework.js", "old": "app58.js", "about": "الواجب الإلكتروني برابط: أزرار ونافذة المشاركة QR"},
     {"src": "src/core/report-studio.js", "old": "app59.js", "about": "استوديو التقارير A.printDoc بهوية المدرسة"},
     {"src": "src/attendance/counseling.js", "old": "app60.js", "about": "الإرشاد الطلابي: الإحالات والحالات والوكيل V.refer/V.counsel/V.deputy"},
+    {"src": "src/attendance/behavior-admin.js", "about": "متابعة السلوك للمالك V.bhadmin: غير المُحالة وإحالتها (فردي/جماعي)، تعديل السلوك المرصود بالخطأ بسجل تعديلات وصلاحيات يحددها المالك (behaviors_guard + settings.bhedit)، فتح أي حالة، وطلبات التوضيح لأي موظف V.clarify بمفتاح clarify (sql/107)"},
     {"src": "src/attendance/students-browser.js", "old": "app61.js", "about": "تبويب الطلاب: قوائم وإحصاءات تفاعلية A.stuBrowser"},
     {"src": "src/assess/school-bank.js", "old": "app62.js", "about": "بنك أسئلة المدرسة V.qbank + إتاحة الواجب الإلكتروني + واجهات الطالب + تصدير Excel"},
     {"src": "src/assess/bank-booklet.js", "about": "كراسة التدريب PDF من بنك الأسئلة A.bankBooklet: غلاف بهوية المدرسة، ثلاثة أنماط (تدريب/اختبار تجريبي/مراجعة بالحل)، تقسيم آلي لصفحات A4، مفتاح الإجابة وورقة إجابة، QR، طباعة/حفظ PDF وتنزيل مباشر"},

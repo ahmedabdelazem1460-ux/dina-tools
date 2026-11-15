@@ -43,13 +43,13 @@ const { chromium } = require('playwright');
       for (const w of ['class', 'teacher', 'day', 'masterT', 'master', 'assign', 'index', 'now']) {
         await p.selectOption('#pW', w); await p.waitForTimeout(1500);
         const f = p.frames().find(x => x.parentFrame() && x.name() === '' && x.url() === 'about:blank' ) || p.frames()[1];
-        const r = await p.evaluate(() => { const d = document.querySelector('#pFr').contentDocument, pg = d.querySelector('.pg'), t = d.querySelector('.tvp-b > table, .tvp-b'); const b = d.querySelector('.pg.grid .tvp-b'); return { pg: !!pg, logo: !!d.querySelector('.tvp-h img'), over: b ? (b.firstElementChild.getBoundingClientRect().bottom > b.getBoundingClientRect().bottom + 2 || b.firstElementChild.getBoundingClientRect().left < b.getBoundingClientRect().left - 2) : false, sig: !!d.querySelector('.tvp-sig') }; });
+        const r = await p.evaluate(() => { const d = document.querySelector('#pFr').contentDocument, pg = d.querySelector('.pg'), t = d.querySelector('.tvp-b > table, .tvp-b'); const bs = [...d.querySelectorAll('.pg.grid .tvp-b')]; return { pg: !!pg, logo: !!d.querySelector('.tvp-h img, .tl-h img'), over: bs.some(b => { const r = b.firstElementChild.getBoundingClientRect(), z = parseFloat(b.firstElementChild.style.zoom || 1), q = b.getBoundingClientRect(); return r.height * z > q.height + 3; }), sig: !!d.querySelector('.tvp-sig, .tl-sig') }; });
         chk(r.pg && r.logo && r.sig && !r.over, `الطباعة ${w}: صفحة بالشعار والتوقيعات دون فيض ${JSON.stringify(r)}`);
         await p.locator('.tv-prev').screenshot({ path: `p0/t200-print-${w}.png` });
       }
       for (const s of ['modern', 'colors', 'eco']) { await p.selectOption('#pW', 'class'); await p.check(`[name=pS][value=${s}]`, { force: true }); await p.waitForTimeout(1300); await p.locator('.tv-prev').screenshot({ path: `p0/t200-print-style-${s}.png` }); }
-      await p.check('#pTwo'); await p.waitForTimeout(1300); await p.locator('.tv-prev').screenshot({ path: 'p0/t200-print-two.png' });
-      chk(await p.evaluate(() => document.querySelector('#pFr').contentDocument.querySelectorAll('.pg .tvp-who').length === 2), 'جدولان في الصفحة');
+      await p.selectOption('#pW', 'class'); await p.waitForTimeout(400); await p.selectOption('#pPer', '2'); await p.waitForTimeout(1300); await p.locator('.tv-prev').screenshot({ path: 'p0/t200-print-two.png' });
+      chk(await p.evaluate(() => document.querySelector('#pFr').contentDocument.querySelectorAll('.pg .tl').length === 2), 'جدولان في الصفحة');
       await p.evaluate(() => document.querySelectorAll('.ovl').forEach(o => o.remove()));
       // Excel
       await p.click('.tv-tabs [data-v="index"]'); await p.waitForTimeout(400);

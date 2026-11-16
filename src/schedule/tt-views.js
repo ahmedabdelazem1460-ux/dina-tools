@@ -115,11 +115,11 @@
   function idxTeacher() {
     const c = C(); let T = teachers().map(t => { const l = D.L.filter(s => s.teacher_id === t.id && vis(s)), by = {}; l.forEach(s => { const k = s.subject_id; (by[k] = by[k] || {}); by[k][s.class_id] = (by[k][s.class_id] || 0) + 1; }); return { id: t.id, n: l.length, by, nc: new Set(l.map(s => s.class_id)).size }; });
     if (c.iSort === 'load') T.sort((a, b) => b.n - a.n);
-    return { T, html: `<table class="tvg tvg-i"><thead><tr><th class="nn">م</th><th>المعلم</th><th>المادة</th><th>الفصول (عدد الحصص)</th><th class="nn">الفصول</th><th class="nn">النصاب</th></tr></thead><tbody>${T.map((t, i) => { const subs = Object.keys(t.by); return subs.map((sid, j) => `<tr class="${j ? 'cont' : 'first'}${i % 2 ? ' alt' : ''}" style="--sc:${col(sid)}">${j ? '' : `<td class="nn" rowspan="${subs.length}">${AR(i + 1)}</td><td rowspan="${subs.length}" class="tn"><b data-go="teacher|${t.id}">${esc(tN(t.id))}</b></td>`}<td class="sb" style="--sc:${col(sid)}"><b>${esc(sN(sid))}</b></td><td class="chips">${Object.entries(t.by[sid]).sort((a, b) => (A.cmpCls ? A.cmpCls(a[0], b[0]) : 0)).map(([cid, n]) => `<span data-go="class|${cid}">${esc(cN(cid))}<small>${AR(n)}</small></span>`).join('')}</td>${j ? '' : `<td class="nn" rowspan="${subs.length}">${AR(t.nc)}</td><td class="nn tot" rowspan="${subs.length}">${AR(t.n)}</td>`}</tr>`).join(''); }).join('') || '<tr><td colspan="6" class="e">لا توجد إسنادات</td></tr>'}</tbody><tfoot><tr><td></td><td>${A.cnt(T.length, 'معلم', 'معلمين')}</td><td colspan="3"></td><td class="nn">${AR(T.reduce((a, t) => a + t.n, 0))}</td></tr></tfoot></table>` };
+    return { T, html: `<table class="tvg tvg-i"><thead><tr><th class="nn">م</th><th>المعلم</th><th>المادة</th><th>الفصول (عدد الحصص)</th><th class="nn">الفصول</th><th class="nn">النصاب</th></tr></thead><tbody>${T.map((t, i) => { const subs = Object.keys(t.by); return subs.map((sid, j) => `<tr class="${j ? 'cont' : 'first'}${i % 2 ? ' alt' : ''}" style="--sc:${col(sid)}"${j ? '' : ` data-u="t:${t.id}"`}>${j ? '' : `<td class="nn" rowspan="${subs.length}">${AR(i + 1)}</td><td rowspan="${subs.length}" class="tn"><b data-go="teacher|${t.id}">${esc(tN(t.id))}</b></td>`}<td class="sb" style="--sc:${col(sid)}"><b>${esc(sN(sid))}</b></td><td class="chips">${Object.entries(t.by[sid]).sort((a, b) => (A.cmpCls ? A.cmpCls(a[0], b[0]) : 0)).map(([cid, n]) => `<span data-go="class|${cid}">${esc(cN(cid))}<small>${AR(n)}</small></span>`).join('')}</td>${j ? '' : `<td class="nn" rowspan="${subs.length}">${AR(t.nc)}</td><td class="nn tot" rowspan="${subs.length}">${AR(t.n)}</td>`}</tr>`).join(''); }).join('') || '<tr><td colspan="6" class="e">لا توجد إسنادات</td></tr>'}</tbody><tfoot><tr><td></td><td>${A.cnt(T.length, 'معلم', 'معلمين')}</td><td colspan="3"></td><td class="nn">${AR(T.reduce((a, t) => a + t.n, 0))}</td></tr></tfoot></table>` };
   }
   function idxSubject() {
     const rows = subjects().filter(sid => !C().hideS.includes(sid)).map(sid => { const l = D.L.filter(s => s.subject_id === sid), by = {}; l.forEach(s => { const k = s.teacher_id || ''; (by[k] = by[k] || {}); by[k][s.class_id] = (by[k][s.class_id] || 0) + 1; }); return { sid, by, n: l.length }; });
-    return `<table class="tvg tvg-i"><thead><tr><th class="nn">م</th><th>المادة</th><th>المعلم</th><th>الفصول (عدد الحصص)</th><th class="nn">الحصص</th></tr></thead><tbody>${rows.map((r, i) => { const ts = Object.keys(r.by); return ts.map((tid, j) => `<tr class="${j ? 'cont' : 'first'}${i % 2 ? ' alt' : ''}" style="--sc:${col(r.sid)}">${j ? '' : `<td class="nn" rowspan="${ts.length}">${AR(i + 1)}</td><td rowspan="${ts.length}" class="sb" style="--sc:${col(r.sid)}"><b>${esc(sN(r.sid))}</b></td>`}<td>${tid ? esc(tN(tid)) : '<span class="tv-no">بلا معلم</span>'}</td><td class="chips">${Object.entries(r.by[tid]).sort((a, b) => (A.cmpCls ? A.cmpCls(a[0], b[0]) : 0)).map(([cid, n]) => `<span data-go="class|${cid}">${esc(cN(cid))}<small>${AR(n)}</small></span>`).join('')}</td><td class="nn tot">${AR(Object.values(r.by[tid]).reduce((a, b) => a + b, 0))}</td></tr>`).join(''); }).join('')}</tbody></table>`;
+    return `<table class="tvg tvg-i"><thead><tr><th class="nn">م</th><th>المادة</th><th>المعلم</th><th>الفصول (عدد الحصص)</th><th class="nn">الحصص</th></tr></thead><tbody>${rows.map((r, i) => { const ts = Object.keys(r.by); return ts.map((tid, j) => `<tr class="${j ? 'cont' : 'first'}${i % 2 ? ' alt' : ''}" style="--sc:${col(r.sid)}"${j ? '' : ` data-u="s:${r.sid}"`}>${j ? '' : `<td class="nn" rowspan="${ts.length}">${AR(i + 1)}</td><td rowspan="${ts.length}" class="sb" style="--sc:${col(r.sid)}"><b>${esc(sN(r.sid))}</b></td>`}<td>${tid ? esc(tN(tid)) : '<span class="tv-no">بلا معلم</span>'}</td><td class="chips">${Object.entries(r.by[tid]).sort((a, b) => (A.cmpCls ? A.cmpCls(a[0], b[0]) : 0)).map(([cid, n]) => `<span data-go="class|${cid}">${esc(cN(cid))}<small>${AR(n)}</small></span>`).join('')}</td><td class="nn tot">${AR(Object.values(r.by[tid]).reduce((a, b) => a + b, 0))}</td></tr>`).join(''); }).join('')}</tbody></table>`;
   }
   function idxMatrix() {
     const SB = subjects().filter(sid => !C().hideS.includes(sid)), CL = classes();
@@ -357,7 +357,7 @@
   const WHAT = [['class', 'جداول الفصول'], ['teacher', 'جداول المعلمين'], ['assign', 'إسنادات الفصول'], ['index', 'الكشاف العام للإسنادات'], ['day', 'جدول اليوم العام (الفصول)'], ['dayT', 'جدول اليوم العام (المعلمون)'], ['master', 'الجدول العام للأسبوع (الفصول)'], ['masterT', 'الجدول العام للأسبوع (المعلمون)'], ['now', 'الحصص الجارية (لقطة)']];
   const TILE_OK = w => ['class', 'teacher', 'assign', 'index'].includes(w);
   function printDialog(v0) {
-    const st = ST(), c = cfg(), CL = classes(), T = teachers(), P0 = (() => { try { return JSON.parse(A.LS.get('ttv_pr') || '{}'); } catch (_) { return {}; } })();
+    const st = ST(), c = cfg(), CL = classes(), T = teachers(), P0 = (() => { try { return JSON.parse(A.LS.get('ttv_pr') || '{}'); } catch (_) { return {}; } })(), PB0 = pbPref();
     const m = A.modal(`<h3>طباعة وتصدير احترافي</h3><p class="sub">${esc(verTxt())}</p>
       <div class="grid g2"><div class="field"><label for="pW">ماذا تطبع؟</label><select class="in" id="pW">${WHAT.map(([k, l]) => `<option value="${k}" ${k === (v0 === 'now' ? 'class' : v0) ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
         <div class="field" id="pWhoF"><label for="pWho">النطاق</label><select class="in" id="pWho"></select></div></div>
@@ -367,6 +367,13 @@
         <div class="field" id="pGF"><label class="chk" style="margin-top:26px"><input type="checkbox" id="pG" ${P0.g ? 'checked' : ''}> إضافة الجدول الأسبوعي للبطاقة</label></div></div>
         <div class="tv-cks" id="pCols"><span class="small muted">الأعمدة:</span><label class="chk"><input type="checkbox" data-pc="aN" ${c.aN ? 'checked' : ''}> عدد الحصص</label><label class="chk"><input type="checkbox" data-pc="aT" ${c.aT ? 'checked' : ''}> المعلم</label><label class="chk"><input type="checkbox" data-pc="aTot" ${c.aTot ? 'checked' : ''}> المجموع</label><label class="chk"><input type="checkbox" data-pc="aNone" ${c.aNone ? 'checked' : ''}> المواد بلا معلم</label><label class="chk"><input type="checkbox" data-pc="showT" ${c.showT ? 'checked' : ''}> المعلم في الجدول</label></div>
         <p class="small muted" id="pHint" style="margin:4px 0 0"></p></fieldset>
+      <fieldset class="tv-fs" id="pPB"><legend>فواصل الصفحات والترحيل</legend><div class="grid g4">
+        <div class="field"><label for="pbM">طريقة التقسيم</label><select class="in" id="pbM">${[['smart', 'ذكي: المجموعة المرتبطة لا تُقسَّم'], ['rows', 'ملء الصفحة: التقسيم بين الأسطر مع تكرار الاسم']].map(([k, l]) => `<option value="${k}" ${PB0.mode === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+        <div class="field"><label for="pbH">رأس الصفحات التالية</label><select class="in" id="pbH">${[['same', 'مثل الصفحة الأولى'], ['mini', 'مختصر (سطر واحد)'], ['none', 'بدون رأس']].map(([k, l]) => `<option value="${k}" ${PB0.head === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+        <div class="field"><label for="pbS">التوقيعات والختم</label><select class="in" id="pbS">${[['last', 'في الصفحة الأخيرة فقط'], ['all', 'في كل صفحة']].map(([k, l]) => `<option value="${k}" ${PB0.sig === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+        <div class="field"><label for="pbZ">حجم المحتوى</label><select class="in" id="pbZ">${[100, 95, 90, 85, 80, 75].map(z => `<option value="${z}" ${+PB0.z === z ? 'selected' : ''}>${AR(z)}٪${z === 100 ? ' (الأصلي)' : ''}</option>`).join('')}</select></div></div>
+        <div class="tv-cks"><label class="chk"><input type="checkbox" id="pbT" ${PB0.th ? 'checked' : ''}> تكرار رأس الجدول في كل صفحة</label><label class="chk"><input type="checkbox" id="pbN" ${PB0.num ? 'checked' : ''}> ترقيم «صفحة ١ من ٣»</label><label class="chk"><input type="checkbox" id="pbA" ${PB0.all ? 'checked' : ''}> عرض كل الصفحات بفواصلها في المعاينة</label><label class="chk"><input type="checkbox" id="pbX" ${PB0.tools ? 'checked' : ''}> أدوات الترحيل اليدوي في المعاينة</label></div>
+        <p class="small muted" style="margin:4px 0 0">في المعاينة بجوار كل عنصر: <b>⤓</b> يرحّله ليبدأ صفحة جديدة، و<b>🔗</b> يربطه بما بعده فلا يُفصلان. <button type="button" class="btn ghost sm" id="pbR" style="display:none">↺ إلغاء الترحيل اليدوي (<span id="pbRn"></span>)</button></p></fieldset>
       <fieldset class="tv-fs"><legend>الرأس والأسطر والتوقيعات</legend><div class="grid g2">
         <div class="field"><label for="pH">الرأس</label><select class="in" id="pH">${[['full', 'كامل بالشعار والعنوان'], ['mini', 'مختصر احترافي (سطر واحد)'], ['none', 'بدون رأس']].map(([k, l]) => `<option value="${k}" ${(P0.h || 'full') === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
         <div class="field"><label for="pZ">تلوين الأسطر (يسهّل القراءة)</label><select class="in" id="pZ">${[['zebra', 'متناوب (سطر ملوّن وسطر أبيض)'], ['subj', 'كل سطر بلون مادته'], ['none', 'بلا تلوين']].map(([k, l]) => `<option value="${k}" ${(P0.z || 'zebra') === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div></div>
@@ -378,7 +385,7 @@
       <div class="tv-cks"><label class="chk"><input type="checkbox" id="pSt" ${c.stamp ? 'checked' : ''}> ختم «معتمد»</label><label class="chk"><input type="checkbox" id="pSg" ${P0.sg === false ? '' : 'checked'}> إظهار التوقيعات</label><label class="chk"><input type="checkbox" id="pCut" ${P0.cut === false ? '' : 'checked'}> خطوط قصّ بين البطاقات</label></div>
       <div class="tv-prev"><div class="tv-prev-h"><b>المعاينة</b><span class="tv-pn"><button type="button" class="btn ghost sm" id="pPv" aria-label="الصفحة السابقة">‹</button><span id="pCnt" class="small" aria-live="polite"></span><button type="button" class="btn ghost sm" id="pNx" aria-label="الصفحة التالية">›</button></span></div><div class="tv-prev-b"><iframe id="pFr" title="معاينة الطباعة"></iframe></div></div>
       <div class="acts tv-exp"><button class="btn" id="pGo">🖨️ طباعة</button><button class="btn sky" id="pPdf">📄 تنزيل PDF</button><button class="btn ghost" id="pDoc">📝 Word منسّق</button><button class="btn ghost" id="pPng">🖼️ صورة الصفحة</button></div>`, { cls: 'wide xl' });
-    const q = s => m.el.querySelector(s); let pg = 0, LAST = null;
+    const q = s => m.el.querySelector(s); let pg = 0, LAST = null, TOT = 1;
     const SGS = c.sig.concat((P0.sx || []).filter(x => !c.sig.some(y => y.t === x.t))), off = new Set(P0.so || []);
     const drawSg = () => { q('#pSgL').innerHTML = SGS.map((x, i) => `<label class="tv-sgc"><input type="checkbox" data-sg="${i}" ${off.has(x.t) ? '' : 'checked'}><span>${esc(x.t)}${x.n ? ` <small>${esc(x.n)}</small>` : ''}</span></label>`).join(''); $$('[data-sg]', m.el).forEach(i => i.onchange = () => { const t = SGS[+i.dataset.sg].t; i.checked ? off.delete(t) : off.add(t); prev(true); }); };
     drawSg();
@@ -392,19 +399,31 @@
       if (!q('#pPer').value) q('#pPer').selectedIndex = 0;
       const per = +q('#pPer').value; q('#pCp').disabled = per === 0; q('#pGF').style.display = (w === 'assign' || (w === 'index' && who === 'teacher')) && per !== 0 ? '' : 'none';
       q('#pCols').style.display = rep || w === 'class' ? '' : 'none';
+      q('#pPB').style.display = (rep && per === 0 && !(w === 'index' && who === 'matrix')) || w === 'now' ? '' : 'none';
       q('#pHint').textContent = per === 0 ? 'التقرير المتصل يجمع كل البطاقات في صفحات متتالية.' : `كل ${w === 'teacher' || (w === 'index' && who === 'teacher') ? 'معلم' : w === 'index' ? 'مادة' : 'فصل'} في بطاقة مستقلة بالشعار والتوقيع — مناسبة للتعليق على باب الفصل أو التسليم للمعلم.`; };
     const opt = () => { const o = { head: q('#pH').value, zebra: q('#pZ').value, sigs: SGS.filter(x => !off.has(x.t)), w: q('#pW').value, who: q('#pWho').value, style: (m.el.querySelector('[name=pS]:checked') || {}).value, theme: (m.el.querySelector('[name=pC]:checked') || {}).value, orient: q('#pO').value, stamp: q('#pSt').checked, sig: q('#pSg').checked, cut: q('#pCut').checked, per: q('#pLay').style.display === 'none' ? 1 : +q('#pPer').value, cp: +q('#pCp').value || 1, g: q('#pG').checked, cols: {} };
-      $$('[data-pc]', m.el).forEach(i => o.cols[i.dataset.pc] = i.checked); A.LS.set('ttv_pr', JSON.stringify({ per: o.per, cp: o.cp, g: o.g, o: o.orient, cut: o.cut, h: o.head, z: o.zebra, sg: o.sig, so: [...off], sx: SGS.filter(x => x.x) })); return o; };
-    let tmr = null; const prev = (keep) => { clearTimeout(tmr); tmr = setTimeout(() => { const o = opt(); LAST = { o, P: pages(o) }; if (!keep) pg = 0; pg = Math.min(pg, LAST.P.pages.length - 1); q('#pCnt').textContent = `صفحة ${AR(pg + 1)} من ${AR(LAST.P.pages.length)}`; q('#pPv').disabled = pg <= 0; q('#pNx').disabled = pg >= LAST.P.pages.length - 1; renderFrame(q('#pFr'), LAST.P.pages.slice(pg, pg + 1), o, true); }, 120); };
+      $$('[data-pc]', m.el).forEach(i => o.cols[i.dataset.pc] = i.checked);
+      o.pb = { mode: q('#pbM').value, head: q('#pbH').value, sig: q('#pbS').value, z: +q('#pbZ').value, th: q('#pbT').checked, num: q('#pbN').checked, all: q('#pbA').checked, tools: q('#pbX').checked }; A.LS.set('ttv_pb', JSON.stringify(o.pb)); o.pbm = pbGet(o); A.LS.set('ttv_pr', JSON.stringify({ per: o.per, cp: o.cp, g: o.g, o: o.orient, cut: o.cut, h: o.head, z: o.zebra, sg: o.sig, so: [...off], sx: SGS.filter(x => x.x) })); return o; };
+    const navTxt = () => { q('#pCnt').textContent = `صفحة ${AR(pg + 1)} من ${AR(TOT)}`; q('#pPv').disabled = pg <= 0; q('#pNx').disabled = pg >= TOT - 1; };
+    const isAll = () => LAST && LAST.fl && LAST.o.pb.all;
+    let tmr = null; const prev = (keep, scroll) => { clearTimeout(tmr); tmr = setTimeout(async () => { const o = opt(), P = pages(o), fl = P.pages.some(x => x.kind === 'flow'), f = q('#pFr'); LAST = { o, P, fl }; if (!keep) pg = 0;
+      const sy = keep && f.contentWindow ? f.contentWindow.scrollY : 0, nb = o.pbm.brk.length + o.pbm.lnk.length; q('#pbR').style.display = nb ? '' : 'none'; q('#pbRn').textContent = AR(nb);
+      PB_CB = (k, key) => { const v = pbGet(o), L = k === 'b' ? v.brk : v.lnk, i = L.indexOf(key); i < 0 ? L.push(key) : L.splice(i, 1); pbSet(o, v); prev(true); };
+      if (!fl) pg = Math.min(pg, P.pages.length - 1);
+      const n = await renderFrame(f, fl ? P.pages : P.pages.slice(pg, pg + 1), o, true, fl ? { page: pg, all: o.pb.all, onPage: i => { if (i !== pg) { pg = i; navTxt(); } } } : { page: 0, all: false });
+      TOT = fl ? n : P.pages.length; if (fl && pg > TOT - 1) { pg = TOT - 1; if (!o.pb.all) return prev(true); } navTxt();
+      if (fl && o.pb.all) { if (scroll) goPg(); else if (sy) f.contentWindow.scrollTo(0, sy); } }, 120); };
+    const goPg = () => { const d = q('#pFr').contentDocument, el = d && d.querySelectorAll('.pg')[pg]; if (el) el.scrollIntoView({ block: 'start' }); navTxt(); };
+    q('#pbR').onclick = () => { if (LAST) { pbSet(LAST.o, { brk: [], lnk: [] }); prev(true); } };
     q('#pW').onchange = () => { q('#pPer').value = ''; fillWho(); prev(); }; q('#pWho').onchange = () => { layOpts(); prev(); }; q('#pPer').onchange = () => { layOpts(); prev(); };
-    m.el.querySelectorAll('input:not(#pSgT):not(#pSgN),#pO,#pCp,#pH,#pZ').forEach(i => i.addEventListener('change', () => prev()));
-    q('#pPv').onclick = () => { pg = Math.max(0, pg - 1); prev(true); }; q('#pNx').onclick = () => { pg++; prev(true); };
+    m.el.querySelectorAll('input:not(#pSgT):not(#pSgN),#pO,#pCp,#pH,#pZ,#pPB select').forEach(i => i.addEventListener('change', () => prev()));
+    q('#pPv').onclick = () => { pg = Math.max(0, pg - 1); isAll() ? goPg() : prev(true); }; q('#pNx').onclick = () => { pg = Math.min(TOT - 1, pg + 1); isAll() ? goPg() : prev(true); };
     fillWho(); prev();
     const full = async () => { const o = opt(), P = pages(o), f = document.createElement('iframe'); f.style.cssText = 'position:fixed;left:-9999px;top:0;width:1200px;height:900px;border:0'; document.body.appendChild(f); await renderFrame(f, P.pages, o, false); return { f, o, P }; };
     q('#pGo').onclick = async () => { const { f } = await full(); f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 5000); };
     q('#pPdf').onclick = e => A.run(e.currentTarget, async () => { const { f, o } = await full(); try { await toPdf(f.contentDocument, o, fileName(o) + '.pdf'); A.toast('نُزّل ملف PDF', 'ok'); } finally { f.remove(); } });
     q('#pDoc').onclick = e => A.run(e.currentTarget, async () => { const { f, o } = await full(); try { toWord(f.contentDocument, o, fileName(o) + '.doc'); A.toast('نُزّل ملف Word', 'ok'); } finally { f.remove(); } });
-    q('#pPng').onclick = e => A.run(e.currentTarget, async () => { if (!window.html2canvas) throw new Error('مكتبة الصور غير محمّلة'); const el = q('#pFr').contentDocument.querySelector('.pg'); const z = el.ownerDocument.body.style.zoom; el.ownerDocument.body.style.zoom = 1; try { const cv = await html2canvas(el, { scale: 2, backgroundColor: '#fff' }); A.download(await new Promise(r => cv.toBlob(r, 'image/png')), fileName(opt()) + '.png'); } finally { el.ownerDocument.body.style.zoom = z; } });
+    q('#pPng').onclick = e => A.run(e.currentTarget, async () => { if (!window.html2canvas) throw new Error('مكتبة الصور غير محمّلة'); const fd = q('#pFr').contentDocument, el = fd.querySelectorAll('.pg')[isAll() ? pg : 0] || [...fd.querySelectorAll('.pg')].find(x => !x.hidden); const z = fd.body.style.zoom; fd.body.style.zoom = 1; fd.body.classList.add('pb-cap'); try { const cv = await html2canvas(el, { scale: 2, backgroundColor: '#fff' }); A.download(await new Promise(r => cv.toBlob(r, 'image/png')), fileName(opt()) + '.png'); } finally { fd.body.style.zoom = z; fd.body.classList.remove('pb-cap'); } });
   }
   const fileName = o => `${(WHAT.find(x => x[0] === o.w) || [])[1] || 'الجداول'} — ${A.section().name}`.replace(/[\\/:*?"<>|]/g, '-');
   // بطاقات مستقلة: [{who, sub, body}]
@@ -429,16 +448,16 @@
       if (tile) return { pages: items(o).map(x => ({ ...x, kind: 'grid' })) };
       if (o.w === 'day' || o.w === 'dayT') (o.who === '*' ? Array.from({ length: nd() }, (_, d) => d) : [+o.who]).forEach(d => P.push({ who: `جدول يوم ${DAYS[d]}`, sub: o.w === 'dayT' ? 'جدول المعلمين' : 'جدول الفصول', body: gDay(d, o.w === 'dayT' ? 'teacher' : 'class', false), kind: 'grid' }));
       else if (o.w === 'master' || o.w === 'masterT') P.push({ who: o.w === 'masterT' ? 'الجدول العام للمعلمين' : 'الجدول العام للفصول', sub: 'الأسبوع كاملاً', body: gMaster(o.w === 'masterT' ? 'teacher' : 'class'), after: o.w === 'masterT' ? legendC() + legend() : legend(), kind: 'grid' });
-      else if (o.w === 'assign') { const l = o.who === '*' ? CL : CL.filter(c => c.id === o.who); const G = byStage(l); P.push({ who: 'إسنادات الفصول', sub: `${A.cnt(l.length, 'فصل', 'فصول')} · ${A.cnt(new Set(D.L.filter(s => vis(s) && l.some(c => c.id === s.class_id)).map(s => s.teacher_id).filter(Boolean)).size, 'معلم', 'معلمين')}`, body: kpiHtml() + Object.entries(G).map(([g, cl]) => `<h4 class="tv-gh">${esc(g)}</h4><div class="tv-acards">${cl.map(x => `<section class="tv-ac"><h3>${esc(x.name)}</h3>${aTable(x.id, false)}</section>`).join('')}</div>`).join(''), kind: 'flow' }); }
+      else if (o.w === 'assign') { const l = o.who === '*' ? CL : CL.filter(c => c.id === o.who); const G = byStage(l); P.push({ who: 'إسنادات الفصول', sub: `${A.cnt(l.length, 'فصل', 'فصول')} · ${A.cnt(new Set(D.L.filter(s => vis(s) && l.some(c => c.id === s.class_id)).map(s => s.teacher_id).filter(Boolean)).size, 'معلم', 'معلمين')}`, body: kpiHtml() + Object.entries(G).map(([g, cl]) => `<h4 class="tv-gh" data-u="g:${esc(g)}">${esc(g)}</h4><div class="tv-acards">${cl.map(x => `<section class="tv-ac" data-u="c:${x.id}"><h3>${esc(x.name)}</h3>${aTable(x.id, false)}</section>`).join('')}</div>`).join(''), kind: 'flow' }); }
       else if (o.w === 'index') { const mode = o.who; const t = mode === 'subject' ? idxSubject() : mode === 'matrix' ? idxMatrix() : idxTeacher().html; P.push({ who: 'الكشاف العام للإسنادات', sub: mode === 'subject' ? 'حسب المادة' : mode === 'matrix' ? 'مصفوفة الفصول × المواد' : 'حسب المعلم', body: (mode === 'matrix' ? '' : kpiHtml()) + t, kind: mode === 'matrix' ? 'grid' : 'flow' }); }
       else if (o.w === 'now') { const r = nowHtml(ST()); P.push({ who: 'الحصص الجارية', sub: '', body: r.html.replace(/<details[^>]*>/, '<div class="tv-free">').replace('</details>', '</div>').replace(/<summary>/, '<div>').replace('</summary>', '</div>').replace(/<button type="button"[^>]*>/g, '<span>').replace(/<\/button>/g, '</span>'), kind: 'flow' }); }
       return { pages: P };
     } finally { OVR = null; }
   }
   function pageHtml(p, o) {
-    const c = cfg(), sec = A.section(), [, a, b, pl] = THEMES[o.theme] || THEMES.navy, port = o.orient === 'port';
+    const c = cfg(), sec = A.section(), [, a, b, pl] = THEMES[o.theme] || THEMES.navy, port = o.orient === 'port', zf = p.kind === 'flow' && o.pb ? (+o.pb.z || 100) / 100 : 1;
     const SG = o.sigs || c.sig, hd = o.head || 'full', mark = 'assets/mark.svg';
-    const vars = `--a:${o.style === 'eco' ? '#111' : a};--b:${o.style === 'eco' ? '#555' : b};--p:${o.style === 'eco' ? '#f3f3f3' : pl};--fs:${c.fs / 100}`, cls = `tvp s-${o.style}${c.color && o.style !== 'eco' ? '' : ' nocol'} z-${o.zebra || 'none'} h-${hd}`, logo = `assets/${o.style === 'formal' ? 'logo_white' : 'logo'}.svg`;
+    const vars = `--a:${o.style === 'eco' ? '#111' : a};--b:${o.style === 'eco' ? '#555' : b};--p:${o.style === 'eco' ? '#f3f3f3' : pl};--fs:${c.fs / 100 * zf}`, cls = `tvp s-${o.style}${c.color && o.style !== 'eco' ? '' : ' nocol'} z-${o.zebra || 'none'} h-${hd}`, logo = `assets/${o.style === 'formal' ? 'logo_white' : 'logo'}.svg`;
     const stampSvg = `<svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="55" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="60" cy="60" r="44" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="3 3"/><text x="60" y="56" text-anchor="middle" font-size="22" font-weight="800" fill="currentColor">معتمد</text><text x="60" y="76" text-anchor="middle" font-size="9.5" fill="currentColor">${esc((S.school.name || '').slice(0, 26))}</text><text x="60" y="90" text-anchor="middle" font-size="8.5" fill="currentColor">${esc(D.ver && D.ver.approved_at ? D.ver.approved_at.slice(0, 10) : '')}</text></svg>`;
     if (p.tiles) { const [gc, gr] = (GRID[port ? 'port' : 'land'][p.n] || [1, 1]), ts = p.n >= 8 ? 0.62 : p.n >= 6 ? 0.7 : p.n >= 4 ? 0.8 : p.n >= 2 ? 0.92 : 1;
       const sig = o.sig && SG.length ? `<div class="tl-sig">${SG.map(s => `<span><b>${esc(s.t)}</b>${esc(s.n) ? ' ' + esc(s.n) : ''}: ........</span>`).join('')}</div>` : '<div></div>';
@@ -449,15 +468,17 @@
         <div class="tl-f">${sig}${o.stamp && D.ver ? `<div class="tl-stamp">${stampSvg}</div>` : ''}</div></div>`).join('')}</div></div></div>`; }
     const sig = o.sig && SG.length ? `<div class="tvp-sig">${SG.map(s => `<div><span>${esc(s.t)}</span><b>${esc(s.n) || '&nbsp;'}</b><i>التوقيع: ..................</i></div>`).join('')}</div>` : '<div></div>';
     return `<div class="pg ${port ? 'port' : 'land'} ${p.kind}"><div class="${cls}" style="${vars}">
-      ${hd === 'full' ? `<header class="tvp-h"><img src="${logo}" alt="${esc(S.school.name || '')}"><div class="tvp-t"><h1>${esc(c.title)}</h1><p>${esc(sec.name)} · ${esc(verTxt())}</p></div><div class="tvp-m">${c.date ? `طُبع: ${esc(A.arDate ? A.arDate(today()) : today())}` : ''}</div></header>` : hd === 'mini' ? `<header class="tvp-hm"><img src="${mark}" alt=""><b>${esc(c.title)}</b><span>${esc(S.school.name || '')} · ${esc(sec.name)}</span><small>${c.date ? esc(A.arDate ? A.arDate(today()) : today()) : ''}</small></header>` : ''}
+      ${hd === 'full' ? `<header class="tvp-h"><img src="${logo}" alt="${esc(S.school.name || '')}"><div class="tvp-t"><h1>${esc(c.title)}</h1><p>${esc(sec.name)} · ${esc(verTxt())}</p></div><div class="tvp-m">${c.date ? `طُبع: ${esc(A.arDate ? A.arDate(today()) : today())}` : ''}</div></header>` : hd === 'mini' ? hmHtml() : ''}
       <div class="tvp-who"><b>${esc(p.who)}</b>${p.sub ? `<span>${esc(p.sub)}</span>` : ''}</div><div class="tvp-b"><div class="fitw">${p.body}</div></div>${p.after || ''}
       <footer class="tvp-f">${sig}${o.stamp && D.ver ? `<div class="tvp-stamp" aria-hidden="true">${stampSvg}</div>` : ''}</footer>${hd === 'none' ? '' : `<div class="tvp-band"><span>${esc(c.foot)}</span><span>${esc(S.school.name || '')}</span></div>`}</div></div>`;
   }
-  function renderFrame(f, P, o, preview) {
+  function renderFrame(f, P, o, preview, view) {
+    view = view || { page: 0, all: false };
     const base = location.href.split('#')[0].replace(/[^/]*$/, ''), d = f.contentDocument, port = o.orient === 'port';
-    d.open(); d.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><base href="${base}"><title>${esc(cfg().title)}</title><style>${FONT}@page{size:A4 ${port ? 'portrait' : 'landscape'};margin:0}html,body{margin:0;background:${preview ? '#E9EEF5' : '#fff'}}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;box-sizing:border-box}${PCSS}${preview ? '.pg{margin:0 auto;box-shadow:0 6px 24px #0002}' : ''}</style></head><body>${P.map(p => pageHtml(p, o)).join('') || '<p style="padding:40px;font-family:sans-serif">لا يوجد ما يُطبع</p>'}</body></html>`); d.close();
+    d.open(); d.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><base href="${base}"><title>${esc(cfg().title)}</title><style>${FONT}@page{size:A4 ${port ? 'portrait' : 'landscape'};margin:0}html,body{margin:0;background:${preview ? '#E9EEF5' : '#fff'}}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;box-sizing:border-box}${PCSS}${preview ? '.pg{margin:0 auto;box-shadow:0 6px 24px #0002}' + PBPREV : ''}</style></head><body>${P.map(p => pageHtml(p, o)).join('') || '<p style="padding:40px;font-family:sans-serif">لا يوجد ما يُطبع</p>'}</body></html>`); d.close();
     const imgs = [...d.images].map(i => i.complete ? 0 : new Promise(r => { i.onload = i.onerror = r; }));
-    return Promise.race([Promise.all([d.fonts ? d.fonts.ready : 0, ...imgs]), new Promise(r => setTimeout(r, 2500))]).then(() => { fit(d); if (preview) { const pg = d.querySelector('.pg'); if (pg) { const W = f.parentElement.clientWidth || 600, s = Math.min(1, (W - 8) / pg.offsetWidth); d.body.style.zoom = s; f.style.height = Math.ceil(pg.offsetHeight * s + 8) + 'px'; } } });
+    return Promise.race([Promise.all([d.fonts ? d.fonts.ready : 0, ...imgs]), new Promise(r => setTimeout(r, 2500))]).then(() => { paginate(d, o); const im2 = [...d.images].filter(i => !i.complete).map(i => new Promise(r => { i.onload = i.onerror = r; })); return Promise.race([Promise.all(im2), new Promise(r => setTimeout(r, 2000))]); }).then(() => { fit(d); if (preview) { pbDecor(d, o, view); const pg = [...d.querySelectorAll('.pg')].find(x => !x.hidden); if (pg) { const W = f.parentElement.clientWidth || 600, s = Math.min(1, (W - 8) / pg.offsetWidth), tot = d.documentElement.scrollHeight; d.body.style.zoom = s; f.style.height = Math.ceil(view.all ? Math.min(window.innerHeight * 0.72, tot * s + 8) : pg.offsetHeight * s + 8) + 'px';
+          if (view.all && view.onPage) { const P2 = [...d.querySelectorAll('.pg')]; f.contentWindow.onscroll = () => { const y = f.contentWindow.scrollY + 40; let i = 0; P2.forEach((x, k) => { if (x.offsetTop * s <= y) i = k; }); view.onPage(i); }; } } } return d.querySelectorAll('.pg').length; });
   }
   // ملاءمة المحتوى لمساحته: تصغير ما يفيض، ومدّ الجدول الوحيد رأسياً ليملأ المساحة
   function fit(d) { d.querySelectorAll('.pg.grid .tvp-b').forEach(b => { const t = b.firstElementChild; if (!t) return; t.style.transform = ''; t.style.width = ''; t.style.zoom = ''; const W = b.clientWidth, H = b.clientHeight, w = t.scrollWidth, h = t.scrollHeight; if (!w || !h) return; let s = Math.min(1, W / w, H / h);
@@ -465,6 +486,94 @@
     if (s < 1) { const ok = x => { t.style.width = (W / x) + 'px'; t.style.transformOrigin = 'top right'; t.style.transform = `scale(${x.toFixed(4)})`; return t.scrollHeight * x <= H + 1 && t.scrollWidth <= W / x + 1; };
       let lo = Math.max(0.2, s * 0.9), hi = 1; if (!ok(lo)) lo = 0.2; for (let k = 0; k < 9; k++) { const mid = (lo + hi) / 2; if (ok(mid)) lo = mid; else hi = mid; } ok(lo * 0.99); t.dataset.sc = (lo * 0.99).toFixed(4); return; }
     const tb = t.children.length === 1 && t.firstElementChild.tagName === 'TABLE' ? t.firstElementChild : null; if (tb && !tb.classList.contains('tvg-a')) tb.style.height = Math.floor(H * 0.95) + 'px'; }); }
+  // ---------- فواصل الصفحات للتقارير المتصلة (الكشاف العام، إسنادات الفصول، الحصص الجارية) ----------
+  // تُقسَّم الصفحة المتصلة إلى صفحات A4 حقيقية بوحدات مترابطة: المعلم بكل مواده سطر واحد لا يُفصل، بطاقة الفصل كاملة،
+  // عنوان المرحلة يلتصق بما بعده، وصف المجموع يلتصق بآخر مجموعة. التحكم: o.pb (الإعدادات) و o.pbm {brk:[مفاتيح تبدأ صفحة جديدة], lnk:[مفاتيح تُربط بما بعدها]}
+  const PBDEF = { mode: 'smart', head: 'mini', th: true, sig: 'last', num: true, z: 100, all: true, tools: true };
+  const pbPref = () => { try { return Object.assign({}, PBDEF, JSON.parse(A.LS.get('ttv_pb') || '{}')); } catch (_) { return Object.assign({}, PBDEF); } };
+  const pbMan = () => { try { return JSON.parse(A.LS.get('ttv_pbm') || '{}'); } catch (_) { return {}; } };
+  const pbKey = o => o.w + '|' + (o.w === 'index' || o.w === 'assign' ? o.who : '') + '|' + o.orient;
+  const pbGet = o => { const m = pbMan()[pbKey(o)] || {}; return { brk: (m.brk || []).slice(), lnk: (m.lnk || []).slice() }; };
+  const pbSet = (o, v) => { const all = pbMan(); if (v.brk.length || v.lnk.length) all[pbKey(o)] = v; else delete all[pbKey(o)]; A.LS.set('ttv_pbm', JSON.stringify(all)); };
+  let PB_CB = null;
+  const hmHtml = () => { const c = cfg(), sec = A.section(); return `<header class="tvp-hm"><img src="assets/mark.svg" alt=""><b>${esc(c.title)}</b><span>${esc(S.school.name || '')} · ${esc(sec.name)}</span><small>${c.date ? esc(A.arDate ? A.arDate(today()) : today()) : ''}</small></header>`; };
+  function paginate(d, o) {
+    const pb = Object.assign({}, PBDEF, o.pb || {}), man = o.pbm || { brk: [], lnk: [] }, BRK = new Set(man.brk), LNK = new Set(man.lnk);
+    [...d.querySelectorAll('.pg.flow')].forEach(src => {
+      const fw = src.querySelector('.fitw'), body0 = src.querySelector('.tvp-b'); if (!fw || !body0) return;
+      const af = body0.nextElementSibling; if (af && !af.matches('.tvp-f')) fw.appendChild(af); // وسيلة الإيضاح تُعامل كوحدة أخيرة
+      // تثبيت عرض الأعمدة كما في الجدول الكامل ليتطابق الجدول في كل الصفحات
+      fw.querySelectorAll('table').forEach(t => { const r = t.tHead && t.tHead.rows[0], W = t.getBoundingClientRect().width; if (!r || !W) return; const cg = d.createElement('colgroup'); [...r.cells].forEach(c => { const k = d.createElement('col'); if (c.colSpan > 1) k.span = c.colSpan; k.style.width = (c.getBoundingClientRect().width / W * 100).toFixed(3) + '%'; cg.appendChild(k); }); t.insertBefore(cg, t.firstChild); t.style.tableLayout = 'fixed'; });
+      // الوحدات
+      const U = []; let n = 0;
+      const walk = (el, path) => [...el.children].forEach(ch => {
+        if (ch.tagName === 'TABLE' && ch.tBodies.length && ch.tBodies[0].rows.length) { let g = null; [...ch.tBodies[0].rows].forEach(r => { if (!g || !r.classList.contains('cont')) { g = { t: 'tr', path, tb: ch, rows: [], key: r.dataset.u || ('r' + n++) }; U.push(g); } g.rows.push(r); });
+          if (ch.tFoot) { U[U.length - 1].kwn = 1; U.push({ t: 'tf', path, tb: ch, el: ch.tFoot, key: 'f' + n++ }); } }
+        else if (ch.matches('.tv-acards,.tv-ncs,.tv-ng')) walk(ch, path.concat(ch));
+        else U.push({ t: 'el', path, el: ch, key: ch.dataset.u || ch.dataset.go || ('e' + n++), kwn: ch.matches('h1,h2,h3,h4,h5,.tv-gh') ? 1 : 0 });
+      });
+      walk(fw, []);
+      U.forEach(u => { if (LNK.has(u.key)) u.kwn = 1; u.brk = BRK.has(u.key); (u.t === 'tr' ? u.rows[0] : u.el).dataset.pbk = u.key; if (LNK.has(u.key)) (u.t === 'tr' ? u.rows[0] : u.el).dataset.pbl = 1; });
+      // سلاسل الوحدات المرتبطة (لا تُفصل إلا إن كانت أكبر من صفحة)
+      const CH = []; U.forEach((u, i) => { if (!CH.length || !U[i - 1].kwn || u.brk) CH.push([u]); else CH[CH.length - 1].push(u); });
+      // قالب الصفحة
+      const shell = src.cloneNode(true); shell.querySelector('.fitw').innerHTML = ''; shell.classList.remove('flow'); shell.classList.add('paged');
+      const FT = shell.querySelector('.tvp-f'), FULL = FT ? FT.innerHTML : '';
+      const foot = (p, full) => { const f = p.querySelector('.tvp-f'); if (!f) return; f.innerHTML = full ? FULL : ''; f.classList.toggle('nosig', !full); if (pb.num) f.insertAdjacentHTML('beforeend', '<span class="pb-num"></span>'); };
+      const mk = i => { const p = shell.cloneNode(true); if (i > 0) { const h = p.querySelector('.tvp-h,.tvp-hm'); if (h && pb.head === 'none') h.remove(); else if (h && pb.head === 'mini' && h.classList.contains('tvp-h')) h.outerHTML = hmHtml();
+          const w = p.querySelector('.tvp-who'); if (w) w.insertAdjacentHTML('beforeend', '<em class="pb-cont">تابع</em>'); } foot(p, pb.sig === 'all'); return p; };
+      const pages = []; let P = null;
+      const newPg = () => { P = mk(pages.length); P._log = []; src.parentNode.insertBefore(P, src); pages.push(P); };
+      const over = p => { const b = p.querySelector('.tvp-b'); return b.scrollHeight > b.clientHeight + 1; };
+      const NC = new Map(); // عدد نسخ كل جدول (لرأس الجدول عند عدم تكراره)
+      const target = path => { let par = P.querySelector('.fitw'); path.forEach(c => { const l = par.lastElementChild; if (l && l._src === c) par = l; else { const k = c.cloneNode(false); k._src = c; par.appendChild(k); par = k; } }); return par; };
+      const tbodyOf = (par, tb) => { const l = par.lastElementChild; if (l && l._src === tb) return l.tBodies[0]; const k = tb.cloneNode(false); k._src = tb; [...tb.children].forEach(ch => { if (ch.tagName === 'COLGROUP' || (ch.tagName === 'THEAD' && (pb.th || !NC.get(tb)))) k.appendChild(ch.cloneNode(true)); }); k.appendChild(d.createElement('tbody')); par.appendChild(k); NC.set(tb, (NC.get(tb) || 0) + 1); return k.tBodies[0]; };
+      const prune = (e, fwp) => { while (e && e !== fwp) { const empty = e.tagName === 'TABLE' ? !(e.tBodies[0] && e.tBodies[0].rows.length) && !e.tFoot : !e.children.length; if (!empty) break; const up = e.parentElement; if (e.tagName === 'TABLE') NC.set(e._src, NC.get(e._src) - 1); e.remove(); e = up; } };
+      const place = u => { const par = target(u.path), fwp = P.querySelector('.fitw'); let nodes, base = par;
+        if (u.t === 'tr') { const tbd = tbodyOf(par, u.tb); u.rows.forEach(r => tbd.appendChild(r)); nodes = u.rows; base = tbd.parentNode; }
+        else if (u.t === 'tf') { const tbd = tbodyOf(par, u.tb); tbd.parentNode.appendChild(u.el); nodes = [u.el]; base = tbd.parentNode; }
+        else { par.appendChild(u.el); nodes = [u.el]; }
+        const page = P, f = () => { nodes.forEach(x => x.remove()); prune(base, fwp); const i = page._log.findIndex(x => x.f === f); if (i >= 0) page._log.splice(i, 1); };
+        P._log.push({ u, f }); return f; };
+      // تقسيم مجموعة أسطر بعد k سطر: الخلايا الممتدة (الاسم، الرقم، النصاب) تتكرر في الجزء الثاني بعلامة «تابع»
+      const spanCells = u => [...u.rows[0].cells].map(c => ({ c, s: c._rs || (c._rs = c.rowSpan) }));
+      const setK = (u, k) => spanCells(u).forEach(({ c, s }) => { if (s > 1) c.rowSpan = Math.min(s, k); });
+      const fitK = u => { let best = 0; for (let k = 1; k < u.rows.length; k++) { setK(u, k); const f = place({ ...u, rows: u.rows.slice(0, k) }); const ok = !over(P); f(); if (ok) best = k; else break; } setK(u, u.rows.length); return best; };
+      const split = (u, k) => { const orig = spanCells(u), B = u.rows.slice(k), own = [...B[0].cells], cells = [];
+        orig.forEach(({ c, s }) => { if (s > 1) { if (s - k > 0) { const x = c.cloneNode(true); x.rowSpan = s - k; x._rs = s - k; x.classList.add('pb-rep'); cells.push(x); } } else if (own.length) cells.push(own.shift()); });
+        own.forEach(x => cells.push(x)); cells.forEach(x => B[0].appendChild(x)); B[0].classList.add('pb-st'); setK(u, k); orig.forEach(o2 => { if (o2.s > 1) o2.c._rs = Math.min(o2.s, k); });
+        return [{ ...u, rows: u.rows.slice(0, k) }, { ...u, rows: B, key: u.key + '+', brk: false }]; };
+      // ما يلتصق بالعنصر التالي (عنوان، صف مرتبط) يرحل معه ولا يبقى وحيداً أسفل الصفحة
+      const carry = (L, min = 1) => { const cr = []; while (L._log.length > min && L._log[L._log.length - 1].u.kwn) { const x = L._log[L._log.length - 1]; x.f(); cr.unshift(x.u); } return cr; };
+      const fill = u => { for (let g = 0; g < 400; g++) { const f = place(u); if (!over(P)) return; f(); const cnt = P._log.length - (P._c || 0);
+          if (u.t === 'tr' && u.rows.length > 1) { const k = fitK(u); if (k > 0) { const [a, b] = split(u, k); place(a); newPg(); u = b; continue; } }
+          if (cnt > 0) { const cr = carry(P, 0); if (P._log.length) newPg(); cr.forEach(place); P._c = cr.length; continue; }
+          place(u); P.classList.add('pb-big', 'grid'); return; } }; // أكبر من صفحة كاملة: يُصغَّر ليتسع
+      newPg();
+      for (const ch of CH) {
+        if (ch[0].brk && P._log.length) newPg();
+        let und = ch.map(place); if (!over(P)) continue; und.reverse().forEach(f => f());
+        if (pb.mode === 'rows' && P._log.length) { ch.forEach(fill); continue; }
+        if (P._log.length) { newPg(); und = ch.map(place); if (!over(P)) continue; und.reverse().forEach(f => f()); }
+        ch.forEach(fill);
+      }
+      // الصفحة الأخيرة تحمل التوقيعات والختم: إن لم تتسع يُرحَّل آخر محتواها لصفحة جديدة
+      if (pb.sig !== 'all') for (let r = 0; r < 4; r++) { const L = P; foot(L, true); if (!over(L) || L._log.length < 2 || L.classList.contains('pb-big')) break; const mv = []; while (over(L) && L._log.length > 1) { const x = L._log[L._log.length - 1]; x.f(); mv.unshift(x.u); } mv.unshift(...carry(L)); foot(L, false); newPg(); mv.forEach(fill); }
+      src.remove();
+      pages.forEach((p, i) => { const b = p.querySelector('.tvp-b'); p._fill = Math.min(100, Math.round(b.scrollHeight / Math.max(1, b.clientHeight) * 100)); const nm = p.querySelector('.pb-num'); if (nm) nm.textContent = `صفحة ${AR(i + 1)} من ${AR(pages.length)}`; });
+    });
+  }
+  // أدوات المعاينة: علامة بين الصفحات بنسبة الامتلاء، وزرّا «ابدأ صفحة جديدة من هنا» و«اربطه بما بعده» لكل وحدة
+  function pbDecor(d, o, opts) {
+    const pgs = [...d.querySelectorAll('.pg')], paged = pgs.some(p => p.classList.contains('paged')); if (!paged) return;
+    const man = o.pbm || { brk: [], lnk: [] }, port = o.orient === 'port';
+    if (o.pb && o.pb.tools) pgs.forEach(p => { if (!p.classList.contains('paged')) return; const R = p.getBoundingClientRect();
+      p.querySelectorAll('[data-pbk]').forEach(el => { const k = el.dataset.pbk, y = el.getBoundingClientRect().top - R.top, b = man.brk.includes(k), l = man.lnk.includes(k);
+        p.insertAdjacentHTML('beforeend', `<div class="pb-tool${b ? ' on' : ''}" style="top:${Math.max(0, y - 1).toFixed(1)}px;--pw:${port ? 206 : 293}mm"><button type="button" data-pbb="${esc(k)}" class="${b ? 'on' : ''}" title="${b ? 'إلغاء الترحيل: يعود للصفحة السابقة إن اتسع' : 'رحّله: ابدأ صفحة جديدة من هنا'}">⤓</button><button type="button" data-pbl="${esc(k)}" class="${l ? 'on' : ''}" title="${l ? 'فكّ الربط بما بعده' : 'اربطه بما بعده ليبقيا معاً في صفحة واحدة'}">🔗</button></div>`); }); });
+    if (opts.all) pgs.forEach((p, i) => { if (i < pgs.length - 1) p.insertAdjacentHTML('afterend', `<div class="pb-mark" style="width:${port ? 210 : 297}mm"><span>✂ فاصل صفحة — تبدأ الصفحة ${AR(i + 2)}</span>${p._fill != null ? `<small>امتلاء الصفحة ${AR(i + 1)}: ${AR(p._fill)}٪</small>` : ''}</div>`); });
+    else pgs.forEach((p, i) => { p.hidden = i !== opts.page; });
+    d.body.onclick = e => { const b = e.target.closest('[data-pbb],[data-pbl]'); if (b && PB_CB) PB_CB(b.dataset.pbb != null ? 'b' : 'l', b.dataset.pbb != null ? b.dataset.pbb : b.dataset.pbl); };
+  }
   // تنزيل PDF مباشر: كل صفحة صورة عالية الدقة، والصفحات المتصلة الطويلة تُقسَّم على A4
   async function toPdf(d, o, name) {
     if (!window.html2canvas || !window.jspdf) throw new Error('مكتبات PDF غير محمّلة');
@@ -501,6 +610,9 @@
   .tv-leg{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:8px;font-size:.82em;color:#334155}.tv-leg span{display:inline-flex;align-items:center;gap:5px}.tv-leg i{width:14px;height:14px;border-radius:4px;background:var(--sc);border:1px solid #0001}
   .tvg .bk{width:30px;min-width:30px;padding:2px 1px;background:repeating-linear-gradient(135deg,#FFF6E5 0 6px,#FFEDCC 6px 12px);color:#8A5300;font-weight:800}.tvg .bk span{writing-mode:vertical-rl;transform:rotate(180deg);display:inline-block;white-space:nowrap;font-size:.82em;line-height:1.1}.tvg thead th.bk{background:#E8962E;color:#fff}.tvg thead th.bk small{writing-mode:vertical-rl;transform:rotate(180deg);display:inline-block;direction:ltr;font-size:.7em}.tvg .bk.none{background:#FAFAFA}.tvg-d .bk.sm span{font-size:.75em}
   .nocol .tvg td.c,.nocol .tvg-x td.c{background:#fff}.nocol .tvg td.sb{border-inline-start-color:#CBD5E1}.nocol .tv-leg{display:none}`;
+  const PBPREV = `.pg+.pg{margin-top:18px}.pg[hidden]{display:none}.pb-mark{display:flex;align-items:center;gap:12px;margin:12px auto 4px;font:700 13px 'GE SS Two',sans-serif;color:#005499}.pb-mark::before,.pb-mark::after{content:"";flex:1;border-top:2px dashed #3AB1DB}.pb-mark small{font-weight:500;color:#475569;background:#fff;border-radius:99px;padding:1px 10px}.pb-mark+.pg{margin-top:4px}
+  .pb-tool{position:absolute;left:1.5mm;z-index:9;display:flex;gap:3px}.pb-tool button{width:28px;height:28px;padding:0;border-radius:8px;border:1px solid #94A3B8;background:#ffffffe6;font-size:15px;line-height:1;cursor:pointer;opacity:.55;color:#082B5A}.pb-tool button:hover,.pb-tool button:focus-visible{opacity:1;outline:2px solid #3AB1DB}.pb-tool button.on{opacity:1;background:#005499;color:#fff;border-color:#005499}
+  .pb-tool::after{content:"";position:absolute;left:0;top:-1px;width:var(--pw);border-top:2px dashed #3AB1DB;opacity:0;pointer-events:none}.pb-tool:hover::after,.pb-tool.on::after{opacity:1}.pb-tool.on::after{border-color:#005499}.pb-cap .pb-tool{display:none}`;
   const PCSS = GCSS + `
   body{font-family:'GE SS Two','Tajawal',sans-serif;color:#0B2545}.pg{position:relative;overflow:hidden;page-break-after:always;background:#fff}.pg:last-child{page-break-after:auto}
   .pg.land{width:297mm;height:210mm}.pg.port{width:210mm;height:297mm}.pg.flow{height:auto;min-height:0;overflow:visible}
@@ -508,6 +620,8 @@
   .tvp-h{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;padding-bottom:8px;border-bottom:3px solid var(--a)}.tvp-h img{height:58px}.tvp-t h1{margin:0;font-size:1.9em;color:var(--a);line-height:1.15}.tvp-t p{margin:3px 0 0;color:#475569;font-size:.95em}.tvp-m{font-size:.85em;color:#475569;text-align:left}
   .tvp-who{display:flex;align-items:baseline;gap:12px;margin:9px 0 7px}.tvp-who b{background:var(--a);color:#fff;border-radius:10px;padding:5px 16px;font-size:1.3em}.tvp-who span{color:#475569}
   .tvp-b{flex:1;min-height:0;overflow:hidden;display:flex;align-items:flex-start;justify-content:center}.tvp-b>table{margin:0 auto}.flow .tvp-b{display:block;overflow:visible;flex:none}.tvp-b.half{flex:1}
+  .pg.paged .tvp-b{display:block;flex:1;min-height:0;overflow:hidden}.pg.paged .tvp-band{margin-top:0}.tvp-f.nosig{min-height:0;padding:3px 0 5px;justify-content:flex-end}.pb-num{font-size:.78em;color:#64748B;white-space:nowrap;align-self:flex-end}.pb-cont{font-style:normal;font-size:.78em;color:var(--a);border:1px dashed var(--b);border-radius:8px;padding:1px 8px}.s-eco .pb-cont{color:#000;border-color:#000}
+  .tvg tr.pb-st>td{border-top-style:solid}.tvg td.pb-rep b::after{content:" (تابع)";font-weight:500;font-size:.78em;color:#64748B}.pg.paged .tv-acards,.pg.paged .tv-ncs{align-content:start}
   .tvp-f{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;padding:8px 0 6px;min-height:22mm}.tvp-sig{display:flex;gap:26px;flex-wrap:wrap}.tvp-sig div{display:flex;flex-direction:column;min-width:44mm;font-size:.9em}.tvp-sig span{font-weight:800;color:var(--a)}.tvp-sig b{font-weight:600;min-height:1.2em}.tvp-sig i{font-style:normal;color:#64748B;margin-top:4px}
   .tvp-stamp{color:var(--b);width:25mm;height:25mm;transform:rotate(-12deg);opacity:.9}.tvp-stamp svg{width:100%;height:100%}
   .tvp-band{margin:0 -10mm;background:var(--a);color:#fff;display:flex;justify-content:space-between;padding:6px 12mm;font-size:.85em;margin-top:auto}.flow .tvp-band{margin-top:14px}
@@ -515,9 +629,9 @@
   .z-zebra .tvg-a tbody tr:nth-child(even)>td,.z-zebra .tvg-i tbody tr.alt>td{background:var(--p)}.z-zebra .tvg-a tbody tr:nth-child(even)>td.sb{background:var(--p)}
   .z-subj .tvg-a tbody tr>td,.z-subj .tvg-i tbody tr>td{background:var(--sc,#fff)}.z-subj .tvg td.sb{border-inline-start-color:#0B254555}
   .nocol.z-subj .tvg-a tbody tr>td{background:#fff}.s-eco.z-zebra .tvg-a tbody tr:nth-child(even)>td,.s-eco.z-zebra .tvg-i tbody tr.alt>td{background:#EFEFEF}
-  .tvp-hm{display:flex;align-items:center;gap:10px;padding:0 0 6px;border-bottom:2.5px solid var(--a)}.tvp-hm img{height:26px}.tvp-hm b{color:var(--a);font-size:1.25em}.tvp-hm span{color:#475569}.tvp-hm small{margin-inline-start:auto;color:#64748B}
+  .tvp-hm{display:flex;align-items:center;gap:10px;padding:0 0 6px;border-bottom:2.5px solid var(--a)}.tvp-hm img{height:26px;width:28px}.tvp-hm b{color:var(--a);font-size:1.25em}.tvp-hm span{color:#475569}.tvp-hm small{margin-inline-start:auto;color:#64748B}
   .h-none.tvp{padding-top:7mm}.h-none .tvp-f{padding-bottom:7mm}
-  .tl-hm{display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:auto auto;column-gap:7px;align-items:center;padding:1px 0 4px;margin-bottom:4px;border-bottom:2px solid var(--a)}.tl-hm img{grid-row:1/3;height:calc(26px*var(--ts))}.tl-hm b{color:var(--a);font-size:1.25em;line-height:1.15}.tl-hm span{grid-column:2;color:#475569;font-size:.8em}.tl-hm small{grid-row:1/3;grid-column:3;text-align:left;color:#64748B;font-size:.72em;line-height:1.3}
+  .tl-hm{display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:auto auto;column-gap:7px;align-items:center;padding:1px 0 4px;margin-bottom:4px;border-bottom:2px solid var(--a)}.tl-hm img{grid-row:1/3;height:calc(26px*var(--ts));width:calc(28px*var(--ts))}.tl-hm b{color:var(--a);font-size:1.25em;line-height:1.15}.tl-hm span{grid-column:2;color:#475569;font-size:.8em}.tl-hm small{grid-row:1/3;grid-column:3;text-align:left;color:#64748B;font-size:.72em;line-height:1.3}
   .s-formal .tl-hm{background:var(--a);margin:-3.2mm -3.2mm 4px;padding:2mm 3.2mm;border-radius:10px 10px 0 0;border:0;box-shadow:inset 0 -3px 0 var(--b)}.s-formal .tl-hm b,.s-formal .tl-hm span,.s-formal .tl-hm small{color:#fff}.s-formal .tl-hm img{filter:brightness(0) invert(1)}
   .tl-hn{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;border-inline-start:5px solid var(--a);padding:1px 8px;margin-bottom:5px}.tl-hn b{color:var(--a);font-size:1.2em}.tl-hn span{color:#475569;font-size:.8em}
   .pg.tiles .tlp{padding:6mm;height:100%}.tl-grid{display:grid;gap:5mm;height:100%}.tl-grid.cut{gap:8mm}

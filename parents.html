@@ -91,16 +91,17 @@ main{max-width:1040px}.top-in{max-width:1040px}
 @media print{.ptw{box-shadow:none;border:0;overflow:visible}.ptbl{min-width:0}.hero{background:#fff!important;color:#082B5A}.hero h2{color:#082B5A}}
 html.lang-en body,html.lang-en input,html.lang-en select,html.lang-en textarea,html.lang-en button{font-family:'Myriad Pro','GE SS Two',Tahoma,sans-serif}
 </style>
-<script src="i18n_en.js?v=1794913906"></script>
-<script src="i18n.js?v=1794913906"></script>
-<script src="digits.js?v=1794913906"></script>
+<script src="i18n_en.js?v=1794938140"></script>
+<script src="i18n.js?v=1794938140"></script>
+<script src="digits.js?v=1794938140"></script>
 </head>
 <body>
 <header class="top"><div class="top-in"><img src="assets/logo_white.svg" alt="مدارس دينا العالمية"><h1>خطط أبنائي<small id="schName">مدارس دينا العالمية</small></h1></div></header>
 <main id="app"><div class="spin" role="status" aria-label="جارٍ التحميل"></div></main>
 <footer>مدارس دينا العالمية · Dinaaedu · 920035881</footer>
-<script src="live.js?v=1794913906"></script>
-<script src="config.js?v=1794913906"></script>
+<script src="live.js?v=1794938140"></script>
+<script src="pitems.js?v=1794938140"></script>
+<script src="config.js?v=1794938140"></script>
 <script>
 (function () {
   const C = window.APP_CONFIG, $ = s => document.querySelector(s), app = $('#app');
@@ -110,8 +111,8 @@ html.lang-en body,html.lang-en input,html.lang-en select,html.lang-en textarea,h
   const AR = s => String(s).replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[d]).replace(/(?<![٠-٩\/\u200F])[٠-٩]{1,4}\/[٠-٩]{1,2}(?:\/[٠-٩]{2,4})?(?![٠-٩\/])/g, RTLD);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const blank = s => !s || /^[\s\-–—_.ـ]*$/.test(s);
-  const LS = { get(k) { try { return JSON.parse(localStorage.getItem('dina_parent_' + k)); } catch (_) { return null; } }, set(k, v) { try { localStorage.setItem('dina_parent_' + k, JSON.stringify(v)); } catch (_) { } } };
-  const q = new URLSearchParams(location.search);
+  const q = new URLSearchParams(location.search), PV = q.get('pv') === '1'; // معاينة من المنصة: لا حفظ على الجهاز ولا عدّاد مشاهدات
+  const MEM = {}; const LS = { get(k) { if (PV) return MEM[k] ?? null; try { return JSON.parse(localStorage.getItem('dina_parent_' + k)); } catch (_) { return null; } }, set(k, v) { if (PV) { MEM[k] = v; return; } try { localStorage.setItem('dina_parent_' + k, JSON.stringify(v)); } catch (_) { } } };
   const token = q.get('t') || LS.get('token'); if (q.get('t')) LS.set('token', q.get('t'));
   const st = { posts: [], gposts: null, showAll: false, info: null, kids: LS.get('kids') || [], cur: null, view: LS.get('view') || 'day', week: null, day: null, data: null, adding: false, sec: null };
   if (q.get('c') && !st.kids.includes(q.get('c'))) { st.kids.push(q.get('c')); LS.set('kids', st.kids); }
@@ -138,12 +139,14 @@ html.lang-en body,html.lang-en input,html.lang-en select,html.lang-en textarea,h
   }
   async function load(week) {
     app.innerHTML = kidsBar() + '<div class="spin" role="status" aria-label="جارٍ التحميل"></div>'; bindKids();
-    try { const [d, ps] = await Promise.all([rpc('parent_plan', { p_token: token, p_class: st.cur, p_week: week || null }), rpc('parent_posts_for', { p_token: token, p_class: st.cur }).catch(() => [])]); st.data = d; st.posts = ps || []; rpc('parent_live', { p_token: token, p_class: st.cur }).then(r => { st.live = r; if (st.cur && !st.adding) render(); }).catch(() => { st.live = null; }); rpc('parent_resources', { p_token: token, p_class: st.cur }).then(r => { st.res = r || []; if (st.cur && !st.adding) render(); }).catch(() => { st.res = []; }); rpc('parent_quizzes', { p_token: token, p_class: st.cur, p_week: (d && d.week && d.week.id) || st.week || null }).then(r => { st.quz = r || []; if (st.cur && !st.adding) render(); }).catch(() => { st.quz = []; }); }
+    try { const [d, ps] = await Promise.all([rpc('parent_plan', { p_token: token, p_class: st.cur, p_week: week || null }), rpc('parent_posts_for', { p_token: token, p_class: st.cur }).catch(() => [])]); st.data = d; st.posts = ps || []; rpc('parent_live', { p_token: token, p_class: st.cur }).then(r => { st.live = r; if (st.cur && !st.adding) render(); }).catch(() => { st.live = null; }); rpc('parent_resources', { p_token: token, p_class: st.cur }).then(r => { st.res = r || []; if (st.cur && !st.adding) render(); }).catch(() => { st.res = []; }); rpc('parent_quizzes', { p_token: token, p_class: st.cur, p_week: (d && d.week && d.week.id) || st.week || null }).then(r => { st.quz = r || []; if (st.cur && !st.adding) render(); }).catch(() => { st.quz = []; }); loadItems((d && d.week && d.week.id) || null); }
     catch (e) { app.innerHTML = kidsBar() + `<div class="card">${emptyBox('تعذّر تحميل الخطة', esc(e.message))}</div>`; bindKids(); return; }
     const w = st.data.week; st.week = w && w.id;
     if (w) { const t = Math.round((new Date(st.data.today + 'T00:00:00') - new Date(w.start + 'T00:00:00')) / 864e5); if (st.day == null || week) st.day = t >= 0 && t < st.data.class.days ? t : 0; }
     LS.set('cur', st.cur); render();
   }
+  // بنود أولياء الأمور (مراجعات، أسئلة، ملفات…) — pitems.js
+  function loadItems(wk) { if (!window.DinaItems) return; rpc('parent_items_for', { p_token: token, p_class: st.cur, p_week: wk }).then(r => { st.items = r; if (st.cur && !st.adding) render(); }).catch(() => { st.items = null; }); }
   const KINDS = { announcement: ['إعلان', '#082B5A', '#E4EBF5'], reminder: ['تذكير', '#8A5A12', '#FFF4DC'], tip: ['نصيحة', '#23704A', '#E5F4EA'], celebration: ['احتفال', '#6B4FA3', '#EEEBF6'], event: ['مناسبة', '#005499', '#E1F3FA'] };
   const ddate = s => { const x = new Date(s + 'T00:00:00'); return dmy(x); };
   function postsHtml(list) {
@@ -231,8 +234,11 @@ html.lang-en body,html.lang-en input,html.lang-en select,html.lang-en textarea,h
     const QK = { quiz: 'اختبار قصير', worksheet: 'ورقة عمل', homework: 'واجب إلكتروني', remedial: 'ورقة دعم' }, DN = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
     const quzHtml = (st.quz || []).length ? `<section class="card no-print" aria-label="الواجبات وأوراق العمل الإلكترونية"><h3 style="margin:0 0 8px">الواجبات وأوراق العمل الإلكترونية <span class="small muted">(${AR(st.quz.length)})</span></h3>${st.quz.map(z => `<a class="resl" href="student.html?q=${encodeURIComponent(z.code)}" target="_blank" rel="noopener"><span class="rk">${esc(QK[z.kind] || 'واجب')}</span><span><b>${esc(z.title)}</b><br><span class="small muted">${esc([z.subject, z.flex ? 'متاح طوال الفترة' : (z.day != null ? DN[z.day] : 'هذا الأسبوع')].filter(Boolean).join(' · '))}</span></span></a>`).join('')}</section>` : '';
     const liveHtml = st.live && window.DinaLive ? (st.live.list || []).map(x => window.DinaLive.html(x, { today: st.live.today, cls: st.cur, clsName: clsName(st.cur) })).join('') : '';
-    app.innerHTML = kidsBar() + postsHtml(st.posts) + `<div class="card hero" style="padding:16px 18px"><h2 style="margin:0">${esc(clsName(st.cur) || d.class.name)}</h2><span class="small">الخطة المعتمدة من المدرسة · تُحدَّث تلقائياً</span></div>` + liveHtml + body + quzHtml + resHtml;
+    const DI = window.DinaItems, icfg = DI && st.items ? DI.cfgOf(st.items.cfg) : null, itHtml = icfg ? DI.html(st.items, { cat: st.pcat, preview: PV }) : '';
+    if (itHtml && icfg.place === 'before') body = itHtml + body; else if (itHtml && icfg.place === 'top') body = itHtml + body;
+    app.innerHTML = kidsBar() + postsHtml(st.posts) + `<div class="card hero" style="padding:16px 18px"><h2 style="margin:0">${esc(clsName(st.cur) || d.class.name)}</h2><span class="small">الخطة المعتمدة من المدرسة · تُحدَّث تلقائياً</span></div>` + liveHtml + body + (itHtml && (icfg.place || 'after') === 'after' ? itHtml : '') + quzHtml + resHtml + (itHtml && icfg.place === 'end' ? itHtml : '');
     bindKids(); bindPosts(); if (liveHtml) window.DinaLive.bind(app);
+    if (itHtml) DI.bind(app, st.items, { onCat: k => { st.pcat = k; render(); }, onSeen: id => { if (!PV) rpc('pitem_seen', { p_item: id }).catch(() => { }); } });
     app.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { st.view = b.dataset.v; LS.set('view', st.view); render(); });
     app.querySelectorAll('[data-d]').forEach(b => b.onclick = () => { st.day = +b.dataset.d; render(); });
     app.querySelectorAll('[data-w]').forEach(b => b.onclick = () => { if (b.dataset.w) load(b.dataset.w); });

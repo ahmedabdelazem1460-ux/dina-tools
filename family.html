@@ -136,14 +136,16 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px 10px 30p
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media print{header.top,nav,.bnav,.noprint,footer{display:none!important}body{background:#fff}.card{box-shadow:none;border:0}}
 </style>
-<script src="digits.js?v=1794913906"></script>
+<script src="digits.js?v=1794938140"></script>
 </head>
 <body>
 <header class="top"><div class="hin"><img src="assets/logo_white.svg" alt="مدارس دينا العالمية"><div class="grow"><div class="t" id="ht">بوابة ولي الأمر</div><div class="s" id="hs">مدارس دينا العالمية</div></div><div id="hb" class="row"></div></div></header>
 <main id="m"><div class="spin" role="status" aria-label="جارٍ التحميل"></div></main>
 <nav class="bnav" id="bn" aria-label="الأقسام" hidden></nav>
 <footer>مدارس دينا العالمية · بياناتك ورسائلك خاصة ولا يطّلع عليها غير المختصين</footer>
-<script src="config.js?v=1794913906"></script>
+<script src="config.js?v=1794938140"></script>
+<script src="live.js?v=1794938140"></script>
+<script src="pitems.js?v=1794938140"></script>
 <script>
 (function () {
   'use strict';
@@ -167,6 +169,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px 10px 30p
     NOT_ALLOWED: 'لا يمكن مراسلة هذا الموظف', EMPTY: 'اكتب الرسالة أولاً', NOT_FOUND: 'غير متاح', HOURS: 'الاستئذان متاح في أوقات الدوام المحددة من المدرسة', ACTIVE: 'يوجد طلب استئذان نشط لهذا الابن اليوم', PERSON: 'اكتب اسم من سيستلم الطالب',
     NO_SITE: 'لم تحدد المدرسة موقعها بعد — سيُنادى ابنك من المدرسة', NO_GPS: 'تعذّر تحديد موقعك', ALREADY: 'هذا الابن مرتبط بحسابك بالفعل', STATE: 'لا يمكن تنفيذ ذلك الآن' };
   const I = {
+    items: '<path d="M4 4h12l4 4v12H4z"/><path d="M16 4v4h4"/><path d="M8 12h8M8 16h5"/>',
     home: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>', plan: '<rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 10h18"/>', tasks: '<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
     att: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', rep: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>', prac: '<path d="M12 3l9 5-9 5-9-5z"/><path d="M5 10v5c0 1.5 3 3.5 7 3.5s7-2 7-3.5v-5"/>',
     msg: '<path d="M21 12a8 8 0 0 1-11.5 7.2L4 21l1.8-5.2A8 8 0 1 1 21 12z"/>', pick: '<path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/>', out: '<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/>', key: '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3"/>', beh: '<path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z"/>' };
@@ -189,7 +192,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px 10px 30p
   }
   async function busy(btn, fn) { if (btn) btn.disabled = true; try { return await fn(); } catch (e) { toast(e.message, true); } finally { if (btn) btn.disabled = false; } }
 
-  let tok = LS.get('dina_fam_t'), H = null, kid = LS.get('dina_fam_kid'), D = null, view = LS.get('dina_fam_v') || 'home', week = null, chatWith = null, poll = null;
+  let FI = null, FIcat = 'all'; let tok = LS.get('dina_fam_t'), H = null, kid = LS.get('dina_fam_kid'), D = null, view = LS.get('dina_fam_v') || 'home', week = null, chatWith = null, poll = null;
 
   /* ---------------- الدخول والتفعيل ---------------- */
   function auth(mode, msg) {
@@ -230,7 +233,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px 10px 30p
 
   /* ---------------- الهيكل ---------------- */
   const SECTIONS = () => [['home', 'الرئيسية', 'home', 1], ['plan', 'خطة الأسبوع', 'plan', 1], ['tasks', 'الواجبات والنتائج', 'tasks', 1], ['att', 'الحضور والأعذار', 'att', H.cfg.att || H.cfg.excuse], ['pick', 'الاستئذان والنداء', 'pick', H.pickup],
-    ['rep', 'التقارير', 'rep', 1], ['prac', 'التدريب', 'prac', H.cfg.practice], ['msg', 'التواصل', 'msg', H.cfg.msg !== 'off']].filter(s => s[3]);
+    ['items', (FI && FI.cfg && FI.cfg.title) || 'مراجعات وأسئلة ومرفقات', 'items', !!(FI && (FI.items || []).length && window.DinaItems)], ['rep', 'التقارير', 'rep', 1], ['prac', 'التدريب', 'prac', H.cfg.practice], ['msg', 'التواصل', 'msg', H.cfg.msg !== 'off']].filter(s => s[3]);
   async function start() {
     m.innerHTML = '<div class="spin" role="status" aria-label="جارٍ التحميل"></div>';
     try { H = await rpc('fam_home', { p_token: tok }); } catch (e) { if (e.code !== 'AUTH') auth('login', e.message); return; }
@@ -248,6 +251,8 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px 10px 30p
     LS.set('dina_fam_kid', kid);
     m.innerHTML = shell('<div class="spin" role="status" aria-label="جارٍ التحميل"></div>'); bindShell();
     try { D = await rpc('fam_child', { p_token: tok, p_student: kid, p_week: week }); } catch (e) { if (e.code !== 'AUTH') document.getElementById('vw').innerHTML = `<div class="card empty">${esc(e.message)}</div>`; return; }
+    FI = null; if (window.DinaItems) { try { const r = await rpc('fam_items', { p_token: tok, p_student: kid, p_week: (D.week && D.week.id) || null }); if (r && !r.error) FI = r; } catch (_) { } }
+    if (view === 'items' && !(FI && (FI.items || []).length)) view = 'home';
     render();
   }
   function shell(inner) {
@@ -263,7 +268,8 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px 10px 30p
     const lk = document.getElementById('lnk'); if (lk) lk.onclick = linkDialog;
   }
   function go(v) { view = v; LS.set('dina_fam_v', v); clearInterval(poll); if (D) render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
-  function render() { m.innerHTML = shell(''); bindShell(); pkBanner(); const V = document.getElementById('vw'); ({ home, plan, tasks, att, rep, prac, msg, pick })[view](V); }
+  function render() { m.innerHTML = shell(''); bindShell(); pkBanner(); const V = document.getElementById('vw'); ({ home, plan, tasks, att, rep, prac, msg, pick, items })[view](V); }
+  function items(V) { const DI = window.DinaItems; V.innerHTML = `<div class="card" id="fiw">${DI.html(FI, { cat: FIcat })}</div>`; DI.bind(V, FI, { onCat: k => { FIcat = k; items(V); }, onSeen: id => rpc('pitem_seen', { p_item: id }).catch(() => { }) }); }
 
   /* ---------------- الرئيسية ---------------- */
   function stats() {

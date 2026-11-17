@@ -61,6 +61,7 @@
 - `parent_accounts` (bcrypt في pass، fails/locked_until) و`parent_sessions` (th = sha256 للرمز) — لا وصول مباشر لأي دور؛ فقط عبر الدوال.
 - للعموم بالرمز: `fam_activate`, `fam_login`, `fam_logout`, `fam_password`, `fam_home`, `fam_child`, `fam_report`, `fam_practice`, `fam_excuse`, `fam_contacts`, `fam_thread`, `fam_send`. الحماية `portal_blocked` + `portal_fails`.
 - `parent_msgs` (قراءة: `staff_id = me()` فقط)، `parent_excuses`, `parent_reports`, `parent_practice` (قراءة حسب `family_manager()`/المنشئ/المدرسة؛ الكتابة بالدوال): `pmsg_inbox/thread/send`, `excuse_list/file/decide`, `preport_send/decide/del`, `ppractice_save/decide/del`.
+- `parent_items` (بنود أولياء الأمور: cat، att jsonb، status، views…) — RLS بـ`has_module('pitems')`، الحارس `pitems_guard`، الإعدادات `pitems_cfg(school)` = `settings.pitems`؛ العرض `parent_items_for(token, class, week)` و`fam_items(token, student, week)` و`pitem_seen(id)`. نافذة الأسابيع لأولياء الأمور: `portal_win/portal_week_ok/portal_default_week` (`settings.portal.plan`) — sql/110.
 - `schools.settings.portal` بقيم افتراضية في `fam_cfg(school)`.
 
 ### 105 ربط الأبناء المرن و106 النداء الآلي

@@ -10,7 +10,7 @@
   const stg = c => { const s = String(c.stage || '') + ' ' + c.name; return /ابتدائ/.test(s) ? 'p' : /متوسط/.test(s) ? 'm' : /ثانوي/.test(s) ? 's' : ''; };
 
   V.studio = function (root) {
-    if (!S.me.is_owner) { root.innerHTML = `<div class="card">${A.emptyBox('استوديو الجداول لحساب المالك فقط')}</div>`; return; }
+    if (!S.me.is_owner) { root.innerHTML = ''; if (location.hash !== '#/home') location.hash = '#/home'; return; }
     let t = A.LS.get('studio_t') || 'plan'; if (!TABS.some(x => x[0] === t)) t = 'plan';
     const ap = (S.school.settings || {}).nisab_ok || {};
     root.innerHTML = `<div class="card st-head"><div class="head"><div class="grow"><h2>استوديو الجداول والأنصبة</h2><p class="sub" style="margin:2px 0 0">من النصاب إلى الجدول المعتمد في مكان واحد. لكل قسم جدوله الخاص، ويُكشف تعارض المعلم المشترك بين الأقسام تلقائياً. الأقسام تُضاف من «الإدارة ← المدرسة والأقسام».</p></div></div>

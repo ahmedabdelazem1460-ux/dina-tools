@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><script src="../digits.js?v=1794808263"></script>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><script src="../digits.js?v=1794903618"></script>
 </head><body>
 
 <title>نماذج الإشراف التربوي</title>
@@ -2013,7 +2013,7 @@ function vSettings(ap,main){
   var th=h('div',{class:'card'},h('h2',{text:'المظهر والبيانات'}),
     h('div',{class:'row-w'},fld('مظهر التطبيق',sel(themePref(),[['auto','تلقائي'],['light','فاتح'],['dark','داكن']],setTheme)),
       h('button',{class:'btn',type:'button',onclick:function(){saveFile('نسخة-احتياطية-الاشراف.json',JSON.stringify({kind:'dina-sup-backup',v:2,at:Date.now(),cfg:S.cfg,teachers:S.teachers,logos:S.logos,tpls:S.tpls,recs:S.recs}));}},ico('dl'),'نسخة احتياطية JSON')),
-    h('div',{class:'muted sm',text:S.remote?(window.__DINA_EMBED?'التخزين: قاعدة بيانات منصة دينا — مشتركة بين المالك ومن يملك صلاحية الإشراف التربوي.':'التخزين: سجل مركزي مشترك لكل من يفتح هذا الرابط.'):'التخزين: هذا المتصفح فقط.'}));
+    h('div',{class:'muted sm',text:S.remote?(window.__DINA_EMBED?'التخزين: قاعدة بيانات منصة دينا — مشتركة بين الإدارة ومن يملك صلاحية الإشراف التربوي.':'التخزين: سجل مركزي مشترك لكل من يفتح هذا الرابط.'):'التخزين: هذا المتصفح فقط.'}));
   th.appendChild(h('div',{class:'row-w'},h('label',{class:'btn'},ico('plus'),'استيراد نسخة احتياطية',h('input',{type:'file',accept:'.json',style:'display:none',onchange:function(e){importBackup(e.target.files[0]);e.target.value='';}})),
     h('span',{class:'muted sm',text:'الاستيراد يدمج: يضيف الجديد ويستبدل السجل أو القالب المطابق بالمعرّف، ولا يحذف شيئًا موجودًا.'})));
   st.appendChild(th);st.appendChild(trashCard());main.appendChild(st);

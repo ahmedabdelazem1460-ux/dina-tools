@@ -292,7 +292,7 @@
 
   V.visits = async function (root) {
     ensureCss(); navLabel();
-    if (!can()) { root.innerHTML = `<div class="card">${A.emptyBox('هذه الصفحة غير متاحة لحسابك', 'يمنحها المالك من «المسميات والصلاحيات» (الزيارات) ويفعّلها من «تخصيص صفحة المعلم»')}</div>`; return; }
+    if (!can()) { root.innerHTML = `<div class="card">${A.emptyBox('هذه الصفحة غير متاحة لحسابك')}</div>`; return; }
     if (!NV) resetNV();
     // رابط مباشر لفصل (رمز QR على باب الفصل): ?vc=<class_id>
     const vc = (location.search.match(/[?&]vc=([0-9a-f-]{36})/) || [])[1]; if (vc && !NV._vcUsed && classes().some(c => c.id === vc)) { NV._vcUsed = true; st.tab = 'new'; NV.cid = vc; NV.period = 0; }
@@ -387,7 +387,7 @@
     $('#vsR', O).oninput = e => { NV.role = e.target.value; }; $('#vsNt', O).oninput = e => { NV.note = e.target.value; };
     // ٤) النماذج
     let L = null, AL = [];
-    const drawT = () => { $('#vsTpl', O).innerHTML = AL.map(t => { const k = NV.tpls.indexOf(t.key); return `<div class="vs-t ${k >= 0 ? 'on' : ''}" role="checkbox" tabindex="0" aria-checked="${k >= 0}" data-tk="${esc(t.key)}"><span class="k" aria-hidden="true">${k >= 0 ? AR(k + 1) : ''}</span><b>${esc(t.name)}</b>${t.tag ? `<span class="vs-tag" style="justify-self:start">${esc(t.tag)}</span>` : ''}<span class="small muted">${esc(t.desc || '')}</span></div>`; }).join('') || '<p class="small muted">لا نماذج متاحة — يحددها المالك من الإعدادات</p>';
+    const drawT = () => { $('#vsTpl', O).innerHTML = AL.map(t => { const k = NV.tpls.indexOf(t.key); return `<div class="vs-t ${k >= 0 ? 'on' : ''}" role="checkbox" tabindex="0" aria-checked="${k >= 0}" data-tk="${esc(t.key)}"><span class="k" aria-hidden="true">${k >= 0 ? AR(k + 1) : ''}</span><b>${esc(t.name)}</b>${t.tag ? `<span class="vs-tag" style="justify-self:start">${esc(t.tag)}</span>` : ''}<span class="small muted">${esc(t.desc || '')}</span></div>`; }).join('') || '<p class="small muted">لا نماذج متاحة حالياً</p>';
       $$('#vsTpl [data-tk]', O).forEach(el => { const tg = () => { const k = el.dataset.tk, i = NV.tpls.indexOf(k); if (i >= 0) NV.tpls.splice(i, 1); else NV.tpls.push(k); if (NV.custom) { NV.custom = null; A.toast('تغيّر اختيار النماذج فأُلغي التخصيص السابق', 'warn'); } drawT(); sum(); }; el.onclick = tg; el.onkeydown = e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); tg(); } }; });
       $('#vsCusI', O).innerHTML = NV.custom ? '<span class="vs-tag ok">✎ مخصّص لهذه الزيارة</span> <button type="button" class="btn ghost sm" id="vsCusX">إلغاء التخصيص</button>' : ''; const x = $('#vsCusX', O); if (x) x.onclick = () => { NV.custom = null; drawT(); }; };
     const picked = () => NV.tpls.map(k => AL.find(t => t.key === k)).filter(Boolean);

@@ -412,7 +412,7 @@
   V.clarify = async function (root) {
     if (!S.me) return;
     if (own()) { st.tab = 'clar'; location.hash = '#/bhadmin'; return; }
-    if (!(canAsk() || (A.tfeat && A.tfeat('clarify')))) { root.innerHTML = `<div class="card">${A.emptyBox('هذه الصفحة غير مفعّلة لحسابك', 'يفعّلها المالك')}</div>`; return; }
+    if (!(canAsk() || (A.tfeat && A.tfeat('clarify')))) { root.innerHTML = `<div class="card">${A.emptyBox('هذه الصفحة غير متاحة لحسابك')}</div>`; return; }
     root.innerHTML = '<div class="spinner"></div>';
     const reqs = await api.list('clar_requests', { school_id: S.school.id }, { order: 'created_at', desc: true }).catch(() => []);
     const inL = reqs.filter(r => r.to_staff === S.me.id), outL = reqs.filter(r => r.from_staff === S.me.id);

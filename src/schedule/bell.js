@@ -215,7 +215,7 @@
 
   // ---------- الواجهة ----------
   V.bell = function (root) {
-    if (!S.me.is_owner) { root.innerHTML = `<div class="card">${A.emptyBox('هذه الإعدادات لحساب المالك')}</div>`; return; }
+    if (!S.me.is_owner) { root.innerHTML = ''; if (location.hash !== '#/home') location.hash = '#/home'; return; }
     const sec = A.section(); let b = bellOf(sec);
     let cur = A.LS.get('bell_s_' + sec.id); if (!b.schedules.some(s => s.id === cur)) cur = b.def;
     let pvCls = '', dirty = false, saving = null;

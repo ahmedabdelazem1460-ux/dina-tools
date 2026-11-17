@@ -6,7 +6,7 @@
   // ---------- صلاحيات الأنظمة الخاصة (تحليل النتائج، سجلاتي…) ----------
   const FOPT = { all: 'لكل المعلمين', granted: 'لمن أمنحه فقط', off: 'مخفي (للمالك فقط)' };
   const FEATS = [['assess', 'التقويم والاختبارات', ['all', 'granted', 'off']], ['records', 'سجل المتابعة', ['all', 'granted', 'off']], ['resources', 'المصادر', ['all', 'granted', 'off']], ['analysis', 'تحليل النتائج', ['granted', 'off']], ['attendance', 'الحضور والسلوك والإرشاد', ['granted', 'off']], ['supervision', 'الإشراف التربوي وتقاريري', ['granted', 'off']]];
-  const MODULES = [['assess', 'التقويم والاختبارات (عند تفعيله «لمن أمنحه»)', 'التقويم'], ['analysis', 'تحليل النتائج والاختبارات التشخيصية', 'التحليل'], ['supervision', 'الإشراف التربوي', 'الإشراف'], ['attendance', 'الحضور والسلوك — مشرف دور', 'الحضور'], ['counselor', 'الإرشاد الطلابي — الإحالات', 'الموجه'], ['deputy', 'الوكيل — استقبال إحالات الطلاب', 'الوكيل'], ['records', 'سجل المتابعة (عند تفعيله «لمن أمنحه»)', 'السجل'], ['resources', 'المصادر (عند تفعيلها «لمن أمنحه»)', 'المصادر'], ['noor', 'تحليل درجات نور', 'نور'], ['gifted', 'رعاية الموهوبين — ملفات الطلاب واللجنة', 'الموهوبون'], ['clarify', 'طلبات التوضيح — إرسالها لأي موظف', 'التوضيح'], ['visits', 'الزيارات الصفية — زيارة الفصول وتقييم المعلمين', 'الزيارات']];
+  const MODULES = [['assess', 'التقويم والاختبارات (عند تفعيله «لمن أمنحه»)', 'التقويم'], ['analysis', 'تحليل النتائج والاختبارات التشخيصية', 'التحليل'], ['supervision', 'الإشراف التربوي', 'الإشراف'], ['attendance', 'الحضور والسلوك — مشرف دور', 'الحضور'], ['counselor', 'الإرشاد الطلابي — الإحالات', 'الموجه'], ['deputy', 'الوكيل — استقبال إحالات الطلاب', 'الوكيل'], ['records', 'سجل المتابعة (عند تفعيله «لمن أمنحه»)', 'السجل'], ['resources', 'المصادر (عند تفعيلها «لمن أمنحه»)', 'المصادر'], ['noor', 'تحليل درجات نور', 'نور'], ['gifted', 'رعاية الموهوبين — ملفات الطلاب واللجنة', 'الموهوبون'], ['clarify', 'طلبات التوضيح — إرسالها لأي موظف', 'التوضيح'], ['visits', 'الزيارات الصفية — زيارة الفصول وتقييم المعلمين', 'الزيارات'], ['sb_view', 'حصص الانتظار والتأمين — عرض', 'الانتظار: عرض'], ['sb_cover', 'حصص الانتظار — إعداد تأمين اليوم وتوزيع البدلاء', 'الانتظار: تأمين'], ['sb_roster', 'حصص الانتظار — جدول الانتظار الأسبوعي', 'الانتظار: الأسبوعي'], ['sb_approve', 'حصص الانتظار — اعتماد التأمين', 'الانتظار: اعتماد'], ['sb_print', 'حصص الانتظار — الطباعة والتصدير', 'الانتظار: طباعة']];
   A.hasModule = m => !!S.me && (S.me.is_owner || (S.grants || []).some(g => g.module === m && g.staff_id === S.me.id));
   async function loadGrants() { try { S.grants = await api.moduleGrants(); } catch (_) { S.grants = []; } }
   const prevAfter = window.APP_AFTER_WEEK;
@@ -95,7 +95,7 @@
   //  تحليل النتائج والاختبارات التشخيصية — للمالك ومن يمنحه (التصحيح الآلي للمالك فقط)
   // =====================================================================
   V.analysis = function (root) {
-    if (!A.hasModule('analysis')) { root.innerHTML = `<div class="card">${A.emptyBox('هذا النظام غير متاح لحسابك', 'يمنحه مالك النظام من «المسميات والصلاحيات».')}</div>`; return; }
+    if (!A.hasModule('analysis')) { root.innerHTML = `<div class="card">${A.emptyBox('هذا النظام غير متاح لحسابك')}</div>`; return; }
     root.innerHTML = `<div class="card" style="padding:10px"><div class="head" style="margin-bottom:8px"><div class="grow"><h2 style="margin:0">تحليل النتائج والاختبارات التشخيصية</h2><p class="sub" style="margin:2px 0 0">${S.me.is_owner ? 'نسختك الكاملة بما فيها التصحيح الآلي.' : 'التصحيح الآلي متاح لمالك النظام فقط.'} البيانات تُحفظ في هذا المتصفح — استخدم «النسخ الاحتياطي» داخل النظام لنقلها.</p></div><a class="btn ghost sm" href="tools/analysis.html" target="_blank" rel="noopener">فتح في نافذة مستقلة</a></div>
       <iframe id="anF" src="tools/analysis.html" title="نظام تحليل النتائج" style="width:100%;height:calc(100vh - 210px);min-height:560px;border:1px solid var(--border);border-radius:14px;background:#fff"></iframe></div>`;
     const f = $('#anF', root);
@@ -116,7 +116,7 @@
   ];
   const ALLP = A.PERMS.concat(A.TOOL_PERMS);
   V.roles = function (root) {
-    if (!S.me.is_owner) { root.innerHTML = `<div class="card">${A.emptyBox('الصلاحيات تُدار من حساب المالك فقط')}</div>`; return; }
+    if (!S.me.is_owner) { root.innerHTML = ''; if (location.hash !== '#/home') location.hash = '#/home'; return; }
     const sets = () => { const c = ((S.school.settings || {}).perm_sets) || []; return BUILTIN.filter(b => !c.some(x => x.id === b.id)).concat(c); };
     const people = S.staff.filter(p => p.active && !p.is_owner);
     const memOf = (sid, sec) => S.memberships.find(m => m.staff_id === sid && m.section_id === sec);

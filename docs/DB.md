@@ -74,3 +74,11 @@
 - `form_tasks.visit` jsonb (بيانات الزيارة؛ null للنماذج العادية) + فهرس جزئي. `visit_ok()` = مالك أو supervision أو visits. `ft_ins` يسمح لمنحة `visits` بإدراج زيارات فقط (`visit is not null and mode='sign' and created_by = me()`).
 - الإعدادات `schools.settings.visits` {title, types[], defType, roles[], tpls[], defTpls[], tlabels{}, pace, head, autoPeriod, notifyOwner, att, maxAtt, presets[]}. المرفقات في `form_tasks.data._att`.
 - ملفات أداة الإشراف داخل المنصة: `sup_docs` (school_id, key = col/id, col cfg|tpl|rec, data, meta) — RLS `sd_rw` للمالك وsupervision.
+
+### 109 تأمين الحصص الاحترافي ومتابعة الموظفين
+- `sb_ok(section, k)` (k: view|cover|roster|approve|print): مالك أو `has_perm(section,'timetable_edit')` أو منحة `sb_<k>` (view = أي منحة sb_، cover يشمل sb_approve). سياسة `subs_write` على `substitutions` صارت `sb_ok(section_id,'cover')`.
+- `substitutions` + `sig_at`, `notified_at`, `prio` (empty|last|manual). مشغّل `sub_reset` (BEFORE UPDATE): تغيير `sub_teacher` يصفّر التوقيع والإشعار. `trg_sub_notif`: لا إشعار إن وُجد `standby_days` غير معتمد لليوم.
+- `standby_days` (school_id, section_id, day UNIQUE(section_id,day), status draft|pending|approved, empty jsonb, note, prepared_*, approved_*, signs jsonb, trail jsonb) — RLS: القراءة `sb_ok view`، الكتابة `sb_ok cover`؛ `sbd_guard` يمنع كتابة signs/approved_*/trail أو الحالة approved إلا داخل الدوال (`set_config('dina.sb','1',true)`).
+- `owner_vault` (school_id, key, data jsonb) للمالك فقط — مفاتيح `sbsig:<sigId>` = {img}.
+- RPC: `sb_approve(p_section, p_day, p_note)`، `sb_reopen(p_section, p_day)`، `sb_sign(p_id)` (NO_SIG / NOT_ALLOWED)، `sb_day(p_section, p_day)` → {day, sigs{subId: img}}، `sb_save_roster(p_section, p_roster, p_gen)`، `staff_work(p_from, p_to)` (مالك فقط، ≤٤٠٠ يوم) → [{s, c, d, n, l[]}].
+- `sections.standby`: max, per, perDay, roster, gen, excl[], rules{tid:{mode,perDay,perWeek,days,periods,why}}, prio first|after|off, coverDay, form{title, tsig e|paper, note, showRoster, sigs[{id,title,name,mode blank|auto,staff?}]}.

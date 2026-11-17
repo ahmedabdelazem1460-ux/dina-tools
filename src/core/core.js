@@ -146,7 +146,7 @@
   }
   async function run(btn, fn) {
     const b = btn; if (b) { b.disabled = true; b.dataset.l = b.innerHTML; b.innerHTML = '<span class="small">جارٍ التنفيذ…</span>'; }
-    try { return await fn(); } catch (e) { console.error(e); toast(apiMsg(e), 'err'); } finally { if (b && b.isConnected) { b.disabled = false; b.innerHTML = b.dataset.l; } }
+    try { return await fn(); } catch (e) { console.error(e); ((window.APP && window.APP.toast) || toast)(apiMsg(e), 'err'); } finally { if (b && b.isConnected) { b.disabled = false; b.innerHTML = b.dataset.l; } }
   }
   const pill = st => `<span class="pill st-${st}">${STATUS[st] || st}</span>`;
   const bar = (a, b) => `<div class="bar ${a >= b && b ? 'done' : ''}"><i style="width:${pct(a, b)}%"></i></div>`;
@@ -356,7 +356,7 @@
   window.VIEWS = VIEWS;
   function route() {
     let k = (location.hash.match(/^#\/(\w+)/) || [])[1];
-    if (S.me.is_owner && ['timetable', 'nisab', 'plan', 'builder'].includes(k)) { LS.set('studio_t', k); k = 'studio'; }
+    if (S.me.is_owner && ['timetable', 'nisab', 'plan', 'builder', 'standby'].includes(k)) { LS.set('studio_t', k); k = 'studio'; }
     if (k === 'paper') { LS.set('as_t', 'paper'); k = 'assess'; }
     const allowed = NAV.filter(navOK).map(n => n[0]);
     let v = allowed.includes(k) ? k : (LS.get('view') && allowed.includes(LS.get('view')) ? LS.get('view') : (anyPerm('review', 'export', 'structure', 'users') && !S.entries.some(e => e.teacher_id === S.me.id) ? 'dash' : (allowed.includes('my') ? 'my' : allowed[0])));

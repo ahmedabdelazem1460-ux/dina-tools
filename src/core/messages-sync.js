@@ -178,7 +178,7 @@
     const ro = !!opts.all && !A.perm('exec_confirm'); // التأكيد من معلم الحصة، أو ممن مُنح صلاحية «التأكيد نيابةً»
     A._exRe = () => { if (root.isConnected && $('#exL', root)) V._exec(root, { ...opts, day }); else A._exRe = null; };
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>التنفيذ اليومي — ${opts.all ? 'كل الفصول' : 'حصصي'}</h2>
-      <p class="sub" style="margin:2px 0 0">${ro ? 'متابعة فقط — يؤكّد كل معلم حصصه بنفسه من «خطتي ← التنفيذ اليومي»، أو من يمنحه المالك صلاحية التأكيد نيابةً. تتحدّث الألوان لحظياً.' : opts.all ? 'لديك صلاحية التأكيد نيابةً عن المعلمين — كل تأكيد يُسجَّل باسمك.' : 'أكّد لكل حصة: نُفِّذت كما خُطِّط (أخضر)، أو عُدِّلت ثم نُفِّذت (أخضر فاتح)، أو لم تُنفَّذ مع السبب. غير المؤكَّد يبقى أصفر.'}</p></div>
+      <p class="sub" style="margin:2px 0 0">${ro ? 'متابعة فقط — يؤكّد كل معلم حصصه بنفسه من «خطتي ← التنفيذ اليومي»، أو من لديه صلاحية التأكيد نيابةً. تتحدّث الألوان لحظياً.' : opts.all ? 'لديك صلاحية التأكيد نيابةً عن المعلمين — كل تأكيد يُسجَّل باسمك.' : 'أكّد لكل حصة: نُفِّذت كما خُطِّط (أخضر)، أو عُدِّلت ثم نُفِّذت (أخضر فاتح)، أو لم تُنفَّذ مع السبب. غير المؤكَّد يبقى أصفر.'}</p></div>
       <div class="row">${exPill('done')} ${AR(cnt('done'))} ${exPill('modified')} ${AR(cnt('modified'))} ${exPill('pending')} ${AR(cnt('pending'))} ${exPill('not_done')} ${AR(cnt('not_done'))}</div></div>
       <div class="tabs">${dates.map((d, i) => `<button data-d="${i}" class="${i === day ? 'on' : ''}">${DAYS[i]} <span class="small muted">${AR(d)}</span></button>`).join('')}</div>
       ${list.length && !ro ? `<div class="row" style="margin-bottom:10px"><button class="btn ok sm" id="exAll">${I.check} تأكيد كل حصص اليوم كما خُطِّطت</button></div>` : ''}

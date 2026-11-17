@@ -68,9 +68,9 @@
   const POL = () => Object.assign({ review: true, auto: 'none', trusted: [], trusted_scope: 'all', parents: false }, ((S.school || {}).settings || {}).res_policy || {});
   const polText = (p, me) => { const tr = (p.trusted || []).includes(me); const sc = { subject: 'معلمي المادة', all: 'كل المعلمين' };
     if (tr) return `مصادرك تُشارك مباشرة مع ${sc[p.trusted_scope] || 'كل المعلمين'} (أنت ضمن الموثوقين).`;
-    if (p.auto !== 'none') return p.review ? `كل مصدر تضيفه يُشارك مباشرة مع ${sc[p.auto]} حسب إعداد المالك.` : `مصدرك خاص بك، وإذا طلبت مشاركته يُشارك مباشرة مع ${sc[p.auto]}.`;
-    return p.review ? 'كل مصدر تضيفه يصل للمالك تلقائياً «بانتظار الاعتماد»، ولا يراه زملاؤك إلا بعد موافقته.' : 'مصدرك خاص بك والمالك؛ لمشاركته اضغط «طلب مشاركة» وينتظر موافقة المالك.'; };
-  const SH = { private: ['خاص بصاحبه', 'st-empty'], pending: ['بانتظار اعتماد المالك', 'st-returned'], shared: ['مشترك', 'st-approved'], rejected: ['لم تُعتمد المشاركة', 'st-returned'] };
+    if (p.auto !== 'none') return p.review ? `كل مصدر تضيفه يُشارك مباشرة مع ${sc[p.auto]}.` : `مصدرك خاص بك، وإذا طلبت مشاركته يُشارك مباشرة مع ${sc[p.auto]}.`;
+    return p.review ? 'كل مصدر تضيفه يصل للمالك تلقائياً «بانتظار الاعتماد»، ولا يراه زملاؤك إلا بعد موافقته.' : 'مصدرك خاص بك؛ لمشاركته اضغط «طلب مشاركة» وينتظر الموافقة.'; };
+  const SH = { private: ['خاص بصاحبه', 'st-empty'], pending: ['بانتظار الاعتماد', 'st-returned'], shared: ['مشترك', 'st-approved'], rejected: ['لم تُعتمد المشاركة', 'st-returned'] };
   const SCOPE = { all: 'كل المعلمين', subject: 'معلمو المادة', people: 'أشخاص محددون' };
   const stageOf = k => String(k || '').split('|')[0] || '';
   const STG_ORD = s => /رياض|KG/i.test(s) ? 0 : /ابتدائ/.test(s) ? 1 : /متوسط/.test(s) ? 2 : /ثانو/.test(s) ? 3 : 4;
@@ -105,10 +105,10 @@
       const pend = RES.filter(r => stOf(r) === 'pending').length; const pol = POL();
       root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>المصادر</h2><p class="sub" style="margin:2px 0 0">مخزن المواد التعليمية للمدرسة: أوراق العمل والعروض والفيديو والصور والملفات وروابط Drive، مرتّبة بالمرحلة والصف والمادة والدرس.</p></div>
         <div class="row"><button class="btn" id="rsAdd">${I.plus} إضافة مصدر</button>${own ? `<button class="btn ghost" id="rsPol">إعدادات المشاركة</button>` : ''}<button class="btn ghost" id="rsPrint">${I.print} طباعة القائمة</button></div></div>
-        ${own ? `<div class="notice info" style="display:block;margin:6px 0 0">الإعداد الحالي: ${pol.auto === 'none' ? '<b>انتظار موافقتك</b>' : `<b>موافقة مباشرة</b> مع ${pol.auto === 'subject' ? 'معلمي المادة' : 'كل المعلمين'}`} · ${pol.review ? 'كل مصدر جديد يُرسل للمراجعة تلقائياً' : 'يبقى خاصاً حتى يطلب المعلم المشاركة'}${(pol.trusted || []).length ? ` · ${AR(pol.trusted.length)} معلم موثوق` : ''}${pol.parents ? ' · إظهار المصادر لأولياء الأمور بموافقتك' : ''}</div>` : `<div class="notice info" style="display:block;margin:6px 0 0">${polText(pol, S.me.id)}${pol.parents ? ' وإظهار مصدرك لأولياء الأمور يحتاج موافقة المالك.' : ''}</div>`}
+        ${own ? `<div class="notice info" style="display:block;margin:6px 0 0">الإعداد الحالي: ${pol.auto === 'none' ? '<b>انتظار موافقتك</b>' : `<b>موافقة مباشرة</b> مع ${pol.auto === 'subject' ? 'معلمي المادة' : 'كل المعلمين'}`} · ${pol.review ? 'كل مصدر جديد يُرسل للمراجعة تلقائياً' : 'يبقى خاصاً حتى يطلب المعلم المشاركة'}${(pol.trusted || []).length ? ` · ${AR(pol.trusted.length)} معلم موثوق` : ''}${pol.parents ? ' · إظهار المصادر لأولياء الأمور بموافقتك' : ''}</div>` : `<div class="notice info" style="display:block;margin:6px 0 0">${polText(pol, S.me.id)}${pol.parents ? ' وإظهار مصدرك لأولياء الأمور يحتاج موافقة.' : ''}</div>`}
         <details class="rs-how"${A.LS.get('rs_how') === '0' ? '' : ' open'}><summary><b>كيف تعمل المصادر؟</b></summary><ul>
-          <li><b>الإضافة تلقائية:</b> كل رابط أو ملف يضيفه المعلم — هنا أو من التحضير — يُحفظ في المصادر ويراه المالك دائماً.</li>
-          <li><b>لا يرى المعلمون مصادر بعضهم إلا بإذن المالك:</b> ${own ? 'تختار من «إعدادات المشاركة»: انتظار موافقتك لكل مصدر، أو موافقة مباشرة لمعلمي المادة أو للجميع، أو معلمين موثوقين تُشارك مصادرهم مباشرة. ولكل مصدر تحدد النطاق أو توقف مشاركته في أي وقت.' : 'المالك يحدد طريقة المشاركة؛ ' + polText(pol, S.me.id)}</li>
+          <li><b>الإضافة تلقائية:</b> كل رابط أو ملف يضيفه المعلم — هنا أو من التحضير — يُحفظ في المصادر وتراه الإدارة دائماً.</li>
+          <li><b>لا يرى المعلمون مصادر بعضهم إلا بإذن المالك:</b> ${own ? 'تختار من «إعدادات المشاركة»: انتظار موافقتك لكل مصدر، أو موافقة مباشرة لمعلمي المادة أو للجميع، أو معلمين موثوقين تُشارك مصادرهم مباشرة. ولكل مصدر تحدد النطاق أو توقف مشاركته في أي وقت.' : polText(pol, S.me.id)}</li>
           <li><b>مرتبط بالدرس:</b> اختر الصف والدرس عند الإضافة فيظهر المصدر داخل تحضير ذلك الدرس، وتُضيفه للحصة بضغطة.</li>
           <li><b>أولياء الأمور:</b> لا يرون أي مصدر إلا إذا فعّلت «يظهر لأولياء الأمور» للمصدر وحددت فصوله.</li>
           <li><b>من المكتبة:</b> مصادر تحضيرات «مكتبة المدرسة» تظهر للمعلمين عند تفعيل التحضير فقط.</li></ul></details>
@@ -152,7 +152,7 @@
       $$('[data-ap]', box).forEach(b => b.onclick = () => shareDlg(R(b.dataset.ap)));
       $$('[data-pa]', box).forEach(b => b.onclick = () => A.run(b, async () => up(R(b.dataset.pa), { visible_to_parents: true, parents_req: false }, 'يظهر الآن لأولياء الأمور')));
       $$('[data-pr]', box).forEach(b => b.onclick = () => A.run(b, async () => up(R(b.dataset.pr), { parents_req: false }, 'رُفض إظهاره لأولياء الأمور')));
-      $$('[data-rj]', box).forEach(b => b.onclick = () => A.run(b, async () => up(R(b.dataset.rj), { share_status: 'rejected', share_note: 'لم يعتمد المالك مشاركة هذا المصدر' }, 'رُفض الطلب — يبقى المصدر خاصاً بصاحبه')));
+      $$('[data-rj]', box).forEach(b => b.onclick = () => A.run(b, async () => up(R(b.dataset.rj), { share_status: 'rejected', share_note: 'لم تُعتمد مشاركة هذا المصدر' }, 'رُفض الطلب — يبقى المصدر خاصاً بصاحبه')));
       $$('[data-un]', box).forEach(b => b.onclick = () => A.run(b, async () => up(R(b.dataset.un), { share_status: 'private', share_note: '' }, 'أُوقفت المشاركة')));
       $$('[data-rq]', box).forEach(b => b.onclick = () => A.run(b, async () => up(R(b.dataset.rq), { share_status: 'pending', share_note: '' }, 'أُرسل طلب المشاركة للمالك')));
       $$('[data-cn]', box).forEach(b => b.onclick = () => A.run(b, async () => up(R(b.dataset.cn), { share_status: 'private', share_note: '' }, 'أصبح المصدر خاصاً بك')));
@@ -202,7 +202,7 @@
             <div class="field"><label for="reL">الدرس (اختياري)</label><select class="in" id="reL"><option value="">—</option>${C2.map(l => `<option value="${l.id}" ${r.lesson_id === l.id ? 'selected' : ''}>${esc(l.unit ? l.unit + ' — ' : '')}${esc(l.lesson)}</option>`).join('')}</select>${!C2.length && r.subject_id && r.grade_key ? '<span class="small muted">لا توجد دروس مدخلة لهذا الصف (من «التقويم ← المنهج والدروس»).</span>' : ''}</div>
             <div class="field"><label for="reN">وصف مختصر (اختياري)</label><input class="in" id="reN" value="${esc(r.note || '')}" placeholder="مثال: تدريبات على الدرس مع الحل"></div></div>
           <div class="sec-box" style="margin-bottom:8px">${own ? `<label class="chk"><input type="checkbox" id="reSh" ${(r._share ?? stOf(r) === 'shared') ? 'checked' : ''}> مشترك مع كل المعلمين <span class="small muted">(تحديد نطاق أدق من زر «النطاق» في البطاقة)</span></label>` : `<p class="small" style="margin:0">🔒 ${polText(POL(), S.me.id)}</p>`}
-            <label class="chk"><input type="checkbox" id="reP" ${r.visible_to_parents || r.parents_req ? 'checked' : ''}> يظهر لأولياء الأمور في بوابتهم مع خطة الأسبوع${!own && POL().parents ? ' <span class="small muted">(بعد موافقة المالك)</span>' : ''}${r.parents_req ? ' <span class="pill st-returned">بانتظار الموافقة</span>' : ''}</label></div>
+            <label class="chk"><input type="checkbox" id="reP" ${r.visible_to_parents || r.parents_req ? 'checked' : ''}> يظهر لأولياء الأمور في بوابتهم مع خطة الأسبوع${!own && POL().parents ? ' <span class="small muted">(بعد الموافقة)</span>' : ''}${r.parents_req ? ' <span class="pill st-returned">بانتظار الموافقة</span>' : ''}</label></div>
           <div class="field"><label>الفصول (اتركها كلها فارغة ليظهر للجميع)</label><div class="perm-grid">${cls.map(c => `<label class="chk"><input type="checkbox" value="${c.id}" ${(r.class_ids || []).includes(c.id) ? 'checked' : ''}> ${esc(c.name)}</label>`).join('')}</div></div>
           <div class="acts"><button class="btn" id="reGo">حفظ</button></div>`;
         q('#reU').onchange = () => { q('#reK').value = guess(q('#reU').value); };

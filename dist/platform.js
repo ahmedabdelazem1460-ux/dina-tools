@@ -522,6 +522,8 @@ body.band .foot{background:#082B5A;color:#fff;border-top:0;height:56px}
       slotConflictApply: id => sb.rpc('slot_conflict_apply', { p_entry: id }).then(ok),
       bulkReview: (w, classes, action) => sb.rpc('bulk_review', { p_week: w, p_classes: classes && classes.length ? classes : null, p_action: action }).then(ok),
       // واجهة عامة للوحدات الجديدة (الطلاب، الحضور، السلوك، الإشراف) — تخضع لصلاحيات الصفوف في قاعدة البيانات
+      // بحث نصي (ilike) في أعمدة جدول — تحترم سياسات RLS فلا يُعاد إلا ما يحق للمستخدم
+      async search(t, cols, q, o = {}) { const s = String(q || '').replace(/[%,()*"\\]/g, ' ').replace(/\s+/g, ' ').trim(); if (!s) return []; let x = T(t).select(o.select || '*').or(cols.map(c => `${c}.ilike."%${s}%"`).join(',')); Object.entries(o.eq || {}).forEach(([k, v]) => { x = v === null ? x.is(k, null) : Array.isArray(v) ? x.in(k, v) : x.eq(k, v); }); if (o.order) x = x.order(o.order, { ascending: !o.desc }); return ok(await x.limit(o.limit || 20)); },
       async list(t, eq = {}, o = {}) { let q = T(t).select(o.select || '*'); Object.entries(eq).forEach(([k, v]) => { q = v === null ? q.is(k, null) : Array.isArray(v) ? q.in(k, v) : q.eq(k, v); }); Object.entries(o.gte || {}).forEach(([k, v]) => q = q.gte(k, v)); Object.entries(o.lte || {}).forEach(([k, v]) => q = q.lte(k, v)); if (o.order) q = q.order(o.order, { ascending: !o.desc }); let all = [], from = 0; for (;;) { const r = ok(await q.range(from, from + 999)); all = all.concat(r); if (r.length < 1000) break; from += 1000; } return all; },
       ins: (t, r) => T(t).insert(r).select().then(ok),
       upd: (t, id, p) => T(t).update(p).eq('id', id).select().single().then(ok),
@@ -810,6 +812,7 @@ body.band .foot{background:#082B5A;color:#fff;border-top:0;height:56px}
         return wait({ count: n, unpublished: un });
       },
       async resetPassword() { return wait(true); },
+      async search(t, cols, q, o = {}) { const s = String(q || '').trim().toLowerCase(); if (!s) return wait([]); const l = (D[t] = D[t] || []).filter(r => cols.some(c => String(r[c] ?? '').toLowerCase().includes(s)) && Object.entries(o.eq || {}).every(([k, v]) => Array.isArray(v) ? v.includes(r[k]) : (r[k] ?? null) === v)); return wait(clone(l.slice(0, o.limit || 20))); },
       async list(t, eq = {}, o = {}) { let l = (D[t] = D[t] || []).filter(r => Object.entries(eq).every(([k, v]) => Array.isArray(v) ? v.includes(r[k]) : (r[k] ?? null) === v) && Object.entries(o.gte || {}).every(([k, v]) => r[k] >= v) && Object.entries(o.lte || {}).every(([k, v]) => r[k] <= v)); if (o.order) l = l.slice().sort((a, b) => String(a[o.order]).localeCompare(String(b[o.order])) * (o.desc ? -1 : 1)); return wait(clone(l)); },
       async ins(t, r) { D[t] = D[t] || []; const extra = t === 'games' ? () => ({ state: 'lobby', qi: -1, host: meId }) : t === 'game_sets' ? () => ({ plays: 0, active: true, created_by: meId }) : t === 'quizzes' ? () => ({ code: Math.random().toString(16).slice(2, 14), status: 'draft' }) : t === 'remedial_plans' ? () => ({ token: Math.random().toString(16).slice(2, 18), support_quiz_ids: [], resource_links: [], progress: 0, status: 'active', gaps: [] }) : t === 'questions' ? () => ({ options: [], shared: true }) : () => ({}); return wait((Array.isArray(r) ? r : [r]).map(x => ins(t, { school_id: D.schools[0].id, by_staff: meId, created_by: meId, ...extra(), ...x }))); },
       upd: (t, id, p) => wait(upd(t, id, p)),
@@ -1246,7 +1249,7 @@ body.band .foot{background:#082B5A;color:#fff;border-top:0;height:56px}
   }
   async function run(btn, fn) {
     const b = btn; if (b) { b.disabled = true; b.dataset.l = b.innerHTML; b.innerHTML = '<span class="small">جارٍ التنفيذ…</span>'; }
-    try { return await fn(); } catch (e) { console.error(e); toast(apiMsg(e), 'err'); } finally { if (b && b.isConnected) { b.disabled = false; b.innerHTML = b.dataset.l; } }
+    try { return await fn(); } catch (e) { console.error(e); ((window.APP && window.APP.toast) || toast)(apiMsg(e), 'err'); } finally { if (b && b.isConnected) { b.disabled = false; b.innerHTML = b.dataset.l; } }
   }
   const pill = st => `<span class="pill st-${st}">${STATUS[st] || st}</span>`;
   const bar = (a, b) => `<div class="bar ${a >= b && b ? 'done' : ''}"><i style="width:${pct(a, b)}%"></i></div>`;
@@ -1456,7 +1459,7 @@ body.band .foot{background:#082B5A;color:#fff;border-top:0;height:56px}
   window.VIEWS = VIEWS;
   function route() {
     let k = (location.hash.match(/^#\/(\w+)/) || [])[1];
-    if (S.me.is_owner && ['timetable', 'nisab', 'plan', 'builder'].includes(k)) { LS.set('studio_t', k); k = 'studio'; }
+    if (S.me.is_owner && ['timetable', 'nisab', 'plan', 'builder', 'standby'].includes(k)) { LS.set('studio_t', k); k = 'studio'; }
     if (k === 'paper') { LS.set('as_t', 'paper'); k = 'assess'; }
     const allowed = NAV.filter(navOK).map(n => n[0]);
     let v = allowed.includes(k) ? k : (LS.get('view') && allowed.includes(LS.get('view')) ? LS.get('view') : (anyPerm('review', 'export', 'structure', 'users') && !S.entries.some(e => e.teacher_id === S.me.id) ? 'dash' : (allowed.includes('my') ? 'my' : allowed[0])));
@@ -2623,11 +2626,11 @@ body.band .foot{background:#082B5A;color:#fff;border-top:0;height:56px}
       <div class="sec-box"><b>حساب الدخول</b><div class="grid g2" style="margin-top:8px"><div class="field"><label>البريد الإلكتروني</label><input class="in" id="se" dir="ltr" value="${esc(p.email || '')}" placeholder="name@dinaschool.com"></div>
         <div class="field"><label>${p.user_id ? 'كلمة مرور جديدة (اتركها فارغة للإبقاء)' : 'كلمة المرور'}</label><div class="row" style="flex-wrap:nowrap"><input class="in" id="spw" dir="ltr" placeholder="${p.user_id ? '••••••••' : ''}"><button class="btn ghost sm" id="gp" type="button">توليد</button></div></div></div>
         <p class="small muted" style="margin:0">${p.user_id ? 'الحساب مفعّل.' : 'بدون كلمة مرور يُحفظ الموظف بلا حساب دخول (يمكن إسناد الحصص له لاحقاً).'} انسخ كلمة المرور وأرسلها للمعلم، ويمكنه تغييرها بعد الدخول.</p></div>
-      ${p.is_owner ? '<div class="notice ok">مالك النظام — كل الصلاحيات في كل الأقسام.</div>' : `<div><b>الأقسام والصلاحيات</b>${secs.map(s => { const mm = S.memberships.find(x => x.staff_id === p.id && x.section_id === s.id) || {}; return `<div class="sec-box" data-sec="${s.id}" style="margin-top:8px"><div class="row" style="justify-content:space-between"><b>${esc(s.name)}</b><select class="in" data-role style="max-width:200px"><option value="">غير مضاف</option>${Object.entries(ROLES).map(([k, l]) => `<option value="${k}" ${mm.role === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div><div class="perm-grid" style="margin-top:10px">${PERMS.map(([k, l]) => `<label class="chk"><input type="checkbox" data-p="${k}" ${mm[k] ? 'checked' : ''}> ${l}</label>`).join('')}</div><div class="perm-grid" style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)"><span class="small muted">صلاحيات يمنحها المالك:</span>${A.TOOL_PERMS.map(([k, l]) => `<label class="chk"><input type="checkbox" data-tp="${k}" ${mm[k] ? 'checked' : ''}> ${l}</label>`).join('')}</div><div class="perm-grid" style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)"><span class="small muted">اطلاع فقط (بلا تعديل):</span>${(A.VIEW_PERMS || []).map(([k, l]) => `<label class="chk"><input type="checkbox" data-vp="${k}" ${((mm.extra || {}).view || []).includes(k) ? 'checked' : ''}> ${l}</label>`).join('')}</div><div class="perm-grid" data-stg="${s.id}" data-cur="${esc(JSON.stringify({ s: (mm.extra || {}).stages || [], g: (mm.extra || {}).grades || [], c: (mm.extra || {}).classes || [] }))}" style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);display:block"><span class="small muted"><b>نطاق العرض والإدخال</b> — بلا اختيار = القسم كاملاً. اختر مرحلة كاملة، أو صفوفاً، أو فصولاً بعينها، أو خليطاً منها. يُطبَّق على ما يظهر له وعلى رصد الحضور.</span></div><label class="chk adm-r" style="margin-top:8px"><input type="checkbox" data-rs ${(mm.extra || {}).restricted ? 'checked' : ''}> تحديد صلاحيات «مدير القسم» يدوياً بدل منحه كل الصلاحيات</label><p class="small faint" style="margin:6px 0 0">«مدير القسم» يملك كل صلاحيات القسم ما لم تحدّدها يدوياً. للمعلم والمشرف والمنسق فعّل ما تريد تفويضه فقط.</p></div>`; }).join('')}</div>`}
+      ${p.is_owner ? '<div class="notice ok">مالك النظام — كل الصلاحيات في كل الأقسام.</div>' : `<div><b>الأقسام والصلاحيات</b>${secs.map(s => { const mm = S.memberships.find(x => x.staff_id === p.id && x.section_id === s.id) || {}; return `<div class="sec-box" data-sec="${s.id}" style="margin-top:8px"><div class="row" style="justify-content:space-between"><b>${esc(s.name)}</b><select class="in" data-role style="max-width:200px"><option value="">غير مضاف</option>${Object.entries(ROLES).map(([k, l]) => `<option value="${k}" ${mm.role === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div><div class="perm-grid" style="margin-top:10px">${PERMS.map(([k, l]) => `<label class="chk"><input type="checkbox" data-p="${k}" ${mm[k] ? 'checked' : ''}> ${l}</label>`).join('')}</div><div class="perm-grid" style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)"><span class="small muted">صلاحيات إضافية:</span>${A.TOOL_PERMS.map(([k, l]) => `<label class="chk"><input type="checkbox" data-tp="${k}" ${mm[k] ? 'checked' : ''}> ${l}</label>`).join('')}</div><div class="perm-grid" style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)"><span class="small muted">اطلاع فقط (بلا تعديل):</span>${(A.VIEW_PERMS || []).map(([k, l]) => `<label class="chk"><input type="checkbox" data-vp="${k}" ${((mm.extra || {}).view || []).includes(k) ? 'checked' : ''}> ${l}</label>`).join('')}</div><div class="perm-grid" data-stg="${s.id}" data-cur="${esc(JSON.stringify({ s: (mm.extra || {}).stages || [], g: (mm.extra || {}).grades || [], c: (mm.extra || {}).classes || [] }))}" style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);display:block"><span class="small muted"><b>نطاق العرض والإدخال</b> — بلا اختيار = القسم كاملاً. اختر مرحلة كاملة، أو صفوفاً، أو فصولاً بعينها، أو خليطاً منها. يُطبَّق على ما يظهر له وعلى رصد الحضور.</span></div><label class="chk adm-r" style="margin-top:8px"><input type="checkbox" data-rs ${(mm.extra || {}).restricted ? 'checked' : ''}> تحديد صلاحيات «مدير القسم» يدوياً بدل منحه كل الصلاحيات</label><p class="small faint" style="margin:6px 0 0">«مدير القسم» يملك كل صلاحيات القسم ما لم تحدّدها يدوياً. للمعلم والمشرف والمنسق فعّل ما تريد تفويضه فقط.</p></div>`; }).join('')}</div>`}
       <div class="acts">${!isNew && !p.is_owner && (S.realMe || S.me).is_owner ? `<button class="btn ghost" id="sview">${I.eye} الدخول بحسابه</button>` : ''}${!isNew && !p.is_owner && p.id !== S.me.id ? `<button class="btn bad" id="sact">${p.active ? 'إيقاف الحساب' : 'إعادة التفعيل'}</button>` : ''}<button class="btn" id="ssave">حفظ</button></div>`, { cls: 'wide' });
     const OWN = (S.realMe || S.me).is_owner;
     { const ss = m.el.querySelector('#sttS'), ti = m.el.querySelector('#stt'); if (ss) ss.onchange = () => { if (ss.value === '__other') { ti.hidden = false; ti.value = ''; ti.focus(); } else { ti.hidden = true; ti.value = ss.value; } }; }
-    const syncRole = box => { if (!OWN) { const rs = box.querySelector('[data-role]'); [...rs.options].forEach(o => { o.disabled = !(o.value === '' || o.value === 'teacher' || o.value === rs.value); }); $$('[data-p],[data-tp],[data-vp],[data-rs]', box).forEach(i => i.disabled = true); if (!box.querySelector('.own-note')) box.insertAdjacentHTML('beforeend', '<p class="small muted own-note" style="margin:4px 0 0">الصلاحيات تُمنح من حساب المالك فقط.</p>'); return; } const r = box.querySelector('[data-role]').value, rs = box.querySelector('[data-rs]'), lim = r === 'admin' && rs && rs.checked; if (rs) rs.closest('label').style.display = r === 'admin' ? '' : 'none'; $$('[data-p]', box).forEach(i => { i.disabled = !r || (r === 'admin' && !lim); if (r === 'admin' && !lim) i.checked = true; }); $$('[data-tp],[data-vp]', box).forEach(i => { i.disabled = !r; }); };
+    const syncRole = box => { if (!OWN) { const rs = box.querySelector('[data-role]'); [...rs.options].forEach(o => { o.disabled = !(o.value === '' || o.value === 'teacher' || o.value === rs.value); }); $$('[data-p],[data-tp],[data-vp],[data-rs]', box).forEach(i => i.disabled = true); if (!box.querySelector('.own-note')) box.insertAdjacentHTML('beforeend', ''); return; } const r = box.querySelector('[data-role]').value, rs = box.querySelector('[data-rs]'), lim = r === 'admin' && rs && rs.checked; if (rs) rs.closest('label').style.display = r === 'admin' ? '' : 'none'; $$('[data-p]', box).forEach(i => { i.disabled = !r || (r === 'admin' && !lim); if (r === 'admin' && !lim) i.checked = true; }); $$('[data-tp],[data-vp]', box).forEach(i => { i.disabled = !r; }); };
     $$('[data-sec]', m.el).forEach(b => { syncRole(b); b.querySelector('[data-role]').onchange = e => { const r = e.target.value; if (r && ROLE_DEFAULTS[r]) $$('[data-p]', b).forEach(i => i.checked = r === 'admin' || !!ROLE_DEFAULTS[r][i.dataset.p]); syncRole(b); }; const rsx = b.querySelector('[data-rs]'); if (rsx) rsx.onchange = () => syncRole(b); });
     $$('[data-stg]', m.el).forEach(async g => { const cls = (g.dataset.stg === S.sectionId ? S.allClasses : await api.classes(g.dataset.stg).catch(() => [])).filter(c => c.active !== false); let cur = JSON.parse(g.dataset.cur || '{}'); if (Array.isArray(cur)) cur = { s: cur, g: [], c: [] }; const dis = OWN ? '' : 'disabled';
       const GO = ['الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس']; const stages = [...new Set(cls.map(A.stageOf))];
@@ -3440,7 +3443,7 @@ ${S.me.full_name}`;
     const ro = !!opts.all && !A.perm('exec_confirm'); // التأكيد من معلم الحصة، أو ممن مُنح صلاحية «التأكيد نيابةً»
     A._exRe = () => { if (root.isConnected && $('#exL', root)) V._exec(root, { ...opts, day }); else A._exRe = null; };
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>التنفيذ اليومي — ${opts.all ? 'كل الفصول' : 'حصصي'}</h2>
-      <p class="sub" style="margin:2px 0 0">${ro ? 'متابعة فقط — يؤكّد كل معلم حصصه بنفسه من «خطتي ← التنفيذ اليومي»، أو من يمنحه المالك صلاحية التأكيد نيابةً. تتحدّث الألوان لحظياً.' : opts.all ? 'لديك صلاحية التأكيد نيابةً عن المعلمين — كل تأكيد يُسجَّل باسمك.' : 'أكّد لكل حصة: نُفِّذت كما خُطِّط (أخضر)، أو عُدِّلت ثم نُفِّذت (أخضر فاتح)، أو لم تُنفَّذ مع السبب. غير المؤكَّد يبقى أصفر.'}</p></div>
+      <p class="sub" style="margin:2px 0 0">${ro ? 'متابعة فقط — يؤكّد كل معلم حصصه بنفسه من «خطتي ← التنفيذ اليومي»، أو من لديه صلاحية التأكيد نيابةً. تتحدّث الألوان لحظياً.' : opts.all ? 'لديك صلاحية التأكيد نيابةً عن المعلمين — كل تأكيد يُسجَّل باسمك.' : 'أكّد لكل حصة: نُفِّذت كما خُطِّط (أخضر)، أو عُدِّلت ثم نُفِّذت (أخضر فاتح)، أو لم تُنفَّذ مع السبب. غير المؤكَّد يبقى أصفر.'}</p></div>
       <div class="row">${exPill('done')} ${AR(cnt('done'))} ${exPill('modified')} ${AR(cnt('modified'))} ${exPill('pending')} ${AR(cnt('pending'))} ${exPill('not_done')} ${AR(cnt('not_done'))}</div></div>
       <div class="tabs">${dates.map((d, i) => `<button data-d="${i}" class="${i === day ? 'on' : ''}">${DAYS[i]} <span class="small muted">${AR(d)}</span></button>`).join('')}</div>
       ${list.length && !ro ? `<div class="row" style="margin-bottom:10px"><button class="btn ok sm" id="exAll">${I.check} تأكيد كل حصص اليوم كما خُطِّطت</button></div>` : ''}
@@ -3952,7 +3955,7 @@ ${S.me.full_name}`;
       if (!(await A.confirmBox('كتابة كل خطط هذا الأسبوع من المنصة داخل ملف Google Sheet؟<br><span class="small muted">تُستبدل الخانات المختلفة في الشيت بما في المنصة.</span>', 'إرسال إلى الشيت'))) return;
       const r = await api.requestSheetSync(w.id, 'push');
       if (r.worker) A.toast('جارٍ كتابة بيانات المنصة في الشيت…', 'ok');
-      else A.toast(S.me.is_owner ? 'الكتابة في الشيت تحتاج تفعيل سكربت المزامنة مرة واحدة (لوحة المطوّر ← مزامنة Google Sheets). سيُنفَّذ الطلب تلقائياً بعد التفعيل.' : 'الكتابة في الشيت تحتاج تفعيل سكربت المزامنة من حساب المالك. سيُنفَّذ الطلب تلقائياً بعد التفعيل.', 'err');
+      else A.toast(S.me.is_owner ? 'الكتابة في الشيت تحتاج تفعيل سكربت المزامنة مرة واحدة (لوحة المطوّر ← مزامنة Google Sheets). سيُنفَّذ الطلب تلقائياً بعد التفعيل.' : 'الكتابة في الشيت تحتاج تفعيل سكربت المزامنة. سيُنفَّذ الطلب تلقائياً بعد التفعيل.', 'err');
     }));
     $$('[data-sync-link]', root).forEach(b => b.onclick = () => linkDialog(w));
   }
@@ -4689,7 +4692,7 @@ ${S.me.full_name}`;
       const link = m.el.querySelector('#pL').value.trim(); if (link && !/^https?:\/\//.test(link)) throw new Error('الرابط يجب أن يبدأ بـ https://');
       const d1 = m.el.querySelector('#pD1').value || today(), d2 = m.el.querySelector('#pD2').value || null; if (d2 && d2 < d1) throw new Error('تاريخ النهاية قبل البداية');
       const cids = $$('#paC input:checked', m.el).map(i => i.value); if (au === 'classes' && !cids.length) throw new Error('اختر فصلاً واحداً على الأقل');
-      if (!S.me.is_owner && au === 'all') throw new Error('الإعلان لكل المدرسة من صلاحية المالك — اختر قسماً أو فصولاً');
+      if (!S.me.is_owner && au === 'all') throw new Error('اختر قسماً أو فصولاً للإعلان');
       const rec = { kind, title, body: m.el.querySelector('#pB').value.trim(), image_url: img, link_url: link || null, starts_on: d1, ends_on: d2, pinned: m.el.querySelector('#pP').checked,
         section_id: au === 'section' ? m.el.querySelector('#pS').value : au === 'classes' ? S.sectionId : null, class_ids: au === 'classes' ? cids : null };
       if (isNew) await api.addPost(rec); else await api.updatePost(p.id, rec);
@@ -4709,7 +4712,7 @@ ${S.me.full_name}`;
   // ---------- صلاحيات الأنظمة الخاصة (تحليل النتائج، سجلاتي…) ----------
   const FOPT = { all: 'لكل المعلمين', granted: 'لمن أمنحه فقط', off: 'مخفي (للمالك فقط)' };
   const FEATS = [['assess', 'التقويم والاختبارات', ['all', 'granted', 'off']], ['records', 'سجل المتابعة', ['all', 'granted', 'off']], ['resources', 'المصادر', ['all', 'granted', 'off']], ['analysis', 'تحليل النتائج', ['granted', 'off']], ['attendance', 'الحضور والسلوك والإرشاد', ['granted', 'off']], ['supervision', 'الإشراف التربوي وتقاريري', ['granted', 'off']]];
-  const MODULES = [['assess', 'التقويم والاختبارات (عند تفعيله «لمن أمنحه»)', 'التقويم'], ['analysis', 'تحليل النتائج والاختبارات التشخيصية', 'التحليل'], ['supervision', 'الإشراف التربوي', 'الإشراف'], ['attendance', 'الحضور والسلوك — مشرف دور', 'الحضور'], ['counselor', 'الإرشاد الطلابي — الإحالات', 'الموجه'], ['deputy', 'الوكيل — استقبال إحالات الطلاب', 'الوكيل'], ['records', 'سجل المتابعة (عند تفعيله «لمن أمنحه»)', 'السجل'], ['resources', 'المصادر (عند تفعيلها «لمن أمنحه»)', 'المصادر'], ['noor', 'تحليل درجات نور', 'نور'], ['gifted', 'رعاية الموهوبين — ملفات الطلاب واللجنة', 'الموهوبون'], ['clarify', 'طلبات التوضيح — إرسالها لأي موظف', 'التوضيح'], ['visits', 'الزيارات الصفية — زيارة الفصول وتقييم المعلمين', 'الزيارات']];
+  const MODULES = [['assess', 'التقويم والاختبارات (عند تفعيله «لمن أمنحه»)', 'التقويم'], ['analysis', 'تحليل النتائج والاختبارات التشخيصية', 'التحليل'], ['supervision', 'الإشراف التربوي', 'الإشراف'], ['attendance', 'الحضور والسلوك — مشرف دور', 'الحضور'], ['counselor', 'الإرشاد الطلابي — الإحالات', 'الموجه'], ['deputy', 'الوكيل — استقبال إحالات الطلاب', 'الوكيل'], ['records', 'سجل المتابعة (عند تفعيله «لمن أمنحه»)', 'السجل'], ['resources', 'المصادر (عند تفعيلها «لمن أمنحه»)', 'المصادر'], ['noor', 'تحليل درجات نور', 'نور'], ['gifted', 'رعاية الموهوبين — ملفات الطلاب واللجنة', 'الموهوبون'], ['clarify', 'طلبات التوضيح — إرسالها لأي موظف', 'التوضيح'], ['visits', 'الزيارات الصفية — زيارة الفصول وتقييم المعلمين', 'الزيارات'], ['sb_view', 'حصص الانتظار والتأمين — عرض', 'الانتظار: عرض'], ['sb_cover', 'حصص الانتظار — إعداد تأمين اليوم وتوزيع البدلاء', 'الانتظار: تأمين'], ['sb_roster', 'حصص الانتظار — جدول الانتظار الأسبوعي', 'الانتظار: الأسبوعي'], ['sb_approve', 'حصص الانتظار — اعتماد التأمين', 'الانتظار: اعتماد'], ['sb_print', 'حصص الانتظار — الطباعة والتصدير', 'الانتظار: طباعة']];
   A.hasModule = m => !!S.me && (S.me.is_owner || (S.grants || []).some(g => g.module === m && g.staff_id === S.me.id));
   async function loadGrants() { try { S.grants = await api.moduleGrants(); } catch (_) { S.grants = []; } }
   const prevAfter = window.APP_AFTER_WEEK;
@@ -4798,7 +4801,7 @@ ${S.me.full_name}`;
   //  تحليل النتائج والاختبارات التشخيصية — للمالك ومن يمنحه (التصحيح الآلي للمالك فقط)
   // =====================================================================
   V.analysis = function (root) {
-    if (!A.hasModule('analysis')) { root.innerHTML = `<div class="card">${A.emptyBox('هذا النظام غير متاح لحسابك', 'يمنحه مالك النظام من «المسميات والصلاحيات».')}</div>`; return; }
+    if (!A.hasModule('analysis')) { root.innerHTML = `<div class="card">${A.emptyBox('هذا النظام غير متاح لحسابك')}</div>`; return; }
     root.innerHTML = `<div class="card" style="padding:10px"><div class="head" style="margin-bottom:8px"><div class="grow"><h2 style="margin:0">تحليل النتائج والاختبارات التشخيصية</h2><p class="sub" style="margin:2px 0 0">${S.me.is_owner ? 'نسختك الكاملة بما فيها التصحيح الآلي.' : 'التصحيح الآلي متاح لمالك النظام فقط.'} البيانات تُحفظ في هذا المتصفح — استخدم «النسخ الاحتياطي» داخل النظام لنقلها.</p></div><a class="btn ghost sm" href="tools/analysis.html" target="_blank" rel="noopener">فتح في نافذة مستقلة</a></div>
       <iframe id="anF" src="tools/analysis.html" title="نظام تحليل النتائج" style="width:100%;height:calc(100vh - 210px);min-height:560px;border:1px solid var(--border);border-radius:14px;background:#fff"></iframe></div>`;
     const f = $('#anF', root);
@@ -4819,7 +4822,7 @@ ${S.me.full_name}`;
   ];
   const ALLP = A.PERMS.concat(A.TOOL_PERMS);
   V.roles = function (root) {
-    if (!S.me.is_owner) { root.innerHTML = `<div class="card">${A.emptyBox('الصلاحيات تُدار من حساب المالك فقط')}</div>`; return; }
+    if (!S.me.is_owner) { root.innerHTML = ''; if (location.hash !== '#/home') location.hash = '#/home'; return; }
     const sets = () => { const c = ((S.school.settings || {}).perm_sets) || []; return BUILTIN.filter(b => !c.some(x => x.id === b.id)).concat(c); };
     const people = S.staff.filter(p => p.active && !p.is_owner);
     const memOf = (sid, sec) => S.memberships.find(m => m.staff_id === sid && m.section_id === sec);
@@ -4924,7 +4927,7 @@ ${S.me.full_name}`;
   //  الحضور والسلوك
   // =====================================================================
   V.attendance = async function (root) {
-    if (!(mod('attendance') || mod('counselor') || mod('supervision'))) { root.innerHTML = `<div class="card">${A.emptyBox('غير متاح لحسابك', 'يمنحه مالك النظام لمشرفي الأدوار والموجه الطلابي من «المسميات والصلاحيات».')}</div>`; return; }
+    if (!(mod('attendance') || mod('counselor') || mod('supervision'))) { root.innerHTML = `<div class="card">${A.emptyBox('غير متاح لحسابك')}</div>`; return; }
     root.innerHTML = '<div class="spinner"></div>';
     await loadStudents(true);
     const tabs = [mod('attendance') && A.attRecord && ['record', 'رصد الحضور'], (A.liveOK ? A.liveOK() : (mod('attendance') || mod('counselor') || mod('supervision'))) && A.attLive && ['live', 'لوحة الحضور اللحظية'], mod('attendance') && A.attPeriods && ['periods', 'حضور الحصص'], mod('attendance') && ['take', 'الحضور الصباحي'], (mod('attendance') || mod('counselor')) && ['behavior', 'السلوك'], (mod('counselor') || S.me.is_owner) && ['refer', 'الإحالات'], ['reports', 'التقارير'], S.me.is_owner && ['students', 'الطلاب']].filter(Boolean);
@@ -5135,7 +5138,7 @@ ${S.me.full_name}`;
   }
 
   V.supervision = async function (root) {
-    if (!mod('supervision')) { root.innerHTML = `<div class="card">${A.emptyBox('غير متاح لحسابك', 'يمنحه مالك النظام من «المسميات والصلاحيات».')}</div>`; return; }
+    if (!mod('supervision')) { root.innerHTML = `<div class="card">${A.emptyBox('غير متاح لحسابك')}</div>`; return; }
     root.innerHTML = '<div class="spinner"></div>';
     let [tpls, recs] = await Promise.all([api.list('sup_templates', { school_id: sch() }, { order: 'created_at' }), api.list('sup_records', { school_id: sch() }, { order: 'created_at', desc: true })]);
     const allT = () => BUILT.filter(b => !tpls.some(t => t.title === b.title)).map(b => ({ ...b, id: b.key, builtin: true })).concat(tpls);
@@ -7136,7 +7139,7 @@ ${S.me.full_name}`;
   }
 
   V.activity = function (root) {
-    if (!isOwner()) { root.innerHTML = `<div class="card">${A.emptyBox('هذه الصفحة لحساب المالك فقط')}</div>`; return; }
+    if (!isOwner()) { root.innerHTML = ''; if (location.hash !== '#/home') location.hash = '#/home'; return; }
     const st = { r: A.LS.get('ac_r') || '7', from: A.LS.get('ac_f') || '', to: A.LS.get('ac_t') || '' };
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>النشاط والدخول</h2><p class="sub" style="margin:2px 0 0">يظهر لك وحدك: مرات دخول كل موظف وآخر دخول، وتوقيت إدخال الخطط في الأسبوع المختار من أعلى الصفحة. وتوقيت كل حصة يظهر لك أيضاً أسفل حالتها في «خطط الفصول».</p></div></div>
       <div class="row" style="gap:8px;flex-wrap:wrap"><div class="chip-filter" id="acR" style="margin:0">${RANGES.map(([k, l]) => `<button data-r="${k}" class="${st.r === k ? 'on' : ''}">${l}</button>`).join('')}</div>
@@ -7169,14 +7172,15 @@ ${S.me.full_name}`;
     ['الطلاب والرعاية', ['refer', 'attendance', 'compass', 'gifted', 'counsel', 'bhadmin', 'clarify', 'deputy', 'stucodes'], '#F2C66D', '#C98A12', '🧑‍🎓'],
     ['التواصل', ['notify', 'x_notif', 'x_app', 'posts', 'board'], '#84B7E3', '#082B5A', '💬'],
     ['المتابعة والتخطيط', ['dash', 'classes', 'export', 'weeks', 'reports'], '#5E9BD3', '#082B5A', '📈'],
-    ['الجداول والأنصبة', ['studio', 'timetable', 'ttviews', 'nisab', 'plan', 'builder'], '#3AB1DB', '#0B3F8A', '🧩'],
+    ['الجداول والأنصبة', ['studio', 'timetable', 'ttviews', 'standby', 'nisab', 'plan', 'builder'], '#3AB1DB', '#0B3F8A', '🧩'],
     ['الإشراف والموارد البشرية', ['supervision', 'visits', 'forms', 'duty', 'hr'], '#F09A8E', '#D0564A', '📋'],
-    ['الإدارة', ['admin', 'roles', 'tui', 'testt', 'activity', 'archive', 'trash', 'dev'], '#9AA9BC', '#40526A', '⚙️'],
+    ['الإدارة', ['admin', 'roles', 'tui', 'testt', 'staffwork', 'activity', 'archive', 'trash', 'dev'], '#9AA9BC', '#40526A', '⚙️'],
   ];
   A.HOME_GROUPS = GROUPS;
   const DESC = {
     hwf: 'متابعة الواجبات: الحِمل اليومي لكل فصل، وواجبات كل معلم وأنواعها، والواجبات الإلكترونية وتسليماتها.',
     my: 'أدخل خطتك الأسبوعية لكل حصة وأرسلها للمراجعة.', classes: 'خطة كل فصل أسبوعياً مع الاعتماد والإرجاع والمعاينة.', dash: 'نسب الإنجاز والإرسال والاعتماد لكل فصل ومعلم.', export: 'ملفات PDF وWord للخطة بهوية دينا.', weeks: 'الأسابيع والمواعيد والإجازات.', reports: 'تقارير الالتزام والإنجاز والتنفيذ والتعديلات.',
+    standby: 'حصص الانتظار وتأمين الحصص والنموذج المعتمد بالتوقيعات.', staffwork: 'ما أنجزه كل موظف يوماً بيوم أو أسبوعياً، مع أبرز الأعمال وتقرير مفصّل.',
     studio: 'استوديو الجداول: النصاب والتوزيع والتوليد والاعتماد في مكان واحد.', timetable: 'الجدول المعتمد لكل قسم وإسناد المعلمين.', nisab: 'احتساب النصاب واحتياج المعلمين.', plan: 'توزيع الحصص بقيود مرنة وتوليد آلي.', builder: 'بناء الجدول آلياً.',
     prep: 'تحضير الدروس بالمولّد الآلي، ومكتبة المدرسة، والإدراج في الخطة.', assess: 'الاختبارات الورقية والإلكترونية: أوراق تظليل وتصحيح آلي، بنك أسئلة، تحليل ولجان وخطط علاجية.', paper: 'اختبارات ورقية بأوراق تظليل وتصحيح آلي وتحليل ومشاركة.', analysis: 'تحليل نتائج الاختبارات.', records: 'سجل متابعة الطلاب بغلاف دينا وحفظ سحابي.', resources: 'مكتبة المصادر وأوراق العمل وروابط Drive.',
     board: 'شاشة المدرسة اليومية والمتابعة اللحظية.', labs: 'محاكيات علمية ورياضية تفاعلية مصنفة بالمادة والمرحلة.', wboard: 'سبورة رسم وكتابة وصفحات للعرض على السبورة الذكية.', games: 'مسابقة مباشرة برمز يجيب فيها الطلاب من جوالاتهم، وألعاب ذاتية (بطاقات، مطابقة، تحدٍّ، صح أم خطأ، عجلة) من بنك الأسئلة.', stucodes: 'رموز دخول الطلاب إلى «حسابي»: خطة الفصل والاختبارات والنتائج، مع بطاقات QR وإرسال واتساب.', duty: 'جداول الإشراف والمناوبة المرتبطة بالجدول الزمني، والتوزيع العادل، والمتابعة اللحظية للتواجد.', attendance: 'الحضور والسلوك والإحالات.', supervision: 'نماذج الإشراف التربوي والزيارات والتقارير.', myreports: 'تقارير الإشراف الموجهة إليك.', posts: 'إعلانات أولياء الأمور.',
@@ -7255,7 +7259,7 @@ ${S.me.full_name}`;
   const stg = c => { const s = String(c.stage || '') + ' ' + c.name; return /ابتدائ/.test(s) ? 'p' : /متوسط/.test(s) ? 'm' : /ثانوي/.test(s) ? 's' : ''; };
 
   V.studio = function (root) {
-    if (!S.me.is_owner) { root.innerHTML = `<div class="card">${A.emptyBox('استوديو الجداول لحساب المالك فقط')}</div>`; return; }
+    if (!S.me.is_owner) { root.innerHTML = ''; if (location.hash !== '#/home') location.hash = '#/home'; return; }
     let t = A.LS.get('studio_t') || 'plan'; if (!TABS.some(x => x[0] === t)) t = 'plan';
     const ap = (S.school.settings || {}).nisab_ok || {};
     root.innerHTML = `<div class="card st-head"><div class="head"><div class="grow"><h2>استوديو الجداول والأنصبة</h2><p class="sub" style="margin:2px 0 0">من النصاب إلى الجدول المعتمد في مكان واحد. لكل قسم جدوله الخاص، ويُكشف تعارض المعلم المشترك بين الأقسام تلقائياً. الأقسام تُضاف من «الإدارة ← المدرسة والأقسام».</p></div></div>
@@ -7632,7 +7636,7 @@ ${S.me.full_name}`;
 
   // ---------- الواجهة ----------
   V.bell = function (root) {
-    if (!S.me.is_owner) { root.innerHTML = `<div class="card">${A.emptyBox('هذه الإعدادات لحساب المالك')}</div>`; return; }
+    if (!S.me.is_owner) { root.innerHTML = ''; if (location.hash !== '#/home') location.hash = '#/home'; return; }
     const sec = A.section(); let b = bellOf(sec);
     let cur = A.LS.get('bell_s_' + sec.id); if (!b.schedules.some(s => s.id === cur)) cur = b.def;
     let pvCls = '', dirty = false, saving = null;
@@ -10287,14 +10291,36 @@ ${S.me.full_name}`;
 
 /* ==== src/schedule/standby.js ==== */
 ;try{
-/* منصة دينا — حصص الانتظار وتأمين الحصص (استوديو الجداول ← «حصص الانتظار وتأمين الحصص»)
-   (١) جدول الانتظار الأسبوعي: توزيع عادل آلي (منتظر ١، منتظر ٢…) على من نصابه أقل من الحد، في حصص فراغه فقط، مع حد يومي.
-   (٢) تأمين حصص اليوم: تحديد الغائبين ← تُسند حصصهم تلقائياً للمنتظرين ثم للأقل تغطية، مع تعديل يدوي وحفظ وطباعة. */
+/* منصة دينا — حصص الانتظار وتأمين الحصص (استوديو الجداول ← «حصص الانتظار وتأمين الحصص»، وبند قائمة لمن يُسند إليه)
+   (١) جدول الانتظار الأسبوعي: توزيع عادل آلي (منتظر ١، منتظر ٢…) على من نصابه أقل من الحد، في حصص فراغه فقط، مع حد يومي وقيود لكل معلم.
+   (٢) تأمين حصص اليوم: الغائبون ← البديل لكل حصة بالأولوية: معلم فصله خالٍ (لم يحضر أحد) ← المنتظر ← الأقل تغطية،
+       مع القيود (مستثنى / عند الضرورة فقط / حد يومي وأسبوعي / أيام وحصص ممنوعة) ← حفظ ← إرسال للاعتماد ← اعتماد (sql/109: sb_approve).
+   (٣) نموذج التأمين المعتمد: جدول بتوقيع كل معلم بديل أمام حصته (إلكترونياً من حسابه sb_sign أو ورقياً)، وأسفله توقيعات الاعتماد
+       (افتراضياً: وكيل المدرسة، المدير الأكاديمي، مدير المدرسة) — التلقائي منها يُختم عند الاعتماد من خزنة المالك owner_vault أو توقيع الحساب المرتبط.
+   الصلاحيات المقسّمة (منح الوحدات module_grants): sb_view عرض · sb_cover إعداد التأمين · sb_roster جدول الانتظار · sb_approve الاعتماد · sb_print الطباعة والتصدير.
+   الإعدادات والقيود ونموذج الاعتماد للمالك وحده. المعلم البديل يرى حصصه ويوقّع عليها بمفتاح tfeat('sbsign'). */
 (function () {
   const A = window.APP, V = window.VIEWS, { S, api, $, $$, esc, AR, DAYS, PER, I } = A;
   const today = () => new Date(Date.now() + 3 * 36e5).toISOString().slice(0, 10);
   const pn = id => A.personName(id) || '—';
   const cName = id => (A.cls(id) || {}).name || '';
+  const own = () => !!(S.me && S.me.is_owner && !S.realMe);
+  const mod = m => !!S.me && (S.grants || []).some(g => g.module === m && g.staff_id === S.me.id);
+  const SBM = [['sb_view', 'عرض', 'يطّلع على جدول الانتظار والتأمين والنموذج المعتمد'], ['sb_cover', 'إعداد التأمين', 'يحدد الغائبين والفصول الخالية ويوزّع البدلاء ويرسلها للاعتماد'], ['sb_roster', 'جدول الانتظار', 'يوزّع جدول الانتظار الأسبوعي ويعدّله'], ['sb_approve', 'الاعتماد', 'يعتمد تأمين اليوم أو يلغي اعتماده (ويشمل إعداد التأمين)'], ['sb_print', 'الطباعة والتصدير', 'يطبع النماذج والتقارير ويصدّرها Excel']];
+  // can: نفس منطق sb_ok في القاعدة
+  const can = k => own() || A.perm('timetable_edit') || mod('sb_' + k) || (k === 'view' && SBM.some(([m]) => mod(m))) || (k === 'cover' && mod('sb_approve')) || (k === 'print' && (mod('sb_cover') || mod('sb_approve')));
+  A.sbCan = can;
+  if (!A.I.standby) A.I.standby = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><path d="M3 20v-1a6 6 0 0 1 9-5.2"/><path d="M16 13l2 2 4-4"/><rect x="13" y="16" width="0" height="0"/></svg>';
+  if (A.NAV && !A.NAV.some(n => n[0] === 'standby')) { const i = A.NAV.findIndex(n => n[0] === 'timetable'); A.NAV.splice(i < 0 ? A.NAV.length : i + 1, 0, ['standby', 'حصص الانتظار', () => !!S.me && !S.me.is_owner && (can('view') || (A.tfeat && A.tfeat('sbsign')))]); }
+
+  const DEF_SIGS = () => [{ id: 'wk', title: 'وكيل المدرسة', name: 'أحمد رضوان المالكي', mode: 'blank' }, { id: 'ad', title: 'المدير الأكاديمي', name: 'أحمد عبد العظيم صلاح', mode: 'auto' }, { id: 'pr', title: 'مدير المدرسة', name: 'إبراهيم حسن الفيفي', mode: 'auto' }];
+  const FORM_DEF = () => ({ title: 'نموذج تأمين حصص الانتظار', tsig: 'e', showRoster: false, note: '', sigs: DEF_SIGS() });
+  const cfgOf = sec => { const c = Object.assign({ max: 24, per: 2, perDay: 2, excl: [], roster: {}, rules: {}, prio: 'first', coverDay: 2 }, sec.standby || {}); c.form = Object.assign(FORM_DEF(), c.form || {}); if (!Array.isArray(c.form.sigs)) c.form.sigs = DEF_SIGS(); c.rules = c.rules || {}; c.excl = c.excl || []; return c; };
+  // قيود المعلم: mode normal|limit|last|never، perDay، perWeek، days[]، periods[]، why
+  const ruleOf = (cfg, t) => Object.assign({ mode: cfg.excl.includes(t) ? 'never' : 'normal', perDay: 0, perWeek: 0, days: [], periods: [], why: '' }, cfg.rules[t] || {});
+  const blocked = (r, d, p) => r.mode === 'never' || (r.days || []).includes(d) || (r.periods || []).includes(p);
+  const RMODE = { normal: 'عادي', limit: 'بحد خاص', last: 'عند الضرورة فقط', never: 'مستثنى' };
+
   let CACHE = null;
   async function load() {
     const vers = await api.list('timetable_versions', { status: 'approved' });
@@ -10306,100 +10332,320 @@ ${S.me.full_name}`;
     const T = [...new Set(mine.filter(x => x.teacher_id).map(x => x.teacher_id))].sort((a, b) => pn(a).localeCompare(pn(b), 'ar'));
     CACHE = { vers, slots, cur, load, busy, mine, T }; return CACHE;
   }
-  const cfgOf = sec => Object.assign({ max: 24, per: 2, perDay: 2, excl: [], roster: {} }, sec.standby || {});
 
   function generate(C, cfg, sec) {
     const days = Array.from({ length: sec.days || 5 }, (_, i) => i), P = sec.periods || 7;
-    const elig = C.T.filter(t => !cfg.excl.includes(t) && (C.load[t] || 0) < cfg.max);
-    const cap = t => cfg.max - (C.load[t] || 0), cnt = {}, dayCnt = {}, R = {};
+    const R0 = t => ruleOf(cfg, t);
+    const elig = C.T.filter(t => R0(t).mode !== 'never' && (C.load[t] || 0) < cfg.max);
+    const cap = t => { const r = R0(t), c = cfg.max - (C.load[t] || 0); return r.perWeek ? Math.min(c, r.perWeek) : c; };
+    const dayCap = t => { const r = R0(t); return r.perDay ? Math.min(r.perDay, cfg.perDay) : cfg.perDay; };
+    const cnt = {}, dayCnt = {}, R = {};
     const order = []; for (let k = 0; k < cfg.per; k++) for (const d of days) for (let p = 0; p < P; p++) order.push({ d, p, k });
     const miss = [];
     order.forEach(({ d, p, k }) => { const key = d + '|' + p; R[key] = R[key] || [];
-      const c = elig.filter(t => !C.busy.has(t + '|' + d + '|' + p) && !R[key].includes(t) && (cnt[t] || 0) < cap(t) && (dayCnt[t + '|' + d] || 0) < cfg.perDay)
-        .sort((a, b) => ((cnt[a] || 0) / cap(a)) - ((cnt[b] || 0) / cap(b)) || (C.load[a] || 0) - (C.load[b] || 0) || (dayCnt[a + '|' + d] || 0) - (dayCnt[b + '|' + d] || 0));
+      const c = elig.filter(t => !C.busy.has(t + '|' + d + '|' + p) && !R[key].includes(t) && !blocked(R0(t), d, p) && (cnt[t] || 0) < cap(t) && (dayCnt[t + '|' + d] || 0) < dayCap(t))
+        .sort((a, b) => (R0(a).mode === 'last') - (R0(b).mode === 'last') || ((cnt[a] || 0) / cap(a)) - ((cnt[b] || 0) / cap(b)) || (C.load[a] || 0) - (C.load[b] || 0) || (dayCnt[a + '|' + d] || 0) - (dayCnt[b + '|' + d] || 0));
       if (!c.length) { miss.push({ d, p, k }); return; }
       const t = c[0]; R[key][k] = t; cnt[t] = (cnt[t] || 0) + 1; dayCnt[t + '|' + d] = (dayCnt[t + '|' + d] || 0) + 1; });
     return { roster: R, miss, elig };
   }
 
+  // ---------- الصفحة ----------
   V.standby = async function (root) {
-    if (!S.me.is_owner) { root.innerHTML = `<div class="card">${A.emptyBox('لحساب المالك')}</div>`; return; }
+    if (!can('view')) { if (A.tfeat && A.tfeat('sbsign')) return mine(root, true); root.innerHTML = ''; if (location.hash !== '#/home') location.hash = '#/home'; return; }
+    css();
     root.innerHTML = '<div class="card"><div class="spinner"></div></div>';
     const sec = A.section(); let C; try { C = await load(); } catch (e) { root.innerHTML = `<div class="card">${A.emptyBox('تعذّر التحميل', esc(e.message))}</div>`; return; }
     if (!C.cur) { root.innerHTML = `<div class="card">${A.emptyBox('لا يوجد جدول معتمد لهذا القسم')}</div>`; return; }
-    let tab = A.LS.get('sb_t') || 'roster';
-    root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2 style="margin:0">حصص الانتظار وتأمين الحصص — ${esc(sec.name)}</h2><p class="sub" style="margin:2px 0 0">يُحسب النصاب من كل الجداول المعتمدة (كل الأقسام)، وتُختار حصص الفراغ فقط فلا تعارض.</p></div></div>
-      <div class="kpick" id="sbT"><button data-t="roster">جدول الانتظار الأسبوعي</button><button data-t="cover">تأمين حصص اليوم</button><button data-t="stats">تقرير العدالة</button></div><div id="sbB" style="margin-top:10px"></div></div>`;
+    const TABS = [['roster', 'جدول الانتظار الأسبوعي'], ['cover', 'تأمين حصص اليوم'], ['stats', 'تقرير العدالة']];
+    if (A.tfeat && A.tfeat('sbsign') && !own()) TABS.push(['mine', 'حصصي']);
+    let tab = A.LS.get('sb_t') || 'cover'; if (!TABS.some(t => t[0] === tab)) tab = 'cover';
+    root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2 style="margin:0">حصص الانتظار وتأمين الحصص — ${esc(sec.name)}</h2><p class="sub" style="margin:2px 0 0">يُحسب النصاب من كل الجداول المعتمدة (كل الأقسام)، وتُختار حصص الفراغ فقط فلا تعارض.</p></div>
+        ${own() ? `<div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn ghost sm" id="sbRules">⚖️ قيود التوزيع العادل</button><button class="btn ghost sm" id="sbForm">✍️ نموذج الاعتماد والتوقيعات</button><button class="btn ghost sm" id="sbPerm">🔑 الصلاحيات</button></div>` : ''}</div>
+      <div class="kpick" id="sbT">${TABS.map(([k, l]) => `<button data-t="${k}">${l}</button>`).join('')}</div><div id="sbB" style="margin-top:10px"></div></div>`;
     $$('#sbT button', root).forEach(b => { b.classList.toggle('on', b.dataset.t === tab); b.onclick = () => { A.LS.set('sb_t', b.dataset.t); V.standby(root); }; });
+    if (own()) { $('#sbRules', root).onclick = () => rulesDialog(C, sec, () => V.standby(root)); $('#sbForm', root).onclick = () => formDialog(sec, () => V.standby(root)); $('#sbPerm', root).onclick = () => permDialog(); }
     const B = $('#sbB', root);
+    if (tab === 'mine') return mine(B, false);
     ({ roster, cover, stats })[tab](B, C, sec, root);
   };
+
+  const saveCfg = async (sec, cfg) => { const r = await api.updateSection(sec.id, { standby: cfg }); Object.assign(sec, r); };
 
   // ---------- جدول الانتظار الأسبوعي ----------
   function roster(B, C, sec, root) {
     const cfg = cfgOf(sec), days = Array.from({ length: sec.days || 5 }, (_, i) => i), P = sec.periods || 7;
-    const saveCfg = async () => { const r = await api.updateSection(sec.id, { standby: cfg }); Object.assign(sec, r); };
-    const cnt = {}; Object.values(cfg.roster).forEach(l => (l || []).forEach(t => { if (t) cnt[t] = (cnt[t] || 0) + 1; }));
-    const elig = C.T.filter(t => !cfg.excl.includes(t) && (C.load[t] || 0) < cfg.max);
-    B.innerHTML = `<div class="grid g3"><div class="field"><label for="sbM">من نصابه أقل من</label><input class="in" type="number" id="sbM" min="1" max="40" value="${cfg.max}"></div><div class="field"><label for="sbP">عدد المنتظرين في كل حصة</label><input class="in" type="number" id="sbP" min="1" max="6" value="${cfg.per}"></div><div class="field"><label for="sbD">أقصى انتظار للمعلم في اليوم</label><input class="in" type="number" id="sbD" min="1" max="6" value="${cfg.perDay}"></div></div>
-      <details class="dz-det"><summary>المعلمون المؤهلون (${AR(elig.length)} من ${AR(C.T.length)}) — يمكنك استثناء أي معلم</summary><div class="perm-grid" style="margin-top:6px">${C.T.map(t => `<label class="chk ${(C.load[t] || 0) >= cfg.max ? 'faint' : ''}"><input type="checkbox" data-ex="${t}" ${cfg.excl.includes(t) ? '' : 'checked'} ${(C.load[t] || 0) >= cfg.max ? 'disabled' : ''}> ${esc(pn(t))} <span class="small muted">· نصابه ${AR(C.load[t] || 0)}</span></label>`).join('')}</div></details>
-      <div class="row" style="gap:6px;margin:10px 0;flex-wrap:wrap"><button class="btn" id="sbGen">${Object.keys(cfg.roster).length ? 'إعادة التوزيع العادل' : 'توزيع عادل تلقائي'}</button><button class="btn ghost" id="sbPr">${I.print || ''} طباعة الأسبوعي</button><button class="btn ghost" id="sbPd">${I.print || ''} طباعة جدول يوم</button><select class="in" id="sbPdD" style="width:auto">${days.map(d => `<option value="${d}">${DAYS[d]}</option>`).join('')}</select><button class="btn ghost" id="sbX">Excel</button>${cfg.gen ? `<span class="small muted">آخر توزيع: ${A.fmtDT(cfg.gen)}</span>` : ''}</div>
-      <div class="scroll"><table class="tbl sb-g"><thead><tr><th>اليوم</th>${Array.from({ length: P }, (_, p) => `<th>${PER[p] || AR(p + 1)}</th>`).join('')}</tr></thead><tbody>${days.map(d => `<tr><th>${DAYS[d]}</th>${Array.from({ length: P }, (_, p) => { const l = cfg.roster[d + '|' + p] || []; return `<td>${Array.from({ length: cfg.per }, (_, k) => `<select class="in sb-s" data-k="${d}|${p}|${k}" aria-label="منتظر ${AR(k + 1)} — ${DAYS[d]} الحصة ${AR(p + 1)}"><option value="">منتظر ${AR(k + 1)} —</option>${elig.filter(t => !C.busy.has(t + '|' + d + '|' + p) || t === l[k]).map(t => `<option value="${t}" ${t === l[k] ? 'selected' : ''}>${esc(pn(t))}</option>`).join('')}</select>`).join('')}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>
-      <p class="small muted">القائمة في كل خانة لا تعرض إلا المعلمين الذين لديهم فراغ في تلك الحصة. يُطبَّق التعديل اليدوي ويُحفظ فوراً.</p>`;
-    const num = (id, k, lo, hi) => $(id, B).onchange = e => { cfg[k] = Math.max(lo, Math.min(hi, +e.target.value || cfg[k])); saveCfg().then(() => roster(B, C, sec, root)); };
-    num('#sbM', 'max', 1, 40); num('#sbP', 'per', 1, 6); num('#sbD', 'perDay', 1, 6);
-    $$('[data-ex]', B).forEach(c => c.onchange = () => { const t = c.dataset.ex; cfg.excl = cfg.excl.filter(x => x !== t); if (!c.checked) cfg.excl.push(t); saveCfg(); });
-    $$('[data-k]', B).forEach(s => s.onchange = () => { const [d, p, k] = s.dataset.k.split('|'); const key = d + '|' + p; cfg.roster[key] = cfg.roster[key] || []; cfg.roster[key][+k] = s.value || null; saveCfg().then(() => A.toast('حُفظ', 'ok')); });
-    $('#sbGen', B).onclick = e => A.run(e.currentTarget, async () => { if (Object.keys(cfg.roster).length && !(await A.confirmBox('إعادة توزيع جدول الانتظار بالكامل؟ التعديلات اليدوية الحالية تُستبدل.', 'توزيع'))) return; const r = generate(C, cfg, sec); cfg.roster = r.roster; cfg.gen = new Date().toISOString(); await saveCfg(); A.toast(r.miss.length ? `وُزّع الجدول · ${AR(r.miss.length)} خانة بلا منتظر متاح` : 'وُزّع جدول الانتظار بعدالة ✓', r.miss.length ? 'warn' : 'ok'); roster(B, C, sec, root); });
+    const edit = can('roster'), setts = own();
+    const saveRoster = async () => { if (setts) return saveCfg(sec, cfg); const r = await api.rpc('sb_save_roster', { p_section: sec.id, p_roster: cfg.roster, p_gen: cfg.gen || null }); if (r) sec.standby = r; else sec.standby = Object.assign({}, sec.standby || {}, { roster: cfg.roster, gen: cfg.gen }); };
+    const elig = C.T.filter(t => ruleOf(cfg, t).mode !== 'never' && (C.load[t] || 0) < cfg.max);
+    const nRules = Object.keys(cfg.rules).filter(t => ruleOf(cfg, t).mode !== 'normal' || (cfg.rules[t].days || []).length || (cfg.rules[t].periods || []).length).length + cfg.excl.filter(t => !cfg.rules[t]).length;
+    B.innerHTML = `${setts ? `<div class="grid g3"><div class="field"><label for="sbM">من نصابه أقل من</label><input class="in" type="number" id="sbM" min="1" max="40" value="${cfg.max}"></div><div class="field"><label for="sbP">عدد المنتظرين في كل حصة</label><input class="in" type="number" id="sbP" min="1" max="6" value="${cfg.per}"></div><div class="field"><label for="sbD">أقصى انتظار للمعلم في اليوم</label><input class="in" type="number" id="sbD" min="1" max="6" value="${cfg.perDay}"></div></div>
+      <p class="small muted" style="margin:0 0 6px">المؤهلون ${AR(elig.length)} من ${AR(C.T.length)} معلماً${nRules ? ` · ${AR(nRules)} معلم بقيود خاصة` : ''} — <button class="linkbtn" id="sbRules2">تعديل القيود والاستثناءات</button></p>` : ''}
+      <div class="row" style="gap:6px;margin:10px 0;flex-wrap:wrap">${edit ? `<button class="btn" id="sbGen">${Object.keys(cfg.roster).length ? 'إعادة التوزيع العادل' : 'توزيع عادل تلقائي'}</button>` : ''}${can('print') ? `<button class="btn ghost" id="sbPr">${I.print || ''} طباعة الأسبوعي</button><button class="btn ghost" id="sbPd">${I.print || ''} طباعة جدول يوم</button><select class="in" id="sbPdD" style="width:auto" aria-label="اليوم">${days.map(d => `<option value="${d}">${DAYS[d]}</option>`).join('')}</select><button class="btn ghost" id="sbX">Excel</button>` : ''}${cfg.gen ? `<span class="small muted">آخر توزيع: ${A.fmtDT(cfg.gen)}</span>` : ''}</div>
+      <div class="scroll"><table class="tbl sb-g"><thead><tr><th>اليوم</th>${Array.from({ length: P }, (_, p) => `<th>${PER[p] || AR(p + 1)}</th>`).join('')}</tr></thead><tbody>${days.map(d => `<tr><th>${DAYS[d]}</th>${Array.from({ length: P }, (_, p) => { const l = cfg.roster[d + '|' + p] || []; return `<td>${Array.from({ length: cfg.per }, (_, k) => edit ? `<select class="in sb-s" data-k="${d}|${p}|${k}" aria-label="منتظر ${AR(k + 1)} — ${DAYS[d]} الحصة ${AR(p + 1)}"><option value="">منتظر ${AR(k + 1)} —</option>${elig.filter(t => (!C.busy.has(t + '|' + d + '|' + p) && !blocked(ruleOf(cfg, t), d, p)) || t === l[k]).map(t => `<option value="${t}" ${t === l[k] ? 'selected' : ''}>${esc(pn(t))}</option>`).join('')}</select>` : `<div class="small">${l[k] ? `<span class="muted">${AR(k + 1)}:</span> ${esc(pn(l[k]))}` : '—'}</div>`).join('')}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>
+      ${edit ? '<p class="small muted">القائمة في كل خانة لا تعرض إلا المعلمين الذين لديهم فراغ في تلك الحصة ولا تمنعهم قيودهم. يُحفظ التعديل اليدوي فوراً.</p>' : ''}`;
+    if (setts) { const num = (id, k, lo, hi) => $(id, B).onchange = e => { cfg[k] = Math.max(lo, Math.min(hi, +A.norm(e.target.value) || cfg[k])); saveCfg(sec, cfg).then(() => roster(B, C, sec, root)); };
+      num('#sbM', 'max', 1, 40); num('#sbP', 'per', 1, 6); num('#sbD', 'perDay', 1, 6); $('#sbRules2', B).onclick = () => rulesDialog(C, sec, () => roster(B, C, sec, root)); }
+    $$('[data-k]', B).forEach(s => s.onchange = () => A.run(null, async () => { const [d, p, k] = s.dataset.k.split('|'); const key = d + '|' + p; cfg.roster[key] = cfg.roster[key] || []; cfg.roster[key][+k] = s.value || null; await saveRoster(); A.toast('حُفظ', 'ok'); }));
+    const g = $('#sbGen', B); if (g) g.onclick = e => A.run(e.currentTarget, async () => { if (Object.keys(cfg.roster).length && !(await A.confirmBox('إعادة توزيع جدول الانتظار بالكامل؟ التعديلات اليدوية الحالية تُستبدل.', 'توزيع'))) return; const r = generate(C, cfg, sec); cfg.roster = r.roster; cfg.gen = new Date().toISOString(); await saveRoster(); A.toast(r.miss.length ? `وُزّع الجدول · ${AR(r.miss.length)} خانة بلا منتظر متاح` : 'وُزّع جدول الانتظار بعدالة ✓', r.miss.length ? 'warn' : 'ok'); roster(B, C, sec, root); });
+    if (!can('print')) return;
     const tbl = dl => `<table><tr><th>اليوم</th>${Array.from({ length: P }, (_, p) => `<th>${AR(p + 1)}</th>`).join('')}</tr>${dl.map(d => `<tr><td><b>${DAYS[d]}</b></td>${Array.from({ length: P }, (_, p) => `<td>${(cfg.roster[d + '|' + p] || []).map((t, k) => t ? `<div><small>منتظر ${AR(k + 1)}:</small> ${esc(pn(t))}</div>` : '').join('') || '—'}</td>`).join('')}</tr>`).join('')}</table>`;
     $('#sbPr', B).onclick = () => A.printDoc('جدول حصص الانتظار', sec.name, tbl(days), true);
     $('#sbPd', B).onclick = () => { const d = +$('#sbPdD', B).value; A.printDoc(`جدول المنتظرين — يوم ${DAYS[d]}`, sec.name, `<table><tr><th>الحصة</th>${Array.from({ length: cfg.per }, (_, k) => `<th>منتظر ${AR(k + 1)}</th>`).join('')}</tr>${Array.from({ length: P }, (_, p) => `<tr><td><b>${PER[p] || AR(p + 1)}</b></td>${Array.from({ length: cfg.per }, (_, k) => `<td>${esc(pn((cfg.roster[d + '|' + p] || [])[k]))}</td>`).join('')}</tr>`).join('')}</table>`, false); };
-    $('#sbX', B).onclick = () => { const rows = []; days.forEach(d => { for (let p = 0; p < P; p++) { const o = { 'اليوم': DAYS[d], 'الحصة': p + 1 }; for (let k = 0; k < cfg.per; k++) o['منتظر ' + (k + 1)] = (cfg.roster[d + '|' + p] || [])[k] ? pn(cfg.roster[d + '|' + p][k]) : ''; rows.push(o); } }); const ws = XLSX.utils.json_to_sheet(rows); ws['!views'] = [{ RTL: true }]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'الانتظار'); XLSX.writeFile(wb, 'جدول الانتظار - ' + sec.name + '.xlsx'); };
+    $('#sbX', B).onclick = () => { const rows = []; days.forEach(d => { for (let p = 0; p < P; p++) { const o = { 'اليوم': DAYS[d], 'الحصة': p + 1 }; for (let k = 0; k < cfg.per; k++) o['منتظر ' + (k + 1)] = (cfg.roster[d + '|' + p] || [])[k] ? pn(cfg.roster[d + '|' + p][k]) : ''; rows.push(o); } }); xlsx(rows, 'الانتظار', 'جدول الانتظار - ' + sec.name); };
   }
+  const xlsx = (rows, sheet, file) => { const ws = XLSX.utils.json_to_sheet(rows); ws['!views'] = [{ RTL: true }]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, sheet); XLSX.writeFile(wb, file + '.xlsx'); };
 
   // ---------- تأمين حصص اليوم ----------
+  const ST = { draft: ['مسودة', 'st-empty'], pending: ['بانتظار الاعتماد', 'st-submitted'], approved: ['معتمد', 'st-approved'] };
   async function cover(B, C, sec, root) {
-    const cfg = cfgOf(sec); let day = A.LS.get('sb_day') || today(); let abs = new Set((A.LS.get('sb_abs_' + day) || '').split(',').filter(Boolean));
+    const cfg = cfgOf(sec); let day = A.LS.get('sb_day') || today(); let abs = null, empty = null, DAYROW = null;
+    const ed = can('cover'), apv = can('approve');
     const draw = async () => {
-      const d = A.parseDate(day).getDay(), P = sec.periods || 7;
-      const [ex, hist] = await Promise.all([api.list('substitutions', { section_id: sec.id, day }).catch(() => []), api.list('substitutions', { section_id: sec.id }, { select: 'sub_teacher,day', gte: { day: (() => { const x = A.parseDate(day); x.setDate(x.getDate() - 30); return A.isoDate(x); })() } }).catch(() => [])]);
-      ex.forEach(x => { if (x.absent_teacher) abs.add(x.absent_teacher); });
-      const hrA = await api.list('staff_att', { school_id: S.school.id, day }).catch(() => []); const hrAbs = hrA.filter(x => ['absent', 'leave'].includes(x.status) && C.T.includes(x.staff_id)); hrAbs.forEach(x => abs.add(x.staff_id));
-      const covN = {}; hist.forEach(x => { if (x.sub_teacher) covN[x.sub_teacher] = (covN[x.sub_teacher] || 0) + 1; });
-      const needs = C.mine.filter(x => x.day === d && x.subject_id && x.teacher_id && abs.has(x.teacher_id)).sort((a, b) => a.period - b.period || cName(a.class_id).localeCompare(cName(b.class_id), 'ar'));
-      const taken = {}; const pickFor = x => { const e = ex.find(y => y.class_id === x.class_id && y.period === x.period); if (e) return e.sub_teacher; const k = d + '|' + x.period, used = taken[x.period] = taken[x.period] || new Set();
-        const free = t => t && !abs.has(t) && !C.busy.has(t + '|' + d + '|' + x.period) && !used.has(t);
-        const sb = (cfg.roster[k] || []).find(free); if (sb) { used.add(sb); return sb; }
-        const alt = C.T.filter(t => free(t) && !cfg.excl.includes(t)).sort((a, b) => (covN[a] || 0) - (covN[b] || 0) || (C.load[a] || 0) - (C.load[b] || 0))[0]; if (alt) used.add(alt); return alt || ''; };
-      const rows = needs.map(x => ({ x, sub: pickFor(x), saved: ex.some(y => y.class_id === x.class_id && y.period === x.period) }));
-      B.innerHTML = `<div class="row" style="gap:8px;flex-wrap:wrap;align-items:end"><div class="field" style="margin:0"><label for="cvD">اليوم</label><input class="in" type="date" id="cvD" value="${day}"></div><span class="small muted">${DAYS[d] || ''}</span></div>
-        ${hrAbs.length ? `<div class="notice info" style="display:block;margin-top:8px">حُدِّد ${A.cnt(hrAbs.length, 'غائب', 'غائبين')} تلقائياً من رصد الموارد البشرية، واقتُرح لكل حصة بديل — راجع ثم اعتمد.</div>` : ''}
-        <div class="field" style="margin-top:8px"><label>المعلمون الغائبون</label><div class="sb-abs">${C.T.map(t => `<label class="chk ${abs.has(t) ? 'on' : ''}"><input type="checkbox" data-ab="${t}" ${abs.has(t) ? 'checked' : ''}> ${esc(pn(t))}</label>`).join('')}</div></div>
-        ${rows.length ? `<div class="scroll"><table class="tbl"><thead><tr><th>الحصة</th><th>الفصل</th><th>المادة</th><th>الغائب</th><th>البديل</th><th></th></tr></thead><tbody>${rows.map((r, i) => { const k = d + '|' + r.x.period, sb = cfg.roster[k] || []; const opts = C.T.filter(t => !abs.has(t) && (!C.busy.has(t + '|' + d + '|' + r.x.period) || t === r.sub));
-          return `<tr><td>${PER[r.x.period] || AR(r.x.period + 1)}</td><td><b>${esc(cName(r.x.class_id))}</b></td><td>${esc(A.subjName(r.x.subject_id))}</td><td class="small">${esc(pn(r.x.teacher_id))}</td><td><select class="in" data-sub="${i}"><option value="">— بلا بديل —</option>${opts.map(t => `<option value="${t}" ${t === r.sub ? 'selected' : ''}>${esc(pn(t))}${sb.includes(t) ? ` (منتظر ${AR(sb.indexOf(t) + 1)})` : ''} · غطّى ${AR(covN[t] || 0)}</option>`).join('')}</select></td><td>${r.saved ? '<span class="pill st-approved">محفوظ</span>' : '<span class="pill st-submitted">مقترح</span>'}</td></tr>`; }).join('')}</tbody></table></div>
-          <div class="acts" style="flex-wrap:wrap"><button class="btn ok" id="cvSv">${I.check} اعتماد التأمين</button><button class="btn ghost" id="cvPr">${I.print || ''} طباعة تأمين اليوم</button></div>` : `<p class="small muted" style="margin-top:8px">${abs.size ? 'لا حصص للغائبين في هذا اليوم.' : 'حدد المعلمين الغائبين لتظهر حصصهم والبديل المقترح لكل حصة.'}</p>`}`;
-      $('#cvD', B).onchange = e => { day = e.target.value; A.LS.set('sb_day', day); abs = new Set((A.LS.get('sb_abs_' + day) || '').split(',').filter(Boolean)); draw(); };
+      const d = A.parseDate(day).getDay(), P = sec.periods || 7, wk0 = (() => { const x = A.parseDate(day); x.setDate(x.getDate() - x.getDay()); return A.isoDate(x); })();
+      B.innerHTML = '<div class="spinner"></div>';
+      const back30 = (() => { const x = A.parseDate(day); x.setDate(x.getDate() - 30); return A.isoDate(x); })();
+      const [ex, hist, hrA, dr] = await Promise.all([api.list('substitutions', { section_id: sec.id, day }).catch(() => []), api.list('substitutions', { section_id: sec.id }, { select: 'sub_teacher,day', gte: { day: back30 } }).catch(() => []), api.list('staff_att', { school_id: S.school.id, day }).catch(() => []), api.list('standby_days', { section_id: sec.id, day }).catch(() => [])]);
+      DAYROW = dr[0] || null; const status = DAYROW ? DAYROW.status : (ex.length ? 'draft' : '');
+      const locked = status === 'approved';
+      const hrAbs = hrA.filter(x => ['absent', 'leave'].includes(x.status) && C.T.includes(x.staff_id));
+      if (!abs) { abs = new Set((A.LS.get('sb_abs_' + day) || '').split(',').filter(Boolean)); ex.forEach(x => { if (x.absent_teacher) abs.add(x.absent_teacher); }); hrAbs.forEach(x => abs.add(x.staff_id)); }
+      if (!empty) empty = (DAYROW && DAYROW.empty) || [];
+      const isEmpty = (cid, p) => empty.some(e => e.class_id === cid && (!(e.periods || []).length || e.periods.includes(p)));
+      const covN = {}, wkN = {}; hist.forEach(x => { if (x.sub_teacher) { covN[x.sub_teacher] = (covN[x.sub_teacher] || 0) + 1; if (x.day >= wk0 && x.day !== day) wkN[x.sub_teacher] = (wkN[x.sub_teacher] || 0) + 1; } });
+      // من صار فارغاً لأن فصله خالٍ في هذه الحصة
+      const freedAt = p => new Set(C.mine.filter(x => x.day === d && x.period === p && x.teacher_id && x.subject_id && isEmpty(x.class_id, p)).map(x => x.teacher_id));
+      const needs = C.mine.filter(x => x.day === d && x.subject_id && x.teacher_id && abs.has(x.teacher_id) && !isEmpty(x.class_id, x.period)).sort((a, b) => a.period - b.period || cName(a.class_id).localeCompare(cName(b.class_id), 'ar'));
+      const taken = {}, dayN = {};
+      const okFor = (t, p) => { const r = ruleOf(cfg, t); if (blocked(r, d, p)) return false; const lim = r.perDay || cfg.coverDay || 99; if ((dayN[t] || 0) >= lim) return false; if (r.perWeek && (wkN[t] || 0) + (dayN[t] || 0) >= r.perWeek) return false; return true; };
+      const isFree = (t, p) => t && !abs.has(t) && (!C.busy.has(t + '|' + d + '|' + p) || freedAt(p).has(t));
+      const pickFor = x => { const e = ex.find(y => y.class_id === x.class_id && y.period === x.period); const used = taken[x.period] = taken[x.period] || new Set();
+        if (e && e.sub_teacher) { used.add(e.sub_teacher); dayN[e.sub_teacher] = (dayN[e.sub_teacher] || 0) + 1; return { t: e.sub_teacher, why: e.prio || e.kind }; }
+        const free = t => isFree(t, x.period) && !used.has(t) && okFor(t, x.period);
+        const take = (t, why) => { used.add(t); dayN[t] = (dayN[t] || 0) + 1; return { t, why }; };
+        const fr = [...freedAt(x.period)].filter(free).sort((a, b) => (covN[a] || 0) - (covN[b] || 0));
+        const sb = (cfg.roster[d + '|' + x.period] || []).find(t => free(t));
+        if (cfg.prio !== 'off' && cfg.prio !== 'after' && fr[0]) return take(fr[0], 'empty');
+        if (sb) return take(sb, 'standby');
+        if (cfg.prio === 'after' && fr[0]) return take(fr[0], 'empty');
+        const alt = C.T.filter(t => free(t) && ruleOf(cfg, t).mode !== 'never').sort((a, b) => (ruleOf(cfg, a).mode === 'last') - (ruleOf(cfg, b).mode === 'last') || (covN[a] || 0) - (covN[b] || 0) || (C.load[a] || 0) - (C.load[b] || 0))[0];
+        return alt ? take(alt, ruleOf(cfg, alt).mode === 'last' ? 'last' : 'auto') : { t: '', why: '' }; };
+      const rows = needs.map(x => { const r = pickFor(x), e = ex.find(y => y.class_id === x.class_id && y.period === x.period); return { x, sub: r.t, why: r.why, saved: !!e, rec: e }; });
+      const WHY = { empty: ['فصله خالٍ', 'sb-wE'], standby: ['منتظر', 'sb-wS'], auto: ['توزيع عادل', 'sb-wA'], last: ['عند الضرورة', 'sb-wL'] };
+      const allCls = S.classes.filter(c => c.active !== false);
+      B.innerHTML = `<div class="row" style="gap:8px;flex-wrap:wrap;align-items:end"><div class="field" style="margin:0"><label for="cvD">اليوم</label><input class="in" type="date" id="cvD" value="${day}"></div><span class="small muted">${DAYS[d] || ''}</span>
+          ${status ? `<span class="pill ${ST[status][1]}">${ST[status][0]}</span>` : ''}${DAYROW && DAYROW.approved_at ? `<span class="small muted">اعتمده ${esc(pn(DAYROW.approved_by))} · ${A.fmtDT(DAYROW.approved_at)}</span>` : ''}</div>
+        ${hrAbs.length && !locked ? `<div class="notice info" style="display:block;margin-top:8px">حُدِّد ${A.cnt(hrAbs.length, 'غائب', 'غائبين')} تلقائياً من رصد الموارد البشرية، واقتُرح لكل حصة بديل — راجع ثم اعتمد.</div>` : ''}
+        ${locked ? '' : `<div class="field" style="margin-top:8px"><label>المعلمون الغائبون</label><div class="sb-abs">${C.T.map(t => `<label class="chk ${abs.has(t) ? 'on' : ''}"><input type="checkbox" data-ab="${t}" ${abs.has(t) ? 'checked' : ''} ${ed ? '' : 'disabled'}> ${esc(pn(t))}</label>`).join('')}</div></div>
+        <details class="dz-det sb-emp" ${empty.length ? 'open' : ''}><summary>فصول لم يحضر منها أحد (${AR(empty.length)}) — معلموها في تلك الحصص يُسند إليهم الانتظار ${cfg.prio === 'off' ? '' : 'بالأولوية'}</summary>
+          <div class="small muted" style="margin:6px 0">اختر الفصل (اليوم كله) أو حدّد حصصاً بعينها. حصص الفصل الخالي لا تحتاج تأميناً، ومعلمها يصير متاحاً للتأمين في فصل آخر.</div>
+          ${ed ? '<button class="btn ghost sm" id="cvSug">اقتراح من الحضور المرصود</button>' : ''}
+          <div class="sb-ecls">${allCls.map(c => { const e = empty.find(x => x.class_id === c.id); return `<div class="sb-ec ${e ? 'on' : ''}"><label class="chk"><input type="checkbox" data-ec="${c.id}" ${e ? 'checked' : ''} ${ed ? '' : 'disabled'}> ${esc(c.name)}</label>${e ? `<span class="sb-eps">${Array.from({ length: P }, (_, p) => `<button type="button" class="${!(e.periods || []).length || e.periods.includes(p) ? 'on' : ''}" data-ep="${c.id}|${p}" ${ed ? '' : 'disabled'} aria-label="الحصة ${AR(p + 1)}">${AR(p + 1)}</button>`).join('')}</span>` : ''}</div>`; }).join('')}</div></details>`}
+        ${locked ? '' : rows.length ? `<div class="scroll"><table class="tbl"><thead><tr><th>الحصة</th><th>الفصل</th><th>المادة</th><th>الغائب</th><th>البديل</th><th>الأساس</th><th></th></tr></thead><tbody>${rows.map((r, i) => { const k = d + '|' + r.x.period, sb = cfg.roster[k] || [], fr = freedAt(r.x.period); const opts = C.T.filter(t => (isFree(t, r.x.period) && ruleOf(cfg, t).mode !== 'never') || t === r.sub);
+          const w = WHY[r.why] || (r.sub ? ['يدوي', 'sb-wA'] : null);
+          return `<tr><td>${PER[r.x.period] || AR(r.x.period + 1)}</td><td><b>${esc(cName(r.x.class_id))}</b></td><td>${esc(A.subjName(r.x.subject_id))}</td><td class="small">${esc(pn(r.x.teacher_id))}</td><td>${locked || !ed ? `<b>${esc(r.sub ? pn(r.sub) : '—')}</b>` : `<select class="in" data-sub="${i}" aria-label="البديل — ${esc(cName(r.x.class_id))} الحصة ${AR(r.x.period + 1)}"><option value="">— بلا بديل —</option>${opts.map(t => { const rl = ruleOf(cfg, t); return `<option value="${t}" ${t === r.sub ? 'selected' : ''}>${esc(pn(t))}${fr.has(t) ? ' (فصله خالٍ)' : ''}${sb.includes(t) ? ` (منتظر ${AR(sb.indexOf(t) + 1)})` : ''}${rl.mode !== 'normal' ? ` · ${RMODE[rl.mode]}` : ''} · غطّى ${AR(covN[t] || 0)}</option>`; }).join('')}</select>`}</td><td>${w ? `<span class="sb-why ${w[1]}">${w[0]}</span>` : ''}</td><td>${r.saved ? (r.rec.sig_at ? '<span class="pill st-approved">وقّع ✓</span>' : '<span class="pill st-approved">محفوظ</span>') : '<span class="pill st-submitted">مقترح</span>'}</td></tr>`; }).join('')}</tbody></table></div>` : `<p class="small muted" style="margin-top:8px">${abs.size ? 'لا حصص للغائبين تحتاج تأميناً في هذا اليوم.' : 'حدد المعلمين الغائبين لتظهر حصصهم والبديل المقترح لكل حصة.'}</p>`}
+        <div class="acts" style="flex-wrap:wrap">${locked ? (apv ? '<button class="btn ghost" id="cvRe">إلغاء الاعتماد للتعديل</button>' : '') : `${ed && rows.length ? '<button class="btn ghost" id="cvSv">حفظ</button>' : ''}${ed && !apv && rows.length ? '<button class="btn" id="cvSend">حفظ وإرسال للاعتماد</button>' : ''}${apv && rows.length ? `<button class="btn ok" id="cvAp">${I.check} اعتماد التأمين</button>` : ''}`}
+          ${(rows.length || ex.length) && can('print') ? `<button class="btn ghost" id="cvPr">${I.print || ''} طباعة النموذج</button><button class="btn ghost" id="cvX">Excel</button>` : ''}</div>
+        <div id="cvForm"></div>`;
+      $('#cvD', B).onchange = e => { day = e.target.value; A.LS.set('sb_day', day); abs = null; empty = null; draw(); };
       $$('[data-ab]', B).forEach(c => c.onchange = () => { c.checked ? abs.add(c.dataset.ab) : abs.delete(c.dataset.ab); A.LS.set('sb_abs_' + day, [...abs].join(',')); draw(); });
-      $$('[data-sub]', B).forEach(s => s.onchange = () => { rows[+s.dataset.sub].sub = s.value; });
-      const sv = $('#cvSv', B); if (sv) sv.onclick = e => A.run(e.currentTarget, async () => {
-        const cl = rows.filter(r => r.sub).map(r => ({ school_id: S.school.id, section_id: sec.id, day, period: r.x.period, class_id: r.x.class_id, absent_teacher: r.x.teacher_id, sub_teacher: r.sub, subject_id: r.x.subject_id, kind: (cfg.roster[d + '|' + r.x.period] || []).includes(r.sub) ? 'standby' : 'auto' }));
+      $$('[data-ec]', B).forEach(c => c.onchange = () => { const id = c.dataset.ec; empty = empty.filter(e => e.class_id !== id); if (c.checked) empty.push({ class_id: id, periods: [] }); draw(); });
+      $$('[data-ep]', B).forEach(b => b.onclick = () => { const [id, p] = b.dataset.ep.split('|'); const e = empty.find(x => x.class_id === id); const all = Array.from({ length: P }, (_, i) => i); let ps = (e.periods || []).length ? e.periods.slice() : all; ps = ps.includes(+p) ? ps.filter(x => x !== +p) : ps.concat(+p).sort((a, b) => a - b); if (!ps.length) empty = empty.filter(x => x !== e); else e.periods = ps.length === P ? [] : ps; draw(); });
+      const sug = $('#cvSug', B); if (sug) sug.onclick = e => A.run(e.currentTarget, async () => {
+        const [att, pa] = await Promise.all([api.list('attendance', { school_id: S.school.id, day }).catch(() => []), api.list('period_attendance', { section_id: sec.id, day }).catch(() => [])]);
+        const out = []; allCls.forEach(c => { const a = att.filter(x => x.class_id === c.id); if (a.length && a.every(x => x.status === 'absent')) { out.push({ class_id: c.id, periods: [] }); return; }
+          const ps = []; for (let p = 0; p < P; p++) { const r = pa.filter(x => x.class_id === c.id && x.period === p); if (r.length && r.every(x => x.status === 'absent')) ps.push(p); } if (ps.length) out.push({ class_id: c.id, periods: ps.length === P ? [] : ps }); });
+        if (!out.length) return A.toast('لا يوجد في الحضور المرصود فصل غاب كل طلابه', 'warn');
+        out.forEach(o => { if (!empty.some(e => e.class_id === o.class_id)) empty.push(o); }); A.toast(`أُضيف ${AR(out.length)} فصل — راجعها`, 'ok'); draw(); });
+      $$('[data-sub]', B).forEach(s => s.onchange = () => { const r = rows[+s.dataset.sub]; r.sub = s.value; r.why = s.value ? (freedAt(r.x.period).has(s.value) ? 'empty' : (cfg.roster[d + '|' + r.x.period] || []).includes(s.value) ? 'standby' : 'manual') : ''; });
+      const persist = async st => {
+        const cl = rows.filter(r => r.sub).map(r => ({ school_id: S.school.id, section_id: sec.id, day, period: r.x.period, class_id: r.x.class_id, absent_teacher: r.x.teacher_id, sub_teacher: r.sub, subject_id: r.x.subject_id, kind: r.why === 'standby' ? 'standby' : 'auto', prio: r.why === 'empty' ? 'empty' : r.why === 'last' ? 'last' : r.why === 'manual' ? 'manual' : null }));
+        // سجل اليوم أولاً: وجوده (غير معتمد) يؤجّل إشعار البدلاء حتى الاعتماد
+        const row = { section_id: sec.id, day, empty, prepared_by: S.me.id, prepared_at: new Date().toISOString(), status: st };
+        if (DAYROW) await api.upd('standby_days', DAYROW.id, row); else await api.ins('standby_days', [Object.assign({ school_id: S.school.id }, row)]);
         if (cl.length) await api.ups('substitutions', cl, 'day,class_id,period');
-        A.toast(`حُفظ تأمين ${AR(cl.length)} حصة${rows.length - cl.length ? ` · ${AR(rows.length - cl.length)} بلا بديل` : ''}`, rows.length - cl.length ? 'warn' : 'ok'); draw(); });
-      const pr = $('#cvPr', B); if (pr) pr.onclick = () => A.printDoc(`تأمين حصص يوم ${DAYS[d]}`, `${AR(A.dmy(A.parseDate(day)))} · ${sec.name}`, `<table><tr><th>الحصة</th><th>الفصل</th><th>المادة</th><th>المعلم الغائب</th><th>البديل</th><th>توقيع البديل</th></tr>${rows.map(r => `<tr><td>${AR(r.x.period + 1)}</td><td>${esc(cName(r.x.class_id))}</td><td>${esc(A.subjName(r.x.subject_id))}</td><td>${esc(pn(r.x.teacher_id))}</td><td><b>${esc(r.sub ? pn(r.sub) : '—')}</b></td><td></td></tr>`).join('')}</table>
-        <h3>المنتظرون اليوم</h3><table><tr><th>الحصة</th>${Array.from({ length: cfg.per }, (_, k) => `<th>منتظر ${AR(k + 1)}</th>`).join('')}</tr>${Array.from({ length: P }, (_, p) => `<tr><td>${AR(p + 1)}</td>${Array.from({ length: cfg.per }, (_, k) => `<td>${esc(pn((cfg.roster[d + '|' + p] || [])[k]))}</td>`).join('')}</tr>`).join('')}</table>`, false);
+        // ما حُفظ سابقاً ولم يعد مطلوباً (أُلغي غياب المعلم، صار الفصل خالياً، أو «بلا بديل»)
+        const keep = new Set(cl.map(r => r.class_id + '|' + r.period)); for (const e of ex) if (!keep.has(e.class_id + '|' + e.period)) await api.del('substitutions', e.id);
+        return cl.length;
+      };
+      const sv = $('#cvSv', B); if (sv) sv.onclick = e => A.run(e.currentTarget, async () => { const n = await persist(DAYROW && DAYROW.status === 'pending' ? 'pending' : 'draft'); A.toast(`حُفظ تأمين ${AR(n)} حصة${rows.length - n ? ` · ${AR(rows.length - n)} بلا بديل` : ''}`, rows.length - n ? 'warn' : 'ok'); draw(); });
+      const sd = $('#cvSend', B); if (sd) sd.onclick = e => A.run(e.currentTarget, async () => { await persist('pending');
+        const ids = (S.staff || []).filter(s => s.is_owner || (S.grants || []).some(g => g.staff_id === s.id && g.module === 'sb_approve')).map(s => s.id).filter(id => id !== S.me.id);
+        if (ids.length && A.notice) await A.notice(ids, 'تأمين حصص بانتظار الاعتماد', `${sec.name} — ${DAYS[d]} ${A.dmy(A.parseDate(day))} (${AR(rows.length)} حصة)`, { link: '#/standby', kind: 'standby' }).catch(() => { });
+        A.toast('أُرسل للاعتماد ✓', 'ok'); draw(); });
+      const ap = $('#cvAp', B); if (ap) ap.onclick = e => A.run(e.currentTarget, async () => { const miss = rows.filter(r => !r.sub).length;
+        if (miss && !(await A.confirmBox(`${A.cnt(miss, 'حصة', 'حصص')} بلا بديل. اعتماد التأمين على هذا الحال؟`, 'اعتماد'))) return;
+        await persist(DAYROW ? DAYROW.status === 'approved' ? 'pending' : DAYROW.status : 'pending');
+        if (A.DEMO) { const r = (await api.list('standby_days', { section_id: sec.id, day }))[0]; await api.upd('standby_days', r.id, { status: 'approved', approved_by: S.me.id, approved_at: new Date().toISOString(), signs: await demoSigns(cfg) }); }
+        else await api.rpc('sb_approve', { p_section: sec.id, p_day: day, p_note: null });
+        A.toast('اعتُمد تأمين اليوم وأُشعر البدلاء ✓', 'ok'); await draw(); const f = $('#cvForm', B); if (f) f.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); });
+      const re = $('#cvRe', B); if (re) re.onclick = e => A.run(e.currentTarget, async () => { if (!(await A.confirmBox('إلغاء اعتماد تأمين هذا اليوم لتعديله؟ تُزال توقيعات الاعتماد وتُعاد عند الاعتماد مجدداً.', 'إلغاء الاعتماد', true))) return;
+        if (A.DEMO) await api.upd('standby_days', DAYROW.id, { status: 'pending', signs: {}, approved_at: null, approved_by: null }); else await api.rpc('sb_reopen', { p_section: sec.id, p_day: day }); draw(); });
+      const ctx = { sec, cfg, day, d, P, DAYROW, C };
+      const pr = $('#cvPr', B); if (pr) pr.onclick = e => A.run(e.currentTarget, async () => printForm(ctx, await formRows(ctx)));
+      const xb = $('#cvX', B); if (xb) xb.onclick = e => A.run(e.currentTarget, async () => { const R = await formRows(ctx); xlsx(R.rows.map((r, i) => ({ 'م': i + 1, 'الحصة': r.period + 1, 'الفصل': cName(r.class_id), 'المادة': A.subjName(r.subject_id), 'المعلم الغائب': pn(r.absent_teacher), 'البديل': r.sub_teacher ? pn(r.sub_teacher) : '', 'التوقيع': r.sig_at ? 'وقّع ' + A.fmtDT(r.sig_at) : '' })), 'التأمين', `تأمين الحصص ${day} - ${sec.name}`); });
+      if (locked || (DAYROW && ex.length)) { const f = $('#cvForm', B); formRows(ctx).then(R => { if (f.isConnected) f.innerHTML = `<h3 class="sb-fh">${esc(cfg.form.title)} ${locked ? '<span class="pill st-approved">معتمد</span>' : '<span class="pill st-submitted">لم يُعتمد بعد</span>'}</h3>${formHtml(ctx, R, false)}`; }).catch(() => { }); }
     };
     await draw();
+  }
+  async function demoSigns(cfg) { const o = {}; for (const s of cfg.form.sigs) if (s.mode === 'auto') { const v = (await api.list('owner_vault', { key: 'sbsig:' + s.id }).catch(() => []))[0]; if (v && v.data && v.data.img) o[s.id] = { img: v.data.img, at: new Date().toISOString() }; } return o; }
+  async function formRows(ctx) {
+    const rows = (await api.list('substitutions', { section_id: ctx.sec.id, day: ctx.day })).sort((a, b) => a.period - b.period || cName(a.class_id).localeCompare(cName(b.class_id), 'ar'));
+    let sigs = {}, dayRow = ctx.DAYROW;
+    if (!A.DEMO) { try { const r = await api.rpc('sb_day', { p_section: ctx.sec.id, p_day: ctx.day }); if (r) { sigs = r.sigs || {}; dayRow = r.day || dayRow; } } catch (_) { } }
+    else { const me = (await api.list('staff_signatures', {}).catch(() => [])); rows.forEach(r => { const g = me.find(x => x.staff_id === r.sub_teacher); if (r.sig_at && g) sigs[r.id] = g.img; }); }
+    return { rows, sigs, dayRow };
+  }
+  function formHtml(ctx, R, print) {
+    const f = ctx.cfg.form, signs = (R.dayRow && R.dayRow.status === 'approved' && R.dayRow.signs) || {};
+    const sigCell = r => { if (f.tsig === 'paper') return ''; if (r.sig_at && R.sigs[r.id]) return `<img src="${R.sigs[r.id]}" alt="توقيع ${esc(pn(r.sub_teacher))}" style="max-height:34px;max-width:120px">`; if (r.sig_at) return '✓ وقّع'; return print ? '' : '<span class="small muted">لم يوقّع بعد</span>'; };
+    const tb = `<table class="${print ? '' : 'tbl sb-ft'}"><thead><tr><th>م</th><th>الحصة</th><th>الفصل</th><th>المادة</th><th>المعلم الغائب</th><th>المعلم البديل</th><th style="min-width:110px">توقيع المعلم</th></tr></thead><tbody>${R.rows.map((r, i) => `<tr><td>${AR(i + 1)}</td><td>${PER[r.period] || AR(r.period + 1)}</td><td><b>${esc(cName(r.class_id))}</b></td><td>${esc(A.subjName(r.subject_id))}</td><td>${esc(pn(r.absent_teacher))}</td><td><b>${esc(r.sub_teacher ? pn(r.sub_teacher) : '—')}</b></td><td style="height:40px">${sigCell(r)}</td></tr>`).join('') || `<tr><td colspan="7">لا حصص مؤمَّنة</td></tr>`}</tbody></table>`;
+    const sg = (f.sigs || []).filter(s => s.title || s.name);
+    const sigs = sg.length ? `<div class="rs-sig sb-sigs" style="display:grid;grid-template-columns:repeat(${Math.min(sg.length, 4)},1fr);gap:14px;margin-top:22px;break-inside:avoid">${sg.map(s => `<div style="text-align:center;border-top:1.5px solid #CFE0F2;padding-top:6px;min-height:80px"><b style="display:block">${esc(s.title)}</b><span>${esc(s.name)}</span><span style="height:46px;display:flex;align-items:center;justify-content:center">${signs[s.id] && signs[s.id].img ? `<img src="${signs[s.id].img}" alt="توقيع ${esc(s.title)}" style="max-height:44px;max-width:150px">` : (print ? '' : '<span class="small muted">التوقيع</span>')}</span></div>`).join('')}</div>` : '';
+    const note = f.note ? `<p style="margin:8px 0 0">${esc(f.note)}</p>` : '';
+    let rost = '';
+    if (print && f.showRoster) { const cfg = ctx.cfg; rost = `<h3>المنتظرون اليوم</h3><table><tr><th>الحصة</th>${Array.from({ length: cfg.per }, (_, k) => `<th>منتظر ${AR(k + 1)}</th>`).join('')}</tr>${Array.from({ length: ctx.P }, (_, p) => `<tr><td>${AR(p + 1)}</td>${Array.from({ length: cfg.per }, (_, k) => `<td>${esc(pn((cfg.roster[ctx.d + '|' + p] || [])[k]))}</td>`).join('')}</tr>`).join('')}</table>`; }
+    const emp = (R.dayRow && R.dayRow.empty) || []; const empTxt = emp.length ? `<p class="small" style="margin:6px 0 0">فصول لم يحضر منها أحد: ${emp.map(e => esc(cName(e.class_id)) + ((e.periods || []).length ? ` (الحصص ${e.periods.map(p => AR(p + 1)).join('، ')})` : '')).join(' · ')}</p>` : '';
+    return (print ? '' : '<div class="scroll">') + tb + (print ? '' : '</div>') + empTxt + note + sigs + rost;
+  }
+  function printForm(ctx, R) { A.printDoc(ctx.cfg.form.title, `يوم ${DAYS[ctx.d]} ${AR(A.dmy(A.parseDate(ctx.day)))} · ${ctx.sec.name}`, formHtml(ctx, R, true), false); }
+
+  // ---------- حصصي (للمعلم البديل) ----------
+  async function mine(root, page) {
+    css();
+    root.innerHTML = '<div class="spinner"></div>';
+    const from = (() => { const x = A.parseDate(today()); x.setDate(x.getDate() - 14); return A.isoDate(x); })();
+    let rows = [], hasSig = false;
+    try { [rows, hasSig] = await Promise.all([api.list('substitutions', { sub_teacher: S.me.id }, { gte: { day: from } }), api.list('staff_signatures', { staff_id: S.me.id }).then(r => !!r.length).catch(() => false)]); } catch (e) { root.innerHTML = `<div class="card">${A.emptyBox('تعذّر التحميل', esc(e.message))}</div>`; return; }
+    rows = rows.filter(r => r.notified_at || A.DEMO).sort((a, b) => b.day.localeCompare(a.day) || a.period - b.period);
+    const body = `<p class="sub" style="margin:2px 0 10px">الحصص التي أُسندت إليك بعد اعتماد التأمين. وقّع أمام كل حصة بعد تغطيتها.</p>
+      ${rows.length ? `<div class="sb-my">${rows.map(r => `<div class="sb-mc ${r.sig_at ? 'ok' : ''}"><div class="sb-md"><b>${esc(DAYS[A.parseDate(r.day).getDay()] || '')}</b><span>${AR(A.dmy(A.parseDate(r.day)))}</span><i>${PER[r.period] || 'الحصة ' + AR(r.period + 1)}</i></div>
+        <div class="sb-mb"><b>${esc(cName(r.class_id))}</b><span>${esc(A.subjName(r.subject_id))}</span><small>بدلاً من ${esc(pn(r.absent_teacher))}</small></div>
+        <div class="sb-ms">${r.sig_at ? `<span class="pill st-approved">وقّعت ✓</span><small>${A.fmtDT(r.sig_at)}</small>` : `<button class="btn sm" data-sg="${r.id}">✍️ توقيع</button>`}</div></div>`).join('')}</div>` : `<div>${A.emptyBox('لا حصص انتظار مسندة إليك حالياً')}</div>`}`;
+    root.innerHTML = page ? `<div class="card"><h2 style="margin:0">حصص الانتظار المسندة إليّ</h2>${body}</div>` : body;
+    $$('[data-sg]', root).forEach(b => b.onclick = e => A.run(e.currentTarget, async () => {
+      if (!hasSig) { if (A.formsSigModal) { A.formsSigModal(() => { hasSig = true; A.toast('حُفظ توقيعك — اضغط «توقيع» أمام الحصة الآن', 'ok'); }); return; } throw new Error('احفظ توقيعك الإلكتروني أولاً'); }
+      if (A.DEMO) await api.upd('substitutions', b.dataset.sg, { sig_at: new Date().toISOString() });
+      else { try { await api.rpc('sb_sign', { p_id: b.dataset.sg }); } catch (er) { throw new Error(/NO_SIG/.test(er.message) ? 'احفظ توقيعك الإلكتروني أولاً' : /NOT_ALLOWED/.test(er.message) ? 'لا يمكن التوقيع قبل اعتماد التأمين' : er.message); } }
+      A.toast('وُقّع ✓', 'ok'); mine(root, page); }));
+  }
+
+  // ---------- قيود التوزيع العادل (المالك) ----------
+  function rulesDialog(C, sec, done) {
+    const cfg = cfgOf(sec), days = Array.from({ length: sec.days || 5 }, (_, i) => i), P = sec.periods || 7;
+    const R = {}; C.T.forEach(t => R[t] = ruleOf(cfg, t));
+    const m = A.modal(`<h3>قيود التوزيع العادل والاستثناءات</h3><p class="sub">للمكلّفين بأعمال أخرى (رائد نشاط، منسّق، إشراف…): استثناء كامل، أو «عند الضرورة فقط» (آخر من يُسند إليه)، أو حد خاص يومي/أسبوعي، أو أيام وحصص لا يُسند فيها. تُطبَّق على جدول الانتظار الأسبوعي وتأمين الحصص معاً.</p>
+      <div class="grid g3"><div class="field"><label for="ruCD">أقصى تأمين للمعلم في اليوم (للجميع)</label><input class="in" type="number" id="ruCD" min="1" max="8" value="${cfg.coverDay || 2}"></div>
+      <div class="field"><label for="ruPr">معلم الفصل الخالي (لم يحضر أحد)</label><select class="in" id="ruPr"><option value="first" ${cfg.prio === 'first' ? 'selected' : ''}>أولوية قبل المنتظرين</option><option value="after" ${cfg.prio === 'after' ? 'selected' : ''}>بعد المنتظرين</option><option value="off" ${cfg.prio === 'off' ? 'selected' : ''}>كغيره (بلا أولوية)</option></select></div>
+      <div class="field"><label for="ruQ">بحث</label><input class="in" id="ruQ" placeholder="اسم المعلم"></div></div>
+      <div class="scroll" style="max-height:52vh"><table class="tbl sb-ru"><thead><tr><th>المعلم</th><th>الحالة</th><th>حد يومي</th><th>حد أسبوعي</th><th>أيام لا يُسند فيها</th><th>حصص لا يُسند فيها</th><th>السبب / التكليف</th></tr></thead><tbody>${C.T.map(t => { const r = R[t]; return `<tr data-t="${t}" data-n="${esc(A.normKey(pn(t)))}"><td><b>${esc(pn(t))}</b><div class="small muted">نصابه ${AR(C.load[t] || 0)}</div></td>
+        <td><select class="in" data-f="mode" aria-label="الحالة">${Object.entries(RMODE).map(([k, l]) => `<option value="${k}" ${r.mode === k ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
+        <td><input class="in sb-n" type="number" min="0" max="8" data-f="perDay" value="${r.perDay || ''}" placeholder="—" aria-label="حد يومي"></td><td><input class="in sb-n" type="number" min="0" max="30" data-f="perWeek" value="${r.perWeek || ''}" placeholder="—" aria-label="حد أسبوعي"></td>
+        <td><span class="sb-eps">${days.map(d => `<button type="button" data-d="${d}" class="${(r.days || []).includes(d) ? 'on' : ''}" title="${DAYS[d]}">${DAYS[d].slice(0, 2)}</button>`).join('')}</span></td>
+        <td><span class="sb-eps">${Array.from({ length: P }, (_, p) => `<button type="button" data-p="${p}" class="${(r.periods || []).includes(p) ? 'on' : ''}" aria-label="الحصة ${AR(p + 1)}">${AR(p + 1)}</button>`).join('')}</span></td>
+        <td><input class="in" data-f="why" value="${esc(r.why || '')}" placeholder="مثال: رائد النشاط" aria-label="السبب"></td></tr>`; }).join('')}</tbody></table></div>
+      <div class="acts"><button class="btn" id="ruOk">حفظ القيود</button></div>`, { cls: 'wide' });
+    $('#ruQ', m.el).oninput = e => { const q = A.normKey(e.target.value); $$('tr[data-t]', m.el).forEach(tr => tr.hidden = !!q && !tr.dataset.n.includes(q)); };
+    $$('tr[data-t] .sb-eps button', m.el).forEach(b => b.onclick = () => b.classList.toggle('on'));
+    $('#ruOk', m.el).onclick = e => A.run(e.currentTarget, async () => {
+      const rules = {}; $$('tr[data-t]', m.el).forEach(tr => { const g = f => tr.querySelector(`[data-f="${f}"]`).value; const r = { mode: g('mode'), perDay: +A.norm(g('perDay')) || 0, perWeek: +A.norm(g('perWeek')) || 0, days: $$('[data-d].on', tr).map(b => +b.dataset.d), periods: $$('[data-p].on', tr).map(b => +b.dataset.p), why: g('why').trim() };
+        if (r.mode !== 'normal' || r.perDay || r.perWeek || r.days.length || r.periods.length || r.why) rules[tr.dataset.t] = r; });
+      cfg.rules = rules; cfg.excl = Object.keys(rules).filter(t => rules[t].mode === 'never'); cfg.coverDay = Math.max(1, Math.min(8, +A.norm($('#ruCD', m.el).value) || 2)); cfg.prio = $('#ruPr', m.el).value;
+      await saveCfg(sec, cfg); m.close(); A.toast('حُفظت القيود ✓ — أعد التوزيع العادل لتطبيقها على الجدول الأسبوعي', 'ok'); done && done(); });
+  }
+
+  // ---------- نموذج الاعتماد والتوقيعات (المالك) ----------
+  async function formDialog(sec, done) {
+    const cfg = cfgOf(sec), f = JSON.parse(JSON.stringify(cfg.form));
+    const vault = {}; try { (await api.list('owner_vault', {})).forEach(v => { if (/^sbsig:/.test(v.key)) vault[v.key.slice(6)] = (v.data || {}).img; }); } catch (_) { }
+    const staff = (S.staff || []).filter(s => s.active !== false).sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'ar'));
+    const m = A.modal(`<h3>نموذج تأمين الحصص — الاعتماد والتوقيعات</h3><p class="sub">هذه الإعدادات لك وحدك. التوقيع «التلقائي» يُختم على النموذج لحظة الاعتماد فقط (لا يظهر قبله)، من صورة ترفعها/ترسمها هنا أو من التوقيع المحفوظ في حساب الموظف الذي تربطه.</p>
+      <div class="grid g2"><div class="field"><label for="ffT">عنوان النموذج</label><input class="in" id="ffT" value="${esc(f.title)}"></div>
+      <div class="field"><label for="ffS">توقيع المعلم البديل</label><select class="in" id="ffS"><option value="e" ${f.tsig === 'e' ? 'selected' : ''}>إلكتروني من حسابه (مع خانة فارغة للورقي)</option><option value="paper" ${f.tsig === 'paper' ? 'selected' : ''}>ورقي فقط (خانة فارغة)</option></select></div></div>
+      <div class="field"><label for="ffN">ملاحظة تظهر أسفل الجدول (اختياري)</label><input class="in" id="ffN" value="${esc(f.note || '')}"></div>
+      <label class="chk"><input type="checkbox" id="ffR" ${f.showRoster ? 'checked' : ''}> إرفاق جدول المنتظرين لليوم في الطباعة</label>
+      <h4 style="margin:14px 0 6px">التوقيعات أسفل الجدول</h4><div id="ffL"></div><button class="btn ghost sm" id="ffAdd">+ إضافة توقيع</button>
+      <div class="acts"><button class="btn" id="ffOk">حفظ</button><button class="btn ghost" id="ffDef">الافتراضي</button></div>`, { cls: 'wide' });
+    const L = $('#ffL', m.el), pend = {};
+    const draw = () => { L.innerHTML = f.sigs.map((s, i) => { const img = pend[s.id] !== undefined ? pend[s.id] : vault[s.id]; return `<div class="sb-sg" data-i="${i}">
+        <div class="grid g3"><div class="field"><label>الصفة</label><input class="in" data-k="title" value="${esc(s.title)}"></div><div class="field"><label>الاسم</label><input class="in" data-k="name" value="${esc(s.name)}"></div>
+        <div class="field"><label>طريقة التوقيع</label><select class="in" data-k="mode"><option value="blank" ${s.mode !== 'auto' ? 'selected' : ''}>يدوي (خانة فارغة)</option><option value="auto" ${s.mode === 'auto' ? 'selected' : ''}>تلقائي عند الاعتماد</option></select></div></div>
+        ${s.mode === 'auto' ? `<div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><span class="small muted">الصورة:</span>${img ? `<img src="${img}" alt="توقيع ${esc(s.title)}" class="sb-sgi">` : '<span class="small" style="color:#B7791F">لا صورة بعد</span>'}<button class="btn ghost sm" data-draw="${i}">✍️ رسم</button><label class="btn ghost sm" style="cursor:pointer">رفع صورة<input type="file" accept="image/*" data-up="${i}" hidden></label>${S.me && i >= 0 ? `<button class="btn ghost sm" data-mine="${i}">توقيعي المحفوظ</button>` : ''}${img ? `<button class="btn ghost sm" data-clr="${i}">إزالة</button>` : ''}
+          <span class="small muted" style="margin-inline-start:auto">أو من حساب:</span><select class="in" data-k="staff" style="width:auto;max-width:200px"><option value="">—</option>${staff.map(x => `<option value="${x.id}" ${s.staff === x.id ? 'selected' : ''}>${esc(x.full_name)}</option>`).join('')}</select></div>` : ''}
+        <div class="row" style="gap:4px;justify-content:flex-end"><button class="btn ghost sm" data-mv="${i}|-1" aria-label="أعلى" ${i ? '' : 'disabled'}>▲</button><button class="btn ghost sm" data-mv="${i}|1" aria-label="أسفل" ${i < f.sigs.length - 1 ? '' : 'disabled'}>▼</button><button class="btn ghost sm" data-rm="${i}">حذف</button></div></div>`; }).join('') || '<p class="small muted">بلا توقيعات</p>';
+      $$('[data-k]', L).forEach(el => el.onchange = el.oninput = () => { const s = f.sigs[+el.closest('[data-i]').dataset.i]; s[el.dataset.k] = el.value; if (el.dataset.k === 'mode') draw(); });
+      $$('[data-rm]', L).forEach(b => b.onclick = () => { f.sigs.splice(+b.dataset.rm, 1); draw(); });
+      $$('[data-mv]', L).forEach(b => b.onclick = () => { const [i, dd] = b.dataset.mv.split('|').map(Number); const t = f.sigs[i]; f.sigs[i] = f.sigs[i + dd]; f.sigs[i + dd] = t; draw(); });
+      $$('[data-clr]', L).forEach(b => b.onclick = () => { pend[f.sigs[+b.dataset.clr].id] = null; draw(); });
+      $$('[data-draw]', L).forEach(b => b.onclick = () => drawPad(img => { pend[f.sigs[+b.dataset.draw].id] = img; draw(); }));
+      $$('[data-mine]', L).forEach(b => b.onclick = () => A.run(b, async () => { const r = (await api.list('staff_signatures', { staff_id: S.me.id }))[0]; if (!r) throw new Error('لا يوجد توقيع محفوظ في حسابك'); pend[f.sigs[+b.dataset.mine].id] = r.img; draw(); }));
+      $$('[data-up]', L).forEach(inp => inp.onchange = () => { const fl = inp.files[0]; if (!fl) return; shrink(fl).then(img => { pend[f.sigs[+inp.dataset.up].id] = img; draw(); }).catch(e => A.toast(e.message, 'err')); });
+    };
+    draw();
+    $('#ffAdd', m.el).onclick = () => { f.sigs.push({ id: 's' + Date.now().toString(36), title: '', name: '', mode: 'blank' }); draw(); };
+    $('#ffDef', m.el).onclick = () => { f.sigs = DEF_SIGS(); draw(); };
+    $('#ffOk', m.el).onclick = e => A.run(e.currentTarget, async () => {
+      f.title = $('#ffT', m.el).value.trim() || FORM_DEF().title; f.tsig = $('#ffS', m.el).value; f.note = $('#ffN', m.el).value.trim(); f.showRoster = $('#ffR', m.el).checked;
+      f.sigs = f.sigs.filter(s => (s.title || s.name).trim()).map(s => ({ id: s.id, title: s.title.trim(), name: s.name.trim(), mode: s.mode === 'auto' ? 'auto' : 'blank', staff: s.mode === 'auto' && s.staff ? s.staff : undefined }));
+      for (const [id, img] of Object.entries(pend)) await api.ups('owner_vault', [{ school_id: S.school.id, key: 'sbsig:' + id, data: img ? { img } : {}, updated_at: new Date().toISOString() }], 'school_id,key');
+      cfg.form = f; await saveCfg(sec, cfg); m.close(); A.toast('حُفظ نموذج الاعتماد ✓', 'ok'); done && done(); });
+  }
+  const shrink = file => new Promise((res, rej) => { if (file.size > 4e6) return rej(new Error('الصورة أكبر من ٤ م.ب')); const r = new FileReader(); r.onload = () => { const im = new Image(); im.onload = () => { const s = Math.min(1, 500 / im.width, 200 / im.height), c = document.createElement('canvas'); c.width = Math.round(im.width * s); c.height = Math.round(im.height * s); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); res(c.toDataURL('image/png')); }; im.onerror = () => rej(new Error('تعذّر قراءة الصورة')); im.src = r.result; }; r.readAsDataURL(file); });
+  function drawPad(done) {
+    const m = A.modal(`<h3>رسم التوقيع</h3><div class="sg-wrap"><canvas id="dpC" width="900" height="300" aria-label="مساحة رسم التوقيع"></canvas><span class="sg-line" aria-hidden="true"></span></div><div class="row" style="gap:8px;margin-top:10px"><button class="btn" id="dpS">اعتماد</button><button class="btn ghost" id="dpX">مسح</button></div>`);
+    const c = $('#dpC', m.el), g = c.getContext('2d'); let last = null, drawn = false; g.lineWidth = 5; g.lineCap = 'round'; g.lineJoin = 'round'; g.strokeStyle = '#082B5A';
+    const pt = e => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height]; };
+    c.addEventListener('pointerdown', e => { c.setPointerCapture(e.pointerId); last = pt(e); drawn = true; });
+    c.addEventListener('pointermove', e => { if (!last) return; const p = pt(e); g.beginPath(); g.moveTo(last[0], last[1]); g.lineTo(p[0], p[1]); g.stroke(); last = p; });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(k => c.addEventListener(k, () => last = null));
+    $('#dpX', m.el).onclick = () => { g.clearRect(0, 0, c.width, c.height); drawn = false; };
+    $('#dpS', m.el).onclick = () => { if (!drawn) return A.toast('ارسم التوقيع أولاً', 'err');
+      const d = g.getImageData(0, 0, c.width, c.height).data; let x0 = c.width, y0 = c.height, x1 = 0, y1 = 0;
+      for (let y = 0; y < c.height; y += 2) for (let x = 0; x < c.width; x += 2) if (d[(y * c.width + x) * 4 + 3] > 10) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+      const pad = 12, w = Math.max(20, x1 - x0 + pad * 2), h = Math.max(20, y1 - y0 + pad * 2), o = document.createElement('canvas'); o.width = w; o.height = h; o.getContext('2d').drawImage(c, x0 - pad, y0 - pad, w, h, 0, 0, w, h);
+      m.close(); done(o.toDataURL('image/png')); };
+  }
+
+  // ---------- الصلاحيات المقسّمة (المالك) ----------
+  function permDialog() {
+    const staff = (S.staff || []).filter(s => !s.is_owner && s.active !== false).sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'ar'));
+    const has = (id, m) => (S.grants || []).some(g => g.staff_id === id && g.module === m);
+    const m = A.modal(`<h3>صلاحيات الانتظار والتأمين</h3><p class="sub">أسند المهمة لأي معلم أو موظف وقسّمها كما تريد. الإعدادات والقيود ونموذج الاعتماد تبقى لك وحدك. يظهر لهم بند «حصص الانتظار» في القائمة بحسب ما تمنحه.</p>
+      <div class="sb-pl">${SBM.map(([k, l, d]) => `<span><b>${l}</b>: ${d}</span>`).join('')}</div>
+      <input class="in" id="pmQ" placeholder="بحث بالاسم" style="margin:8px 0">
+      <div class="scroll" style="max-height:55vh"><table class="tbl"><thead><tr><th>الموظف</th>${SBM.map(([k, l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>${staff.map(s => `<tr data-n="${esc(A.normKey(s.full_name || ''))}"><td><b>${esc(s.full_name)}</b>${s.title ? `<div class="small muted">${esc(s.title)}</div>` : ''}</td>${SBM.map(([k, l]) => `<td style="text-align:center"><input type="checkbox" data-g="${s.id}|${k}" ${has(s.id, k) ? 'checked' : ''} aria-label="${esc(l)} — ${esc(s.full_name)}"></td>`).join('')}</tr>`).join('')}</tbody></table></div>`, { cls: 'wide' });
+    $('#pmQ', m.el).oninput = e => { const q = A.normKey(e.target.value); $$('tr[data-n]', m.el).forEach(tr => tr.hidden = !!q && !tr.dataset.n.includes(q)); };
+    $$('[data-g]', m.el).forEach(c => c.onchange = () => A.run(null, async () => { const [id, k] = c.dataset.g.split('|');
+      try { if (c.checked) { await api.grantModule(id, k); S.grants = (S.grants || []).concat([{ staff_id: id, module: k }]); } else { await api.revokeModule(id, k); S.grants = (S.grants || []).filter(g => !(g.staff_id === id && g.module === k)); } A.toast('حُفظ ✓', 'ok'); }
+      catch (er) { c.checked = !c.checked; throw er; } }));
   }
 
   // ---------- تقرير العدالة ----------
   async function stats(B, C, sec) {
     const cfg = cfgOf(sec); const sbN = {}; Object.values(cfg.roster).forEach(l => (l || []).forEach(t => { if (t) sbN[t] = (sbN[t] || 0) + 1; }));
-    const hist = await api.list('substitutions', { section_id: sec.id }, { select: 'sub_teacher,absent_teacher' }).catch(() => []);
-    const cov = {}, ab = {}; hist.forEach(x => { if (x.sub_teacher) cov[x.sub_teacher] = (cov[x.sub_teacher] || 0) + 1; if (x.absent_teacher) ab[x.absent_teacher] = (ab[x.absent_teacher] || 0) + 1; });
-    const R = C.T.map(t => ({ t, load: C.load[t] || 0, sb: sbN[t] || 0, cov: cov[t] || 0, ab: ab[t] || 0 })).sort((a, b) => (b.load + b.sb) - (a.load + a.sb));
-    const tbl = pr => `<table class="${pr ? '' : 'tbl'}"><thead><tr><th>المعلم</th><th>النصاب</th><th>الانتظار الأسبوعي</th><th>النصاب + الانتظار</th><th>حصص غطّاها</th><th>حصص غاب عنها</th></tr></thead><tbody>${R.map(r => `<tr><td><b>${esc(pn(r.t))}</b>${cfg.excl.includes(r.t) ? ' <small>(مستثنى)</small>' : ''}</td><td>${AR(r.load)}</td><td>${AR(r.sb)}</td><td><b style="color:${r.load + r.sb > cfg.max ? '#C53030' : 'inherit'}">${AR(r.load + r.sb)}</b></td><td>${AR(r.cov)}</td><td>${AR(r.ab)}</td></tr>`).join('')}</tbody></table>`;
-    B.innerHTML = `<div class="row" style="gap:6px;margin-bottom:8px"><button class="btn ghost sm" id="stP">${I.print || ''} طباعة</button></div><div class="scroll">${tbl()}</div><p class="small muted">الحد: ${AR(cfg.max)} حصة. «حصص غطّاها» و«غاب عنها» من سجل التأمين المحفوظ.</p>`;
-    $('#stP', B).onclick = () => A.printDoc('تقرير عدالة الانتظار والتأمين', sec.name, tbl(true), true);
+    const hist = await api.list('substitutions', { section_id: sec.id }, { select: 'sub_teacher,absent_teacher,prio' }).catch(() => []);
+    const cov = {}, ab = {}, em = {}; hist.forEach(x => { if (x.sub_teacher) { cov[x.sub_teacher] = (cov[x.sub_teacher] || 0) + 1; if (x.prio === 'empty') em[x.sub_teacher] = (em[x.sub_teacher] || 0) + 1; } if (x.absent_teacher) ab[x.absent_teacher] = (ab[x.absent_teacher] || 0) + 1; });
+    const R = C.T.map(t => ({ t, r: ruleOf(cfg, t), load: C.load[t] || 0, sb: sbN[t] || 0, cov: cov[t] || 0, em: em[t] || 0, ab: ab[t] || 0 })).sort((a, b) => (b.load + b.sb) - (a.load + a.sb));
+    const tbl = pr => `<table class="${pr ? '' : 'tbl'}"><thead><tr><th>المعلم</th><th>النصاب</th><th>الانتظار الأسبوعي</th><th>النصاب + الانتظار</th><th>حصص غطّاها</th><th>منها لخلوّ فصله</th><th>حصص غاب عنها</th></tr></thead><tbody>${R.map(r => `<tr><td><b>${esc(pn(r.t))}</b>${r.r.mode !== 'normal' ? ` <small>(${RMODE[r.r.mode]}${r.r.why ? ' — ' + esc(r.r.why) : ''})</small>` : ''}</td><td>${AR(r.load)}</td><td>${AR(r.sb)}</td><td><b style="color:${r.load + r.sb > cfg.max ? '#C53030' : 'inherit'}">${AR(r.load + r.sb)}</b></td><td>${AR(r.cov)}</td><td>${AR(r.em)}</td><td>${AR(r.ab)}</td></tr>`).join('')}</tbody></table>`;
+    B.innerHTML = `${can('print') ? `<div class="row" style="gap:6px;margin-bottom:8px"><button class="btn ghost sm" id="stP">${I.print || ''} طباعة</button></div>` : ''}<div class="scroll">${tbl()}</div><p class="small muted">الحد: ${AR(cfg.max)} حصة. «حصص غطّاها» و«غاب عنها» من سجل التأمين المحفوظ.</p>`;
+    const p = $('#stP', B); if (p) p.onclick = () => A.printDoc('تقرير عدالة الانتظار والتأمين', sec.name, tbl(true), true);
+  }
+
+  function css() {
+    if (document.getElementById('sbp-css')) return;
+    const s = document.createElement('style'); s.id = 'sbp-css';
+    s.textContent = `.sb-why{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap}.sb-wE{background:#E8F6EE;color:#1F6B43}.sb-wS{background:#E4EBF5;color:#082B5A}.sb-wA{background:#EEF6FB;color:#005499}.sb-wL{background:#FFF4E0;color:#8A5A00}
+      .sb-ecls{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.sb-ec{border:1px solid var(--border,#E4EBF5);border-radius:10px;padding:4px 8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}.sb-ec.on{border-color:#2E8B57;background:#F3FBF6}
+      .sb-eps{display:inline-flex;flex-wrap:wrap;gap:3px}.sb-eps button{min-width:28px;height:28px;border-radius:8px;border:1px solid #CFE0F2;background:#fff;color:#082B5A;font:inherit;font-size:12px;cursor:pointer}.sb-eps button.on{background:#082B5A;color:#fff;border-color:#082B5A}.sb-eps button:focus-visible{outline:3px solid #3AB1DB;outline-offset:1px}
+      .sb-fh{margin:18px 0 8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sb-ft td{vertical-align:middle}.sb-sigs{margin-bottom:6px}
+      .sb-sg{border:1px solid var(--border,#E4EBF5);border-radius:12px;padding:10px;margin-bottom:8px;background:var(--card,#fff)}.sb-sgi{height:40px;max-width:160px;border:1px solid #E4EBF5;border-radius:8px;background:#fff}
+      .sb-ru td{vertical-align:middle}.sb-ru .in{min-width:0}.sb-ru .sb-n{width:62px}.sb-ru td:last-child .in{min-width:130px}
+      .sb-pl{display:grid;gap:4px;font-size:13px;background:#F4F8FC;border-radius:10px;padding:8px 10px}
+      .linkbtn{background:none;border:0;padding:0;color:#005499;text-decoration:underline;cursor:pointer;font:inherit}
+      .sb-my{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}.sb-mc{display:flex;gap:10px;align-items:center;border:1px solid #E4EBF5;border-radius:14px;padding:10px;background:#fff;border-inline-start:4px solid #3AB1DB}.sb-mc.ok{border-inline-start-color:#2E8B57}
+      .sb-md{display:flex;flex-direction:column;align-items:center;min-width:74px;background:#F2F7FC;border-radius:10px;padding:6px}.sb-md span{font-size:11.5px;color:#5B7090}.sb-md i{font-style:normal;font-size:12px;font-weight:700;color:#005499}
+      .sb-mb{flex:1;min-width:0;display:flex;flex-direction:column}.sb-mb span{font-size:13px}.sb-mb small{color:#5B7090}.sb-ms{display:flex;flex-direction:column;align-items:center;gap:2px}.sb-ms small{font-size:11px;color:#5B7090}`;
+    document.head.appendChild(s);
   }
 })();
 }catch(e){console.error('[dina] src/schedule/standby.js',e)}
@@ -11554,9 +11800,9 @@ ${S.me.full_name}`;
   const POL = () => Object.assign({ review: true, auto: 'none', trusted: [], trusted_scope: 'all', parents: false }, ((S.school || {}).settings || {}).res_policy || {});
   const polText = (p, me) => { const tr = (p.trusted || []).includes(me); const sc = { subject: 'معلمي المادة', all: 'كل المعلمين' };
     if (tr) return `مصادرك تُشارك مباشرة مع ${sc[p.trusted_scope] || 'كل المعلمين'} (أنت ضمن الموثوقين).`;
-    if (p.auto !== 'none') return p.review ? `كل مصدر تضيفه يُشارك مباشرة مع ${sc[p.auto]} حسب إعداد المالك.` : `مصدرك خاص بك، وإذا طلبت مشاركته يُشارك مباشرة مع ${sc[p.auto]}.`;
-    return p.review ? 'كل مصدر تضيفه يصل للمالك تلقائياً «بانتظار الاعتماد»، ولا يراه زملاؤك إلا بعد موافقته.' : 'مصدرك خاص بك والمالك؛ لمشاركته اضغط «طلب مشاركة» وينتظر موافقة المالك.'; };
-  const SH = { private: ['خاص بصاحبه', 'st-empty'], pending: ['بانتظار اعتماد المالك', 'st-returned'], shared: ['مشترك', 'st-approved'], rejected: ['لم تُعتمد المشاركة', 'st-returned'] };
+    if (p.auto !== 'none') return p.review ? `كل مصدر تضيفه يُشارك مباشرة مع ${sc[p.auto]}.` : `مصدرك خاص بك، وإذا طلبت مشاركته يُشارك مباشرة مع ${sc[p.auto]}.`;
+    return p.review ? 'كل مصدر تضيفه يصل للمالك تلقائياً «بانتظار الاعتماد»، ولا يراه زملاؤك إلا بعد موافقته.' : 'مصدرك خاص بك؛ لمشاركته اضغط «طلب مشاركة» وينتظر الموافقة.'; };
+  const SH = { private: ['خاص بصاحبه', 'st-empty'], pending: ['بانتظار الاعتماد', 'st-returned'], shared: ['مشترك', 'st-approved'], rejected: ['لم تُعتمد المشاركة', 'st-returned'] };
   const SCOPE = { all: 'كل المعلمين', subject: 'معلمو المادة', people: 'أشخاص محددون' };
   const stageOf = k => String(k || '').split('|')[0] || '';
   const STG_ORD = s => /رياض|KG/i.test(s) ? 0 : /ابتدائ/.test(s) ? 1 : /متوسط/.test(s) ? 2 : /ثانو/.test(s) ? 3 : 4;
@@ -11591,10 +11837,10 @@ ${S.me.full_name}`;
       const pend = RES.filter(r => stOf(r) === 'pending').length; const pol = POL();
       root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>المصادر</h2><p class="sub" style="margin:2px 0 0">مخزن المواد التعليمية للمدرسة: أوراق العمل والعروض والفيديو والصور والملفات وروابط Drive، مرتّبة بالمرحلة والصف والمادة والدرس.</p></div>
         <div class="row"><button class="btn" id="rsAdd">${I.plus} إضافة مصدر</button>${own ? `<button class="btn ghost" id="rsPol">إعدادات المشاركة</button>` : ''}<button class="btn ghost" id="rsPrint">${I.print} طباعة القائمة</button></div></div>
-        ${own ? `<div class="notice info" style="display:block;margin:6px 0 0">الإعداد الحالي: ${pol.auto === 'none' ? '<b>انتظار موافقتك</b>' : `<b>موافقة مباشرة</b> مع ${pol.auto === 'subject' ? 'معلمي المادة' : 'كل المعلمين'}`} · ${pol.review ? 'كل مصدر جديد يُرسل للمراجعة تلقائياً' : 'يبقى خاصاً حتى يطلب المعلم المشاركة'}${(pol.trusted || []).length ? ` · ${AR(pol.trusted.length)} معلم موثوق` : ''}${pol.parents ? ' · إظهار المصادر لأولياء الأمور بموافقتك' : ''}</div>` : `<div class="notice info" style="display:block;margin:6px 0 0">${polText(pol, S.me.id)}${pol.parents ? ' وإظهار مصدرك لأولياء الأمور يحتاج موافقة المالك.' : ''}</div>`}
+        ${own ? `<div class="notice info" style="display:block;margin:6px 0 0">الإعداد الحالي: ${pol.auto === 'none' ? '<b>انتظار موافقتك</b>' : `<b>موافقة مباشرة</b> مع ${pol.auto === 'subject' ? 'معلمي المادة' : 'كل المعلمين'}`} · ${pol.review ? 'كل مصدر جديد يُرسل للمراجعة تلقائياً' : 'يبقى خاصاً حتى يطلب المعلم المشاركة'}${(pol.trusted || []).length ? ` · ${AR(pol.trusted.length)} معلم موثوق` : ''}${pol.parents ? ' · إظهار المصادر لأولياء الأمور بموافقتك' : ''}</div>` : `<div class="notice info" style="display:block;margin:6px 0 0">${polText(pol, S.me.id)}${pol.parents ? ' وإظهار مصدرك لأولياء الأمور يحتاج موافقة.' : ''}</div>`}
         <details class="rs-how"${A.LS.get('rs_how') === '0' ? '' : ' open'}><summary><b>كيف تعمل المصادر؟</b></summary><ul>
-          <li><b>الإضافة تلقائية:</b> كل رابط أو ملف يضيفه المعلم — هنا أو من التحضير — يُحفظ في المصادر ويراه المالك دائماً.</li>
-          <li><b>لا يرى المعلمون مصادر بعضهم إلا بإذن المالك:</b> ${own ? 'تختار من «إعدادات المشاركة»: انتظار موافقتك لكل مصدر، أو موافقة مباشرة لمعلمي المادة أو للجميع، أو معلمين موثوقين تُشارك مصادرهم مباشرة. ولكل مصدر تحدد النطاق أو توقف مشاركته في أي وقت.' : 'المالك يحدد طريقة المشاركة؛ ' + polText(pol, S.me.id)}</li>
+          <li><b>الإضافة تلقائية:</b> كل رابط أو ملف يضيفه المعلم — هنا أو من التحضير — يُحفظ في المصادر وتراه الإدارة دائماً.</li>
+          <li><b>لا يرى المعلمون مصادر بعضهم إلا بإذن المالك:</b> ${own ? 'تختار من «إعدادات المشاركة»: انتظار موافقتك لكل مصدر، أو موافقة مباشرة لمعلمي المادة أو للجميع، أو معلمين موثوقين تُشارك مصادرهم مباشرة. ولكل مصدر تحدد النطاق أو توقف مشاركته في أي وقت.' : polText(pol, S.me.id)}</li>
           <li><b>مرتبط بالدرس:</b> اختر الصف والدرس عند الإضافة فيظهر المصدر داخل تحضير ذلك الدرس، وتُضيفه للحصة بضغطة.</li>
           <li><b>أولياء الأمور:</b> لا يرون أي مصدر إلا إذا فعّلت «يظهر لأولياء الأمور» للمصدر وحددت فصوله.</li>
           <li><b>من المكتبة:</b> مصادر تحضيرات «مكتبة المدرسة» تظهر للمعلمين عند تفعيل التحضير فقط.</li></ul></details>
@@ -11638,7 +11884,7 @@ ${S.me.full_name}`;
       $$('[data-ap]', box).forEach(b => b.onclick = () => shareDlg(R(b.dataset.ap)));
       $$('[data-pa]', box).forEach(b => b.onclick = () => A.run(b, async () => up(R(b.dataset.pa), { visible_to_parents: true, parents_req: false }, 'يظهر الآن لأولياء الأمور')));
       $$('[data-pr]', box).forEach(b => b.onclick = () => A.run(b, async () => up(R(b.dataset.pr), { parents_req: false }, 'رُفض إظهاره لأولياء الأمور')));
-      $$('[data-rj]', box).forEach(b => b.onclick = () => A.run(b, async () => up(R(b.dataset.rj), { share_status: 'rejected', share_note: 'لم يعتمد المالك مشاركة هذا المصدر' }, 'رُفض الطلب — يبقى المصدر خاصاً بصاحبه')));
+      $$('[data-rj]', box).forEach(b => b.onclick = () => A.run(b, async () => up(R(b.dataset.rj), { share_status: 'rejected', share_note: 'لم تُعتمد مشاركة هذا المصدر' }, 'رُفض الطلب — يبقى المصدر خاصاً بصاحبه')));
       $$('[data-un]', box).forEach(b => b.onclick = () => A.run(b, async () => up(R(b.dataset.un), { share_status: 'private', share_note: '' }, 'أُوقفت المشاركة')));
       $$('[data-rq]', box).forEach(b => b.onclick = () => A.run(b, async () => up(R(b.dataset.rq), { share_status: 'pending', share_note: '' }, 'أُرسل طلب المشاركة للمالك')));
       $$('[data-cn]', box).forEach(b => b.onclick = () => A.run(b, async () => up(R(b.dataset.cn), { share_status: 'private', share_note: '' }, 'أصبح المصدر خاصاً بك')));
@@ -11688,7 +11934,7 @@ ${S.me.full_name}`;
             <div class="field"><label for="reL">الدرس (اختياري)</label><select class="in" id="reL"><option value="">—</option>${C2.map(l => `<option value="${l.id}" ${r.lesson_id === l.id ? 'selected' : ''}>${esc(l.unit ? l.unit + ' — ' : '')}${esc(l.lesson)}</option>`).join('')}</select>${!C2.length && r.subject_id && r.grade_key ? '<span class="small muted">لا توجد دروس مدخلة لهذا الصف (من «التقويم ← المنهج والدروس»).</span>' : ''}</div>
             <div class="field"><label for="reN">وصف مختصر (اختياري)</label><input class="in" id="reN" value="${esc(r.note || '')}" placeholder="مثال: تدريبات على الدرس مع الحل"></div></div>
           <div class="sec-box" style="margin-bottom:8px">${own ? `<label class="chk"><input type="checkbox" id="reSh" ${(r._share ?? stOf(r) === 'shared') ? 'checked' : ''}> مشترك مع كل المعلمين <span class="small muted">(تحديد نطاق أدق من زر «النطاق» في البطاقة)</span></label>` : `<p class="small" style="margin:0">🔒 ${polText(POL(), S.me.id)}</p>`}
-            <label class="chk"><input type="checkbox" id="reP" ${r.visible_to_parents || r.parents_req ? 'checked' : ''}> يظهر لأولياء الأمور في بوابتهم مع خطة الأسبوع${!own && POL().parents ? ' <span class="small muted">(بعد موافقة المالك)</span>' : ''}${r.parents_req ? ' <span class="pill st-returned">بانتظار الموافقة</span>' : ''}</label></div>
+            <label class="chk"><input type="checkbox" id="reP" ${r.visible_to_parents || r.parents_req ? 'checked' : ''}> يظهر لأولياء الأمور في بوابتهم مع خطة الأسبوع${!own && POL().parents ? ' <span class="small muted">(بعد الموافقة)</span>' : ''}${r.parents_req ? ' <span class="pill st-returned">بانتظار الموافقة</span>' : ''}</label></div>
           <div class="field"><label>الفصول (اتركها كلها فارغة ليظهر للجميع)</label><div class="perm-grid">${cls.map(c => `<label class="chk"><input type="checkbox" value="${c.id}" ${(r.class_ids || []).includes(c.id) ? 'checked' : ''}> ${esc(c.name)}</label>`).join('')}</div></div>
           <div class="acts"><button class="btn" id="reGo">حفظ</button></div>`;
         q('#reU').onchange = () => { q('#reK').value = guess(q('#reU').value); };
@@ -15009,7 +15255,7 @@ ${S.me.full_name}`;
   // نموذج بلا خانات توقيع: تُضاف خانتا المعلم والاعتماد
   const withSig = tpl => { const t = JSON.parse(JSON.stringify(tpl)); if (!slotsOf(t).length) t.blocks = (t.blocks || []).concat([{ id: 'bsig', type: 'signatures', withSign: true, roles: [{ id: 's0', label: 'المعلم', name: '' }, { id: 's1', label: 'المدير الأكاديمي', name: '@academic' }] }]); return t; };
 
-  A.formsLoadLib = loadLib; A.formsWithSig = withSig; A.formsTeacherSlot = teacherSlot; A.formsSlots = slotsOf;
+  A.formsLoadLib = loadLib; A.formsWithSig = withSig; A.formsTeacherSlot = teacherSlot; A.formsSlots = slotsOf; A.formsSigModal = cb => sigModal(cb);
   // ---------- التوقيع الإلكتروني ----------
   let MYSIG, SIGUSER; // التوقيع المحفوظ مرتبط بالحساب الحالي فقط
   async function mySig() { if (SIGUSER !== S.me.id) { MYSIG = undefined; SIGUSER = S.me.id; } if (MYSIG !== undefined) return MYSIG; try { const [r] = await api.list('staff_signatures', { staff_id: S.me.id }); MYSIG = r ? r.img : null; } catch (_) { MYSIG = null; } return MYSIG; }
@@ -15324,7 +15570,7 @@ ${S.me.full_name}`;
         <div class="meta">${sub}${pillT(t)}${t.due_date ? `<span>الموعد ${dt(t.due_date)}</span>` : ''}${overdue(t) ? '<span class="pill st-returned">متأخر</span>' : ''}<span>✍ ${AR(sg)} توقيع</span>${co.length ? `<span>${co.filter(c => c.status === 'signed').length === co.length ? '✓ ' : '⌛ '}زملاء ${AR(co.filter(c => c.status === 'signed').length)}/${AR(co.length)}</span>` : ''}</div></div></div>
         <span class="small muted">${dt(t.updated_at || t.created_at)}</span></div>`; };
     const bindRows = () => $$('[data-id]', O).forEach(r => { r.onclick = () => open(r.dataset.id); r.onkeydown = e => { if (e.key === 'Enter') open(r.dataset.id); }; });
-    if (st.tab === 'mine') { O.innerHTML = mine.length ? `<div class="fm-list">${mine.map(t => rowHtml(t, `<span>من ${esc(nm(t.created_by))}</span>`)).join('')}</div>` : A.emptyBox('لا نماذج مرسلة إليك', 'تظهر هنا النماذج التي يرسلها لك المالك أو المشرف'); bindRows(); }
+    if (st.tab === 'mine') { O.innerHTML = mine.length ? `<div class="fm-list">${mine.map(t => rowHtml(t, `<span>من ${esc(nm(t.created_by))}</span>`)).join('')}</div>` : A.emptyBox('لا نماذج مرسلة إليك', 'تظهر هنا النماذج التي ترسلها لك الإدارة أو المشرف'); bindRows(); }
     if (st.tab === 'sign') { O.innerHTML = toSign.length ? `<div class="fm-list">${toSign.map(t => rowHtml(t, `<span>${esc(nm(t.assignee))} يطلب توقيعك في «${esc((t.cosign.find(c => c.staff_id === me) || {}).label || '')}»</span>`)).join('')}</div>` : A.emptyBox('لا طلبات توقيع', 'عندما يطلب زميل توقيعك على نموذج يظهر هنا'); bindRows(); }
     if (st.tab === 'evals') { const grp = [['مسودات لديك — عبّئها ووقّعها ثم أرسلها', evals.filter(t => ['assigned', 'draft', 'returned'].includes(t.status))], ['بانتظار توقيع المعلم', evals.filter(t => t.status === 'submitted')], ['موقّعة ومكتملة', evals.filter(t => t.status === 'approved')]];
       O.innerHTML = evals.length ? grp.filter(g => g[1].length).map(([h, L]) => `<h3 class="fm-gh">${h} <span class="pill">${AR(L.length)}</span></h3><div class="fm-list">${L.map(t => rowHtml(t, `<span>${esc(nm(t.assignee))}</span>${t.teacher_note ? '<span>💬 ملاحظة المعلم</span>' : ''}`)).join('')}</div>`).join('') : A.emptyBox('لا استمارات تقييم بعد', 'من «إرسال نموذج» اختر بطاقة تقييم أو زيارة صفية، واختر «أعبّئه أنا ويوقّع المعلم».'); bindRows(); }
@@ -15788,7 +16034,7 @@ ${S.me.full_name}`;
   // ============ مساحة الوكيل: إحالات الطلاب الموجّهة إليه ============
   const dst = { tab: 'inbox', s: '', q: '' };
   V.deputy = async function (root) {
-    if (!isD()) { root.innerHTML = `<div class="card">${A.emptyBox('هذه الصفحة للوكيل والمالك', 'يمنحها المالك من «المسميات والصلاحيات» ← وحدة الوكيل')}</div>`; return; }
+    if (!isD()) { root.innerHTML = `<div class="card">${A.emptyBox('هذه الصفحة غير متاحة لحسابك')}</div>`; return; }
     root.innerHTML = '<div class="spinner"></div>';
     const [stu, , all] = await Promise.all([A.studentsAll ? A.studentsAll() : api.list('students', { school_id: S.school.id }), allCls(),
       api.list('behaviors', { school_id: S.school.id, referred: true, target: 'deputy' }, { order: 'created_at', desc: true }).catch(() => [])]);
@@ -15883,7 +16129,7 @@ ${S.me.full_name}`;
   // ============ مساحة الموجه الطلابي ============
   const cst = { tab: 'inbox' };
   V.counsel = async function (root) {
-    if (!isC()) { root.innerHTML = `<div class="card">${A.emptyBox('هذه الصفحة للموجه الطلابي والمالك', 'يمنحها المالك من «المسميات والصلاحيات» ← وحدة الموجه الطلابي')}</div>`; return; }
+    if (!isC()) { root.innerHTML = `<div class="card">${A.emptyBox('هذه الصفحة غير متاحة لحسابك')}</div>`; return; }
     root.innerHTML = '<div class="spinner"></div>';
     const [stu, , refs, cases] = await Promise.all([A.studentsAll ? A.studentsAll() : api.list('students', { school_id: S.school.id }), allCls(),
       api.list('behaviors', { school_id: S.school.id, referred: true }, { order: 'created_at', desc: true }).then(L => (L || []).filter(r => toOf(r) === 'counselor')).catch(() => []), api.list('counsel_cases', { school_id: S.school.id }, { order: 'updated_at', desc: true }).catch(() => [])]);
@@ -16632,7 +16878,7 @@ ${S.me.full_name}`;
   V.clarify = async function (root) {
     if (!S.me) return;
     if (own()) { st.tab = 'clar'; location.hash = '#/bhadmin'; return; }
-    if (!(canAsk() || (A.tfeat && A.tfeat('clarify')))) { root.innerHTML = `<div class="card">${A.emptyBox('هذه الصفحة غير مفعّلة لحسابك', 'يفعّلها المالك')}</div>`; return; }
+    if (!(canAsk() || (A.tfeat && A.tfeat('clarify')))) { root.innerHTML = `<div class="card">${A.emptyBox('هذه الصفحة غير متاحة لحسابك')}</div>`; return; }
     root.innerHTML = '<div class="spinner"></div>';
     const reqs = await api.list('clar_requests', { school_id: S.school.id }, { order: 'created_at', desc: true }).catch(() => []);
     const inL = reqs.filter(r => r.to_staff === S.me.id), outL = reqs.filter(r => r.from_staff === S.me.id);
@@ -18166,7 +18412,7 @@ ${S.me.full_name}`;
 
   V.visits = async function (root) {
     ensureCss(); navLabel();
-    if (!can()) { root.innerHTML = `<div class="card">${A.emptyBox('هذه الصفحة غير متاحة لحسابك', 'يمنحها المالك من «المسميات والصلاحيات» (الزيارات) ويفعّلها من «تخصيص صفحة المعلم»')}</div>`; return; }
+    if (!can()) { root.innerHTML = `<div class="card">${A.emptyBox('هذه الصفحة غير متاحة لحسابك')}</div>`; return; }
     if (!NV) resetNV();
     // رابط مباشر لفصل (رمز QR على باب الفصل): ?vc=<class_id>
     const vc = (location.search.match(/[?&]vc=([0-9a-f-]{36})/) || [])[1]; if (vc && !NV._vcUsed && classes().some(c => c.id === vc)) { NV._vcUsed = true; st.tab = 'new'; NV.cid = vc; NV.period = 0; }
@@ -18261,7 +18507,7 @@ ${S.me.full_name}`;
     $('#vsR', O).oninput = e => { NV.role = e.target.value; }; $('#vsNt', O).oninput = e => { NV.note = e.target.value; };
     // ٤) النماذج
     let L = null, AL = [];
-    const drawT = () => { $('#vsTpl', O).innerHTML = AL.map(t => { const k = NV.tpls.indexOf(t.key); return `<div class="vs-t ${k >= 0 ? 'on' : ''}" role="checkbox" tabindex="0" aria-checked="${k >= 0}" data-tk="${esc(t.key)}"><span class="k" aria-hidden="true">${k >= 0 ? AR(k + 1) : ''}</span><b>${esc(t.name)}</b>${t.tag ? `<span class="vs-tag" style="justify-self:start">${esc(t.tag)}</span>` : ''}<span class="small muted">${esc(t.desc || '')}</span></div>`; }).join('') || '<p class="small muted">لا نماذج متاحة — يحددها المالك من الإعدادات</p>';
+    const drawT = () => { $('#vsTpl', O).innerHTML = AL.map(t => { const k = NV.tpls.indexOf(t.key); return `<div class="vs-t ${k >= 0 ? 'on' : ''}" role="checkbox" tabindex="0" aria-checked="${k >= 0}" data-tk="${esc(t.key)}"><span class="k" aria-hidden="true">${k >= 0 ? AR(k + 1) : ''}</span><b>${esc(t.name)}</b>${t.tag ? `<span class="vs-tag" style="justify-self:start">${esc(t.tag)}</span>` : ''}<span class="small muted">${esc(t.desc || '')}</span></div>`; }).join('') || '<p class="small muted">لا نماذج متاحة حالياً</p>';
       $$('#vsTpl [data-tk]', O).forEach(el => { const tg = () => { const k = el.dataset.tk, i = NV.tpls.indexOf(k); if (i >= 0) NV.tpls.splice(i, 1); else NV.tpls.push(k); if (NV.custom) { NV.custom = null; A.toast('تغيّر اختيار النماذج فأُلغي التخصيص السابق', 'warn'); } drawT(); sum(); }; el.onclick = tg; el.onkeydown = e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); tg(); } }; });
       $('#vsCusI', O).innerHTML = NV.custom ? '<span class="vs-tag ok">✎ مخصّص لهذه الزيارة</span> <button type="button" class="btn ghost sm" id="vsCusX">إلغاء التخصيص</button>' : ''; const x = $('#vsCusX', O); if (x) x.onclick = () => { NV.custom = null; drawT(); }; };
     const picked = () => NV.tpls.map(k => AL.find(t => t.key === k)).filter(Boolean);
@@ -18569,6 +18815,7 @@ ${S.me.full_name}`;
     ['ttviews', 'عرض الجداول والإسنادات', 'صفحة «عرض الجداول والإسنادات» لمن لديه صلاحية الجدول الدراسي (كالمدير والوكيل): الحصص الجارية الآن، جدول الفصل والمعلم واليوم والأسبوع، تقرير إسنادات الفصول والكشاف العام، والطباعة الاحترافية وExcel. التعديل لمن يملك «تعديل الجدول» فقط.', '🗓️', 'adm'],
     ['clarify', 'طلبات التوضيح', 'صفحة «طلبات التوضيح»: يرى الموظف طلبات التوضيح الموجهة إليه من الإدارة ويرد عليها (تُفعَّل تلقائياً لمن يرسل له المالك طلباً إلا إن ألغى ذلك).', '❓', 'adm'],
     ['visits', 'الزيارات الصفية', 'صفحة «الزيارات الصفية» لمن مُنح «الزيارات» أو «الإشراف التربوي» (كالمدير والوكيل والمشرف): اختيار الفصل فتُحدَّد الحصة والمعلم والدرس من الجدول والخطة، وتقييم بالنموذج المختار وتوقيع المعلم.', '👁️', 'adm'],
+    ['sbsign', 'حصص الانتظار المسندة إليّ والتوقيع', 'بند «حصص الانتظار» للمعلم: يرى الحصص التي أُسندت إليه بعد اعتماد تأمين اليوم، ويوقّع إلكترونياً أمام كل حصة فيظهر توقيعه في نموذج التأمين المعتمد.', '✍️', 'adm'],
     ['app', 'زر «تطبيق الجوال»', 'تعليمات تثبيت المنصة على أندرويد وآيفون في قائمة المستخدم.', '📱', 'com'],
   ];
   A.TFEAT = F.map(f => [f[0], f[1], f[2]]);
@@ -21078,6 +21325,314 @@ ${S.me.full_name}`;
   A.ttViews = { load, pages: o => pages(o), D };
 })();
 }catch(e){console.error('[dina] src/schedule/tt-views.js',e)}
+
+/* ==== src/core/owner-text.js ==== */
+;try{
+/* منصة دينا — لا تُعرض لغير المالك أي عبارة تخص المالك وصلاحياته («يحددها المالك»، «لحساب المالك»، «يمنحها المالك»…)
+   شبكة أمان عامة: تُنقّى رسائل A.emptyBox و A.toast لغير المالك؛ ما يخص المالك يُحذف بلا بديل يذكره.
+   (الصفحات الخاصة بالمالك أصلاً مخفية من القائمة، ومن يصلها برابط يُعاد للرئيسية بصمت.) */
+(function () {
+  const A = window.APP; if (!A) return;
+  const S = A.S, RE = /المالك|مالك النظام/;
+  const isOwner = () => !!(S.me && S.me.is_owner && !S.realMe);
+  // يحذف الجملة/المقطع الذي يذكر المالك ويُبقي ما سواه
+  const strip = t => String(t == null ? '' : t).split(/(?<=[.،؛])\s+|\s+[—–-]\s+|\s*<br\s*\/?>\s*/).filter(x => !RE.test(x)).join(' ').trim();
+  A.ownerClean = t => isOwner() || !RE.test(String(t || '')) ? t : strip(t);
+  const eb = A.emptyBox;
+  if (eb) A.emptyBox = function (t, sub) { if (isOwner()) return eb.apply(this, arguments); const T = RE.test(t || '') ? (strip(t) || 'غير متاح لحسابك') : t; const SB = RE.test(sub || '') ? strip(sub) : sub; return eb.call(this, T, SB || ''); };
+  const to = A.toast;
+  if (to) A.toast = function (m, type) { if (isOwner() || !RE.test(String(m || ''))) return to.apply(this, arguments); const c = strip(m); return to.call(this, /صلاحي/.test(m) && !c ? 'ليست لديك صلاحية لهذا الإجراء' : (c || 'غير متاح لحسابك'), type); };
+})();
+}catch(e){console.error('[dina] src/core/owner-text.js',e)}
+
+/* ==== src/core/search.js ==== */
+;try{
+/* منصة دينا — البحث الشامل (لكل الحسابات)
+   زر 🔍 في الشريط العلوي + اختصار Ctrl/⌘+K أو «/»: يبحث فيما يحق للمستخدم فقط:
+   الصفحات والأدوات المتاحة له (A.navOK)، الزملاء، الفصول، الطلاب، دروس الخطة، المصادر والملفات، بنك الأسئلة، الاختبارات،
+   النماذج، نماذجي، العروض — والبيانات من القاعدة تمر عبر RLS (api.search) فلا يظهر إلا المسموح.
+   لوحة مفاتيح كاملة (↑↓ Enter Esc)، تصفية بالنوع، تمييز المطابقة، وآخر عمليات البحث. */
+(function () {
+  const A = window.APP, V = window.VIEWS; if (!A) return;
+  const { S, api, $, $$, esc, AR } = A;
+  const nk = s => (A.normKey ? A.normKey(s) : String(s || '').toLowerCase());
+  const navOK = k => A.NAV.some(n => n[0] === k && A.navOK(n));
+  const LSK = 'gs_recent';
+  const KINDS = [['all', 'الكل'], ['page', 'الصفحات'], ['person', 'الزملاء'], ['class', 'الفصول'], ['student', 'الطلاب'], ['lesson', 'الدروس'], ['file', 'الملفات والمصادر'], ['q', 'الأسئلة والاختبارات'], ['form', 'النماذج'], ['tool', 'أدوات']];
+  const KIC = { page: '📄', person: '👤', class: '🏫', student: '🎓', lesson: '📘', file: '📎', q: '❓', form: '📝', tool: '⚙️' };
+
+  // تمييز المطابقة (بلا حساسية للهمزات و«ال»): نبحث عن أول ظهور لأي كلمة
+  function hl(text, q) {
+    const t = String(text || ''); const words = String(q || '').trim().split(/\s+/).filter(w => w.length > 1); if (!words.length) return esc(t);
+    for (const w of words) { const i = t.indexOf(w); if (i >= 0) return esc(t.slice(0, i)) + '<mark>' + esc(t.slice(i, i + w.length)) + '</mark>' + esc(t.slice(i + w.length)); }
+    return esc(t);
+  }
+  const match = (q, ...fields) => { const words = nk(q).split(' ').filter(Boolean); const hay = nk(fields.join(' ')); return words.every(w => hay.includes(w)); };
+
+  const goStudio = (tab) => { A.LS.set('studio_t', tab); location.hash = '#/studio'; };
+  const goTT = (p) => { try { const st = JSON.parse(A.LS.get('ttv_st') || '{}'); A.LS.set('ttv_st', JSON.stringify(Object.assign(st, p))); } catch (_) { A.LS.set('ttv_st', JSON.stringify(p)); } if (S.me.is_owner) goStudio('ttviews'); else location.hash = '#/ttviews'; };
+  const canTT = () => S.me.is_owner || navOK('ttviews');
+
+  // ---------- المصادر المحلية ----------
+  function local(q) {
+    const out = [];
+    A.NAV.filter(A.navOK).forEach(([k, l]) => { if (match(q, l, k)) out.push({ kind: 'page', title: l, sub: 'صفحة', go: () => { location.hash = '#/' + k; } }); });
+    const tools = [['توقيعي الإلكتروني', 'رسم توقيعك المستخدم في النماذج', () => A.formsSigModal && A.formsSigModal()], ['تغيير كلمة المرور', 'أمان الحساب', () => { const b = $('#ub'); b && b.click(); setTimeout(() => { const x = document.querySelector('.menu [data-a=pw]'); x && x.click(); }, 60); }], ['السمات والمظهر', 'تغيير شكل المنصة', () => { const b = $('#thBtn'); b && b.click(); }]];
+    if (A.notifPanel && A.tfeat && A.tfeat('notif')) tools.push(['الإشعارات', 'مركز التنبيهات', () => A.notifPanel()]);
+    tools.forEach(([t, s, f]) => { if (match(q, t, s)) out.push({ kind: 'tool', title: t, sub: s, go: f }); });
+    (S.staff || []).filter(p => p.active !== false).forEach(p => { if (match(q, p.full_name, p.title || '')) out.push({ kind: 'person', title: p.full_name, sub: p.title || (p.is_owner ? 'الإدارة' : 'معلم'), go: canTT() ? () => goTT({ v: 'teacher', tid: p.id }) : null, hint: canTT() ? 'جدوله' : '' }); });
+    const cls = [...new Map([...(S.allClasses || []), ...(S.classes || [])].map(c => [c.id, c])).values()];
+    cls.forEach(c => { if (match(q, c.name, c.stage || '')) out.push({ kind: 'class', title: c.name, sub: ((S.sections || []).find(s => s.id === c.section_id) || {}).name || 'فصل', go: canTT() ? () => goTT({ v: 'class', cid: c.id }) : (navOK('classes') ? () => { location.hash = '#/classes'; } : null), hint: canTT() ? 'جدوله' : '' }); });
+    const E = S.allEntries || S.entries || [], seen = new Set();
+    E.forEach(e => { if (!e.topic && !e.homework) return; if (!match(q, e.topic || '', e.homework || '')) return; const key = e.class_id + '|' + e.subject_id + '|' + e.topic; if (seen.has(key)) return; seen.add(key);
+      const mine = e.teacher_id === S.me.id; if (!mine && !navOK('classes') && !S.me.is_owner) return;
+      out.push({ kind: 'lesson', title: e.topic || e.homework, sub: [A.subjName(e.subject_id), (A.cls(e.class_id) || {}).name, (A.DAYS || [])[e.day]].filter(Boolean).join(' · ') + (e.homework && e.topic ? ' — واجب: ' + e.homework : ''), go: () => { location.hash = mine && navOK('my') ? '#/my' : '#/classes'; } }); });
+    return out;
+  }
+
+  // ---------- المصادر من القاعدة (RLS) ----------
+  async function remote(q) {
+    if (!api.search || String(q).trim().length < 2) return [];
+    const sid = S.school && S.school.id, J = [];
+    const tryS = (t, cols, o, map) => J.push(api.search(t, cols, q, o).then(r => (r || []).map(map).filter(Boolean)).catch(() => []));
+    if (navOK('attendance') || S.me.is_owner) tryS('students', ['full_name', 'student_no'], { eq: { school_id: sid }, select: 'id,full_name,class_id,student_no,active', limit: 8 }, r => r.active === false ? null : ({ kind: 'student', title: r.full_name, sub: ((A.cls(r.class_id) || (S.allClasses || []).find(c => c.id === r.class_id) || {}).name || 'طالب') + (r.student_no ? ' · ' + r.student_no : ''), go: navOK('attendance') ? () => { A.LS.set('atttab', 'students'); try { const st = JSON.parse(A.LS.get('stbr') || '{}'); st.q = r.full_name; A.LS.set('stbr', JSON.stringify(st)); } catch (_) { } location.hash = '#/attendance'; } : null }));
+    tryS('resources', ['title', 'note'], { eq: { school_id: sid }, select: 'id,title,url,kind,note', limit: 8 }, r => ({ kind: 'file', title: r.title, sub: r.note || 'مصدر', go: () => r.url && window.open(r.url, '_blank', 'noopener'), hint: 'فتح' }));
+    if (navOK('assess') || navOK('qbank')) {
+      tryS('questions', ['body'], { eq: { school_id: sid }, select: 'id,body,subject_id,grade_key', limit: 6 }, r => ({ kind: 'q', title: String(r.body || '').slice(0, 110), sub: 'سؤال · ' + (A.subjName(r.subject_id) || ''), go: () => { location.hash = navOK('qbank') ? '#/qbank' : '#/assess'; } }));
+      tryS('quizzes', ['title'], { eq: { school_id: sid }, select: 'id,title,kind,subject_id', limit: 6 }, r => ({ kind: 'q', title: r.title || 'اختبار', sub: (r.kind === 'homework' ? 'واجب' : 'اختبار') + ' · ' + (A.subjName(r.subject_id) || ''), go: () => { location.hash = '#/assess'; } }));
+    }
+    if (navOK('forms')) tryS('form_tasks', ['title'], { eq: { school_id: sid }, select: 'id,title,status,assignee,created_at', limit: 8, order: 'created_at', desc: true }, r => ({ kind: 'form', title: r.title, sub: 'نموذج' + (r.assignee ? ' · ' + (A.personName(r.assignee) || '') : ''), go: () => { location.hash = '#/forms'; } }));
+    if (navOK('myforms')) tryS('user_forms', ['name', 'folder'], { eq: { school_id: sid }, select: 'id,name,folder', limit: 6 }, r => ({ kind: 'form', title: r.name, sub: 'نماذجي' + (r.folder ? ' · ' + r.folder : ''), go: () => { location.hash = '#/myforms'; } }));
+    if (navOK('slides')) tryS('decks', ['title'], { eq: { school_id: sid }, select: 'id,title', limit: 6 }, r => ({ kind: 'file', title: r.title, sub: 'عرض تقديمي', go: () => { location.hash = '#/slides'; } }));
+    return (await Promise.all(J)).flat();
+  }
+
+  // ---------- الواجهة ----------
+  let OV = null;
+  function open(pre) {
+    if (OV) { $('#gsI', OV).focus(); return; }
+    css();
+    const last = document.activeElement;
+    OV = document.createElement('div'); OV.className = 'gs-ov'; OV.setAttribute('role', 'dialog'); OV.setAttribute('aria-modal', 'true'); OV.setAttribute('aria-label', 'البحث في المنصة');
+    OV.innerHTML = `<div class="gs-box"><div class="gs-top"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="gsI" type="search" placeholder="ابحث عن صفحة، زميل، فصل، طالب، درس، ملف، سؤال، نموذج…" autocomplete="off" role="combobox" aria-expanded="true" aria-controls="gsL" aria-autocomplete="list">
+        <kbd class="gs-k">Esc</kbd><button class="gs-x" id="gsX" aria-label="إغلاق البحث">×</button></div>
+      <div class="gs-ch" role="group" aria-label="نوع النتائج">${KINDS.map(([k, l]) => `<button type="button" data-k="${k}" class="${k === 'all' ? 'on' : ''}" aria-pressed="${k === 'all'}">${l}</button>`).join('')}</div>
+      <div class="gs-l" id="gsL" role="listbox" aria-label="النتائج"></div>
+      <div class="gs-f"><span><kbd>↑</kbd><kbd>↓</kbd> تنقّل</span><span><kbd>Enter</kbd> فتح</span><span><kbd>Ctrl</kbd>+<kbd>K</kbd> بحث من أي مكان</span></div></div>`;
+    document.body.appendChild(OV); document.documentElement.classList.add('gs-lock');
+    const I = $('#gsI', OV), L = $('#gsL', OV); let kind = 'all', items = [], act = 0, tok = 0, tm = null, remoteItems = [], localItems = [];
+    const close = () => { if (!OV) return; OV.remove(); OV = null; document.documentElement.classList.remove('gs-lock'); document.removeEventListener('keydown', onKey, true); last && last.focus && last.focus(); };
+    const recent = () => { try { return JSON.parse(A.LS.get(LSK) || '[]'); } catch (_) { return []; } };
+    const remember = q => { const r = recent().filter(x => x !== q); r.unshift(q); A.LS.set(LSK, JSON.stringify(r.slice(0, 6))); };
+    const render = (loading) => {
+      const q = I.value.trim();
+      if (!q) { const r = recent(); items = []; L.innerHTML = r.length ? `<div class="gs-h">آخر عمليات البحث</div>${r.map(x => `<button type="button" class="gs-r" data-rq="${esc(x)}">🕘 ${esc(x)}</button>`).join('')}` : `<div class="gs-e">اكتب حرفين أو أكثر للبحث فيما هو متاح لحسابك.</div>`;
+        $$('[data-rq]', L).forEach(b => b.onclick = () => { I.value = b.dataset.rq; run(); }); return; }
+      const all = localItems.concat(remoteItems).filter(x => kind === 'all' || x.kind === kind);
+      items = all.slice(0, 60); if (act >= items.length) act = 0;
+      const counts = {}; localItems.concat(remoteItems).forEach(x => counts[x.kind] = (counts[x.kind] || 0) + 1);
+      $$('.gs-ch [data-k]', OV).forEach(b => { const n = b.dataset.k === 'all' ? localItems.length + remoteItems.length : counts[b.dataset.k] || 0; b.hidden = b.dataset.k !== 'all' && !n; b.innerHTML = KINDS.find(k => k[0] === b.dataset.k)[1] + (n ? ` <b>${AR(n)}</b>` : ''); });
+      if (!items.length) { L.innerHTML = loading ? '<div class="gs-e"><span class="gs-sp" aria-hidden="true"></span> جارٍ البحث…</div>' : `<div class="gs-e">لا نتائج لـ «${esc(q)}» ضمن ما يتاح لحسابك.</div>`; return; }
+      let html = '', prevK = ''; items.forEach((x, i) => { if (kind === 'all' && x.kind !== prevK) { html += `<div class="gs-h">${KINDS.find(k => k[0] === x.kind)[1]}</div>`; prevK = x.kind; }
+        html += `<div class="gs-i ${i === act ? 'on' : ''} ${x.go ? '' : 'ro'}" role="option" id="gsO${i}" aria-selected="${i === act}" data-i="${i}"><span class="gs-ic" aria-hidden="true">${KIC[x.kind]}</span><span class="gs-t"><b>${hl(x.title, q)}</b><small>${hl(x.sub || '', q)}</small></span>${x.go ? `<span class="gs-go">${esc(x.hint || 'فتح')} ←</span>` : ''}</div>`; });
+      if (loading) html += '<div class="gs-e small"><span class="gs-sp" aria-hidden="true"></span> البحث في البيانات…</div>';
+      L.innerHTML = html; I.setAttribute('aria-activedescendant', 'gsO' + act);
+      $$('.gs-i', L).forEach(el => { el.onclick = () => pick(+el.dataset.i); el.onmousemove = () => { if (act !== +el.dataset.i) { act = +el.dataset.i; mark(); } }; });
+    };
+    const mark = () => { $$('.gs-i', L).forEach(el => { const on = +el.dataset.i === act; el.classList.toggle('on', on); el.setAttribute('aria-selected', on); }); I.setAttribute('aria-activedescendant', 'gsO' + act); const el = $('#gsO' + act, L); el && el.scrollIntoView({ block: 'nearest' }); };
+    const pick = i => { const x = items[i]; if (!x || !x.go) return; remember(I.value.trim()); close(); setTimeout(() => x.go(), 0); };
+    const run = () => { clearTimeout(tm); const q = I.value.trim(); act = 0; localItems = q ? local(q) : []; remoteItems = []; render(q.length >= 2);
+      if (q.length < 2) return; const my = ++tok; tm = setTimeout(async () => { const r = await remote(q); if (my !== tok || !OV) return; remoteItems = r; render(false); }, 260); };
+    function onKey(e) {
+      if (!OV) return;
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); return; }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { if (!items.length) return; e.preventDefault(); act = (act + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length; mark(); return; }
+      if (e.key === 'Enter' && document.activeElement === I) { e.preventDefault(); pick(act); return; }
+      if (e.key === 'Tab') { const f = $$('input,button:not([hidden])', OV).filter(x => x.offsetParent); const i = f.indexOf(document.activeElement); if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); } else if (!e.shiftKey && i === f.length - 1) { e.preventDefault(); f[0].focus(); } }
+    }
+    document.addEventListener('keydown', onKey, true);
+    I.oninput = run; $('#gsX', OV).onclick = close; OV.onclick = e => { if (e.target === OV) close(); };
+    $$('.gs-ch [data-k]', OV).forEach(b => b.onclick = () => { kind = b.dataset.k; act = 0; $$('.gs-ch [data-k]', OV).forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); }); render(false); I.focus(); });
+    if (pre) I.value = pre; run(); setTimeout(() => I.focus(), 0);
+  }
+  A.globalSearch = open;
+
+  // زر في الشريط العلوي (يُعاد إدراجه كلما أُعيد رسم الشريط)
+  function ensureBtn() {
+    if (!S.me) return; if ($('#gsBtn')) { sideBox(); return; } const ub = $('#ub'); if (!ub || !ub.parentNode) return;
+    const b = document.createElement('button'); b.id = 'gsBtn'; b.type = 'button'; b.className = 'gs-btn'; b.title = 'بحث (Ctrl+K)'; b.setAttribute('aria-label', 'البحث في المنصة');
+    b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>بحث</span>';
+    b.onclick = () => open(); const th = $('#thBtn'); ub.parentNode.insertBefore(b, th && th.parentNode === ub.parentNode ? th : ub); css();
+    sideBox();
+  }
+  // على الشاشات الواسعة: خانة بحث أعلى القائمة الجانبية (الشريط العلوي ممتلئ)
+  function sideBox() {
+    const nav = $('#nav'); if (!S.me || !nav || nav.querySelector('#gsSide')) return;
+    const b = document.createElement('button'); b.id = 'gsSide'; b.type = 'button'; b.className = 'gs-side'; b.setAttribute('aria-label', 'البحث في المنصة (Ctrl+K)');
+    b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>بحث…</span><kbd>Ctrl K</kbd>';
+    b.onclick = () => open(); nav.prepend(b);
+  }
+  new MutationObserver(() => ensureBtn()).observe(document.documentElement, { childList: true, subtree: true });
+  document.addEventListener('keydown', e => {
+    if (!S.me || OV) return; const t = e.target, typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K' || e.code === 'KeyK')) { e.preventDefault(); open(); }
+    else if (e.key === '/' && !typing && !document.querySelector('.modal-bg,.rs-ov')) { e.preventDefault(); open(); }
+  });
+
+  function css() {
+    if (document.getElementById('gs-css')) return;
+    const s = document.createElement('style'); s.id = 'gs-css';
+    s.textContent = `.gs-btn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;width:38px;height:38px;border-radius:12px;display:inline-grid;place-items:center;cursor:pointer;margin-inline:4px;flex:none;padding:0}.gs-btn span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+      .gs-btn svg,.gs-top svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round}.gs-btn:hover{background:rgba(255,255,255,.22)}.gs-btn:focus-visible{outline:3px solid #3AB1DB;outline-offset:2px}
+      .gs-side{display:none;align-items:center;gap:8px;width:calc(100% - 16px);margin:10px 8px 6px;padding:9px 12px;border:1px solid #DCE7F3;border-radius:12px;background:#F7FAFD;color:#5B7090;font:inherit;font-size:13.5px;cursor:pointer;text-align:start}
+      .gs-side svg{width:16px;height:16px;fill:none;stroke:#005499;stroke-width:2.2;stroke-linecap:round;flex:none}.gs-side span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gs-side kbd{font:inherit;font-size:10.5px;border:1px solid #CFE0F2;border-bottom-width:2px;border-radius:6px;padding:0 5px;background:#fff;direction:ltr}
+      .gs-side:hover{border-color:#3AB1DB;background:#fff}.gs-side:focus-visible{outline:3px solid #3AB1DB;outline-offset:1px}
+      @media(min-width:1100px){body.ui-side.side-full .gs-side{display:flex}body.ui-side.side-full .gs-btn{display:none!important}}
+      html.gs-lock{overflow:hidden}
+      .gs-ov{position:fixed;inset:0;z-index:10050;background:rgba(8,43,90,.42);backdrop-filter:blur(3px);display:flex;justify-content:center;align-items:flex-start;padding:8vh 12px 12px}
+      .gs-box{width:min(720px,100%);max-height:80vh;display:flex;flex-direction:column;background:#fff;border-radius:20px;box-shadow:0 24px 60px rgba(8,43,90,.35),0 2px 0 #3AB1DB inset;overflow:hidden;color:#082B5A}
+      .gs-top{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #E4EBF5}.gs-top svg{color:#005499;flex:none}
+      .gs-top input{flex:1;min-width:0;border:0;outline:0;font:inherit;font-size:17px;color:#082B5A;background:transparent}.gs-top input::-webkit-search-cancel-button{display:none}
+      .gs-x{border:0;background:#EEF3F9;color:#082B5A;width:32px;height:32px;border-radius:10px;font-size:20px;cursor:pointer}.gs-x:focus-visible{outline:3px solid #3AB1DB}
+      .gs-k,.gs-f kbd{font:inherit;font-size:11px;border:1px solid #CFE0F2;border-bottom-width:2px;border-radius:6px;padding:0 5px;color:#40546F;background:#F7FAFD}
+      .gs-ch{display:flex;gap:6px;padding:8px 12px;overflow-x:auto;border-bottom:1px solid #F0F4F9}.gs-ch button{flex:none;border:1px solid #DCE7F3;background:#fff;color:#082B5A;border-radius:999px;padding:4px 11px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+      .gs-ch button b{font-size:11px;background:#EEF3F9;border-radius:99px;padding:0 6px;color:#005499}.gs-ch button.on{background:#082B5A;color:#fff;border-color:#082B5A}.gs-ch button.on b{background:rgba(255,255,255,.2);color:#fff}.gs-ch button:focus-visible{outline:3px solid #3AB1DB}
+      .gs-l{overflow:auto;padding:6px 8px 10px;flex:1}.gs-h{font-size:12px;font-weight:800;color:#5B7090;padding:10px 8px 4px}
+      .gs-i{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:12px;cursor:pointer}.gs-i.on{background:linear-gradient(90deg,#EEF6FB,#F5F9FD);box-shadow:inset -3px 0 0 #3AB1DB}.gs-i.ro{cursor:default}
+      .gs-ic{width:34px;height:34px;flex:none;border-radius:10px;background:#F2F7FC;display:grid;place-items:center;font-size:17px}
+      .gs-t{flex:1;min-width:0;display:flex;flex-direction:column}.gs-t b{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gs-t small{color:#5B7090;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .gs-t mark{background:#FFF1B8;color:inherit;border-radius:3px;padding:0 1px}.gs-go{font-size:12px;color:#005499;font-weight:700;flex:none}
+      .gs-e{padding:18px 10px;text-align:center;color:#5B7090}.gs-r{display:block;width:100%;text-align:start;border:0;background:none;font:inherit;padding:8px 10px;border-radius:10px;color:#082B5A;cursor:pointer}.gs-r:hover,.gs-r:focus-visible{background:#F2F7FC;outline:none}
+      .gs-f{display:flex;gap:14px;flex-wrap:wrap;padding:8px 14px;border-top:1px solid #E4EBF5;font-size:12px;color:#5B7090;background:#FAFCFE}
+      .gs-sp{display:inline-block;width:12px;height:12px;border:2px solid #CFE0F2;border-top-color:#005499;border-radius:50%;animation:gsr .8s linear infinite;vertical-align:-1px}@keyframes gsr{to{transform:rotate(360deg)}}
+      @media(max-width:640px){.gs-ov{padding:0}.gs-box{width:100%;max-height:none;height:100%;border-radius:0}.gs-f{display:none}}
+      @media(prefers-reduced-motion:reduce){.gs-sp{animation:none}}`;
+    document.head.appendChild(s);
+  }
+})();
+}catch(e){console.error('[dina] src/core/search.js',e)}
+
+/* ==== src/core/staff-work.js ==== */
+;try{
+/* منصة دينا — متابعة الموظفين وأعمالهم (للمالك وحده)
+   RPC staff_work(from, to) (sql/109c): تجميع لكل موظف/نوع/يوم من: الخطة وتنفيذها، التحضير، حضور الحصص والصباحي، السلوك،
+   الاختبارات والبنك، المصادر، النماذج والزيارات، الانتظار، الرسائل، الإرشاد، العروض والأسئلة اللحظية والألعاب، نماذجي،
+   الدخول، الحضور الوظيفي، المناوبة، التوضيح، تقارير أولياء الأمور.
+   الصفحة: فترة (اليوم/أمس/الأسبوع/الأسبوع الماضي/الشهر/مخصص) ← مؤشرات، «أبرز الأعمال»، جدول بكل موظف قابل للترتيب،
+   وتقرير مفصّل لكل موظف يوماً بيوم — طباعة بهوية دينا وExcel. لا يظهر لأي حساب آخر (بند القائمة والصفحة والقاعدة). */
+(function () {
+  const A = window.APP, V = window.VIEWS; if (!A) return;
+  const { S, api, $, $$, esc, AR, I } = A;
+  const own = () => !!(S.me && S.me.is_owner && !S.realMe);
+  if (A.NAV && !A.NAV.some(n => n[0] === 'staffwork')) { const i = A.NAV.findIndex(n => n[0] === 'activity'); A.NAV.splice(i < 0 ? A.NAV.length : i, 0, ['staffwork', 'متابعة الموظفين', () => own()]); }
+  A.I.staffwork = A.I.staffwork || '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="7" r="3"/><path d="M2 20v-1a6 6 0 0 1 10-4.5"/><path d="M14 20l2-5 2 3 2-6 2 8"/></svg>';
+  // [مفتاح، الاسم، الوزن في المؤشر، الأيقونة]
+  const CAT = [['plan', 'حصص الخطة المُدخلة', 1, '📅'], ['exec', 'تنفيذ الحصص', 1, '✅'], ['prep', 'التحضير', 3, '📘'], ['patt', 'رصد حضور الحصص', 1, '🧾'], ['att', 'الحضور الصباحي', 1, '🌅'], ['beh', 'رصد السلوك', 1, '⭐'],
+    ['quiz', 'اختبارات وواجبات', 4, '📝'], ['qbank', 'أسئلة البنك', 1, '❓'], ['res', 'مصادر وملفات', 2, '📎'], ['form', 'نماذج مُسلَّمة', 4, '📋'], ['visit', 'زيارات صفية', 5, '👁️'], ['cover', 'حصص انتظار غطّاها', 3, '🔁'],
+    ['counsel', 'إجراءات إرشادية', 3, '🤝'], ['preport', 'تقارير أولياء الأمور', 3, '👪'], ['clar', 'ردود التوضيح', 2, '💬'], ['duty', 'المناوبة', 2, '🛡️'], ['deck', 'عروض تقديمية', 3, '🖥️'], ['poll', 'أسئلة لحظية', 2, '⚡'], ['game', 'ألعاب تعليمية', 2, '🎮'], ['uform', 'نماذجي', 2, '🗂️'], ['msg', 'رسائل', 0.5, '✉️'], ['login', 'مرات الدخول', 0, '🔑'], ['hr', 'الحضور الوظيفي', 0, '🕘']];
+  const CM = Object.fromEntries(CAT.map(c => [c[0], c]));
+  const HRS = { present: 'حاضر', late: 'متأخر', absent: 'غائب', leave: 'إجازة', excused: 'بعذر', early: 'انصراف مبكر' };
+  const iso = d => A.isoDate(d), todayD = () => A.parseDate(new Date(Date.now() + 3 * 36e5).toISOString().slice(0, 10));
+  const RANGES = [['today', 'اليوم'], ['yest', 'أمس'], ['week', 'هذا الأسبوع'], ['lweek', 'الأسبوع الماضي'], ['month', 'هذا الشهر'], ['custom', 'فترة محددة']];
+  function rangeOf(k, f, t) { const d = todayD(), a = new Date(d), b = new Date(d);
+    if (k === 'yest') { a.setDate(a.getDate() - 1); b.setDate(b.getDate() - 1); }
+    else if (k === 'week') a.setDate(a.getDate() - a.getDay());
+    else if (k === 'lweek') { a.setDate(a.getDate() - a.getDay() - 7); b.setTime(a.getTime()); b.setDate(b.getDate() + 6); }
+    else if (k === 'month') a.setDate(1);
+    else if (k === 'custom') return [f || iso(d), t || iso(d)];
+    return [iso(a), iso(b)]; }
+
+  async function fetchData(from, to) {
+    if (!A.DEMO) return (await api.rpc('staff_work', { p_from: from, p_to: to })) || [];
+    // وضع التجربة: بيانات مولَّدة ثابتة لكل موظف لعرض الواجهة
+    const out = [], days = []; for (let d = A.parseDate(from); d <= A.parseDate(to); d.setDate(d.getDate() + 1)) if (d.getDay() < 5) days.push(iso(d));
+    let seed = 7; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+    (S.staff || []).filter(s => !s.is_owner).forEach(s => days.forEach(d => CAT.forEach(([c]) => { if (rnd() < (c === 'login' ? .8 : c === 'hr' ? .95 : .22)) out.push({ s: s.id, c, d, n: c === 'hr' ? 1 : 1 + Math.floor(rnd() * 5), l: c === 'hr' ? [rnd() < .85 ? 'present' : rnd() < .5 ? 'late' : 'absent'] : ['عنصر تجريبي ' + c] }); })));
+    return out;
+  }
+
+  V.staffwork = async function (root) {
+    if (!own()) { root.innerHTML = ''; if (location.hash !== '#/home') location.hash = '#/home'; return; }
+    css();
+    const st = Object.assign({ r: 'week', f: '', t: '', q: '', sort: 'score', cats: null }, (() => { try { return JSON.parse(A.LS.get('sw_st') || '{}'); } catch (_) { return {}; } })());
+    const save = () => A.LS.set('sw_st', JSON.stringify(st));
+    const [from, to] = rangeOf(st.r, st.f, st.t);
+    root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2 style="margin:0">متابعة الموظفين وأعمالهم</h2><p class="sub" style="margin:2px 0 0">ما أنجزه كل موظف في المنصة خلال الفترة — لك وحدك.</p></div>
+        <div class="row" style="gap:6px"><button class="btn ghost sm" id="swPr">${I.print || ''} طباعة التقرير</button><button class="btn ghost sm" id="swX">Excel</button></div></div>
+      <div class="sw-rg" role="group" aria-label="الفترة">${RANGES.map(([k, l]) => `<button type="button" data-r="${k}" class="${st.r === k ? 'on' : ''}" aria-pressed="${st.r === k}">${l}</button>`).join('')}
+        <span class="sw-cu" ${st.r === 'custom' ? '' : 'hidden'}><label class="sr-only" for="swF">من</label><input class="in" type="date" id="swF" value="${from}"><span>←</span><label class="sr-only" for="swT">إلى</label><input class="in" type="date" id="swT" value="${to}"></span>
+        <span class="small muted">${AR(A.dmy(A.parseDate(from)))}${from !== to ? ' — ' + AR(A.dmy(A.parseDate(to))) : ''}</span></div>
+      <div id="swB"><div class="spinner"></div></div></div>`;
+    $$('[data-r]', root).forEach(b => b.onclick = () => { st.r = b.dataset.r; if (st.r === 'custom' && !st.f) { st.f = from; st.t = to; } save(); V.staffwork(root); });
+    ['#swF', '#swT'].forEach(id => $(id, root).onchange = () => { st.f = $('#swF', root).value; st.t = $('#swT', root).value; if (st.t < st.f) [st.f, st.t] = [st.t, st.f]; save(); V.staffwork(root); });
+    let rows; try { rows = await fetchData(from, to); } catch (e) { $('#swB', root).innerHTML = A.emptyBox('تعذّر تحميل البيانات', esc(e.message)); return; }
+    // تجميع
+    const staff = (S.staff || []).filter(s => !s.is_owner && s.active !== false);
+    const P = {}; staff.forEach(s => P[s.id] = { id: s.id, name: s.full_name, title: s.title || '', c: {}, days: {}, last: '', hr: {}, items: {} });
+    rows.forEach(r => { const p = P[r.s]; if (!p) return; p.c[r.c] = (p.c[r.c] || 0) + r.n; (p.days[r.d] = p.days[r.d] || []).push(r); if (r.c !== 'login' && r.c !== 'hr' && r.d > p.last) p.last = r.d;
+      if (r.c === 'hr') (r.l || []).slice(0, 1).forEach(x => p.hr[x] = (p.hr[x] || 0) + 1); else if (r.c !== 'login') (p.items[r.c] = p.items[r.c] || []).push(...(r.l || []).map(l => ({ l, d: r.d }))); });
+    const score = p => CAT.reduce((s, [k, , w]) => s + (p.c[k] || 0) * w, 0);
+    const L = Object.values(P).map(p => Object.assign(p, { score: Math.round(score(p)), work: CAT.filter(c => c[2] > 0).reduce((s, [k]) => s + (p.c[k] || 0), 0) }));
+    const usedCats = CAT.filter(([k]) => L.some(p => p.c[k]));
+    const B = $('#swB', root);
+    const draw = () => {
+      const q = A.normKey(st.q || ''); let list = L.filter(p => !q || A.normKey(p.name + ' ' + p.title).includes(q));
+      list.sort((a, b) => st.sort === 'name' ? a.name.localeCompare(b.name, 'ar') : st.sort === 'last' ? (b.last || '').localeCompare(a.last || '') : CM[st.sort] ? (b.c[st.sort] || 0) - (a.c[st.sort] || 0) : b.score - a.score);
+      const active = L.filter(p => p.work > 0), idle = L.filter(p => !p.work), tot = L.reduce((s, p) => s + p.work, 0);
+      const catTot = usedCats.filter(c => c[2] > 0).map(([k, l, , ic]) => [k, l, ic, L.reduce((s, p) => s + (p.c[k] || 0), 0)]).sort((a, b) => b[3] - a[3]);
+      const top = L.filter(p => p.score > 0).sort((a, b) => b.score - a.score).slice(0, 5);
+      const hrAbs = L.reduce((s, p) => s + (p.hr.absent || 0), 0), hrLate = L.reduce((s, p) => s + (p.hr.late || 0), 0);
+      const notable = []; ['visit', 'form', 'quiz', 'prep', 'cover', 'counsel', 'preport', 'deck'].forEach(k => L.forEach(p => (p.items[k] || []).slice(0, 2).forEach(it => notable.push({ p, k, ...it }))));
+      notable.sort((a, b) => b.d.localeCompare(a.d) || CM[b.k][2] - CM[a.k][2]);
+      B.innerHTML = `<div class="sw-k">${[[AR(active.length) + ' / ' + AR(L.length), 'موظفون لهم عمل', '#2E8B57'], [AR(tot), 'إجمالي الأعمال', '#005499'], [catTot[0] ? catTot[0][1] : '—', 'الأكثر نشاطاً', '#3AB1DB'], [AR(idle.length), 'بلا أي عمل مسجّل', idle.length ? '#C05621' : '#2E8B57'], [AR(hrLate) + ' · ' + AR(hrAbs), 'تأخر · غياب وظيفي', '#7E62C2']].map(([v, l, c], i) => `<button type="button" class="sw-kc" style="--c:${c}" data-kpi="${i}"><b>${v}</b><span>${l}</span></button>`).join('')}</div>
+        <div class="sw-hi"><section><h3>🏅 الأكثر إنجازاً</h3>${top.length ? `<ol>${top.map(p => `<li><button type="button" class="linkbtn" data-p="${p.id}">${esc(p.name)}</button> <span class="small muted">${CAT.filter(c => c[2] > 0 && p.c[c[0]]).sort((a, b) => (p.c[b[0]] || 0) * b[2] - (p.c[a[0]] || 0) * a[2]).slice(0, 3).map(c => `${c[3]} ${AR(p.c[c[0]])} ${c[1]}`).join(' · ')}</span></li>`).join('')}</ol>` : '<p class="small muted">لا أعمال في الفترة</p>'}</section>
+          <section><h3>✨ أبرز الأعمال</h3>${notable.length ? `<ul>${notable.slice(0, 8).map(n => `<li>${CM[n.k][3]} <b>${esc(n.p.name)}</b> — ${esc(CM[n.k][1])}: ${esc(String(n.l).slice(0, 70))} <span class="small muted">${AR(A.dmy(A.parseDate(n.d)))}</span></li>`).join('')}</ul>` : '<p class="small muted">لا أعمال بارزة في الفترة</p>'}</section>
+          <section><h3>📊 حسب النوع</h3><div class="sw-bars">${catTot.filter(c => c[3]).slice(0, 8).map(([k, l, ic, n]) => `<button type="button" class="sw-bar" data-sort="${k}" title="ترتيب الموظفين حسب ${l}"><span>${ic} ${l}</span><i style="width:${Math.max(4, Math.round(n / (catTot[0][3] || 1) * 100))}%"></i><b>${AR(n)}</b></button>`).join('') || '<p class="small muted">—</p>'}</div></section></div>
+        <div class="row" style="gap:8px;flex-wrap:wrap;margin:12px 0 6px"><input class="in" id="swQ" placeholder="بحث باسم الموظف" value="${esc(st.q || '')}" style="max-width:240px"><label class="small" for="swS">الترتيب</label><select class="in" id="swS" style="width:auto"><option value="score" ${st.sort === 'score' ? 'selected' : ''}>مؤشر الإنجاز</option><option value="name" ${st.sort === 'name' ? 'selected' : ''}>الاسم</option><option value="last" ${st.sort === 'last' ? 'selected' : ''}>آخر عمل</option>${usedCats.map(([k, l]) => `<option value="${k}" ${st.sort === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+        <div class="scroll"><table class="tbl sw-t"><thead><tr><th>الموظف</th><th>المؤشر</th>${usedCats.map(([k, l, , ic]) => `<th title="${l}"><button type="button" class="sw-th" data-sort="${k}">${ic}<span>${l}</span></button></th>`).join('')}<th>آخر عمل</th></tr></thead>
+          <tbody>${list.map(p => `<tr class="${p.work ? '' : 'sw-idle'}"><td><button type="button" class="linkbtn" data-p="${p.id}"><b>${esc(p.name)}</b></button>${p.title ? `<div class="small muted">${esc(p.title)}</div>` : ''}</td><td><b>${AR(p.score)}</b></td>${usedCats.map(([k]) => `<td>${k === 'hr' ? (Object.keys(p.hr).length ? Object.entries(p.hr).map(([s, n]) => `<span class="sw-hr sw-${s}">${HRS[s] || s} ${AR(n)}</span>`).join(' ') : '—') : p.c[k] ? AR(p.c[k]) : '<span class="faint">·</span>'}</td>`).join('')}<td class="small">${p.last ? AR(A.dmy(A.parseDate(p.last))) : '—'}</td></tr>`).join('')}</tbody></table></div>
+        <p class="small muted">المؤشر = مجموع الأعمال بأوزان (الزيارة ٥، الاختبار والنموذج ٤، التحضير والانتظار والإرشاد ٣…) — للمقارنة السريعة لا للتقييم. اضغط اسم الموظف لتقريره المفصّل.</p>`;
+      $('#swQ', B).oninput = e => { st.q = e.target.value; save(); const pos = e.target.selectionStart; draw(); const i = $('#swQ', B); i.focus(); i.setSelectionRange(pos, pos); };
+      $('#swS', B).onchange = e => { st.sort = e.target.value; save(); draw(); };
+      $$('[data-sort]', B).forEach(b => b.onclick = () => { st.sort = b.dataset.sort; save(); draw(); });
+      $$('[data-p]', B).forEach(b => b.onclick = () => detail(P[b.dataset.p], from, to));
+      $$('[data-kpi]', B).forEach(b => b.onclick = () => { const i = +b.dataset.kpi; if (i === 3) listModal('بلا أي عمل مسجّل', idle); else if (i === 0) listModal('موظفون لهم عمل', active); else if (i === 4) listModal('التأخر والغياب الوظيفي', L.filter(p => p.hr.late || p.hr.absent)); else { st.sort = i === 2 && catTot[0] ? catTot[0][0] : 'score'; save(); draw(); } });
+    };
+    const listModal = (t, l) => { const m = A.modal(`<h3>${t} (${AR(l.length)})</h3><div class="sw-ml">${l.map(p => `<button type="button" class="linkbtn" data-p="${p.id}">${esc(p.name)}</button>`).join('') || '<p class="small muted">لا أحد</p>'}</div>`); $$('[data-p]', m.el).forEach(b => b.onclick = () => { m.close(); detail(P[b.dataset.p], from, to); }); };
+    draw();
+    const repHtml = () => `<table><thead><tr><th>الموظف</th><th>المؤشر</th>${usedCats.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>${L.slice().sort((a, b) => b.score - a.score).map(p => `<tr><td><b>${esc(p.name)}</b></td><td>${AR(p.score)}</td>${usedCats.map(([k]) => `<td>${k === 'hr' ? Object.entries(p.hr).map(([s, n]) => (HRS[s] || s) + ' ' + AR(n)).join('، ') : AR(p.c[k] || 0)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    $('#swPr', root).onclick = () => A.printDoc('تقرير متابعة الموظفين وأعمالهم', `${AR(A.dmy(A.parseDate(from)))}${from !== to ? ' — ' + AR(A.dmy(A.parseDate(to))) : ''}`, repHtml(), true);
+    $('#swX', root).onclick = () => { const ws = XLSX.utils.json_to_sheet(L.map(p => Object.assign({ 'الموظف': p.name, 'المسمى': p.title, 'المؤشر': p.score }, Object.fromEntries(usedCats.map(([k, l]) => [l, k === 'hr' ? Object.entries(p.hr).map(([s, n]) => (HRS[s] || s) + ' ' + n).join('، ') : p.c[k] || 0])), { 'آخر عمل': p.last }))); ws['!views'] = [{ RTL: true }]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'الموظفون'); XLSX.writeFile(wb, `متابعة الموظفين ${from} - ${to}.xlsx`); };
+  };
+
+  function detail(p, from, to) {
+    const days = Object.keys(p.days).sort().reverse();
+    const body = pr => `<div class="sw-dk">${CAT.filter(c => p.c[c[0]] && c[0] !== 'hr').map(c => `<span>${c[3]} ${c[1]}: <b>${AR(p.c[c[0]])}</b></span>`).join('')}${Object.keys(p.hr).length ? `<span>🕘 ${Object.entries(p.hr).map(([s, n]) => (HRS[s] || s) + ' ' + AR(n)).join('، ')}</span>` : ''}</div>
+      ${days.length ? days.map(d => `<h3 class="sw-dh">${esc((A.DAYS || [])[A.parseDate(d).getDay()] || '')} ${AR(A.dmy(A.parseDate(d)))}</h3><table class="${pr ? '' : 'tbl'}"><thead><tr><th>العمل</th><th>العدد</th><th>التفاصيل</th></tr></thead><tbody>${p.days[d].slice().sort((a, b) => (CM[b.c] || [0, 0, 0])[2] - (CM[a.c] || [0, 0, 0])[2]).map(r => `<tr><td>${(CM[r.c] || [])[3] || ''} ${esc((CM[r.c] || [r.c, r.c])[1])}</td><td>${r.c === 'hr' ? '' : AR(r.n)}</td><td class="lt small">${r.c === 'hr' ? esc(HRS[(r.l || [])[0]] || (r.l || [])[0] || '') : r.c === 'login' ? '' : esc((r.l || []).filter(Boolean).slice(0, 6).join(' · '))}${r.n > 6 && r.c !== 'hr' && r.c !== 'login' ? ' …' : ''}</td></tr>`).join('')}</tbody></table>`).join('') : '<p class="small muted">لا أعمال مسجّلة في الفترة.</p>'}`;
+    const m = A.modal(`<div class="row" style="gap:8px;align-items:center;flex-wrap:wrap"><h3 style="margin:0;flex:1">${esc(p.name)} <span class="small muted">${esc(p.title)}</span></h3><button class="btn ghost sm" id="sdPr">${I.print || ''} طباعة</button></div>
+      <p class="small muted" style="margin:4px 0 8px">${AR(A.dmy(A.parseDate(from)))}${from !== to ? ' — ' + AR(A.dmy(A.parseDate(to))) : ''} · المؤشر ${AR(p.score)}</p>${body(false)}`, { cls: 'wide' });
+    $('#sdPr', m.el).onclick = () => A.printDoc('تقرير أعمال: ' + p.name, `${AR(A.dmy(A.parseDate(from)))}${from !== to ? ' — ' + AR(A.dmy(A.parseDate(to))) : ''}`, body(true), false);
+  }
+
+  function css() {
+    if (document.getElementById('sw-css')) return;
+    const s = document.createElement('style'); s.id = 'sw-css';
+    s.textContent = `.sw-rg{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0 12px}.sw-rg>button{border:1.5px solid #DCE7F3;background:#fff;color:#082B5A;border-radius:999px;padding:5px 13px;font:inherit;font-weight:700;cursor:pointer}.sw-rg>button.on{background:#082B5A;color:#fff;border-color:#082B5A}.sw-rg button:focus-visible{outline:3px solid #3AB1DB}
+      .sw-cu{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap;max-width:100%}.sw-cu .in{width:auto;min-width:0;max-width:150px}
+      .sw-k{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.sw-kc{border:1px solid #E4EBF5;border-radius:16px;padding:12px;background:linear-gradient(180deg,#fff,#F7FAFD);text-align:start;font:inherit;color:#082B5A;cursor:pointer;box-shadow:0 4px 12px rgba(8,43,90,.06);border-inline-start:4px solid var(--c)}
+      .sw-kc b{display:block;font-size:22px;color:var(--c)}.sw-kc span{font-size:13px;color:#40546F}.sw-kc:focus-visible{outline:3px solid #3AB1DB}
+      .sw-hi{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:12px}.sw-hi section{border:1px solid #E4EBF5;border-radius:16px;padding:10px 12px;background:#fff}.sw-hi h3{margin:0 0 6px;font-size:15px}.sw-hi ol,.sw-hi ul{margin:0;padding-inline-start:18px;display:grid;gap:5px;font-size:13.5px}
+      .sw-bars{display:grid;gap:5px}.sw-bar{display:grid;grid-template-columns:minmax(110px,1.2fr) 2fr 40px;gap:6px;align-items:center;border:0;background:none;font:inherit;font-size:12.5px;color:#082B5A;cursor:pointer;text-align:start;padding:2px;border-radius:8px}.sw-bar:hover,.sw-bar:focus-visible{background:#F2F7FC;outline:none}.sw-bar i{display:block;height:10px;border-radius:5px;background:linear-gradient(90deg,#3AB1DB,#005499)}.sw-bar b{text-align:end}
+      .sw-t th{white-space:nowrap}.sw-th{border:0;background:none;font:inherit;color:inherit;cursor:pointer;display:inline-flex;flex-direction:column;align-items:center;gap:1px;padding:0}.sw-th span{font-size:11px;font-weight:700;max-width:78px;white-space:normal;line-height:1.2}
+      .sw-t td{text-align:center}.sw-t td:first-child{text-align:start;min-width:150px}.sw-idle td{background:#FFF8F1}
+      .sw-hr{display:inline-block;padding:1px 7px;border-radius:99px;font-size:11.5px;background:#EEF3F9;white-space:nowrap}.sw-late{background:#FFF4E0;color:#8A5A00}.sw-absent{background:#FDECEC;color:#B42318}.sw-present{background:#E8F6EE;color:#1F6B43}
+      .sw-dk{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}.sw-dk span{background:#F2F7FC;border-radius:10px;padding:4px 9px;font-size:13px}.sw-dh{margin:12px 0 4px;font-size:15px}.sw-ml{display:grid;gap:6px}
+      .linkbtn{background:none;border:0;padding:0;color:#005499;text-decoration:underline;cursor:pointer;font:inherit;text-align:start}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}`;
+    document.head.appendChild(s);
+  }
+})();
+}catch(e){console.error('[dina] src/core/staff-work.js',e)}
 
 /* ==== src/core/ui-pro.js ==== */
 ;try{

@@ -73,7 +73,7 @@
   // نموذج بلا خانات توقيع: تُضاف خانتا المعلم والاعتماد
   const withSig = tpl => { const t = JSON.parse(JSON.stringify(tpl)); if (!slotsOf(t).length) t.blocks = (t.blocks || []).concat([{ id: 'bsig', type: 'signatures', withSign: true, roles: [{ id: 's0', label: 'المعلم', name: '' }, { id: 's1', label: 'المدير الأكاديمي', name: '@academic' }] }]); return t; };
 
-  A.formsLoadLib = loadLib; A.formsWithSig = withSig; A.formsTeacherSlot = teacherSlot; A.formsSlots = slotsOf;
+  A.formsLoadLib = loadLib; A.formsWithSig = withSig; A.formsTeacherSlot = teacherSlot; A.formsSlots = slotsOf; A.formsSigModal = cb => sigModal(cb);
   // ---------- التوقيع الإلكتروني ----------
   let MYSIG, SIGUSER; // التوقيع المحفوظ مرتبط بالحساب الحالي فقط
   async function mySig() { if (SIGUSER !== S.me.id) { MYSIG = undefined; SIGUSER = S.me.id; } if (MYSIG !== undefined) return MYSIG; try { const [r] = await api.list('staff_signatures', { staff_id: S.me.id }); MYSIG = r ? r.img : null; } catch (_) { MYSIG = null; } return MYSIG; }
@@ -388,7 +388,7 @@
         <div class="meta">${sub}${pillT(t)}${t.due_date ? `<span>الموعد ${dt(t.due_date)}</span>` : ''}${overdue(t) ? '<span class="pill st-returned">متأخر</span>' : ''}<span>✍ ${AR(sg)} توقيع</span>${co.length ? `<span>${co.filter(c => c.status === 'signed').length === co.length ? '✓ ' : '⌛ '}زملاء ${AR(co.filter(c => c.status === 'signed').length)}/${AR(co.length)}</span>` : ''}</div></div></div>
         <span class="small muted">${dt(t.updated_at || t.created_at)}</span></div>`; };
     const bindRows = () => $$('[data-id]', O).forEach(r => { r.onclick = () => open(r.dataset.id); r.onkeydown = e => { if (e.key === 'Enter') open(r.dataset.id); }; });
-    if (st.tab === 'mine') { O.innerHTML = mine.length ? `<div class="fm-list">${mine.map(t => rowHtml(t, `<span>من ${esc(nm(t.created_by))}</span>`)).join('')}</div>` : A.emptyBox('لا نماذج مرسلة إليك', 'تظهر هنا النماذج التي يرسلها لك المالك أو المشرف'); bindRows(); }
+    if (st.tab === 'mine') { O.innerHTML = mine.length ? `<div class="fm-list">${mine.map(t => rowHtml(t, `<span>من ${esc(nm(t.created_by))}</span>`)).join('')}</div>` : A.emptyBox('لا نماذج مرسلة إليك', 'تظهر هنا النماذج التي ترسلها لك الإدارة أو المشرف'); bindRows(); }
     if (st.tab === 'sign') { O.innerHTML = toSign.length ? `<div class="fm-list">${toSign.map(t => rowHtml(t, `<span>${esc(nm(t.assignee))} يطلب توقيعك في «${esc((t.cosign.find(c => c.staff_id === me) || {}).label || '')}»</span>`)).join('')}</div>` : A.emptyBox('لا طلبات توقيع', 'عندما يطلب زميل توقيعك على نموذج يظهر هنا'); bindRows(); }
     if (st.tab === 'evals') { const grp = [['مسودات لديك — عبّئها ووقّعها ثم أرسلها', evals.filter(t => ['assigned', 'draft', 'returned'].includes(t.status))], ['بانتظار توقيع المعلم', evals.filter(t => t.status === 'submitted')], ['موقّعة ومكتملة', evals.filter(t => t.status === 'approved')]];
       O.innerHTML = evals.length ? grp.filter(g => g[1].length).map(([h, L]) => `<h3 class="fm-gh">${h} <span class="pill">${AR(L.length)}</span></h3><div class="fm-list">${L.map(t => rowHtml(t, `<span>${esc(nm(t.assignee))}</span>${t.teacher_note ? '<span>💬 ملاحظة المعلم</span>' : ''}`)).join('')}</div>`).join('') : A.emptyBox('لا استمارات تقييم بعد', 'من «إرسال نموذج» اختر بطاقة تقييم أو زيارة صفية، واختر «أعبّئه أنا ويوقّع المعلم».'); bindRows(); }

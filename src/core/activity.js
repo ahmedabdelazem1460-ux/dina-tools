@@ -45,7 +45,7 @@
   }
 
   V.activity = function (root) {
-    if (!isOwner()) { root.innerHTML = `<div class="card">${A.emptyBox('هذه الصفحة لحساب المالك فقط')}</div>`; return; }
+    if (!isOwner()) { root.innerHTML = ''; if (location.hash !== '#/home') location.hash = '#/home'; return; }
     const st = { r: A.LS.get('ac_r') || '7', from: A.LS.get('ac_f') || '', to: A.LS.get('ac_t') || '' };
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>النشاط والدخول</h2><p class="sub" style="margin:2px 0 0">يظهر لك وحدك: مرات دخول كل موظف وآخر دخول، وتوقيت إدخال الخطط في الأسبوع المختار من أعلى الصفحة. وتوقيت كل حصة يظهر لك أيضاً أسفل حالتها في «خطط الفصول».</p></div></div>
       <div class="row" style="gap:8px;flex-wrap:wrap"><div class="chip-filter" id="acR" style="margin:0">${RANGES.map(([k, l]) => `<button data-r="${k}" class="${st.r === k ? 'on' : ''}">${l}</button>`).join('')}</div>

@@ -9,11 +9,11 @@
 | 1 | `tpl_consts.js` | — | 8 | ثوابت قوالب التصدير (TPL) | — | — |
 | 2 | `export.js` | — | 35 | قوالب تصدير الخطة الأسبوعية PDF/Word بهوية المدرسة | — | — |
 | 3 | `api.js` | — | 16 | طبقة البيانات Supabase: list/ins/upd/ups/del/rpc/subscribe | — | — |
-| 4 | `demo.js` | — | 40 | وضع التجربة ?demo=1: نفس واجهة api في الذاكرة | — | — |
+| 4 | `demo.js` | — | 41 | وضع التجربة ?demo=1: نفس واجهة api في الذاكرة | — | — |
 | 5 | `bellcore.js` | — | 17 | نواة التوقيت الموحّدة DinaBell (المنصة + board.html) | — | — |
 | 6 | `src/core/core.js` | app.js | 104 | الأساس: الحالة S، الدخول، التنقل NAV/route، «خطتي» V.my، لوحة المتابعة V.dash، المساعدات A.* | — | — |
 | 7 | `src/core/order.js` | — | 2 | ترتيب منطقي موحّد للمراحل والصفوف والفصول والمواد: A.cmpCls / A.cmpSubj / A.cmpEntrySG (عرض فقط) | — | clsRank cmpCls cmpEntrySG cmpSubj gradeOrd stageIdx subjRank |
-| 8 | `src/plan/export-timetable-weeks-admin.js` | app2.js | 112 | التصدير، الجدول الدراسي، الأسابيع، الإدارة | admin export timetable weeks | _ttLoadRefresh _ttReqRefresh slotDialog |
+| 8 | `src/plan/export-timetable-weeks-admin.js` | app2.js | 111 | التصدير، الجدول الدراسي، الأسابيع، الإدارة | admin export timetable weeks | _ttLoadRefresh _ttReqRefresh slotDialog |
 | 9 | `src/core/tools-dev.js` | app3.js | 18 | أداتا النصاب والجدول الآلي داخل المنصة + لوحة المطوّر | builder dev nisab | — |
 | 10 | `src/plan/extra-pages-join.js` | app4.js | 23 | الصفحات الإضافية في الخطة + روابط انضمام المعلمين | — | — |
 | 11 | `lang.js` | — | 25 | التدقيق اللغوي للخطة | — | — |
@@ -48,7 +48,7 @@
 | 40 | `src/attendance/period-attendance.js` | app30.js | 27 | حضور الحصص (معلم الحصة) | — | _paLive attEntryOf attLive attPassed attPeriods attTimes curBreaks curPeriod myPeriodAtt takePeriod |
 | 41 | `src/plan/calendar.js` | app31.js | 12 | التقويم الدراسي المرن داخل الأسابيع | weeks | _calInfer _calPlan |
 | 42 | `src/core/trash.js` | app32.js | 6 | سلة المحذوفات V.trash | trash | confirmBox |
-| 43 | `src/schedule/standby.js` | app33.js | 18 | حصص الانتظار وتأمين الحصص V.standby | standby | — |
+| 43 | `src/schedule/standby.js` | app33.js | 59 | حصص الانتظار وتأمين الحصص V.standby | standby | sbCan |
 | 44 | `src/schedule/daily-board.js` | app34.js | 24 | اللوحة اليومية V.board + رابط الشاشة board.html | board | — |
 | 45 | `src/plan/prep.js` | app35.js | 33 | تحضير الدروس V.prep | prep | prepEditor prepGen |
 | 46 | `src/assess/smart-bank.js` | app36.js | 28 | بنك الأسئلة الذكي: بلوم، كشف التكرار، توليد من نص | — | bankSmart bloomOf dupOf genFromText qGenText smartQuiz |
@@ -75,7 +75,7 @@
 | 67 | `src/core/owner-controls.js` | app54.js | 4 | تحكم المالك في الشاشات اللحظية | tui | liveOK |
 | 68 | `src/core/kpi-drill.js` | app55.js | 3 | الأرقام التفاعلية A.attDrill | — | — |
 | 69 | `src/assess/noor-analysis.js` | app56.js | 68 | تحليل درجات نظام نور V.noor (استيراد ملفات نور) | noor | _noor |
-| 70 | `src/supervision/forms.js` | app57.js | 70 | النماذج والاستمارات بالتوقيع الإلكتروني V.forms (مع tools/supervision.html) | forms | _forms formsLoadLib formsSlots formsTeacherSlot formsWithSig |
+| 70 | `src/supervision/forms.js` | app57.js | 70 | النماذج والاستمارات بالتوقيع الإلكتروني V.forms (مع tools/supervision.html) | forms | _forms formsLoadLib formsSigModal formsSlots formsTeacherSlot formsWithSig |
 | 71 | `src/assess/ehomework.js` | app58.js | 4 | الواجب الإلكتروني برابط: أزرار ونافذة المشاركة QR | assess hwf | — |
 | 72 | `src/core/report-studio.js` | app59.js | 31 | استوديو التقارير A.printDoc بهوية المدرسة | — | printDoc printDocDirect printStyle |
 | 73 | `src/attendance/counseling.js` | app60.js | 94 | الإرشاد الطلابي: الإحالات والحالات والوكيل V.refer/V.counsel/V.deputy | counsel deputy refer | _counsel refData refDrill refLive refStats |
@@ -87,7 +87,7 @@
 | 79 | `src/attendance/hr.js` | — | 33 | الموارد البشرية V.hr: حضور الموظفين بالموقع ورمز QR المتغير والرصد اليدوي، السجل والتصدير، المساءلات، الإعدادات، وربط الغياب بتأمين الحصص وعدم احتساب واجب الغائب (sql/096) | home hr | dropAbsent |
 | 80 | `src/supervision/myforms.js` | — | 30 | نماذجي V.myforms: نماذج المستخدم من الصفر أو نص أو ملف (تحويل ذكي A.textToTpl) بهوية المدرسة، تعبئة وحفظ وترتيب ومجلدات ومشاركة (sql/097) | myforms | textToTpl |
 | 81 | `src/supervision/visits.js` | — | 106 | الزيارات الصفية V.visits: اختيار الفصل ← الحصة الجارية من الجدول الزمني وبياناتها من الخطة الأسبوعية والتحضير (قابلة للتعديل)، نوع الزيارة، نموذج أو أكثر مدمجة مع تخصيص العناصر وبند السير في المنهج، استمارة form_tasks (mode=sign, visit) يوقّعها المعلم، التقارير والتغطية، التكامل مع أداة الإشراف، الإعدادات ورموز QR للفصول (sql/108) — مفتاح visits | visits | _visits visitBanner |
-| 82 | `src/core/teacher-features.js` | — | 23 | التحكم في الميزات الجديدة داخل حسابات المعلمين (للمالك) — schools.settings.tfeat ويقرؤه A.tfeat | tui | TFEAT |
+| 82 | `src/core/teacher-features.js` | — | 24 | التحكم في الميزات الجديدة داخل حسابات المعلمين (للمالك) — schools.settings.tfeat ويقرؤه A.tfeat | tui | TFEAT |
 | 83 | `src/assess/live-poll.js` | — | 23 | السؤال اللحظي V.poll + A.livePoll (مثل ClassPoint): رمز/QR للطلاب على poll.html، نتائج لحظية، إدراج النتائج في السبورة (sql/098) | poll | livePoll livePollStart |
 | 84 | `src/assess/slides.js` | — | 34 | العروض التقديمية V.slides: من بنك الأسئلة أو نص/ملف، ست هويات مشتقة من دينا، محرر، عرض بملء الشاشة مع السؤال اللحظي، تصدير PowerPoint (vendor/pptxgen) وPDF (sql/098 decks) | slides | presentDeck slideHTML textToSlides |
 | 85 | `scales.js` | — | 65 | تعريف مقاييس البوصلة DinaScales (مشترك مع scale.html) | — | — |
@@ -96,4 +96,7 @@
 | 88 | `src/plan/assistant.js` | — | 18 | مساعد المعلم V.assistant (مجاني داخل المتصفح): أهداف بلوم، ملخص، سير الحصة، استراتيجيات، أسئلة (A.genFromText)، واجب، تمايز، طباعة، تحويل لعرض/سؤال لحظي | assistant | lessonAssist |
 | 89 | `src/assess/models3d.js` | — | 20 | المجسمات التفاعلية A.models3d داخل المعامل: مجسمات هندسية بمحرك Canvas، نموذج الذرة، المجموعة الشمسية | labs | models3d |
 | 90 | `src/schedule/tt-views.js` | — | 136 | عرض الجداول والإسنادات V.ttviews: الحصص الجارية الآن، جدول الفصل/المعلم/اليوم/الأسبوع، إسنادات الفصول، الكشاف العام (بالمعلم/بالمادة/مصفوفة)، التحكم في الظهور، الطباعة الاحترافية بأربعة أنماط مع التوقيعات وختم الاعتماد، Excel — مفتاح ttviews لغير المالك | ttviews | ttViews |
-| 91 | `src/core/ui-pro.js` | — | 27 | الواجهة الاحترافية: السمات (كلاسيكي/عمق ثلاثي الأبعاد/زجاجي/زخارف دينا) وأيقونات القائمة التفاعلية، لوحة المعلم home2 (الأسبوع أعلى الصفحة + أيقونات)، أيقونات الإشعارات ونوع new، «ما الجديد»، A.announceNew عند تفعيل ميزة — يجب أن تبقى آخر وحدة (تغلّف V.my) | — | THEMES announceNew applyTheme |
+| 91 | `src/core/owner-text.js` | — | 1 | إخفاء عبارات المالك عن غيره: تنقية A.emptyBox و A.toast لغير المالك (A.ownerClean) | — | emptyBox ownerClean toast |
+| 92 | `src/core/search.js` | — | 20 | البحث الشامل لكل الحسابات (Ctrl+K) ضمن الصلاحيات | — | globalSearch |
+| 93 | `src/core/staff-work.js` | — | 20 | متابعة الموظفين وأعمالهم V.staffwork (للمالك) | staffwork | — |
+| 94 | `src/core/ui-pro.js` | — | 27 | الواجهة الاحترافية: السمات (كلاسيكي/عمق ثلاثي الأبعاد/زجاجي/زخارف دينا) وأيقونات القائمة التفاعلية، لوحة المعلم home2 (الأسبوع أعلى الصفحة + أيقونات)، أيقونات الإشعارات ونوع new، «ما الجديد»، A.announceNew عند تفعيل ميزة — يجب أن تبقى آخر وحدة (تغلّف V.my) | — | THEMES announceNew applyTheme |

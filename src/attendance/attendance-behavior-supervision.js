@@ -33,7 +33,7 @@
   //  الحضور والسلوك
   // =====================================================================
   V.attendance = async function (root) {
-    if (!(mod('attendance') || mod('counselor') || mod('supervision'))) { root.innerHTML = `<div class="card">${A.emptyBox('غير متاح لحسابك', 'يمنحه مالك النظام لمشرفي الأدوار والموجه الطلابي من «المسميات والصلاحيات».')}</div>`; return; }
+    if (!(mod('attendance') || mod('counselor') || mod('supervision'))) { root.innerHTML = `<div class="card">${A.emptyBox('غير متاح لحسابك')}</div>`; return; }
     root.innerHTML = '<div class="spinner"></div>';
     await loadStudents(true);
     const tabs = [mod('attendance') && A.attRecord && ['record', 'رصد الحضور'], (A.liveOK ? A.liveOK() : (mod('attendance') || mod('counselor') || mod('supervision'))) && A.attLive && ['live', 'لوحة الحضور اللحظية'], mod('attendance') && A.attPeriods && ['periods', 'حضور الحصص'], mod('attendance') && ['take', 'الحضور الصباحي'], (mod('attendance') || mod('counselor')) && ['behavior', 'السلوك'], (mod('counselor') || S.me.is_owner) && ['refer', 'الإحالات'], ['reports', 'التقارير'], S.me.is_owner && ['students', 'الطلاب']].filter(Boolean);
@@ -244,7 +244,7 @@
   }
 
   V.supervision = async function (root) {
-    if (!mod('supervision')) { root.innerHTML = `<div class="card">${A.emptyBox('غير متاح لحسابك', 'يمنحه مالك النظام من «المسميات والصلاحيات».')}</div>`; return; }
+    if (!mod('supervision')) { root.innerHTML = `<div class="card">${A.emptyBox('غير متاح لحسابك')}</div>`; return; }
     root.innerHTML = '<div class="spinner"></div>';
     let [tpls, recs] = await Promise.all([api.list('sup_templates', { school_id: sch() }, { order: 'created_at' }), api.list('sup_records', { school_id: sch() }, { order: 'created_at', desc: true })]);
     const allT = () => BUILT.filter(b => !tpls.some(t => t.title === b.title)).map(b => ({ ...b, id: b.key, builtin: true })).concat(tpls);

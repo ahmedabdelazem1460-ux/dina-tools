@@ -80,7 +80,7 @@
       const link = m.el.querySelector('#pL').value.trim(); if (link && !/^https?:\/\//.test(link)) throw new Error('الرابط يجب أن يبدأ بـ https://');
       const d1 = m.el.querySelector('#pD1').value || today(), d2 = m.el.querySelector('#pD2').value || null; if (d2 && d2 < d1) throw new Error('تاريخ النهاية قبل البداية');
       const cids = $$('#paC input:checked', m.el).map(i => i.value); if (au === 'classes' && !cids.length) throw new Error('اختر فصلاً واحداً على الأقل');
-      if (!S.me.is_owner && au === 'all') throw new Error('الإعلان لكل المدرسة من صلاحية المالك — اختر قسماً أو فصولاً');
+      if (!S.me.is_owner && au === 'all') throw new Error('اختر قسماً أو فصولاً للإعلان');
       const rec = { kind, title, body: m.el.querySelector('#pB').value.trim(), image_url: img, link_url: link || null, starts_on: d1, ends_on: d2, pinned: m.el.querySelector('#pP').checked,
         section_id: au === 'section' ? m.el.querySelector('#pS').value : au === 'classes' ? S.sectionId : null, class_ids: au === 'classes' ? cids : null };
       if (isNew) await api.addPost(rec); else await api.updatePost(p.id, rec);

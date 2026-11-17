@@ -113,6 +113,11 @@
   async function loadVersions() { T.versions = await api.ttVersions(S.sectionId); }
   async function slotsOf(v) { if (!T.slots[v]) T.slots[v] = await api.ttSlots(v); return T.slots[v]; }
   const approved = () => T.versions.find(v => v.status === 'approved');
+  // اسم الجدول كما يراه المستخدم: المالك يرى الاسم كاملاً بمصدره وتاريخه، وغيره يرى اسماً نظيفاً بلا ذكر الشيت (بطلب المالك)
+  A.verName = v => { const l = String((v && v.label) || ''); if (S.me && S.me.is_owner) return l;
+    const c = l.replace(/\s*[(（][^()（）]*(شيت|sheet|جوجل|google)[^()（）]*[)）]/gi, '').replace(/\s*[-—–:·]?\s*(منقول|مستورد|مأخوذ)\s+من\s+(ال)?(شيت|ملف|google|جوجل)[^،.()]*/gi, '').replace(/\s{2,}/g, ' ').trim();
+    return c || 'الجدول الدراسي'; };
+  A.verWhen = v => S.me && S.me.is_owner && v && v.approved_at ? ' · ' + A.fmtDT(v.approved_at) : '';
   const teachersOpts = (sel) => `<option value="">— بلا معلم —</option>` + S.staff.filter(p => p.active).map(p => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${esc(p.full_name)}</option>`).join('');
   const subjOpts = (sel) => `<option value="">— فراغ —</option>` + S.subjects.map(s => `<option value="${s.id}" ${s.id === sel ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
   V.timetable = async function (root) {
@@ -121,7 +126,7 @@
     T.tab = A.LS.get('tttab') || 'view';
     const tabs = [['view', 'الجدول المعتمد'], ['load', 'نصاب المعلمين'], ['assign', 'إسناد المعلمين'], ['drafts', 'تعديل واستيراد الجدول']];
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>الجدول الدراسي — ${esc(A.section().name)}</h2>
-      <p class="sub" style="margin:2px 0 0">${approved() ? `المعتمد: <b>${esc(approved().label)}</b> · ${A.fmtDT(approved().approved_at)}` : '<span style="color:var(--bad)">لا يوجد جدول معتمد</span>'}</p></div></div>
+      <p class="sub" style="margin:2px 0 0">${approved() ? `المعتمد: <b>${esc(A.verName(approved()))}</b>${A.verWhen(approved())}` : '<span style="color:var(--bad)">لا يوجد جدول معتمد</span>'}</p></div></div>
       <div class="tabs">${tabs.map(([k, l]) => `<button data-t="${k}" class="${T.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div><div id="tt"></div></div>`;
     $$('.tabs button', root).forEach(b => b.onclick = () => { A.LS.set('tttab', b.dataset.t); V.timetable(root); });
     const box = $('#tt', root);
@@ -464,7 +469,7 @@
         ${canE ? `<button class="btn" id="nd">${I.plus} مسودة جديدة من الجدول الحالي</button><button class="btn ghost" id="ne">مسودة فارغة</button>` : ''}
         <button class="btn ghost" id="tpl">${I.down} قالب Excel للجدول</button>${A.perm('tt_builder') ? `<a class="btn sky" href="#/builder">${I.builder} مزامنة من الجدول الآلي</a>` : ''}</div>
       <table class="tbl" style="margin-bottom:16px"><thead><tr><th>الإصدار</th><th>الحالة</th><th>المصدر</th><th>التاريخ</th><th></th></tr></thead><tbody>
-      ${T.versions.map(v => `<tr><td><b>${esc(v.label)}</b>${v.note ? `<div class="small muted">${esc(v.note)}</div>` : ''}</td><td><span class="pill ${v.status === 'approved' ? 'st-approved' : v.scheduled ? 'st-submitted' : v.status === 'draft' ? 'st-draft' : 'st-empty'}">${v.scheduled ? (v.effective_to ? 'مجدول مؤقتاً' : 'مجدول') : LBL[v.status]}</span>${v.scheduled ? `<div class="small muted" style="margin-top:4px">${winTxt(v)}</div>` : ''}</td><td class="small">${esc(v.source || '')}</td><td class="small muted">${A.fmtDT(v.approved_at || v.created_at)}</td><td class="row" style="flex-wrap:nowrap">${v.status === 'draft' ? `<button class="btn sm ${v.id === T.draft ? '' : 'ghost'}" data-open="${v.id}">فتح</button>` : ''}${v.scheduled && canA ? `<button class="btn ghost sm" data-unsch="${v.id}">إلغاء الجدولة</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">لا توجد إصدارات</td></tr>'}
+      ${T.versions.map(v => `<tr><td><b>${esc(A.verName(v))}</b>${v.note ? `<div class="small muted">${esc(v.note)}</div>` : ''}</td><td><span class="pill ${v.status === 'approved' ? 'st-approved' : v.scheduled ? 'st-submitted' : v.status === 'draft' ? 'st-draft' : 'st-empty'}">${v.scheduled ? (v.effective_to ? 'مجدول مؤقتاً' : 'مجدول') : LBL[v.status]}</span>${v.scheduled ? `<div class="small muted" style="margin-top:4px">${winTxt(v)}</div>` : ''}</td><td class="small">${esc(v.source || '')}</td><td class="small muted">${A.fmtDT(v.approved_at || v.created_at)}</td><td class="row" style="flex-wrap:nowrap">${v.status === 'draft' ? `<button class="btn sm ${v.id === T.draft ? '' : 'ghost'}" data-open="${v.id}">فتح</button>` : ''}${v.scheduled && canA ? `<button class="btn ghost sm" data-unsch="${v.id}">إلغاء الجدولة</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">لا توجد إصدارات</td></tr>'}
       </tbody></table><div id="de"></div>`;
     const mkDraft = async (copy) => {
       const lbl = prompt('اسم المسودة', copy ? 'تعديل الجدول — ' + new Date().toLocaleDateString('ar-SA-u-nu-latn') : 'جدول جديد'); if (!lbl) return;

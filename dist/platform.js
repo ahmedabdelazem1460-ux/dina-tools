@@ -2103,6 +2103,11 @@ body.band .foot{background:#082B5A;color:#fff;border-top:0;height:56px}
   async function loadVersions() { T.versions = await api.ttVersions(S.sectionId); }
   async function slotsOf(v) { if (!T.slots[v]) T.slots[v] = await api.ttSlots(v); return T.slots[v]; }
   const approved = () => T.versions.find(v => v.status === 'approved');
+  // اسم الجدول كما يراه المستخدم: المالك يرى الاسم كاملاً بمصدره وتاريخه، وغيره يرى اسماً نظيفاً بلا ذكر الشيت (بطلب المالك)
+  A.verName = v => { const l = String((v && v.label) || ''); if (S.me && S.me.is_owner) return l;
+    const c = l.replace(/\s*[(（][^()（）]*(شيت|sheet|جوجل|google)[^()（）]*[)）]/gi, '').replace(/\s*[-—–:·]?\s*(منقول|مستورد|مأخوذ)\s+من\s+(ال)?(شيت|ملف|google|جوجل)[^،.()]*/gi, '').replace(/\s{2,}/g, ' ').trim();
+    return c || 'الجدول الدراسي'; };
+  A.verWhen = v => S.me && S.me.is_owner && v && v.approved_at ? ' · ' + A.fmtDT(v.approved_at) : '';
   const teachersOpts = (sel) => `<option value="">— بلا معلم —</option>` + S.staff.filter(p => p.active).map(p => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${esc(p.full_name)}</option>`).join('');
   const subjOpts = (sel) => `<option value="">— فراغ —</option>` + S.subjects.map(s => `<option value="${s.id}" ${s.id === sel ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
   V.timetable = async function (root) {
@@ -2111,7 +2116,7 @@ body.band .foot{background:#082B5A;color:#fff;border-top:0;height:56px}
     T.tab = A.LS.get('tttab') || 'view';
     const tabs = [['view', 'الجدول المعتمد'], ['load', 'نصاب المعلمين'], ['assign', 'إسناد المعلمين'], ['drafts', 'تعديل واستيراد الجدول']];
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>الجدول الدراسي — ${esc(A.section().name)}</h2>
-      <p class="sub" style="margin:2px 0 0">${approved() ? `المعتمد: <b>${esc(approved().label)}</b> · ${A.fmtDT(approved().approved_at)}` : '<span style="color:var(--bad)">لا يوجد جدول معتمد</span>'}</p></div></div>
+      <p class="sub" style="margin:2px 0 0">${approved() ? `المعتمد: <b>${esc(A.verName(approved()))}</b>${A.verWhen(approved())}` : '<span style="color:var(--bad)">لا يوجد جدول معتمد</span>'}</p></div></div>
       <div class="tabs">${tabs.map(([k, l]) => `<button data-t="${k}" class="${T.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div><div id="tt"></div></div>`;
     $$('.tabs button', root).forEach(b => b.onclick = () => { A.LS.set('tttab', b.dataset.t); V.timetable(root); });
     const box = $('#tt', root);
@@ -2454,7 +2459,7 @@ body.band .foot{background:#082B5A;color:#fff;border-top:0;height:56px}
         ${canE ? `<button class="btn" id="nd">${I.plus} مسودة جديدة من الجدول الحالي</button><button class="btn ghost" id="ne">مسودة فارغة</button>` : ''}
         <button class="btn ghost" id="tpl">${I.down} قالب Excel للجدول</button>${A.perm('tt_builder') ? `<a class="btn sky" href="#/builder">${I.builder} مزامنة من الجدول الآلي</a>` : ''}</div>
       <table class="tbl" style="margin-bottom:16px"><thead><tr><th>الإصدار</th><th>الحالة</th><th>المصدر</th><th>التاريخ</th><th></th></tr></thead><tbody>
-      ${T.versions.map(v => `<tr><td><b>${esc(v.label)}</b>${v.note ? `<div class="small muted">${esc(v.note)}</div>` : ''}</td><td><span class="pill ${v.status === 'approved' ? 'st-approved' : v.scheduled ? 'st-submitted' : v.status === 'draft' ? 'st-draft' : 'st-empty'}">${v.scheduled ? (v.effective_to ? 'مجدول مؤقتاً' : 'مجدول') : LBL[v.status]}</span>${v.scheduled ? `<div class="small muted" style="margin-top:4px">${winTxt(v)}</div>` : ''}</td><td class="small">${esc(v.source || '')}</td><td class="small muted">${A.fmtDT(v.approved_at || v.created_at)}</td><td class="row" style="flex-wrap:nowrap">${v.status === 'draft' ? `<button class="btn sm ${v.id === T.draft ? '' : 'ghost'}" data-open="${v.id}">فتح</button>` : ''}${v.scheduled && canA ? `<button class="btn ghost sm" data-unsch="${v.id}">إلغاء الجدولة</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">لا توجد إصدارات</td></tr>'}
+      ${T.versions.map(v => `<tr><td><b>${esc(A.verName(v))}</b>${v.note ? `<div class="small muted">${esc(v.note)}</div>` : ''}</td><td><span class="pill ${v.status === 'approved' ? 'st-approved' : v.scheduled ? 'st-submitted' : v.status === 'draft' ? 'st-draft' : 'st-empty'}">${v.scheduled ? (v.effective_to ? 'مجدول مؤقتاً' : 'مجدول') : LBL[v.status]}</span>${v.scheduled ? `<div class="small muted" style="margin-top:4px">${winTxt(v)}</div>` : ''}</td><td class="small">${esc(v.source || '')}</td><td class="small muted">${A.fmtDT(v.approved_at || v.created_at)}</td><td class="row" style="flex-wrap:nowrap">${v.status === 'draft' ? `<button class="btn sm ${v.id === T.draft ? '' : 'ghost'}" data-open="${v.id}">فتح</button>` : ''}${v.scheduled && canA ? `<button class="btn ghost sm" data-unsch="${v.id}">إلغاء الجدولة</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">لا توجد إصدارات</td></tr>'}
       </tbody></table><div id="de"></div>`;
     const mkDraft = async (copy) => {
       const lbl = prompt('اسم المسودة', copy ? 'تعديل الجدول — ' + new Date().toLocaleDateString('ar-SA-u-nu-latn') : 'جدول جديد'); if (!lbl) return;
@@ -3941,7 +3946,7 @@ ${S.me.full_name}`;
   }
 
   function syncBar(w) {
-    if (!w || w.archived || !canSync()) return '';
+    if (!w || w.archived || !canSync() || !S.me.is_owner) return ''; // شريط الشيت للمالك وحده — المنصة هي المصدر، والشيت احتياطي
     if (!w.sheet_id) return canLink() ? `<div class="syncbar off" role="region" aria-label="مزامنة Google Sheets"><span class="ttl">${ICO} مزامنة Google Sheets</span><span class="grow small muted">هذا الأسبوع غير مربوط بملف Google Sheet.</span><button class="btn ghost sm" data-sync-link>ربط بملف</button></div>` : '';
     return `<div class="syncbar" role="region" aria-label="مزامنة Google Sheets"><span class="ttl">${ICO} مزامنة لحظية مع Google Sheets</span>
       <span class="grow small muted"><a href="${sheetUrl(w.sheet_id)}" target="_blank" rel="noopener">فتح الملف</a> · <span id="syncLast" aria-live="polite">${A.syncLabel(w)}</span></span>
@@ -8257,7 +8262,7 @@ ${S.me.full_name}`;
     const targets = () => c.kind === 'class' ? (S.allClasses && S.allClasses.length ? S.allClasses : S.classes).filter(x => D.slots.some(s => s.class_id === x.id && s.subject_id)).map(x => [x.id, x.name]) : [...new Set(D.slots.filter(s => s.teacher_id && s.subject_id).map(s => s.teacher_id))].map(id => [id, pName(id) || '—']).sort((a, b) => a[1].localeCompare(b[1], 'ar'));
     let tg = targets(); let cur = tg.some(t => t[0] === c.cur) ? c.cur : (tg[0] || [])[0];
     const M = !!MASTER[c.kind];
-    const vLbl = v => `${v.label}${v.status === 'ds' ? '' : v.status === 'approved' ? ' (المعتمد)' : v.scheduled ? ' (مجدول)' : ' (مسودة)'}`;
+    const vLbl = v => `${v.status === 'ds' || !A.verName ? v.label : A.verName(v)}${v.status === 'ds' ? '' : v.status === 'approved' ? ' (المعتمد)' : v.scheduled ? ' (مجدول)' : ' (مسودة)'}`;
     root.innerHTML = `<div class="dzw"><aside class="card dz-side" aria-label="إعدادات التصميم">
         <h2 style="margin:0 0 4px">${X ? 'تصميم وطباعة: ' + esc(X.label) : 'تصميم الجداول وتصديرها'}</h2><p class="small muted" style="margin:0 0 10px">${X ? `الحصص والتوقيت والروابط من الجدول نفسه (${esc(X.date_from)} — ${esc(X.date_to)}). ` : ''}كل تعديل يظهر مباشرة في المعاينة، ويُحفظ للمرة القادمة.</p>
         <div class="kpick dz-kinds" id="zK">${[['class', 'جدول فصل'], ['teacher', 'جدول معلم'], ['mclass', 'الجدول العام للفصول'], ['mteacher', 'الجدول العام للمعلمين'], ['load', X ? 'الإسناد والأنصبة' : 'ملخص الأنصبة']].map(([k, l]) => `<button type="button" data-k="${k}" class="${c.kind === k ? 'on' : ''}">${l}</button>`).join('')}</div>
@@ -8901,7 +8906,7 @@ ${S.me.full_name}`;
     const preS = bell.schedules.find(s => /بعد/.test(s.name + ' ' + (s.tag || ''))) || A.bell.activeSched(bell);
     const m = A.modal(`<h3>جدول استثنائي جديد</h3><p class="sub">تُؤخذ لقطة ثابتة من الجدول المختار. تعديل الجدول الأصلي لاحقاً لا يغيّرها (ويمكنك تحديثها يدوياً).</p>
       <div class="grid g2"><div class="field"><label for="lvL">الاسم</label><input class="in" id="lvL" value="جدول التعليم عن بعد"></div><div class="field"><label for="lvT">الشارة</label><input class="in" id="lvT" value="للتعليم عن بعد"></div>
-      <div class="field"><label for="lvV">من جدول</label><select class="in" id="lvV"><option value="__file">استيراد من ملف PDF أو Excel (aSc)</option>${vers.map(v => `<option value="${v.id}" ${pre && v.id === pre.id ? 'selected' : ''}>${esc(v.label)}${v.status === 'approved' ? ' (المعتمد)' : ' (مسودة)'}</option>`).join('')}</select></div>
+      <div class="field"><label for="lvV">من جدول</label><select class="in" id="lvV"><option value="__file">استيراد من ملف PDF أو Excel (aSc)</option>${vers.map(v => `<option value="${v.id}" ${pre && v.id === pre.id ? 'selected' : ''}>${esc(A.verName ? A.verName(v) : v.label)}${v.status === 'approved' ? ' (المعتمد)' : ' (مسودة)'}</option>`).join('')}</select></div>
       <div class="field"><label for="lvS">نسخ التوقيت من</label><select class="in" id="lvS">${bell.schedules.map(s => `<option value="${s.id}" ${s.id === preS.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>
       <p class="small muted" style="grid-column:1/-1;margin:-4px 0 0">يُنسخ التوقيت مرة واحدة ويصبح خاصاً بهذا الجدول: تعدّله من تبويب «التوقيت» دون أن يتأثر توقيت الحضوري، ولا يغيّره أي تعديل لاحق في توقيت الحضوري.</p>
       <div class="field" id="lvFileBox" style="grid-column:1/-1" hidden><label for="lvFile">ملفات الجدول</label><input class="in" type="file" id="lvFile" multiple accept=".pdf,.xlsx,.xls,.csv"><span class="small muted">ارفع ملف الفصول وملف المعلمين معاً إن وُجدا: المواد من ملف الفصول، والمعلمة لكل حصة من ملف المعلمين. لا يُنشأ أي جدول آخر ولا تتأثر الخطط.</span></div>
@@ -9257,7 +9262,7 @@ ${S.me.full_name}`;
     const m = A.modal(`<h3>تحويل يوم أو أسبوع للتعلم عن بعد</h3>
       <p class="sub">يُنشأ جدول استثنائي من الجدول الذي تختاره: تحذف المواد غير المناسبة، وتُرحَّل الحصص الباقية تلقائياً <b>بعدد موحّد لكل الفصول وبلا تعارض للمعلمين</b>. الجدول المعتمد والخطط وما كتبه المعلمون لا يتغير شيء منها.</p>
       <div class="grid g2">
-        <div class="field"><label for="cvSrc">من جدول</label><select class="in" id="cvSrc">${vers.map(v => `<option value="v:${v.id}" ${appr && v.id === appr.id ? 'selected' : ''}>${esc(v.label)}${v.status === 'approved' ? ' (المعتمد)' : ' (مسودة)'}</option>`).join('')}${dss.map(d => `<option value="d:${d.id}">جدول استثنائي: ${esc(d.label)}</option>`).join('')}</select></div>
+        <div class="field"><label for="cvSrc">من جدول</label><select class="in" id="cvSrc">${vers.map(v => `<option value="v:${v.id}" ${appr && v.id === appr.id ? 'selected' : ''}>${esc(A.verName ? A.verName(v) : v.label)}${v.status === 'approved' ? ' (المعتمد)' : ' (مسودة)'}</option>`).join('')}${dss.map(d => `<option value="d:${d.id}">جدول استثنائي: ${esc(d.label)}</option>`).join('')}</select></div>
         <div class="field"><label for="cvL">الاسم</label><input class="in" id="cvL" value="جدول التعليم عن بعد"></div>
         <div class="field"><label>المدة</label><div class="kpick" id="cvMode"><button data-m="week" class="on">أسبوع دراسي</button><button data-m="day">يوم واحد</button><button data-m="range">فترة محددة</button></div></div>
         <div class="field" id="cvWkBox"><label for="cvWk">الأسبوع</label><select class="in" id="cvWk">${WKS.map(w => `<option value="${w.id}" ${w.id === WK0 ? 'selected' : ''}>الأسبوع ${esc(w.word)} — ${AR(A.dmy(A.parseDate(w.start_date)))}${w.id === WKT ? ' (الحالي)' : ''}</option>`).join('')}</select><span class="small muted">تُضبط الفترة على أيام الأسبوع المختار تلقائياً (مع استبعاد أيام إجازته).</span></div>
@@ -20804,7 +20809,7 @@ ${S.me.full_name}`;
   const stg = c => A.stageOf ? A.stageOf(c) : (c.stage || '');
   const nd = () => (A.section() || {}).days || 5, np = () => (A.section() || {}).periods || 7;
   function ptxt(p, cid) { try { const sec = A.section(), b = A.bell.bellOf(sec), s = A.bell.activeSched(b); const it = A.bell.timeline(s, A.bell.maxP(s, sec), cid).items.find(x => x.k === 'p' && x.i === p); return it ? A.bell.fmt(it.from, s) + ' – ' + A.bell.fmt(it.to, s) : ''; } catch (_) { return ''; } }
-  const verTxt = () => D.src === 'wk' && D.wk ? `حصص الأسبوع ${D.wk.word || AR(D.wk.number)} بتعديلاته` : D.ver ? `الجدول المعتمد: ${D.ver.label || ''}${D.ver.approved_at ? ' · ' + A.fmtDT(D.ver.approved_at) : ''}` : 'لا يوجد جدول معتمد';
+  const verTxt = () => D.src === 'wk' && D.wk ? `حصص الأسبوع ${D.wk.word || AR(D.wk.number)} بتعديلاته` : D.ver ? `الجدول المعتمد: ${A.verName ? A.verName(D.ver) : (D.ver.label || '')}${A.verWhen ? A.verWhen(D.ver) : ''}` : 'لا يوجد جدول معتمد';
 
   // ---------- مكوّنات الجداول (مشتركة بين الشاشة والطباعة) ----------
   const cell = (s, top, sub, ed, ex = '') => `<td class="c${s.teacher_id ? '' : ' nt'}${s.override ? ' ov' : ''}${ex}" style="--sc:${col(s.subject_id)}" data-dp="${s.day}|${s.period}" data-c="${s.class_id}"${ed ? ` tabindex="0" role="button" data-ed="${s.class_id}|${s.day}|${s.period}"` : ''}>${top ? `<b>${esc(top)}</b>` : ''}${sub ? `<i>${esc(sub)}</i>` : ''}</td>`;

@@ -80,7 +80,7 @@
   }
 
   function syncBar(w) {
-    if (!w || w.archived || !canSync()) return '';
+    if (!w || w.archived || !canSync() || !S.me.is_owner) return ''; // شريط الشيت للمالك وحده — المنصة هي المصدر، والشيت احتياطي
     if (!w.sheet_id) return canLink() ? `<div class="syncbar off" role="region" aria-label="مزامنة Google Sheets"><span class="ttl">${ICO} مزامنة Google Sheets</span><span class="grow small muted">هذا الأسبوع غير مربوط بملف Google Sheet.</span><button class="btn ghost sm" data-sync-link>ربط بملف</button></div>` : '';
     return `<div class="syncbar" role="region" aria-label="مزامنة Google Sheets"><span class="ttl">${ICO} مزامنة لحظية مع Google Sheets</span>
       <span class="grow small muted"><a href="${sheetUrl(w.sheet_id)}" target="_blank" rel="noopener">فتح الملف</a> · <span id="syncLast" aria-live="polite">${A.syncLabel(w)}</span></span>

@@ -197,7 +197,7 @@
     const targets = () => c.kind === 'class' ? (S.allClasses && S.allClasses.length ? S.allClasses : S.classes).filter(x => D.slots.some(s => s.class_id === x.id && s.subject_id)).map(x => [x.id, x.name]) : [...new Set(D.slots.filter(s => s.teacher_id && s.subject_id).map(s => s.teacher_id))].map(id => [id, pName(id) || '—']).sort((a, b) => a[1].localeCompare(b[1], 'ar'));
     let tg = targets(); let cur = tg.some(t => t[0] === c.cur) ? c.cur : (tg[0] || [])[0];
     const M = !!MASTER[c.kind];
-    const vLbl = v => `${v.label}${v.status === 'ds' ? '' : v.status === 'approved' ? ' (المعتمد)' : v.scheduled ? ' (مجدول)' : ' (مسودة)'}`;
+    const vLbl = v => `${v.status === 'ds' || !A.verName ? v.label : A.verName(v)}${v.status === 'ds' ? '' : v.status === 'approved' ? ' (المعتمد)' : v.scheduled ? ' (مجدول)' : ' (مسودة)'}`;
     root.innerHTML = `<div class="dzw"><aside class="card dz-side" aria-label="إعدادات التصميم">
         <h2 style="margin:0 0 4px">${X ? 'تصميم وطباعة: ' + esc(X.label) : 'تصميم الجداول وتصديرها'}</h2><p class="small muted" style="margin:0 0 10px">${X ? `الحصص والتوقيت والروابط من الجدول نفسه (${esc(X.date_from)} — ${esc(X.date_to)}). ` : ''}كل تعديل يظهر مباشرة في المعاينة، ويُحفظ للمرة القادمة.</p>
         <div class="kpick dz-kinds" id="zK">${[['class', 'جدول فصل'], ['teacher', 'جدول معلم'], ['mclass', 'الجدول العام للفصول'], ['mteacher', 'الجدول العام للمعلمين'], ['load', X ? 'الإسناد والأنصبة' : 'ملخص الأنصبة']].map(([k, l]) => `<button type="button" data-k="${k}" class="${c.kind === k ? 'on' : ''}">${l}</button>`).join('')}</div>

@@ -58,7 +58,7 @@
   const stg = c => A.stageOf ? A.stageOf(c) : (c.stage || '');
   const nd = () => (A.section() || {}).days || 5, np = () => (A.section() || {}).periods || 7;
   function ptxt(p, cid) { try { const sec = A.section(), b = A.bell.bellOf(sec), s = A.bell.activeSched(b); const it = A.bell.timeline(s, A.bell.maxP(s, sec), cid).items.find(x => x.k === 'p' && x.i === p); return it ? A.bell.fmt(it.from, s) + ' – ' + A.bell.fmt(it.to, s) : ''; } catch (_) { return ''; } }
-  const verTxt = () => D.src === 'wk' && D.wk ? `حصص الأسبوع ${D.wk.word || AR(D.wk.number)} بتعديلاته` : D.ver ? `الجدول المعتمد: ${D.ver.label || ''}${D.ver.approved_at ? ' · ' + A.fmtDT(D.ver.approved_at) : ''}` : 'لا يوجد جدول معتمد';
+  const verTxt = () => D.src === 'wk' && D.wk ? `حصص الأسبوع ${D.wk.word || AR(D.wk.number)} بتعديلاته` : D.ver ? `الجدول المعتمد: ${A.verName ? A.verName(D.ver) : (D.ver.label || '')}${A.verWhen ? A.verWhen(D.ver) : ''}` : 'لا يوجد جدول معتمد';
 
   // ---------- مكوّنات الجداول (مشتركة بين الشاشة والطباعة) ----------
   const cell = (s, top, sub, ed, ex = '') => `<td class="c${s.teacher_id ? '' : ' nt'}${s.override ? ' ov' : ''}${ex}" style="--sc:${col(s.subject_id)}" data-dp="${s.day}|${s.period}" data-c="${s.class_id}"${ed ? ` tabindex="0" role="button" data-ed="${s.class_id}|${s.day}|${s.period}"` : ''}>${top ? `<b>${esc(top)}</b>` : ''}${sub ? `<i>${esc(sub)}</i>` : ''}</td>`;

@@ -159,6 +159,7 @@
       if (!isEval(t) && adm && t.status === 'approved' && !t.endorsed_at) b.push(`<button class="btn ghost sm" data-a="reopen">إلغاء الاعتماد</button>`);
       if (S.me.is_owner && t.status === 'approved') b.push(t.endorsed_at ? `<button class="btn ghost sm" data-a="unendorse">إلغاء التعميد</button>` : `<button class="btn sm fm-endbtn" data-a="endorse">✦ تعميد</button>`);
       if ((t.trail || []).length) b.push(`<button class="btn ghost sm" data-a="trail">السجل</button>`);
+      if (A.dsig && A.dsig.on()) b.push(A.dsig.quickBtns(t));
       b.push(`<button class="btn ghost sm" data-a="print">${A.I.print || ''} طباعة / PDF</button><button class="btn ghost sm" data-a="mysig">توقيعي</button>`);
       a.innerHTML = b.join('');
       $$('[data-a]', a).forEach(x => x.onclick = ev => act(x.dataset.a, ev.currentTarget));
@@ -166,6 +167,7 @@
     async function act(k, btn) {
       if (k === 'print') { if (dirty && editable(t)) await save(false).catch(() => { }); return post({ type: 'dina-form-print' }); }
       if (k === 'mysig') return sigModal();
+      if (k.indexOf('dsig:') === 0) return A.run(btn, async () => { if (dirty && editable(t)) await save(false); const n = await A.dsig.fill(t, k.slice(5), rpc); A.toast(n ? `وُقّع ${AR(n)} خانة نيابةً من حسابك ✓` : 'لا خانات فارغة لهذا التوقيع', n ? 'ok' : 'warn'); drawActs(); drawCo(); resend(); after && after(); });
       if (k === 'sendEval') return A.run(btn, async () => {
         const ts = (t.cosign || []).find(c => c.staff_id === t.assignee);
         if (!Object.keys(t.sigs || {}).some(k2 => !ts || k2 !== ts.key) && !(await A.confirmBox('لم توقّع على الاستمارة بعد (يمكنك التوقيع في خانة المقيّم داخلها). هل ترسلها للمعلم الآن؟', 'إرسال'))) return;
@@ -238,8 +240,11 @@
       if (d.type === 'dina-form-change' && editable(t)) { D = d.d; dirty = true; setSv('· تغييرات غير محفوظة'); clearTimeout(timer); timer = setTimeout(() => save(false).catch(err => setSv('· تعذّر الحفظ: ' + err.message)), 2500); }
       if (d.type === 'dina-form-sign') {
         try {
-          if (!d.remove) { const img = await ensureSig(); if (!img) return; if (dirty && editable(t)) await save(false);
-            const r = await rpc('form_sign', { p_id: t.id, p_key: d.key, p_label: d.label, p_img: img, p_name: S.me.full_name, p_remove: false }); Object.assign(t, r || {});
+          if (!d.remove) { let img = null, who = S.me.full_name;
+            // المالك: توقيعه أو توقيع مفوّض (مدير المدرسة…) يُقترح حسب اسم الخانة
+            if (A.dsig && A.dsig.on()) { const ch = await A.dsig.choose(d.label); if (!ch) return; if (ch.img) { img = ch.img; who = ch.name; } }
+            if (!img) { img = await ensureSig(); if (!img) return; } if (dirty && editable(t)) await save(false);
+            const r = await rpc('form_sign', { p_id: t.id, p_key: d.key, p_label: d.label, p_img: img, p_name: who, p_remove: false }); Object.assign(t, r || {});
             const co = (t.cosign || []).find(c => c.key === d.key && c.staff_id === S.me.id); if (co) notify([t.assignee], 'وقّع زميلك: ' + t.title, `وقّع ${S.me.full_name} في خانة «${co.label}» بنموذج «${t.title}».`);
             if (isEval(t) && t.status === 'approved' && t.assignee === S.me.id) { notify([t.created_by], 'وقّع المعلم على استمارة التقييم: ' + t.title, `اطّلع ${S.me.full_name} على «${t.title}» ووقّع بالعلم.${t.teacher_note ? ' ملاحظته: ' + t.teacher_note : ''}`); A.toast('تم توقيعك واكتملت الاستمارة', 'ok'); drawActs(); } else A.toast('تم التوقيع', 'ok'); }
           else { const r = await rpc('form_sign', { p_id: t.id, p_key: d.key, p_label: d.label || '', p_img: '', p_name: '', p_remove: true }); Object.assign(t, r || {}); A.toast('حُذف التوقيع', 'ok'); }
@@ -251,6 +256,7 @@
     const obs = new MutationObserver(() => { if (!document.body.contains(m.el)) { window.removeEventListener('message', onMsg); obs.disconnect(); clearTimeout(timer); if (dirty && editable(t)) save(false).catch(() => { }); } });
     obs.observe(document.body, { childList: true, subtree: true });
     drawActs(); drawCo();
+    if (A.dsig && A.dsig.on()) A.dsig.load().then(() => { if (document.body.contains(m.el)) drawActs(); }).catch(() => { });
   }
   function askNote(label, val) { return new Promise(res => { const m = A.modal(`<h3>${esc(label)}</h3><textarea class="in" id="anT" rows="4" style="width:100%">${esc(val || '')}</textarea><div class="row" style="gap:8px;margin-top:10px"><button class="btn" id="anOk">متابعة</button></div>`); let done = false; $('#anOk', m.el).onclick = () => { const v = $('#anT', m.el).value.trim(); if (!v) return A.toast('اكتب الملاحظة', 'warn'); done = true; m.close(); res(v); }; const o = new MutationObserver(() => { if (!document.body.contains(m.el)) { o.disconnect(); if (!done) res(null); } }); o.observe(document.body, { childList: true, subtree: true }); }); }
 
@@ -375,9 +381,10 @@
     if (st.user !== me) { st.user = me; st.tab = null; }
     if (!st.tab || !tabs.some(t => t[0] === st.tab)) st.tab = (toSign.length && 'sign') || (myOpen.length && 'mine') || tabs[0][0];
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>النماذج والاستمارات</h2><p class="sub" style="margin:2px 0 0">${adm ? 'أرسل نماذج «خطة ونماذج الإشراف» للمعلمين، وتابع التعبئة والتوقيعات، واعتمدها بتوقيعك.' : 'النماذج المرسلة إليك للتعبئة والتوقيع، وطلبات توقيع الزملاء.'}</p></div>
-      <div class="row" style="gap:6px;flex-wrap:wrap">${adm ? `<button class="btn" id="fmSend">${A.I.plus || ''} إرسال نموذج</button>` : ''}<button class="fm-sig btnlike" id="fmMySig" type="button" aria-label="توقيعي الإلكتروني">${MYSIG ? `<img src="${MYSIG}" alt="">` : '✍'} <span class="small">${MYSIG ? 'تغيير توقيعي' : 'إضافة توقيعي'}</span></button></div></div>
+      <div class="row" style="gap:6px;flex-wrap:wrap">${adm ? `<button class="btn" id="fmSend">${A.I.plus || ''} إرسال نموذج</button>` : ''}${S.me.is_owner && !S.realMe && A.dsig ? `<button class="btn ghost" id="fmDsB">✍ التوقيع الجماعي نيابةً</button><button class="btn ghost sm" id="fmDsM">التواقيع المفوّضة</button>` : ''}<button class="fm-sig btnlike" id="fmMySig" type="button" aria-label="توقيعي الإلكتروني">${MYSIG ? `<img src="${MYSIG}" alt="">` : '✍'} <span class="small">${MYSIG ? 'تغيير توقيعي' : 'إضافة توقيعي'}</span></button></div></div>
       <div class="fm-tabs" role="tablist">${tabs.map(([k, l, n]) => `<button role="tab" data-tb="${k}" class="${st.tab === k ? 'on' : ''}" aria-selected="${st.tab === k}">${l}${n ? `<span class="n">${AR(n)}</span>` : ''}</button>`).join('')}</div><div id="fmO"></div></div>`;
     const reload = () => V.forms(root);
+    const dsB = $('#fmDsB', root); if (dsB) dsB.onclick = () => A.dsig.bulk(rpc, reload); const dsM = $('#fmDsM', root); if (dsM) dsM.onclick = () => A.dsig.manage();
     if ($('#fmSend', root)) $('#fmSend', root).onclick = () => sendModal(reload);
     $('#fmMySig', root).onclick = () => sigModal(() => reload());
     $$('[data-tb]', root).forEach(b => b.onclick = () => { st.tab = b.dataset.tb; reload(); });

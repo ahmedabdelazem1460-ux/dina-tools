@@ -71,6 +71,7 @@
     {"src": "src/core/kpi-drill.js", "old": "app55.js", "about": "الأرقام التفاعلية A.attDrill"},
     {"src": "src/assess/noor-analysis.js", "old": "app56.js", "about": "تحليل درجات نظام نور V.noor (استيراد ملفات نور)"},
     {"src": "src/supervision/forms.js", "old": "app57.js", "about": "النماذج والاستمارات بالتوقيع الإلكتروني V.forms (مع tools/supervision.html)"},
+    {"src": "src/supervision/delegated-sigs.js", "about": "التواقيع المفوّضة للمالك A.dsig: توقيع مدير المدرسة (وغيره) نيابةً من حسابه في النماذج — اختيار عند التوقيع، زر داخل النموذج، توقيع جماعي، مكتبة في owner_vault"},
     {"src": "src/assess/ehomework.js", "old": "app58.js", "about": "الواجب الإلكتروني برابط: أزرار ونافذة المشاركة QR"},
     {"src": "src/core/report-studio.js", "old": "app59.js", "about": "استوديو التقارير A.printDoc بهوية المدرسة"},
     {"src": "src/attendance/counseling.js", "old": "app60.js", "about": "الإرشاد الطلابي: الإحالات والحالات والوكيل V.refer/V.counsel/V.deputy"},

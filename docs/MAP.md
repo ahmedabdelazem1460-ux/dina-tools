@@ -98,7 +98,7 @@
 | 90 | `src/attendance/gifted.js` | — | 65 | رعاية الموهوبين V.gifted: الدليل المرجعي، البوابات الخمس، ١٤ نموذجاً وخطة، قرار اللجنة بالأوزان والتصنيف، المؤشرات — gifted_files (sql/100)، A.giftedNominate | gifted | giftedNominate |
 | 91 | `src/plan/assistant.js` | — | 18 | مساعد المعلم V.assistant (مجاني داخل المتصفح): أهداف بلوم، ملخص، سير الحصة، استراتيجيات، أسئلة (A.genFromText)، واجب، تمايز، طباعة، تحويل لعرض/سؤال لحظي | assistant | lessonAssist |
 | 92 | `src/assess/models3d.js` | — | 20 | المجسمات التفاعلية A.models3d داخل المعامل: مجسمات هندسية بمحرك Canvas، نموذج الذرة، المجموعة الشمسية | labs | models3d |
-| 93 | `src/schedule/tt-views.js` | — | 137 | عرض الجداول والإسنادات V.ttviews: الحصص الجارية الآن، جدول الفصل/المعلم/اليوم/الأسبوع، إسنادات الفصول، الكشاف العام (بالمعلم/بالمادة/مصفوفة)، التحكم في الظهور، الطباعة الاحترافية بأربعة أنماط مع التوقيعات وختم الاعتماد، Excel — مفتاح ttviews لغير المالك | ttviews | ttViews |
+| 93 | `src/schedule/tt-views.js` | — | 144 | عرض الجداول والإسنادات V.ttviews: الحصص الجارية الآن، جدول الفصل/المعلم/اليوم/الأسبوع، إسنادات الفصول، الكشاف العام (بالمعلم/بالمادة/مصفوفة)، التحكم في الظهور، الطباعة الاحترافية بأربعة أنماط مع التوقيعات وختم الاعتماد، Excel — مفتاح ttviews لغير المالك | ttviews | ttViews |
 | 94 | `src/core/owner-text.js` | — | 1 | إخفاء عبارات المالك عن غيره: تنقية A.emptyBox و A.toast لغير المالك (A.ownerClean) | — | emptyBox ownerClean toast |
 | 95 | `src/core/search.js` | — | 20 | البحث الشامل لكل الحسابات (Ctrl+K) ضمن الصلاحيات | — | globalSearch |
 | 96 | `src/core/staff-work.js` | — | 20 | متابعة الموظفين وأعمالهم V.staffwork (للمالك) | staffwork | — |

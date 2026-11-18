@@ -20,7 +20,7 @@
   const STYLES = { formal: ['رسمي', 'شريط علوي كحلي وجدول بخطوط واضحة'], modern: ['عصري', 'خلايا بطاقات مستديرة وشريط جانبي'], colors: ['ملوّن بالمواد', 'لون ثابت لكل مادة يسهل القراءة'], eco: ['اقتصادي', 'أبيض وأسود موفّر للحبر'] };
   const PAL = ['#DCEBFA', '#D9F1F8', '#E3F2D6', '#ECE5F8', '#FFF0D2', '#FBE1E7', '#D8F0EA', '#F0EBDD', '#E2E8FC', '#F4E2F5', '#E9F1CF', '#FCE7D6', '#DDE5EF', '#E6F4F1'];
   const SHORT = { 'اللغة العربية': 'لغتي', 'اللغة الإنجليزية': 'E', 'الدراسات الإسلامية والقرآن': 'إسلامية', 'الدراسات الإسلامية': 'إسلامية', 'المهارات الرقمية': 'رقمية', 'المهارات الحياتية': 'حياتية', 'الرياضيات': 'رياضيات', 'العلوم': 'علوم', 'الاجتماعيات': 'اجتماعيات', 'الدراسات الاجتماعية': 'اجتماعيات', 'تمكين وإتقان': 'تمكين', 'التربية البدنية': 'بدنية', 'التربية الفنية': 'فنية', 'التقنية الرقمية': 'تقنية', 'الكفايات اللغوية': 'كفايات', 'التفكير الناقد': 'تفكير ناقد', 'البحث ومصادر المعلومات': 'بحث ومصادر', 'علوم الأرض والفضاء': 'علوم الأرض', 'التربية الصحية والبدنية': 'صحية وبدنية', 'التربية الحياتية والأسرية': 'حياتية وأسرية', 'القرآن الكريم': 'قرآن' };
-  const DEF = { title: 'الجدول الدراسي', theme: 'navy', style: 'formal', orient: 'land', fs: 100, showT: true, showS: true, times: true, color: true, abbr: false, tShort: false, stamp: true, date: true, foot: 'رحلتهم الكبرى... تبدأ من هنا', sig: [{ t: 'وكيل الشؤون التعليمية', n: '' }, { t: 'المدير الأكاديمي', n: '' }, { t: 'مدير المدرسة', n: '' }], hideS: [], hideC: [], aN: true, aT: true, aTot: true, aNone: true, aLay: 'cards', iMode: 'teacher', iSort: 'name', per: 1, nowNext: true, brk: true, nowMark: true };
+  const DEF = { title: 'الجدول الدراسي', theme: 'navy', style: 'formal', orient: 'land', fs: 100, showT: true, showS: true, times: true, color: true, abbr: false, tShort: false, stamp: true, date: true, foot: 'رحلتهم الكبرى... تبدأ من هنا', sig: [{ t: 'وكيل الشؤون التعليمية', n: '' }, { t: 'المدير الأكاديمي', n: '' }, { t: 'مدير المدرسة', n: '' }], hideS: [], hideC: [], aN: true, aT: true, aTot: true, aNone: true, aLay: 'cards', iMode: 'teacher', iSort: 'name', per: 1, nowNext: true, brk: true, nowMark: true, mFs: 100, mCw: 0, mFit: 'shrink', mFull: false, mT: false, mBold: true };
   const school = () => (S.school.settings || {}).ttviews || {};
   const local = () => { try { return JSON.parse(A.LS.get('ttv_cfg') || '{}'); } catch (_) { return {}; } };
   const cfg = () => { const c = Object.assign({}, DEF, school(), local()); if (!Array.isArray(c.sig)) c.sig = DEF.sig; return c; };
@@ -103,12 +103,20 @@
       if (pos.includes(p)) { const b = BR[r.id].find(x => x.after === p); h += b ? `<td class="bk sm" data-bk="${p}" data-c="${rows === 'teacher' ? '' : r.id}"><span>${esc(b.label)}</span></td>` : '<td class="bk none"></td>'; } } h += '</tr>'; });
     return h + '</tbody></table>';
   }
+  // ملاءمة نص كل خلية في الجدول العام: يُصغَّر النص الطويل وحده حتى يتسع خليته (قياس دفعة واحدة ثم تصحيح)
+  function fitCells(sh) {
+    if (!sh) return; const bs = $$('td.c b, td.c i', sh), wrap = sh.classList.contains('m-wrap'); bs.forEach(b => { b.style.fontSize = ''; });
+    for (let pass = 0; pass < 3; pass++) {
+      const m = bs.map(b => { const lh = parseFloat(getComputedStyle(b).lineHeight) || 14; return [b.clientWidth, b.scrollWidth, b.scrollHeight, lh * (wrap && b.tagName === 'B' ? 2 : 1) + 2]; });
+      let ch = 0; bs.forEach((b, i) => { const [cw, sw, sh2, mh] = m[i]; if (!cw) return; let r = Math.min(cw / Math.max(sw, 1), wrap ? Math.sqrt(mh / Math.max(sh2, 1)) : 1); if (r < 0.995) { const cur = parseFloat(b.style.fontSize) || (b.tagName === 'I' ? 80 : 100); b.style.fontSize = Math.max(50, Math.floor(cur * r * 0.98)) + '%'; ch++; } });
+      if (!ch) break; }
+  }
   function gMaster(rows) {
-    const R = rows === 'teacher' ? teachers().map(t => ({ id: t.id, nm: tN(t.id, true), n: t.n })) : classes().map(x => ({ id: x.id, nm: x.name }));
+    const c = C(), R = rows === 'teacher' ? teachers().map(t => ({ id: t.id, nm: tN(t.id, true), n: t.n })) : classes().map(x => ({ id: x.id, nm: x.name }));
     let h = `<table class="tvg tvg-m"><thead><tr><th class="cn" rowspan="2">${rows === 'teacher' ? 'المعلم' : 'الفصل'}</th>${Array.from({ length: nd() }, (_, d) => `<th colspan="${np()}" class="dg" data-hd="${d}">${DAYS[d]}</th>`).join('')}${rows === 'teacher' ? '<th rowspan="2" class="cn">النصاب</th>' : ''}</tr><tr>${Array.from({ length: nd() }, (_, d) => Array.from({ length: np() }, (_, p) => `<th class="pn${p === 0 ? ' d0' : ''}" data-hd="${d}" data-hp="${p}">${AR(p + 1)}</th>`).join('')).join('')}</tr></thead><tbody>`;
     R.forEach(r => { h += `<tr><th class="rh" data-go="${rows === 'teacher' ? 'teacher' : 'class'}|${r.id}" tabindex="0">${esc(r.nm)}</th>`; for (let d = 0; d < nd(); d++) for (let p = 0; p < np(); p++) {
       const s = rows === 'teacher' ? D.L.find(x => x.teacher_id === r.id && x.day === d && x.period === p && vis(x)) : at(r.id, d, p);
-      h += s ? `<td class="c${p === 0 ? ' d0' : ''}${s.teacher_id ? '' : ' nt'}" style="--sc:${col(s.subject_id)}" data-dp="${d}|${p}" data-c="${s.class_id}" title="${esc(sN(s.subject_id) + (rows === 'teacher' ? ' · ' + cN(s.class_id) : s.teacher_id ? ' · ' + tN(s.teacher_id) : ''))}"><b>${esc(rows === 'teacher' ? cS(s.class_id) : sShort(s.subject_id))}</b></td>` : `<td class="e${p === 0 ? ' d0' : ''}" data-dp="${d}|${p}"${rows === 'teacher' ? '' : ` data-c="${r.id}"`}></td>`; }
+      h += s ? `<td class="c${p === 0 ? ' d0' : ''}${s.teacher_id ? '' : ' nt'}" style="--sc:${col(s.subject_id)}" data-dp="${d}|${p}" data-c="${s.class_id}" title="${esc(sN(s.subject_id) + (rows === 'teacher' ? ' · ' + cN(s.class_id) : s.teacher_id ? ' · ' + tN(s.teacher_id) : ''))}"><b>${esc(rows === 'teacher' ? (c.mFull ? cN(s.class_id) : cS(s.class_id)) : (c.mFull ? sN(s.subject_id) : sShort(s.subject_id)))}</b>${rows !== 'teacher' && c.mT ? `<i>${s.teacher_id ? esc(tN(s.teacher_id, true)) : 'بلا معلم'}</i>` : ''}</td>` : `<td class="e${p === 0 ? ' d0' : ''}" data-dp="${d}|${p}"${rows === 'teacher' ? '' : ` data-c="${r.id}"`}></td>`; }
       h += rows === 'teacher' ? `<td class="tot">${AR(r.n)}</td></tr>` : '</tr>'; });
     return h + '</tbody></table>';
   }
@@ -279,10 +287,28 @@
     }
     if (v === 'master') {
       const rows = st.mRows === 'teacher' ? 'teacher' : 'class';
-      tool.innerHTML = `<div class="row"><div class="seg" role="group" aria-label="الصفوف"><button data-r="class" class="${rows === 'class' ? 'on' : ''}">الفصول</button><button data-r="teacher" class="${rows === 'teacher' ? 'on' : ''}">المعلمون</button></div><span class="small muted">مرّر المؤشر على الخلية لرؤية التفاصيل · الألوان تمثّل المواد</span></div>`;
+      const c = C(), fs = Math.min(180, Math.max(60, +c.mFs || 100)), CW = [[0, 'تلقائي'], [30, 'ضيّق'], [40, 'متوسط'], [52, 'واسع'], [66, 'واسع جداً']];
+      tool.innerHTML = `<div class="row"><div class="seg" role="group" aria-label="الصفوف"><button data-r="class" class="${rows === 'class' ? 'on' : ''}">الفصول</button><button data-r="teacher" class="${rows === 'teacher' ? 'on' : ''}">المعلمون</button></div><span class="small muted">مرّر المؤشر على الخلية لرؤية التفاصيل · الألوان تمثّل المواد</span></div>
+        <div class="tv-mz" role="group" aria-label="تنسيق الخط داخل الخلايا"><span class="tv-mzl">🔠 خط الخلايا</span>
+          <span class="tv-mzs"><button type="button" class="tv-mzb" data-z="-5" aria-label="تصغير الخط">A−</button><input type="range" id="tvMz" min="60" max="180" step="5" value="${fs}" aria-label="حجم الخط داخل الخلايا"><button type="button" class="tv-mzb" data-z="5" aria-label="تكبير الخط">A+</button><output id="tvMzo" aria-live="polite">${AR(fs)}٪</output></span>
+          <label class="tv-mzf">عرض الحصة <select class="in sm" id="tvMw">${CW.map(([v, l]) => `<option value="${v}" ${+c.mCw === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+          <div class="seg" role="group" aria-label="طريقة ملاءمة النص"><button type="button" data-mf="shrink" aria-pressed="${c.mFit !== 'wrap'}" class="${c.mFit !== 'wrap' ? 'on' : ''}" title="يصغّر الكلمة الطويلة وحدها حتى تتسع خليتها">سطر واحد يتسع</button><button type="button" data-mf="wrap" aria-pressed="${c.mFit === 'wrap'}" class="${c.mFit === 'wrap' ? 'on' : ''}" title="يلفّ النص على سطرين ويكبر ارتفاع الصف">سطران</button></div>
+          <label class="chk"><input type="checkbox" data-mo="mFull" ${c.mFull ? 'checked' : ''}> ${rows === 'teacher' ? 'اسم الفصل كاملاً' : 'اسم المادة كاملاً'}</label>${rows === 'teacher' ? '' : `<label class="chk"><input type="checkbox" data-mo="mT" ${c.mT ? 'checked' : ''}> اسم المعلم</label>`}<label class="chk"><input type="checkbox" data-mo="mBold" ${c.mBold !== false ? 'checked' : ''}> خط عريض</label>
+          <button type="button" class="btn ghost sm" id="tvMr" title="إعادة حجم الخط والعرض للوضع الافتراضي">↺ افتراضي</button></div>`;
       $$('[data-r]', tool).forEach(b => b.onclick = () => { setST({ mRows: b.dataset.r }); redraw(); });
-      body.innerHTML = `<section class="tv-sheet"><div class="scroll">${gMaster(rows)}</div>${rows === 'teacher' ? legendC() : ''}${legend()}</section>`;
-      live(body); return;
+      const sheet = () => $('.tv-ms', body), apply = () => { const sh = sheet(); if (!sh) return; const k = C(), f = Math.min(180, Math.max(60, +k.mFs || 100)), t = $('table', sh), cols = nd() * np();
+        sh.style.setProperty('--mfs', f / 100); sh.classList.toggle('m-wrap', k.mFit === 'wrap'); sh.classList.toggle('m-thin', k.mBold === false);
+        t.style.minWidth = (110 + (rows === 'teacher' ? 60 : 0) + cols * (+k.mCw || 40)) + 'px'; t.style.width = +k.mCw ? 'auto' : ''; $$('col.mc', t).forEach(x => x.style.width = +k.mCw ? k.mCw + 'px' : ''); fitCells(sh); };
+      body.innerHTML = `<section class="tv-sheet tv-ms"><div class="scroll">${gMaster(rows).replace('<thead>', `<colgroup><col class="mh">${Array.from({ length: nd() * np() }, () => '<col class="mc">').join('')}${rows === 'teacher' ? '<col class="mh2">' : ''}</colgroup><thead>`)}</div>${rows === 'teacher' ? legendC() : ''}${legend()}</section>`;
+      const zr = $('#tvMz', tool), zo = $('#tvMzo', tool), setZ = v => { v = Math.min(180, Math.max(60, Math.round(v / 5) * 5)); zr.value = v; zo.textContent = AR(v) + '٪'; setLocal({ mFs: v }); apply(); };
+      zr.oninput = () => setZ(+zr.value); $$('[data-z]', tool).forEach(b => b.onclick = () => setZ(+zr.value + +b.dataset.z));
+      $('#tvMw', tool).onchange = e => { setLocal({ mCw: +e.target.value }); apply(); };
+      $$('[data-mf]', tool).forEach(b => b.onclick = () => { setLocal({ mFit: b.dataset.mf }); $$('[data-mf]', tool).forEach(x => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-pressed', on); }); apply(); });
+      $$('[data-mo]', tool).forEach(i => i.onchange = () => { setLocal({ [i.dataset.mo]: i.checked }); i.dataset.mo === 'mBold' ? apply() : redraw(); });
+      $('#tvMr', tool).onclick = () => { setLocal({ mFs: 100, mCw: 0, mFit: 'shrink', mBold: true }); redraw(); };
+      apply(); live(body); if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => body.isConnected && fitCells(sheet()));
+      if (window.ResizeObserver) { let rt; const ro = new ResizeObserver(() => { if (!body.isConnected) return ro.disconnect(); clearTimeout(rt); rt = setTimeout(() => fitCells(sheet()), 120); }); ro.observe($('.scroll', body)); }
+      return;
     }
     if (v === 'assign') {
       const c = C(), aed = canEdit() && !!D.ver && st.aEd;
@@ -678,6 +704,14 @@
     .tv-pick{display:flex;flex-wrap:wrap;gap:6px}.tv-pick button{border:1px solid var(--line,#D5DEEA);background:#fff;border-radius:99px;padding:6px 13px;font:inherit;font-size:13px;cursor:pointer;min-height:34px}.tv-pick button.on{background:var(--sky);color:#fff;border-color:var(--sky);font-weight:800}
     .tv-sheet{border:1px solid var(--line,#E2E8F0);border-radius:16px;padding:12px;margin-bottom:14px;background:#fff;box-shadow:0 8px 24px #082b5a0f}.tv-sheet h3{margin:0 0 10px;color:var(--navy)}.tv-sheet h3 small{font-weight:500;color:var(--muted,#64748B);font-size:13px;margin-inline-start:6px}
     .tv-sheet .tvg-w{min-width:720px}.tv-sheet .tvg-d{min-width:760px}.tv-sheet .tvg-m{min-width:${'1100px'}}.tv-sheet .tvg-x{min-width:760px}.tv-sheet .tvg-i{min-width:640px}
+    .tv-mz{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:8px 10px;border:1px solid var(--line,#D5DEEA);border-radius:14px;background:linear-gradient(180deg,#fff,#F4F8FC);box-shadow:0 2px 8px #082b5a0d}
+    .tv-mzl{font-weight:800;color:var(--navy)}.tv-mzs{display:inline-flex;align-items:center;gap:6px}.tv-mzs input[type=range]{width:130px;accent-color:var(--blue,#005499)}.tv-mzs output{min-width:44px;font-weight:800;color:var(--blue,#005499);text-align:center}
+    .tv-mzb{min-width:36px;min-height:36px;border:1px solid var(--line,#D5DEEA);border-radius:10px;background:#fff;font:inherit;font-weight:800;color:var(--navy);cursor:pointer}.tv-mzb:hover{background:#E6F5FB}.tv-mzb:focus-visible,.tv-mz select:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+    .tv-mzf{display:inline-flex;align-items:center;gap:6px;font-size:13px}
+    .tv-ms .tvg-m{font-size:calc(11px*var(--mfs,1))}.tv-ms .tvg-m col.mh{width:110px}.tv-ms .tvg-m col.mh2{width:60px}.tv-ms .tvg-m .rh{white-space:nowrap}
+    .tv-ms .tvg-m td.c{padding:4px 2px;overflow:hidden}.tv-ms .tvg-m td.c b,.tv-ms .tvg-m td.c i{display:block;overflow:hidden;white-space:nowrap;text-overflow:clip;line-height:1.25}.tv-ms .tvg-m td.c b{font-size:1em;font-weight:800}.tv-ms .tvg-m td.c i{font-size:.8em;margin-top:1px}
+    .tv-ms.m-wrap .tvg-m td.c b{white-space:normal;overflow-wrap:normal;word-break:keep-all}.tv-ms.m-thin .tvg-m td.c b{font-weight:600}
+    @media (max-width:560px){.tv-mzs input[type=range]{width:96px}}
     .tv-root [data-ed]{cursor:pointer;transition:transform .12s}.tv-root td[data-ed]:hover{filter:brightness(.96);box-shadow:inset 0 0 0 2px var(--sky)}
     .tv-root .tvg thead th{position:sticky;top:0;z-index:1}.tv-root .tvg .rh{position:sticky;right:0;z-index:1}
     .tv-ts{padding:5px 8px;min-width:170px}

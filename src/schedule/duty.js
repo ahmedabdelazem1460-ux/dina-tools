@@ -28,7 +28,7 @@
     try {
       const { s, P } = bellCtx(sec, iso), tl = A.bell.timeline(s, P, null);
       if (sl.kind === 'start') return { from: tl.start - (+sl.lead || 20), to: tl.start + (+sl.tail || 0) };
-      if (sl.kind === 'end') return { from: tl.end - (+sl.tail || 0), to: tl.end + (+sl.lead || 20) };
+      if (sl.kind === 'end') { const E = (A.bell.dayEnd && A.bell.dayEnd(sec, s)) || tl.end; return { from: E - (+sl.tail || 0), to: E + (+sl.lead || 20) }; }
       if (sl.kind === 'break') { const t = breakTime(s, P, sl.ref); if (t) return t; const any = tl.items.filter(x => x.k === 'b')[+sl.idx || 0]; return any ? { from: any.from, to: any.to } : null; }
       if (sl.kind === 'period') { const p = tl.items.find(x => x.k === 'p' && x.i === +sl.ref); return p ? { from: p.from, to: p.to } : null; }
       return { from: toMin(sl.from), to: toMin(sl.to) };

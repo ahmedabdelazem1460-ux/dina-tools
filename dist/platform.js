@@ -1620,7 +1620,7 @@ body.band .foot{background:#082B5A;color:#fff;border-top:0;height:56px}
     };
     const n = mine.length, f = mine.filter(e => required(e) && filled(e)).length, rq = mine.filter(required).length;
     return `<details class="card tgrid" ${LS.get('mygrid') === '0' ? '' : 'open'} ontoggle="APP.LS.set('mygrid', this.open ? '1' : '0')"><summary><b>جدولي الأسبوعي</b> <span class="small muted">${cnt(n, 'حصة', 'حصص')} · مكتملة ${AR(f)} من ${AR(rq)} · اضغط على أي حصة لفتحها</span></summary>
-      <div class="scroll"><table class="tbl tg"><thead><tr><th>اليوم</th>${Array.from({ length: P }, (_, p) => `<th>${PER[p] || AR(p + 1)}${window.APP && APP.ptime ? APP.ptime(p) : ''}</th>`).join('')}</tr></thead>
+      <div class="scroll"><table class="tbl tg"><thead><tr><th>اليوم</th>${Array.from({ length: P }, (_, p) => `<th>${PER[p] || AR(p + 1)}${window.APP && APP.ptime ? APP.ptime(p, [...new Set(mine.map(e => e.class_id))]) : ''}</th>`).join('')}</tr></thead>
       <tbody>${dates.map((dt, d) => `<tr><th><b>${DAYS[d]}</b><div class="small faint">${AR(dt)}</div></th>${Array.from({ length: P }, (_, p) => cell(d, p)).join('')}</tr>`).join('')}</tbody></table></div>
       <div class="row small muted" style="margin-top:8px"><span class="tg-c ok tg-key"></span> مكتملة <span class="tg-c todo tg-key"></span> بانتظار الإدخال</div></details>`;
   }
@@ -8084,7 +8084,43 @@ ${S.me.full_name}`;
     });
   };
   // وقت الحصة في رؤوس الجداول (إن كان الإظهار مفعّلاً في الجدول الساري اليوم)
-  A.ptime = (p, cid) => { try { const sec = A.section(); if (!sec || !sec.bell || !sec.bell.schedules) return ''; const b = bellOf(sec), s = activeSched(b); if (!s.show) return ''; const it = timeline(s, maxP(s, sec), cid).items.find(x => x.k === 'p' && x.i === p); return it ? `<small class="ptm" dir="rtl">${fmt(it.from, s)} – ${fmt(it.to, s)}</small>` : ''; } catch (_) { return ''; } };
+  /* فئات التوقيت: عند وجود فسحة/صلاة خاصة ببعض الصفوف تختلف أوقات الحصص بين الفصول، فلا يصح حساب التوقيت «بلا فصل».
+     cids: معرّف فصل، أو قائمة معرّفات، أو لا شيء (كل فصول القسم). يعيد {s, P, groups:[{cids, label, tl}]} — مطابق للملصق. */
+  const stgOf = c => { const t = (c.stage || '') + ' ' + (c.name || ''); return /ابتدائ/.test(t) ? 'ابتدائي' : /متوسط/.test(t) ? 'متوسط' : /ثانو/.test(t) ? 'ثانوي' : (c.stage || ''); };
+  const secCls = sec => ((S.allClasses && S.allClasses.length ? S.allClasses : S.classes) || []).filter(c => c.active !== false && !c.is_test && (!c.section_id || !sec || c.section_id === sec.id));
+  A.bell.pGroups = (cids, sec, s) => {
+    sec = sec || A.section(); const X = A.bell, b = X.bellOf(sec); s = s || X.activeSched(b); if (!s) return null; const P = X.maxP(s, sec);
+    const ids = cids == null ? null : [].concat(cids).filter(Boolean), all = secCls(sec), byId = new Map(all.map(c => [c.id, c]));
+    const cl = ids ? ids.map(id => byId.get(id) || A.cls && A.cls(id) || { id, name: '' }) : all;
+    if (!cl.length) return { s, P, groups: [{ cids: [], label: '', tl: X.timeline(s, P, null) }] };
+    const M = new Map(); cl.forEach(c => { const k = (s.breaks || []).filter(br => applies(br, c.id)).map(br => br.id || (br.after + '|' + br.label)).sort().join(','); if (!M.has(k)) M.set(k, []); M.get(k).push(c); });
+    const G = [...M.values()].map(g => ({ cids: g.map(c => c.id), cls: g, tl: X.timeline(s, P, g[0].id) }));
+    // اسم الفئة: مراحلها (ابتدائي / متوسط وثانوي) وإلا أسماء فصولها
+    const st = G.map(g => [...new Set(g.cls.map(stgOf).filter(Boolean))].join(' و'));
+    const uniq = st.every(x => x) && new Set(st).size === st.length;
+    G.forEach((g, i) => { g.label = G.length < 2 ? '' : uniq ? st[i] : g.cls.map(c => c.name).join('، '); delete g.cls; });
+    return { s, P, groups: G };
+  };
+  // أوقات الحصة p لمجموعة فصول: [{from, to, txt, label}] — عنصر واحد بلا اسم إن تطابقت الأوقات
+  A.bell.pRanges = (p, cids, sec) => { try {
+    const R = A.bell.pGroups(cids, sec); if (!R) return []; const out = [];
+    R.groups.forEach(g => { const it = g.tl.items.find(x => x.k === 'p' && x.i === p); if (!it) return; const o = out.find(x => x.from === it.from && x.to === it.to); if (o) o.lbl.push(g.label); else out.push({ from: it.from, to: it.to, txt: A.bell.fmt(it.from, R.s) + ' – ' + A.bell.fmt(it.to, R.s), lbl: [g.label] }); });
+    return out.map(x => ({ from: x.from, to: x.to, txt: x.txt, label: out.length > 1 ? x.lbl.filter(Boolean).join(' و') : '' }));
+  } catch (_) { return []; } };
+  // الفسح والصلاة لمجموعة فصول: [{after (رقم آخر حصة قبلها 0-based), label, t, from, to, part}] — part = اسم الفئة إن خصّت بعضها
+  A.bell.pBreaks = (cids, sec) => { try {
+    const R = A.bell.pGroups(cids, sec); if (!R) return []; const out = [], n = R.groups.length;
+    R.groups.forEach(g => { let last = -1; g.tl.items.forEach(x => { if (x.k === 'p') { last = x.i; return; } if (x.k !== 'b' || last < 0) return;
+      const lb = (x.label || 'الفسحة').trim(), o = out.find(y => y.after === last && y.label === lb && y.from === x.from && y.to === x.to);
+      if (o) o.g.push(g.label); else out.push({ after: last, label: lb, from: x.from, to: x.to, t: A.bell.fmt(x.from, R.s) + ' – ' + A.bell.fmt(x.to, R.s), g: [g.label] }); }); });
+    return out.map(b => ({ after: b.after, label: b.label, from: b.from, to: b.to, t: b.t, part: n > 1 && b.g.length < n ? b.g.filter(Boolean).join(' و') : '' }));
+  } catch (_) { return []; } };
+  // نهاية اليوم الدراسي الفعلية (أطول فئة)
+  A.bell.dayEnd = (sec, s) => { const R = A.bell.pGroups(null, sec, s); return R ? Math.max(...R.groups.map(g => g.tl.end)) : null; };
+  A.bell.stageLabel = stgOf;
+  // وقت الحصة في رؤوس الجداول (إن كان الإظهار مفعّلاً في الجدول الساري اليوم) — cid: فصل أو قائمة فصول أو لا شيء (كل الفصول)
+  A.ptime = (p, cid) => { try { const sec = A.section(); if (!sec || !sec.bell || !sec.bell.schedules) return ''; const s = activeSched(bellOf(sec)); if (!s || !s.show) return '';
+    return A.bell.pRanges(p, cid, sec).map(r => `<small class="ptm" dir="rtl">${r.label ? `<em class="ptm-g">${esc(r.label)}</em> ` : ''}${r.txt}</small>`).join(''); } catch (_) { return ''; } };
 
   // ---------- الملصق ----------
   const CLOCK = '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
@@ -8627,9 +8663,19 @@ ${S.me.full_name}`;
     const days = s ? B.actDays(s, sec) : Array.from({ length: sec.days || 5 }, (_, i) => i);
     const P = s ? B.maxP(s, sec) : (sec.periods || 7);
     const cid = c.kind === 'class' ? target : null;
-    const tl = s ? B.timeline(s, P, cid) : null;
+    // جدول المعلم: الفسح الخاصة ببعض الصفوف تغيّر أوقات حصصه — تُحسب من فئات فصوله (مطابق للملصق وعرض الجداول)
+    const TG = c.kind !== 'class' && s && B === A.bell && A.bell.pGroups ? A.bell.pGroups([...new Set(D.slots.filter(x => x.teacher_id === target && x.subject_id).map(x => x.class_id))], sec, s) : null;
+    const MG = TG && TG.groups.length > 1 ? TG.groups : null;
+    const tl = s ? (TG && TG.groups.length === 1 && TG.groups[0].cids.length ? TG.groups[0].tl : B.timeline(s, P, cid)) : null;
     const pt = p => tl && c.times ? tl.items.find(x => x.k === 'p' && x.i === p) : null;
-    const brAfter = p => tl && c.brk ? tl.items.filter((x, i) => x.k === 'b' && tl.items.slice(0, i).filter(y => y.k === 'p').length === p + 1) : [];
+    const bA = (t, p) => t.items.filter((x, i) => x.k === 'b' && t.items.slice(0, i).filter(y => y.k === 'p').length === p + 1);
+    const brAfter = p => { if (!tl || !c.brk) return []; if (!MG) return bA(tl, p); const out = [];
+      MG.forEach(g => bA(g.tl, p).forEach(b => { const o = out.find(y => y.label === b.label && y.from === b.from && y.to === b.to); if (o) o.g.push(g.label); else out.push(Object.assign({}, b, { g: [g.label] })); }));
+      return out.map(b => Object.assign({}, b, { label: (b.label || 'استراحة') + (b.g.length < MG.length ? ' (' + b.g.join(' و') + ')' : '') })); };
+    const ptx = p => { if (!tl || !c.times) return ''; const L = [];
+      if (MG) MG.forEach(g => { const it = g.tl.items.find(x => x.k === 'p' && x.i === p); if (!it) return; const o = L.find(x => x.from === it.from && x.to === it.to); if (o) o.l.push(g.label); else L.push({ from: it.from, to: it.to, l: [g.label] }); });
+      else { const it = pt(p); if (it) L.push({ from: it.from, to: it.to, l: [] }); }
+      return L.map(x => `<span class="dz-tm"><span class="dz-ic xs" style="background-image:${svgUrl(IC.clock, T.a)}"></span><span>${range(x)}${L.length > 1 ? `<small style="display:block;direction:rtl;font-size:.8em">${esc(x.l.join(' و'))}</small>` : ''}</span></span>`).join(''); };
     const fm = m => { const h = Math.floor(m / 60) % 24, mm = String(m % 60).padStart(2, '0'); return (s && s.h24 ? String(h).padStart(2, '0') : String(h % 12 || 12)) + ':' + mm; };
     const range = it => `${fm(it.from)} – ${fm(it.to)}`;
     const slots = D.slots.filter(x => c.kind === 'class' ? x.class_id === target : x.teacher_id === target);
@@ -8664,7 +8710,7 @@ ${S.me.full_name}`;
         <div class="dz-art"><span class="dz-lap"></span></div></div>
       <div class="dz-who"><span>${esc(c.label || (c.kind === 'class' ? 'الصف:' : 'المعلم:'))}</span><b>${esc(who)}</b>${stat.length ? `<em class="dz-st">${stat.map(([k, v]) => `<span>${k} <b>${v}</b></span>`).join('')}</em>` : ''}</div>
       <table class="dz-t"><colgroup><col style="width:${dayW}px">${cols.map(x => `<col style="width:${x.k === 'b' ? bW : pW}px">`).join('')}</colgroup>
-        <tbody><tr class="dz-h"><th class="dz-dh">اليوم</th>${cols.map(x => x.k === 'b' ? `<th class="dz-b" rowspan="${days.length + 1}"><div class="dz-bi"><span class="dz-ic sm" style="background-image:${svgUrl(IC.cup, T.a)}"></span><div class="dz-bv" style="height:${Math.max(200, days.length * 58 + 30)}px"><span><b>${esc(x.b.label || 'استراحة')}</b>${c.times ? `<i>${range(x.b)}</i>` : ''}</span></div></div></th>` : `<th class="dz-ph">${c.nums ? `<span class="dz-n">${AR(x.p + 1)}</span>` : ''}<span class="dz-pn">الحصة ${PER[x.p] || AR(x.p + 1)}</span>${pt(x.p) ? `<span class="dz-tm"><span class="dz-ic xs" style="background-image:${svgUrl(IC.clock, T.a)}"></span><span>${range(pt(x.p))}</span></span>` : ''}</th>`).join('')}</tr>
+        <tbody><tr class="dz-h"><th class="dz-dh">اليوم</th>${cols.map(x => x.k === 'b' ? `<th class="dz-b" rowspan="${days.length + 1}"><div class="dz-bi"><span class="dz-ic sm" style="background-image:${svgUrl(IC.cup, T.a)}"></span><div class="dz-bv" style="height:${Math.max(200, days.length * 58 + 30)}px"><span><b>${esc(x.b.label || 'استراحة')}</b>${c.times ? `<i>${range(x.b)}</i>` : ''}</span></div></div></th>` : `<th class="dz-ph">${c.nums ? `<span class="dz-n">${AR(x.p + 1)}</span>` : ''}<span class="dz-pn">الحصة ${PER[x.p] || AR(x.p + 1)}</span>${ptx(x.p)}</th>`).join('')}</tr>
         ${days.map(d => `<tr><th class="dz-d">${DAYS[d]}</th>${cols.filter(x => x.k === 'p').map(x => cell(d, x.p)).join('')}</tr>`).join('')}</tbody></table>
       ${perSub || perDay ? `<div class="dz-sum">${perSub ? `<div><i>توزيع الحصص على المواد:</i>${perSub}</div>` : ''}${perDay ? `<div><i>الحصص اليومية:</i>${perDay}</div>` : ''}</div>` : ''}
       <div class="dz-foot"><svg viewBox="0 0 1123 140" preserveAspectRatio="none" aria-hidden="true"><path d="M0 70 C 200 20 380 110 600 60 C 800 20 960 70 1123 40 L1123 140 L0 140Z" fill="${T.b}" opacity=".35"/><path d="M0 95 C 220 50 420 130 640 85 C 840 50 980 95 1123 70 L1123 140 L0 140Z" fill="${T.a}"/></svg>
@@ -8710,12 +8756,17 @@ ${S.me.full_name}`;
       const fs = perDay ? 14 : Math.max(8, Math.min(12, cellW / 4.6));
       const tl = s && c.times && perDay ? B.timeline(s, P, null) : null;
       const pt = p => tl ? tl.items.find(x => x.k === 'p' && x.i === p) : null;
+      // عند اختلاف الفسح بين الفئات تختلف أوقات الحصة — تُعرض أوقات كل فئة (مطابق للملصق)
+      const ptH = p => { if (!tl) return ''; const G = B === A.bell && A.bell.pGroups ? A.bell.pGroups(null, sec, s) : null, L = [];
+        if (G && G.groups.length > 1) G.groups.forEach(g => { const it = g.tl.items.find(x => x.k === 'p' && x.i === p); if (!it) return; const o = L.find(x => x.from === it.from && x.to === it.to); if (o) o.l.push(g.label); else L.push({ from: it.from, to: it.to, l: [g.label] }); });
+        else { const it = pt(p); if (it) L.push({ from: it.from, to: it.to, l: [] }); }
+        return L.map(x => `<div style="font-family:'Myriad Pro',Arial;direction:ltr;font-size:11px">${fm(x.from)} – ${fm(x.to)}${L.length > 1 && x.l.length ? `<span style="direction:rtl;display:block;font-size:10px">${esc(x.l.join(' و'))}</span>` : ''}</div>`).join(''); };
       const fm = m => { const h = Math.floor(m / 60) % 24, mm = String(m % 60).padStart(2, '0'); return (s && s.h24 ? String(h).padStart(2, '0') : String(h % 12 || 12)) + ':' + mm; };
       const pages = chunk(ents, per);
       pages.forEach(pg => out.push({ dl, pg, html: (pi, pn) => `<div class="dz-m" dir="rtl" style="${style}">${head(c.title2 || (isT ? 'الجدول العام للمعلمين' : 'الجدول العام للفصول'), perDay ? 'يوم ' + DAYS[dl[0]] : `${AR(ents.length)} ${isT ? 'معلماً' : 'فصلاً'}`)}
         <table class="dz-mt" style="font-size:${fs}px"><colgroup><col style="width:${nameW}px">${dl.map(() => Array.from({ length: P }, () => `<col>`).join('')).join('')}</colgroup>
         <thead><tr><th rowspan="2" style="font-size:14px">${isT ? 'المعلم' : 'الفصل'}</th>${dl.map((d, k) => `<th colspan="${P}" class="${k ? 'dz-dsep' : ''}" style="font-size:${perDay ? 16 : 13}px;padding:4px 0">${DAYS[d]}</th>`).join('')}</tr>
-          <tr>${dl.map((d, k) => Array.from({ length: P }, (_, p) => `<th class="${k && !p ? 'dz-dsep' : ''}">${perDay ? `الحصة ${PER[p] || AR(p + 1)}${pt(p) ? `<div style="font-family:'Myriad Pro',Arial;direction:ltr;font-size:11px">${fm(pt(p).from)} – ${fm(pt(p).to)}</div>` : ''}` : AR(p + 1)}</th>`).join('')).join('')}</tr></thead>
+          <tr>${dl.map((d, k) => Array.from({ length: P }, (_, p) => `<th class="${k && !p ? 'dz-dsep' : ''}">${perDay ? `الحصة ${PER[p] || AR(p + 1)}${ptH(p)}` : AR(p + 1)}</th>`).join('')).join('')}</tr></thead>
         <tbody>${pg.map(([id, nm]) => `<tr style="height:${rowH}px"><th style="font-size:${Math.min(14, fs + 2)}px">${esc(isT ? (perDay ? nm : tShort(id)) : nm)}</th>${dl.map((d, k) => Array.from({ length: P }, (_, p) => { const off = s && p >= B.schedP(s, sec, d); const l = off ? [] : slotAt(id, d, p); const cl = (k && !p ? 'dz-dsep ' : '') + (off ? 'dz-x' : ''); return `<td class="${cl}">${l.map(x => isT ? `<b>${esc(abbr[x.class_id] || cName(x.class_id))}</b>${c.who ? `<i>${esc(subShort(c, x.subject_id))}</i>` : ''}` : `<b>${esc(subShort(c, x.subject_id))}</b>${c.who ? `<i>${esc(tShort(x.teacher_id))}</i>` : ''}`).join('')}</td>`; }).join('')).join('')}</tr>`).join('')}</tbody></table>${foot(pi, pn)}</div>` }));
     });
     return out.map((o, i) => o.html(i + 1, out.length));
@@ -11758,7 +11809,7 @@ ${S.me.full_name}`;
     try {
       const { s, P } = bellCtx(sec, iso), tl = A.bell.timeline(s, P, null);
       if (sl.kind === 'start') return { from: tl.start - (+sl.lead || 20), to: tl.start + (+sl.tail || 0) };
-      if (sl.kind === 'end') return { from: tl.end - (+sl.tail || 0), to: tl.end + (+sl.lead || 20) };
+      if (sl.kind === 'end') { const E = (A.bell.dayEnd && A.bell.dayEnd(sec, s)) || tl.end; return { from: E - (+sl.tail || 0), to: E + (+sl.lead || 20) }; }
       if (sl.kind === 'break') { const t = breakTime(s, P, sl.ref); if (t) return t; const any = tl.items.filter(x => x.k === 'b')[+sl.idx || 0]; return any ? { from: any.from, to: any.to } : null; }
       if (sl.kind === 'period') { const p = tl.items.find(x => x.k === 'p' && x.i === +sl.ref); return p ? { from: p.from, to: p.to } : null; }
       return { from: toMin(sl.from), to: toMin(sl.to) };
@@ -21337,38 +21388,48 @@ ${S.me.full_name}`;
   const cS = cid => { const c = A.cls(cid) || {}, n = String(c.name || ''), g = GW.findIndex(w => String(c.grade_word || n).includes(w)); if (g < 0) return n; const st = /متوسط/.test((c.stage || '') + n) ? 'م' : /ثانوي/.test((c.stage || '') + n) ? 'ث' : ''; const lb = String(c.class_label || n.split(/\s+/).pop() || '').trim(); return st + AR(g + 1) + (lb && lb.length <= 3 ? lb : ''); };
   const stg = c => A.stageOf ? A.stageOf(c) : (c.stage || '');
   const nd = () => (A.section() || {}).days || 5, np = () => (A.section() || {}).periods || 7;
-  function ptxt(p, cid) { try { const sec = A.section(), b = A.bell.bellOf(sec), s = A.bell.activeSched(b); const it = A.bell.timeline(s, A.bell.maxP(s, sec), cid).items.find(x => x.k === 'p' && x.i === p); return it ? A.bell.fmt(it.from, s) + ' – ' + A.bell.fmt(it.to, s) : ''; } catch (_) { return ''; } }
+  // أوقات الحصة حسب الجدول الزمني الساري — cid: فصل أو قائمة فصول أو null (كل الفصول). عند اختلاف الفسح بين الفئات تُعرض أوقات كل فئة
+  const pRng = (p, cid) => (A.bell.pRanges ? A.bell.pRanges(p, cid) : []);
+  function ptxt(p, cid) { return pRng(p, cid).map(r => (r.label ? `<em class="tv-g">${esc(r.label)}</em>` : '') + r.txt).join('<br>'); }
+  // وقت حصة بعينها لفصل بعينه (يظهر داخل الخلية حين تختلف الأوقات بين فصول المعلم)
+  const cellT = (p, cid) => { const r = pRng(p, cid)[0]; return r ? `<small class="tv-ct">${r.txt}</small>` : ''; };
+  const tCls = tid => [...new Set(D.L.filter(s => s.teacher_id === tid && vis(s)).map(s => s.class_id))];
   const verTxt = () => D.src === 'wk' && D.wk ? `حصص الأسبوع ${D.wk.word || AR(D.wk.number)} بتعديلاته` : D.ver ? `الجدول المعتمد: ${A.verName ? A.verName(D.ver) : (D.ver.label || '')}${A.verWhen ? A.verWhen(D.ver) : ''}` : 'لا يوجد جدول معتمد';
 
   // ---------- مكوّنات الجداول (مشتركة بين الشاشة والطباعة) ----------
-  const cell = (s, top, sub, ed, ex = '') => `<td class="c${s.teacher_id ? '' : ' nt'}${s.override ? ' ov' : ''}${ex}" style="--sc:${col(s.subject_id)}" data-dp="${s.day}|${s.period}" data-c="${s.class_id}"${ed ? ` tabindex="0" role="button" data-ed="${s.class_id}|${s.day}|${s.period}"` : ''}>${top ? `<b>${esc(top)}</b>` : ''}${sub ? `<i>${esc(sub)}</i>` : ''}</td>`;
+  const cell = (s, top, sub, ed, ex = '', tm = '') => `<td class="c${s.teacher_id ? '' : ' nt'}${s.override ? ' ov' : ''}${ex}" style="--sc:${col(s.subject_id)}" data-dp="${s.day}|${s.period}" data-c="${s.class_id}"${ed ? ` tabindex="0" role="button" data-ed="${s.class_id}|${s.day}|${s.period}"` : ''}>${top ? `<b>${esc(top)}</b>` : ''}${sub ? `<i>${esc(sub)}</i>` : ''}${tm}</td>`;
   const emptyC = (ed, d, p, c) => `<td class="e"${d != null ? ` data-dp="${d}|${p}"${c ? ` data-c="${c}"` : ''}` : ''}${ed ? ` tabindex="0" role="button" data-ed="${ed}"` : ''}><span>—</span></td>`;
   // الفسح والصلاة بين الحصص حسب الجدول الزمني الساري: [{after, label, t}]
-  function brks(cid) { if (!C().brk) return []; try { const sec = A.section(), b = A.bell.bellOf(sec), s = A.bell.activeSched(b), out = []; let last = -1;
-    A.bell.timeline(s, A.bell.maxP(s, sec), cid).items.forEach(x => { if (x.k === 'p') last = x.i; else if (x.k === 'b' && last >= 0 && last < np()) { const o = out.find(y => y.after === last); const t = A.bell.fmt(x.from, s) + ' – ' + A.bell.fmt(x.to, s); if (o) { o.label += ' + ' + (x.label || 'فسحة'); } else out.push({ after: last, label: (x.label || 'الفسحة').trim(), t }); } });
+  function brks(cid) { if (!C().brk) return []; try { const out = [];
+    (A.bell.pBreaks ? A.bell.pBreaks(cid) : []).forEach(x => { if (x.after < 0 || x.after >= np()) return; const lb = x.label + (x.part ? ' (' + x.part + ')' : '');
+      const o = out.find(y => y.after === x.after); if (o) { if (!o.label.split(' + ').includes(lb)) { o.label += ' + ' + lb; o.t += ' / ' + x.t; } } else out.push({ after: x.after, label: lb, t: x.t }); });
     return out; } catch (_) { return []; } }
-  const bkTh = b => `<th class="bk" data-bk="${b.after}"><span>${esc(b.label)}</span>${C().times ? `<small>${esc(b.t)}</small>` : ''}</th>`;
+  const bkTh = b => `<th class="bk" data-bk="${b.after}"><span>${esc(b.label)}</span>${C().times && b.t ? `<small>${esc(b.t)}</small>` : ''}</th>`;
   const bkTd = (b, rs) => `<td class="bk" data-bk="${b.after}"${rs ? ` rowspan="${rs}"` : ''}><span>${esc(b.label)}</span></td>`;
   const pHead = (cid, B) => Array.from({ length: np() }, (_, p) => { const t = C().times ? ptxt(p, cid) : ''; const b = B.find(x => x.after === p); return `<th data-hp="${p}">${PER[p]}${t ? `<small>${t}</small>` : ''}</th>${b ? bkTh(b) : ''}`; }).join('');
+  const varies = (p, cids) => C().times && pRng(p, cids).length > 1;
   function gClass(cid, ed) {
     const c = C(), B = brks(cid); let h = `<table class="tvg tvg-w" data-tc="${cid}"><thead><tr><th class="cn">اليوم</th>${pHead(cid, B)}</tr></thead><tbody>`;
     for (let d = 0; d < nd(); d++) { h += `<tr><th class="rh" data-hd="${d}">${DAYS[d]}</th>`; for (let p = 0; p < np(); p++) { const s = at(cid, d, p); h += s ? cell(s, c.showS ? sN(s.subject_id) : '', c.showT ? (s.teacher_id ? tN(s.teacher_id) : 'بلا معلم') : '', ed) : emptyC(ed ? `${cid}|${d}|${p}` : '', d, p, cid); const b = B.find(x => x.after === p); if (b && d === 0) h += bkTd(b, nd()); } h += '</tr>'; }
     return h + '</tbody></table>';
   }
   function gTeacher(tid, ed) {
-    const c = C(), B = brks(null); let h = `<table class="tvg tvg-w"><thead><tr><th class="cn">اليوم</th>${pHead(null, B)}</tr></thead><tbody>`;
+    const c = C(), TC = tCls(tid), B = brks(TC); let h = `<table class="tvg tvg-w"><thead><tr><th class="cn">اليوم</th>${pHead(TC, B)}</tr></thead><tbody>`;
+    const VR = Array.from({ length: np() }, (_, p) => varies(p, TC));
     for (let d = 0; d < nd(); d++) { h += `<tr><th class="rh" data-hd="${d}">${DAYS[d]}</th>`; for (let p = 0; p < np(); p++) { const l = D.L.filter(s => s.teacher_id === tid && s.day === d && s.period === p && vis(s));
-      h += l.length ? cell(l[0], l.map(x => cN(x.class_id)).join(' + '), c.showS ? sN(l[0].subject_id) : '', ed, l.length > 1 ? ' clash' : '') : emptyC('', d, p, ''); const b = B.find(x => x.after === p); if (b && d === 0) h += bkTd(b, nd()); } h += '</tr>'; }
+      h += l.length ? cell(l[0], l.map(x => cN(x.class_id)).join(' + '), c.showS ? sN(l[0].subject_id) : '', ed, l.length > 1 ? ' clash' : '', VR[p] ? cellT(p, l[0].class_id) : '') : emptyC('', d, p, ''); const b = B.find(x => x.after === p); if (b && d === 0) h += bkTd(b, nd()); } h += '</tr>'; }
     return h + '</tbody></table>';
   }
   const tLoad = tid => { const l = D.L.filter(s => s.teacher_id === tid && vis(s)); return { n: l.length, cls: new Set(l.map(s => s.class_id)).size, sub: new Set(l.map(s => s.subject_id)).size, free: nd() * np() - new Set(l.map(s => s.day + '|' + s.period)).size }; };
   function gDay(d, rows, ed) {
     const c = C(), R = rows === 'teacher' ? teachers().map(t => ({ id: t.id, nm: tN(t.id) })) : classes().map(x => ({ id: x.id, nm: x.name }));
-    const BR = {}; R.forEach(r => BR[r.id] = brks(rows === 'teacher' ? null : r.id)); const pos = [...new Set(Object.values(BR).flat().map(b => b.after))];
+    const TCm = {}; if (rows === 'teacher') R.forEach(r => TCm[r.id] = tCls(r.id));
+    const BR = {}; R.forEach(r => BR[r.id] = brks(rows === 'teacher' ? TCm[r.id] : r.id)); const pos = [...new Set(Object.values(BR).flat().map(b => b.after))].sort((a, b) => a - b);
     const B0 = brks(null), U = pos.map(a => B0.find(b => b.after === a) || Object.values(BR).flat().find(b => b.after === a));
+    const VR = Array.from({ length: np() }, (_, p) => varies(p, null));
     let h = `<table class="tvg tvg-d"><thead><tr><th class="cn">${rows === 'teacher' ? 'المعلم' : 'الفصل'}</th>${pHead(null, U)}</tr></thead><tbody>`;
     R.forEach(r => { h += `<tr><th class="rh" data-go="${rows === 'teacher' ? 'teacher' : 'class'}|${r.id}" tabindex="0">${esc(r.nm)}</th>`; for (let p = 0; p < np(); p++) {
-      if (rows === 'teacher') { const l = D.L.filter(s => s.teacher_id === r.id && s.day === d && s.period === p && vis(s)); h += l.length ? cell(l[0], l.map(x => cN(x.class_id)).join(' + '), c.showS ? sN(l[0].subject_id) : '', ed, l.length > 1 ? ' clash' : '') : emptyC('', d, p, ''); }
+      if (rows === 'teacher') { const l = D.L.filter(s => s.teacher_id === r.id && s.day === d && s.period === p && vis(s)); h += l.length ? cell(l[0], l.map(x => cN(x.class_id)).join(' + '), c.showS ? sN(l[0].subject_id) : '', ed, l.length > 1 ? ' clash' : '', VR[p] ? cellT(p, l[0].class_id) : '') : emptyC('', d, p, ''); }
       else { const s = at(r.id, d, p); h += s ? cell(s, c.showS ? sN(s.subject_id) : '', c.showT ? (s.teacher_id ? tN(s.teacher_id, true) : 'بلا معلم') : '', ed) : emptyC(ed ? `${r.id}|${d}|${p}` : '', d, p, r.id); }
       if (pos.includes(p)) { const b = BR[r.id].find(x => x.after === p); h += b ? `<td class="bk sm" data-bk="${p}" data-c="${rows === 'teacher' ? '' : r.id}"><span>${esc(b.label)}</span></td>` : '<td class="bk none"></td>'; } } h += '</tr>'; });
     return h + '</tbody></table>';
@@ -21874,7 +21935,7 @@ ${S.me.full_name}`;
   const FONT = `@font-face{font-family:'Myriad Pro';src:url(fonts/myriad-pro-regular.woff2)}@font-face{font-family:'GE SS Two';font-weight:400 500;src:url(fonts/gess-two-medium.woff2)}@font-face{font-family:'GE SS Two';font-weight:600 900;src:url(fonts/gess-two-bold.woff2)}`;
   // أنماط الجداول المشتركة (الشاشة + الطباعة)
   const GCSS = `.tvg{border-collapse:separate;border-spacing:0;width:100%;font-size:calc(13px*var(--fs,1));table-layout:fixed}.tvg th,.tvg td{border:1px solid #D5DEEA;padding:5px 4px;text-align:center;vertical-align:middle}
-  .tvg thead th{background:var(--a,#082B5A);color:#fff;font-weight:800;line-height:1.25}.tvg thead th small{display:block;font-weight:500;font-size:.78em;opacity:.85;direction:ltr}
+  .tvg thead th{background:var(--a,#082B5A);color:#fff;font-weight:800;line-height:1.25}.tvg thead th small{display:block;font-weight:500;font-size:.78em;opacity:.85;direction:ltr}.tvg thead th small em.tv-g{display:block;direction:rtl;font-style:normal;font-weight:700;opacity:.95;font-size:.92em;margin-top:2px}.tvg td small.tv-ct{display:block;direction:ltr;font-size:.7em;font-weight:600;opacity:.7;margin-top:1px;white-space:nowrap}
   .tvg .rh{background:var(--p,#E4EBF5);color:var(--a,#082B5A);font-weight:800;white-space:nowrap}.tvg .cn{width:110px}
   .tvg td.c{background:var(--sc);height:3.6em}.tvg td.c b{display:block;font-weight:800;color:#0B2545;line-height:1.25}.tvg td.c i{display:block;font-style:normal;font-size:.82em;color:#3E4C63;margin-top:2px;line-height:1.2}
   .tvg td.nt i{color:#B42318;font-weight:700}.tvg td.clash{outline:2px solid #DC2626;outline-offset:-2px}.tvg td.ov{box-shadow:inset 0 -3px 0 #A855F7}.tvg td.e{color:#A0AEC0;background:#fff}

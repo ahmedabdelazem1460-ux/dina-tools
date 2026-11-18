@@ -34,9 +34,19 @@
     const days = s ? B.actDays(s, sec) : Array.from({ length: sec.days || 5 }, (_, i) => i);
     const P = s ? B.maxP(s, sec) : (sec.periods || 7);
     const cid = c.kind === 'class' ? target : null;
-    const tl = s ? B.timeline(s, P, cid) : null;
+    // جدول المعلم: الفسح الخاصة ببعض الصفوف تغيّر أوقات حصصه — تُحسب من فئات فصوله (مطابق للملصق وعرض الجداول)
+    const TG = c.kind !== 'class' && s && B === A.bell && A.bell.pGroups ? A.bell.pGroups([...new Set(D.slots.filter(x => x.teacher_id === target && x.subject_id).map(x => x.class_id))], sec, s) : null;
+    const MG = TG && TG.groups.length > 1 ? TG.groups : null;
+    const tl = s ? (TG && TG.groups.length === 1 && TG.groups[0].cids.length ? TG.groups[0].tl : B.timeline(s, P, cid)) : null;
     const pt = p => tl && c.times ? tl.items.find(x => x.k === 'p' && x.i === p) : null;
-    const brAfter = p => tl && c.brk ? tl.items.filter((x, i) => x.k === 'b' && tl.items.slice(0, i).filter(y => y.k === 'p').length === p + 1) : [];
+    const bA = (t, p) => t.items.filter((x, i) => x.k === 'b' && t.items.slice(0, i).filter(y => y.k === 'p').length === p + 1);
+    const brAfter = p => { if (!tl || !c.brk) return []; if (!MG) return bA(tl, p); const out = [];
+      MG.forEach(g => bA(g.tl, p).forEach(b => { const o = out.find(y => y.label === b.label && y.from === b.from && y.to === b.to); if (o) o.g.push(g.label); else out.push(Object.assign({}, b, { g: [g.label] })); }));
+      return out.map(b => Object.assign({}, b, { label: (b.label || 'استراحة') + (b.g.length < MG.length ? ' (' + b.g.join(' و') + ')' : '') })); };
+    const ptx = p => { if (!tl || !c.times) return ''; const L = [];
+      if (MG) MG.forEach(g => { const it = g.tl.items.find(x => x.k === 'p' && x.i === p); if (!it) return; const o = L.find(x => x.from === it.from && x.to === it.to); if (o) o.l.push(g.label); else L.push({ from: it.from, to: it.to, l: [g.label] }); });
+      else { const it = pt(p); if (it) L.push({ from: it.from, to: it.to, l: [] }); }
+      return L.map(x => `<span class="dz-tm"><span class="dz-ic xs" style="background-image:${svgUrl(IC.clock, T.a)}"></span><span>${range(x)}${L.length > 1 ? `<small style="display:block;direction:rtl;font-size:.8em">${esc(x.l.join(' و'))}</small>` : ''}</span></span>`).join(''); };
     const fm = m => { const h = Math.floor(m / 60) % 24, mm = String(m % 60).padStart(2, '0'); return (s && s.h24 ? String(h).padStart(2, '0') : String(h % 12 || 12)) + ':' + mm; };
     const range = it => `${fm(it.from)} – ${fm(it.to)}`;
     const slots = D.slots.filter(x => c.kind === 'class' ? x.class_id === target : x.teacher_id === target);
@@ -71,7 +81,7 @@
         <div class="dz-art"><span class="dz-lap"></span></div></div>
       <div class="dz-who"><span>${esc(c.label || (c.kind === 'class' ? 'الصف:' : 'المعلم:'))}</span><b>${esc(who)}</b>${stat.length ? `<em class="dz-st">${stat.map(([k, v]) => `<span>${k} <b>${v}</b></span>`).join('')}</em>` : ''}</div>
       <table class="dz-t"><colgroup><col style="width:${dayW}px">${cols.map(x => `<col style="width:${x.k === 'b' ? bW : pW}px">`).join('')}</colgroup>
-        <tbody><tr class="dz-h"><th class="dz-dh">اليوم</th>${cols.map(x => x.k === 'b' ? `<th class="dz-b" rowspan="${days.length + 1}"><div class="dz-bi"><span class="dz-ic sm" style="background-image:${svgUrl(IC.cup, T.a)}"></span><div class="dz-bv" style="height:${Math.max(200, days.length * 58 + 30)}px"><span><b>${esc(x.b.label || 'استراحة')}</b>${c.times ? `<i>${range(x.b)}</i>` : ''}</span></div></div></th>` : `<th class="dz-ph">${c.nums ? `<span class="dz-n">${AR(x.p + 1)}</span>` : ''}<span class="dz-pn">الحصة ${PER[x.p] || AR(x.p + 1)}</span>${pt(x.p) ? `<span class="dz-tm"><span class="dz-ic xs" style="background-image:${svgUrl(IC.clock, T.a)}"></span><span>${range(pt(x.p))}</span></span>` : ''}</th>`).join('')}</tr>
+        <tbody><tr class="dz-h"><th class="dz-dh">اليوم</th>${cols.map(x => x.k === 'b' ? `<th class="dz-b" rowspan="${days.length + 1}"><div class="dz-bi"><span class="dz-ic sm" style="background-image:${svgUrl(IC.cup, T.a)}"></span><div class="dz-bv" style="height:${Math.max(200, days.length * 58 + 30)}px"><span><b>${esc(x.b.label || 'استراحة')}</b>${c.times ? `<i>${range(x.b)}</i>` : ''}</span></div></div></th>` : `<th class="dz-ph">${c.nums ? `<span class="dz-n">${AR(x.p + 1)}</span>` : ''}<span class="dz-pn">الحصة ${PER[x.p] || AR(x.p + 1)}</span>${ptx(x.p)}</th>`).join('')}</tr>
         ${days.map(d => `<tr><th class="dz-d">${DAYS[d]}</th>${cols.filter(x => x.k === 'p').map(x => cell(d, x.p)).join('')}</tr>`).join('')}</tbody></table>
       ${perSub || perDay ? `<div class="dz-sum">${perSub ? `<div><i>توزيع الحصص على المواد:</i>${perSub}</div>` : ''}${perDay ? `<div><i>الحصص اليومية:</i>${perDay}</div>` : ''}</div>` : ''}
       <div class="dz-foot"><svg viewBox="0 0 1123 140" preserveAspectRatio="none" aria-hidden="true"><path d="M0 70 C 200 20 380 110 600 60 C 800 20 960 70 1123 40 L1123 140 L0 140Z" fill="${T.b}" opacity=".35"/><path d="M0 95 C 220 50 420 130 640 85 C 840 50 980 95 1123 70 L1123 140 L0 140Z" fill="${T.a}"/></svg>
@@ -117,12 +127,17 @@
       const fs = perDay ? 14 : Math.max(8, Math.min(12, cellW / 4.6));
       const tl = s && c.times && perDay ? B.timeline(s, P, null) : null;
       const pt = p => tl ? tl.items.find(x => x.k === 'p' && x.i === p) : null;
+      // عند اختلاف الفسح بين الفئات تختلف أوقات الحصة — تُعرض أوقات كل فئة (مطابق للملصق)
+      const ptH = p => { if (!tl) return ''; const G = B === A.bell && A.bell.pGroups ? A.bell.pGroups(null, sec, s) : null, L = [];
+        if (G && G.groups.length > 1) G.groups.forEach(g => { const it = g.tl.items.find(x => x.k === 'p' && x.i === p); if (!it) return; const o = L.find(x => x.from === it.from && x.to === it.to); if (o) o.l.push(g.label); else L.push({ from: it.from, to: it.to, l: [g.label] }); });
+        else { const it = pt(p); if (it) L.push({ from: it.from, to: it.to, l: [] }); }
+        return L.map(x => `<div style="font-family:'Myriad Pro',Arial;direction:ltr;font-size:11px">${fm(x.from)} – ${fm(x.to)}${L.length > 1 && x.l.length ? `<span style="direction:rtl;display:block;font-size:10px">${esc(x.l.join(' و'))}</span>` : ''}</div>`).join(''); };
       const fm = m => { const h = Math.floor(m / 60) % 24, mm = String(m % 60).padStart(2, '0'); return (s && s.h24 ? String(h).padStart(2, '0') : String(h % 12 || 12)) + ':' + mm; };
       const pages = chunk(ents, per);
       pages.forEach(pg => out.push({ dl, pg, html: (pi, pn) => `<div class="dz-m" dir="rtl" style="${style}">${head(c.title2 || (isT ? 'الجدول العام للمعلمين' : 'الجدول العام للفصول'), perDay ? 'يوم ' + DAYS[dl[0]] : `${AR(ents.length)} ${isT ? 'معلماً' : 'فصلاً'}`)}
         <table class="dz-mt" style="font-size:${fs}px"><colgroup><col style="width:${nameW}px">${dl.map(() => Array.from({ length: P }, () => `<col>`).join('')).join('')}</colgroup>
         <thead><tr><th rowspan="2" style="font-size:14px">${isT ? 'المعلم' : 'الفصل'}</th>${dl.map((d, k) => `<th colspan="${P}" class="${k ? 'dz-dsep' : ''}" style="font-size:${perDay ? 16 : 13}px;padding:4px 0">${DAYS[d]}</th>`).join('')}</tr>
-          <tr>${dl.map((d, k) => Array.from({ length: P }, (_, p) => `<th class="${k && !p ? 'dz-dsep' : ''}">${perDay ? `الحصة ${PER[p] || AR(p + 1)}${pt(p) ? `<div style="font-family:'Myriad Pro',Arial;direction:ltr;font-size:11px">${fm(pt(p).from)} – ${fm(pt(p).to)}</div>` : ''}` : AR(p + 1)}</th>`).join('')).join('')}</tr></thead>
+          <tr>${dl.map((d, k) => Array.from({ length: P }, (_, p) => `<th class="${k && !p ? 'dz-dsep' : ''}">${perDay ? `الحصة ${PER[p] || AR(p + 1)}${ptH(p)}` : AR(p + 1)}</th>`).join('')).join('')}</tr></thead>
         <tbody>${pg.map(([id, nm]) => `<tr style="height:${rowH}px"><th style="font-size:${Math.min(14, fs + 2)}px">${esc(isT ? (perDay ? nm : tShort(id)) : nm)}</th>${dl.map((d, k) => Array.from({ length: P }, (_, p) => { const off = s && p >= B.schedP(s, sec, d); const l = off ? [] : slotAt(id, d, p); const cl = (k && !p ? 'dz-dsep ' : '') + (off ? 'dz-x' : ''); return `<td class="${cl}">${l.map(x => isT ? `<b>${esc(abbr[x.class_id] || cName(x.class_id))}</b>${c.who ? `<i>${esc(subShort(c, x.subject_id))}</i>` : ''}` : `<b>${esc(subShort(c, x.subject_id))}</b>${c.who ? `<i>${esc(tShort(x.teacher_id))}</i>` : ''}`).join('')}</td>`; }).join('')).join('')}</tr>`).join('')}</tbody></table>${foot(pi, pn)}</div>` }));
     });
     return out.map((o, i) => o.html(i + 1, out.length));

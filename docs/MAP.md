@@ -11,7 +11,7 @@
 | 3 | `api.js` | — | 16 | طبقة البيانات Supabase: list/ins/upd/ups/del/rpc/subscribe | — | — |
 | 4 | `demo.js` | — | 41 | وضع التجربة ?demo=1: نفس واجهة api في الذاكرة | — | — |
 | 5 | `bellcore.js` | — | 17 | نواة التوقيت الموحّدة DinaBell (المنصة + board.html) | — | — |
-| 6 | `src/core/core.js` | app.js | 104 | الأساس: الحالة S، الدخول، التنقل NAV/route، «خطتي» V.my، لوحة المتابعة V.dash، المساعدات A.* | — | — |
+| 6 | `src/core/core.js` | app.js | 105 | الأساس: الحالة S، الدخول، التنقل NAV/route، «خطتي» V.my، لوحة المتابعة V.dash، المساعدات A.* | — | — |
 | 7 | `src/core/order.js` | — | 2 | ترتيب منطقي موحّد للمراحل والصفوف والفصول والمواد: A.cmpCls / A.cmpSubj / A.cmpEntrySG (عرض فقط) | — | clsRank cmpCls cmpEntrySG cmpSubj gradeOrd stageIdx subjRank |
 | 8 | `src/plan/export-timetable-weeks-admin.js` | app2.js | 112 | التصدير، الجدول الدراسي، الأسابيع، الإدارة | admin export timetable weeks | _ttLoadRefresh _ttReqRefresh slotDialog verName verWhen |
 | 9 | `src/core/tools-dev.js` | app3.js | 18 | أداتا النصاب والجدول الآلي داخل المنصة + لوحة المطوّر | builder dev nisab | — |
@@ -37,10 +37,10 @@
 | 29 | `src/core/home.js` | app18.js | 14 | الصفحة الرئيسية V.home | home | HOME_ACT HOME_GROUPS HOME_ICO |
 | 30 | `src/schedule/studio.js` | app19.js | 12 | استوديو الجداول والأنصبة V.studio (حاوية تبويبات) | studio | — |
 | 31 | `src/schedule/saved-versions.js` | app20.js | 10 | النسخ المحفوظة والحفظ السحابي للنصاب والتوزيع | nisab plan | addSnapshot readNisabAny snapshots |
-| 32 | `src/schedule/bell.js` | app21.js | 61 | اليوم الدراسي والجدول الزمني V.bell + A.bell + التحكم في الجدول المعتمد pin + فحص التوقيت | bell | bell ptime |
+| 32 | `src/schedule/bell.js` | app21.js | 65 | اليوم الدراسي والجدول الزمني V.bell + A.bell + التحكم في الجدول المعتمد pin + فحص التوقيت | bell | bell ptime |
 | 33 | `src/schedule/import-timetable.js` | app22.js | 20 | استيراد الجداول الجاهزة (Excel/CSV/PDF من aSc) | — | ttImport ttMatch ttParsePdf |
 | 34 | `src/schedule/approve-timetable.js` | app23.js | 10 | اعتماد الجدول مع معاينة الأثر | — | ttApprove |
-| 35 | `src/schedule/timetable-designer.js` | app24.js | 48 | مصمم الجداول للطباعة V.timetable | timetable | ttDesign |
+| 35 | `src/schedule/timetable-designer.js` | app24.js | 50 | مصمم الجداول للطباعة V.timetable | timetable | ttDesign |
 | 36 | `src/plan/timetable-mismatch.js` | app25.js | 8 | تنبيه «حصص مكتوبة تخالف الجدول» | dash | conflictsDialog |
 | 37 | `src/plan/unified-entry.js` | app26.js | 16 | الإدخال الموحّد لعدة فصول | my | unifiedEditor |
 | 38 | `live.js` | — | 44 | عرض الجدول الاستثنائي التفاعلي (مشترك مع صفحات العرض) | — | — |
@@ -98,7 +98,7 @@
 | 90 | `src/attendance/gifted.js` | — | 65 | رعاية الموهوبين V.gifted: الدليل المرجعي، البوابات الخمس، ١٤ نموذجاً وخطة، قرار اللجنة بالأوزان والتصنيف، المؤشرات — gifted_files (sql/100)، A.giftedNominate | gifted | giftedNominate |
 | 91 | `src/plan/assistant.js` | — | 18 | مساعد المعلم V.assistant (مجاني داخل المتصفح): أهداف بلوم، ملخص، سير الحصة، استراتيجيات، أسئلة (A.genFromText)، واجب، تمايز، طباعة، تحويل لعرض/سؤال لحظي | assistant | lessonAssist |
 | 92 | `src/assess/models3d.js` | — | 20 | المجسمات التفاعلية A.models3d داخل المعامل: مجسمات هندسية بمحرك Canvas، نموذج الذرة، المجموعة الشمسية | labs | models3d |
-| 93 | `src/schedule/tt-views.js` | — | 136 | عرض الجداول والإسنادات V.ttviews: الحصص الجارية الآن، جدول الفصل/المعلم/اليوم/الأسبوع، إسنادات الفصول، الكشاف العام (بالمعلم/بالمادة/مصفوفة)، التحكم في الظهور، الطباعة الاحترافية بأربعة أنماط مع التوقيعات وختم الاعتماد، Excel — مفتاح ttviews لغير المالك | ttviews | ttViews |
+| 93 | `src/schedule/tt-views.js` | — | 137 | عرض الجداول والإسنادات V.ttviews: الحصص الجارية الآن، جدول الفصل/المعلم/اليوم/الأسبوع، إسنادات الفصول، الكشاف العام (بالمعلم/بالمادة/مصفوفة)، التحكم في الظهور، الطباعة الاحترافية بأربعة أنماط مع التوقيعات وختم الاعتماد، Excel — مفتاح ttviews لغير المالك | ttviews | ttViews |
 | 94 | `src/core/owner-text.js` | — | 1 | إخفاء عبارات المالك عن غيره: تنقية A.emptyBox و A.toast لغير المالك (A.ownerClean) | — | emptyBox ownerClean toast |
 | 95 | `src/core/search.js` | — | 20 | البحث الشامل لكل الحسابات (Ctrl+K) ضمن الصلاحيات | — | globalSearch |
 | 96 | `src/core/staff-work.js` | — | 20 | متابعة الموظفين وأعمالهم V.staffwork (للمالك) | staffwork | — |

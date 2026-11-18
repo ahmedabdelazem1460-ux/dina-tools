@@ -130,7 +130,43 @@
     });
   };
   // وقت الحصة في رؤوس الجداول (إن كان الإظهار مفعّلاً في الجدول الساري اليوم)
-  A.ptime = (p, cid) => { try { const sec = A.section(); if (!sec || !sec.bell || !sec.bell.schedules) return ''; const b = bellOf(sec), s = activeSched(b); if (!s.show) return ''; const it = timeline(s, maxP(s, sec), cid).items.find(x => x.k === 'p' && x.i === p); return it ? `<small class="ptm" dir="rtl">${fmt(it.from, s)} – ${fmt(it.to, s)}</small>` : ''; } catch (_) { return ''; } };
+  /* فئات التوقيت: عند وجود فسحة/صلاة خاصة ببعض الصفوف تختلف أوقات الحصص بين الفصول، فلا يصح حساب التوقيت «بلا فصل».
+     cids: معرّف فصل، أو قائمة معرّفات، أو لا شيء (كل فصول القسم). يعيد {s, P, groups:[{cids, label, tl}]} — مطابق للملصق. */
+  const stgOf = c => { const t = (c.stage || '') + ' ' + (c.name || ''); return /ابتدائ/.test(t) ? 'ابتدائي' : /متوسط/.test(t) ? 'متوسط' : /ثانو/.test(t) ? 'ثانوي' : (c.stage || ''); };
+  const secCls = sec => ((S.allClasses && S.allClasses.length ? S.allClasses : S.classes) || []).filter(c => c.active !== false && !c.is_test && (!c.section_id || !sec || c.section_id === sec.id));
+  A.bell.pGroups = (cids, sec, s) => {
+    sec = sec || A.section(); const X = A.bell, b = X.bellOf(sec); s = s || X.activeSched(b); if (!s) return null; const P = X.maxP(s, sec);
+    const ids = cids == null ? null : [].concat(cids).filter(Boolean), all = secCls(sec), byId = new Map(all.map(c => [c.id, c]));
+    const cl = ids ? ids.map(id => byId.get(id) || A.cls && A.cls(id) || { id, name: '' }) : all;
+    if (!cl.length) return { s, P, groups: [{ cids: [], label: '', tl: X.timeline(s, P, null) }] };
+    const M = new Map(); cl.forEach(c => { const k = (s.breaks || []).filter(br => applies(br, c.id)).map(br => br.id || (br.after + '|' + br.label)).sort().join(','); if (!M.has(k)) M.set(k, []); M.get(k).push(c); });
+    const G = [...M.values()].map(g => ({ cids: g.map(c => c.id), cls: g, tl: X.timeline(s, P, g[0].id) }));
+    // اسم الفئة: مراحلها (ابتدائي / متوسط وثانوي) وإلا أسماء فصولها
+    const st = G.map(g => [...new Set(g.cls.map(stgOf).filter(Boolean))].join(' و'));
+    const uniq = st.every(x => x) && new Set(st).size === st.length;
+    G.forEach((g, i) => { g.label = G.length < 2 ? '' : uniq ? st[i] : g.cls.map(c => c.name).join('، '); delete g.cls; });
+    return { s, P, groups: G };
+  };
+  // أوقات الحصة p لمجموعة فصول: [{from, to, txt, label}] — عنصر واحد بلا اسم إن تطابقت الأوقات
+  A.bell.pRanges = (p, cids, sec) => { try {
+    const R = A.bell.pGroups(cids, sec); if (!R) return []; const out = [];
+    R.groups.forEach(g => { const it = g.tl.items.find(x => x.k === 'p' && x.i === p); if (!it) return; const o = out.find(x => x.from === it.from && x.to === it.to); if (o) o.lbl.push(g.label); else out.push({ from: it.from, to: it.to, txt: A.bell.fmt(it.from, R.s) + ' – ' + A.bell.fmt(it.to, R.s), lbl: [g.label] }); });
+    return out.map(x => ({ from: x.from, to: x.to, txt: x.txt, label: out.length > 1 ? x.lbl.filter(Boolean).join(' و') : '' }));
+  } catch (_) { return []; } };
+  // الفسح والصلاة لمجموعة فصول: [{after (رقم آخر حصة قبلها 0-based), label, t, from, to, part}] — part = اسم الفئة إن خصّت بعضها
+  A.bell.pBreaks = (cids, sec) => { try {
+    const R = A.bell.pGroups(cids, sec); if (!R) return []; const out = [], n = R.groups.length;
+    R.groups.forEach(g => { let last = -1; g.tl.items.forEach(x => { if (x.k === 'p') { last = x.i; return; } if (x.k !== 'b' || last < 0) return;
+      const lb = (x.label || 'الفسحة').trim(), o = out.find(y => y.after === last && y.label === lb && y.from === x.from && y.to === x.to);
+      if (o) o.g.push(g.label); else out.push({ after: last, label: lb, from: x.from, to: x.to, t: A.bell.fmt(x.from, R.s) + ' – ' + A.bell.fmt(x.to, R.s), g: [g.label] }); }); });
+    return out.map(b => ({ after: b.after, label: b.label, from: b.from, to: b.to, t: b.t, part: n > 1 && b.g.length < n ? b.g.filter(Boolean).join(' و') : '' }));
+  } catch (_) { return []; } };
+  // نهاية اليوم الدراسي الفعلية (أطول فئة)
+  A.bell.dayEnd = (sec, s) => { const R = A.bell.pGroups(null, sec, s); return R ? Math.max(...R.groups.map(g => g.tl.end)) : null; };
+  A.bell.stageLabel = stgOf;
+  // وقت الحصة في رؤوس الجداول (إن كان الإظهار مفعّلاً في الجدول الساري اليوم) — cid: فصل أو قائمة فصول أو لا شيء (كل الفصول)
+  A.ptime = (p, cid) => { try { const sec = A.section(); if (!sec || !sec.bell || !sec.bell.schedules) return ''; const s = activeSched(bellOf(sec)); if (!s || !s.show) return '';
+    return A.bell.pRanges(p, cid, sec).map(r => `<small class="ptm" dir="rtl">${r.label ? `<em class="ptm-g">${esc(r.label)}</em> ` : ''}${r.txt}</small>`).join(''); } catch (_) { return ''; } };
 
   // ---------- الملصق ----------
   const CLOCK = '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';

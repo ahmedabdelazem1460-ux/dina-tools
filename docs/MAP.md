@@ -8,7 +8,7 @@
 |---|---|---|---|---|---|---|
 | 1 | `tpl_consts.js` | — | 8 | ثوابت قوالب التصدير (TPL) | — | — |
 | 2 | `export.js` | — | 35 | قوالب تصدير الخطة الأسبوعية PDF/Word بهوية المدرسة | — | — |
-| 3 | `api.js` | — | 16 | طبقة البيانات Supabase: list/ins/upd/ups/del/rpc/subscribe | — | — |
+| 3 | `api.js` | — | 18 | طبقة البيانات Supabase: list/ins/upd/ups/del/rpc/subscribe | — | — |
 | 4 | `demo.js` | — | 41 | وضع التجربة ?demo=1: نفس واجهة api في الذاكرة | — | — |
 | 5 | `bellcore.js` | — | 17 | نواة التوقيت الموحّدة DinaBell (المنصة + board.html) | — | — |
 | 6 | `src/core/core.js` | app.js | 105 | الأساس: الحالة S، الدخول، التنقل NAV/route، «خطتي» V.my، لوحة المتابعة V.dash، المساعدات A.* | — | — |
@@ -22,7 +22,7 @@
 | 14 | `src/plan/sheets-sync.js` | app7.js | 20 | مزامنة Google Sheets | classes dash dev weeks | _dashReq pullFromSheet syncLabel |
 | 15 | `src/core/sidebar-appearance.js` | app8.js | 17 | القائمة الجانبية، المظهر، من يعمل الآن | — | uiSettings |
 | 16 | `src/core/notifications.js` | — | 40 | الإشعارات: الجرس، إذن الجهاز، التنبيهات العامة والمجدولة، التفضيلات وتحكم المالك، مركز الإشعارات V.notify، التثبيت كتطبيق | notify | NOTIF_KINDS appDialog notice noticeMsgBox notifIssue notifMarkRead notifPanel tfeat |
-| 17 | `src/plan/parent-posts.js` | app9.js | 12 | إعلانات أولياء الأمور | posts | POST_KINDS |
+| 17 | `src/plan/parent-posts.js` | app9.js | 16 | إعلانات أولياء الأمور | posts | POST_KINDS shrinkPosts |
 | 18 | `pitems.js` | — | 22 | عرض بنود أولياء الأمور DinaItems (مشترك مع parents.html و family.html): فئات، أسئلة تفاعلية بإظهار الإجابة، ملفات وصور وفيديو وروابط واختبارات، طباعة/PDF | — | — |
 | 19 | `src/plan/parent-items.js` | — | 49 | بنود أولياء الأمور V.pitems (مراجعات، أسئلة من البنك، ملفات، صور، روابط، فيديو، اختبارات، مصادر، نصوص) بمحرر ومعاينة حية واعتماد وطباعة وExcel، الإعدادات والفئات ونافذة الأسابيع لأولياء الأمور (للمالك)، ومعاينة صفحة «خطط أبنائي» V.pview — مفتاح pitems ومنحة pitems (sql/110) | pitems pview | — |
 | 20 | `src/core/resources-analysis-roles.js` | app10.js | 30 | المصادر (قديم)، تحليل النتائج، المسميات والصلاحيات V.roles وإظهار البنود features | analysis resources roles | fetchResources hasModule pickResource |

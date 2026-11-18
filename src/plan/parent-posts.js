@@ -35,17 +35,57 @@
     const f = A.LS.get('ppf') || 'now';
     const shown = list.filter(p => f === 'all' || (f === 'now' ? status(p)[0] === 'ظاهر الآن' : f === 'sch' ? status(p)[0] === 'مجدول' : ['منتهٍ', 'متوقف'].includes(status(p)[0])));
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>إعلانات أولياء الأمور</h2><p class="sub" style="margin:2px 0 0">تظهر في صفحة أولياء الأمور أعلى خطة الأبناء: إعلانات، تذكيرات، نصائح، احتفالات ومناسبات — بنص أو صورة أو تصميم جاهز، لكل المدرسة أو قسم أو فصول محددة، ولمدة تحددها.</p></div>
-      <button class="btn" id="ppN">${I.plus} إعلان جديد</button></div>
+      ${S.me.is_owner ? '<button class="btn ghost" id="ppZ" title="ضغط الصور وتوفير استهلاك التخزين">⚡ تحسين الصور</button> ' : ''}<button class="btn" id="ppN">${I.plus} إعلان جديد</button></div>
       <div class="tabs" id="ppF">${[['now', 'ظاهرة الآن'], ['sch', 'مجدولة'], ['old', 'منتهية ومتوقفة'], ['all', 'الكل']].map(([k, l]) => `<button data-f="${k}" class="${f === k ? 'on' : ''}">${l}</button>`).join('')}</div>
       <div class="pp-grid">${shown.map(card).join('') || `<div style="grid-column:1/-1">${A.emptyBox('لا توجد إعلانات هنا', 'أضف أول إعلان لأولياء الأمور من «إعلان جديد».')}</div>`}</div></div>`;
     $$('#ppF button', root).forEach(b => b.onclick = () => { A.LS.set('ppf', b.dataset.f); V.posts(root); });
     $('#ppN', root).onclick = () => editor(null, () => V.posts(root));
+    const z = $('#ppZ', root); if (z) z.onclick = () => mediaDialog(list, () => V.posts(root));
     $$('[data-pe]', root).forEach(b => b.onclick = () => editor(list.find(p => p.id === b.dataset.pe), () => V.posts(root)));
     $$('[data-pc]', root).forEach(b => b.onclick = () => { const p = list.find(x => x.id === b.dataset.pc); editor({ ...p, id: null, title: p.title + ' (نسخة)', starts_on: today(), ends_on: null }, () => V.posts(root)); });
     $$('[data-pt]', root).forEach(b => b.onclick = () => A.run(b, async () => { const p = list.find(x => x.id === b.dataset.pt); await api.updatePost(p.id, { active: !p.active }); V.posts(root); }));
     $$('[data-pp]', root).forEach(b => b.onclick = () => A.run(b, async () => { const p = list.find(x => x.id === b.dataset.pp); await api.updatePost(p.id, { pinned: !p.pinned }); V.posts(root); }));
     $$('[data-pd]', root).forEach(b => b.onclick = () => A.run(b, async () => { if (!(await A.confirmBox('حذف هذا الإعلان نهائياً؟', 'حذف', true))) return; await api.deletePost(b.dataset.pd); V.posts(root); A.toast('حُذف الإعلان', 'ok'); }));
   };
+  // ---- تحسين الصور (للمالك): ضغط صور الإعلانات المرفوعة سابقاً + إعدادات الضغط عند الرفع
+  const isBig = u => /\/storage\/v1\/object\/public\/plan-assets\/[^?]+\.(png|jpe?g|bmp)$/i.test(u || '');
+  async function shrinkPosts(list) {
+    let done = 0, saved = 0;
+    for (const p of list.filter(x => isBig(x.image_url))) {
+      const r = await fetch(p.image_url); if (!r.ok) continue;
+      const b = await r.blob(); const f0 = new File([b], p.image_url.split('/').pop(), { type: b.type || 'image/png' });
+      const f1 = await window.DinaShrink(f0, { min: 1 }); if (f1 === f0) continue;
+      const url = await api.uploadAsset(f1, { keep: true });
+      await api.updatePost(p.id, { image_url: url }); p.image_url = url; done++; saved += f0.size - f1.size;
+    }
+    return { done, saved };
+  }
+  A.shrinkPosts = shrinkPosts;
+  function mediaDialog(list, after) {
+    const st = S.school.settings || {}, m = st.media || {};
+    const big = list.filter(p => isBig(p.image_url)).length;
+    const md = A.modal(`<h3>⚡ تحسين الصور</h3>
+      <p class="small muted">الصور الكبيرة تُحمَّل في كل زيارة لولي الأمر وتستهلك حصة التخزين. عند التفعيل تُصغَّر كل صورة تُرفع في المنصة وتُحوَّل إلى WebP قبل رفعها (تبقى واضحة للعرض والطباعة).</p>
+      <label class="chk"><input type="checkbox" id="mzOn" ${m.on !== false ? 'checked' : ''}> ضغط الصور تلقائياً عند الرفع</label>
+      <div class="grid g2"><div class="field"><label for="mzMax">أقصى عرض/ارتفاع (بكسل)</label><select class="in" id="mzMax">${[1024, 1280, 1600, 2048, 2560].map(v => `<option value="${v}" ${(+m.max || 1600) === v ? 'selected' : ''}>${AR(v)}</option>`).join('')}</select></div>
+      <div class="field"><label for="mzQ">الجودة</label><select class="in" id="mzQ">${[[0.7, 'اقتصادية'], [0.82, 'متوازنة (موصى بها)'], [0.9, 'عالية']].map(([v, l]) => `<option value="${v}" ${(+m.q || 0.82) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div></div>
+      <div class="acts"><button class="btn" id="mzSave">حفظ الإعدادات</button>
+      <button class="btn ghost" id="mzRun" ${big ? '' : 'disabled'}>ضغط صور الإعلانات الحالية (${AR(big)})</button></div>`);
+    const read = () => ({ on: md.el.querySelector('#mzOn').checked, max: +md.el.querySelector('#mzMax').value, q: +md.el.querySelector('#mzQ').value });
+    const save = async () => { const ns = { ...(S.school.settings || {}), media: read() }; const r = await api.updateSchool(S.school.id, { settings: ns }); S.school.settings = (r && r.settings) || ns; };
+    md.el.querySelector('#mzSave').onclick = e => A.run(e.currentTarget, async () => { await save(); A.toast('حُفظت إعدادات الصور', 'ok'); });
+    md.el.querySelector('#mzRun').onclick = e => A.run(e.currentTarget, async () => {
+      await save(); const r = await shrinkPosts(list);
+      md.close(); after && after(); A.toast(r.done ? `ضُغطت ${AR(r.done)} صورة — وُفّر ${AR(Math.round(r.saved / 1024))} ك.ب في كل زيارة` : 'لا توجد صور تحتاج ضغطاً', 'ok');
+    });
+  }
+  // مرة واحدة لكل جهاز للمالك: ضغط صور الإعلانات الكبيرة القائمة تلقائياً
+  (function autoOnce(n) {
+    if (n > 40) return; const ok = S && S.me && S.school;
+    if (!ok) return setTimeout(() => autoOnce(n + 1), 3000);
+    if (!S.me.is_owner || api.demo || A.LS.get('media_fix1')) return;
+    api.posts().then(l => shrinkPosts(l)).then(r => { A.LS.set('media_fix1', 1); if (r.done) A.toast(`⚡ ضُغطت ${AR(r.done)} من صور إعلانات أولياء الأمور لتوفير استهلاك التخزين`, 'ok'); }).catch(() => { });
+  })(0);
   function card(p) {
     const k = KINDS[p.kind] || KINDS.announcement; const [stl, stc] = status(p);
     return `<div class="pp ${p.active ? '' : 'off'}">${p.image_url ? `<img src="${esc(p.image_url)}" alt="${esc(p.title)}" loading="lazy">` : ''}
@@ -73,7 +113,7 @@
     let kind = p.kind, au = aud, img = p.image_url;
     $$('#pk button', m.el).forEach(b => b.onclick = () => { kind = b.dataset.k; $$('#pk button', m.el).forEach(x => x.classList.toggle('on', x === b)); });
     $$('#pa button', m.el).forEach(b => b.onclick = () => { au = b.dataset.a; $$('#pa button', m.el).forEach(x => x.classList.toggle('on', x === b)); m.el.querySelector('#paS').classList.toggle('hidden', au !== 'section'); m.el.querySelector('#paC').classList.toggle('hidden', au !== 'classes'); });
-    m.el.querySelector('#pF').onchange = e => A.run(null, async () => { const f = e.target.files[0]; if (!f) return; if (f.size > 3e6) throw new Error('الصورة أكبر من ٣ ميجابايت'); m.el.querySelector('#pI span').textContent = 'جارٍ الرفع…'; img = await api.uploadAsset(f); const box = m.el.querySelector('#pI'); let im = box.querySelector('img'); if (!im) { im = document.createElement('img'); box.prepend(im); } im.src = img; m.el.querySelector('#pI span').textContent = 'اضغط لتغيير الصورة'; });
+    m.el.querySelector('#pF').onchange = e => A.run(null, async () => { const f = e.target.files[0]; if (!f) return; if (f.size > 15e6) throw new Error('الصورة أكبر من ١٥ ميجابايت'); m.el.querySelector('#pI span').textContent = 'جارٍ الرفع…'; img = await api.uploadAsset(f); const box = m.el.querySelector('#pI'); let im = box.querySelector('img'); if (!im) { im = document.createElement('img'); box.prepend(im); } im.src = img; m.el.querySelector('#pI span').textContent = 'اضغط لتغيير الصورة'; });
     const ix = m.el.querySelector('#pIx'); if (ix) ix.onclick = () => { img = null; const im = m.el.querySelector('#pI img'); if (im) im.remove(); ix.remove(); };
     m.el.querySelector('#pGo').onclick = e => A.run(e.currentTarget, async () => {
       const title = m.el.querySelector('#pT').value.trim(); if (!title) throw new Error('اكتب عنوان الإعلان');

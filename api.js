@@ -11,6 +11,29 @@
     if (/JWT expired/i.test(m)) return 'انتهت الجلسة — سجّل الدخول من جديد';
     return m;
   }
+  // ---- ضغط الصور قبل الرفع: الإعدادات من schools.settings.media {on, max, q}
+  function mediaCfg(o) {
+    let m = {}; try { m = ((window.APP && APP.S && APP.S.school && APP.S.school.settings) || {}).media || {}; } catch (_) { }
+    return { on: o.on != null ? o.on : m.on !== false, max: +(o.max || m.max) || 1600, q: +(o.q || m.q) || 0.82, min: +(o.min || m.min) || 150000 };
+  }
+  async function shrinkImage(file, o = {}) {
+    const c = mediaCfg(o);
+    if (!c.on || !file || !/^image\/(png|jpe?g|webp|bmp)$/i.test(file.type || '')) return file;
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+      const w0 = img.naturalWidth, h0 = img.naturalHeight; if (!w0 || !h0) return file;
+      const k = Math.min(1, c.max / Math.max(w0, h0));
+      if (k === 1 && file.size <= c.min) return file;
+      const w = Math.round(w0 * k), h = Math.round(h0 * k);
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      const g = cv.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(img, 0, 0, w, h);
+      const blob = await new Promise(r => cv.toBlob(r, 'image/webp', c.q));
+      if (!blob || blob.type !== 'image/webp' || blob.size >= file.size) return file;
+      return new File([blob], (file.name || 'img').replace(/\.[^.]+$/, '') + '.webp', { type: 'image/webp' });
+    } finally { URL.revokeObjectURL(url); }
+  }
+  window.DinaShrink = shrinkImage;
   function make(cfg) {
     const sb = supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey, { auth: { persistSession: true, autoRefreshToken: true } });
     const ok = r => { if (r.error) throw new Error(msg(r.error)); return r.data; };
@@ -143,10 +166,13 @@
       },
       auditRange: (sinceIso, lim = 3000) => T('audit_log').select('*').gte('at', sinceIso).order('at', { ascending: false }).limit(lim).then(ok),
       // ---- ملفات وصور
-      async uploadAsset(file) {
+      // الصور تُضغط قبل الرفع (توفير استهلاك Supabase) — o.keep لرفع الأصل كما هو
+      async uploadAsset(file, o = {}) {
+        if (!o.keep) { try { file = await shrinkImage(file, o); } catch (_) { } }
         const ext = (file.name.split('.').pop() || 'png').toLowerCase();
         const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-        ok(await sb.storage.from('plan-assets').upload(path, file, { contentType: file.type, upsert: false }));
+        // أسماء الملفات فريدة لا تتغير ← تخزين طويل في المتصفح فلا يُعاد تنزيلها
+        ok(await sb.storage.from('plan-assets').upload(path, file, { contentType: file.type, upsert: false, cacheControl: '31536000' }));
         return sb.storage.from('plan-assets').getPublicUrl(path).data.publicUrl;
       },
       joinWithCode2: (code, f) => sb.rpc('join_with_code_v2', { p_code: code, p_full_name: f.name, p_email: f.email, p_password: f.password, p_phone: f.phone || null, p_specialty: f.specialty || null, p_employee_no: f.employee_no || null }).then(ok),

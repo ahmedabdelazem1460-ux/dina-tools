@@ -13,7 +13,7 @@
 | 5 | `bellcore.js` | — | 17 | نواة التوقيت الموحّدة DinaBell (المنصة + board.html) | — | — |
 | 6 | `src/core/core.js` | app.js | 105 | الأساس: الحالة S، الدخول، التنقل NAV/route، «خطتي» V.my، لوحة المتابعة V.dash، المساعدات A.* | — | — |
 | 7 | `src/core/order.js` | — | 2 | ترتيب منطقي موحّد للمراحل والصفوف والفصول والمواد: A.cmpCls / A.cmpSubj / A.cmpEntrySG (عرض فقط) | — | clsRank cmpCls cmpEntrySG cmpSubj gradeOrd stageIdx subjRank |
-| 8 | `src/plan/export-timetable-weeks-admin.js` | app2.js | 112 | التصدير، الجدول الدراسي، الأسابيع، الإدارة | admin export timetable weeks | _ttLoadRefresh _ttReqRefresh slotDialog verName verWhen |
+| 8 | `src/plan/export-timetable-weeks-admin.js` | app2.js | 113 | التصدير، الجدول الدراسي، الأسابيع، الإدارة | admin export timetable weeks | _ttLoadRefresh _ttReqRefresh slotDialog verName verWhen |
 | 9 | `src/core/tools-dev.js` | app3.js | 18 | أداتا النصاب والجدول الآلي داخل المنصة + لوحة المطوّر | builder dev nisab | — |
 | 10 | `src/plan/extra-pages-join.js` | app4.js | 23 | الصفحات الإضافية في الخطة + روابط انضمام المعلمين | — | — |
 | 11 | `lang.js` | — | 25 | التدقيق اللغوي للخطة | — | — |
@@ -26,7 +26,7 @@
 | 18 | `pitems.js` | — | 22 | عرض بنود أولياء الأمور DinaItems (مشترك مع parents.html و family.html): فئات، أسئلة تفاعلية بإظهار الإجابة، ملفات وصور وفيديو وروابط واختبارات، طباعة/PDF | — | — |
 | 19 | `src/plan/parent-items.js` | — | 49 | بنود أولياء الأمور V.pitems (مراجعات، أسئلة من البنك، ملفات، صور، روابط، فيديو، اختبارات، مصادر، نصوص) بمحرر ومعاينة حية واعتماد وطباعة وExcel، الإعدادات والفئات ونافذة الأسابيع لأولياء الأمور (للمالك)، ومعاينة صفحة «خطط أبنائي» V.pview — مفتاح pitems ومنحة pitems (sql/110) | pitems pview | — |
 | 20 | `src/core/resources-analysis-roles.js` | app10.js | 30 | المصادر (قديم)، تحليل النتائج، المسميات والصلاحيات V.roles وإظهار البنود features | analysis resources roles | fetchResources hasModule pickResource |
-| 21 | `src/attendance/attendance-behavior-supervision.js` | app11.js | 62 | الحضور والغياب والسلوك V.attendance + الإشراف التربوي V.supervision | attendance myreports supervision | _attRefresh attWho |
+| 21 | `src/attendance/attendance-behavior-supervision.js` | app11.js | 63 | الحضور والغياب والسلوك V.attendance + الإشراف التربوي V.supervision | attendance myreports supervision | _attRefresh attWho |
 | 22 | `src/assess/assess.js` | app12.js | 105 | الاختبارات V.assess: المنهج، بنك الأسئلة، المواصفات، التكليفات الإلكترونية، النتائج — يصدّر A._assess | assess | _assess _liveRes assessMode canAssess |
 | 23 | `src/core/drive-folders.js` | app13.js | 5 | مجلدات Google Drive لكل معلم | roles | driveDialog |
 | 24 | `src/assess/records.js` | app14.js | 10 | سجل المتابعة (سجلات برو) داخل المنصة | records | — |
@@ -50,7 +50,7 @@
 | 42 | `src/attendance/period-attendance.js` | app30.js | 27 | حضور الحصص (معلم الحصة) | — | _paLive attEntryOf attLive attPassed attPeriods attTimes curBreaks curPeriod myPeriodAtt takePeriod |
 | 43 | `src/plan/calendar.js` | app31.js | 12 | التقويم الدراسي المرن داخل الأسابيع | weeks | _calInfer _calPlan |
 | 44 | `src/core/trash.js` | app32.js | 6 | سلة المحذوفات V.trash | trash | confirmBox |
-| 45 | `src/schedule/standby.js` | app33.js | 60 | حصص الانتظار وتأمين الحصص V.standby | standby | sbCan |
+| 45 | `src/schedule/standby.js` | app33.js | 71 | حصص الانتظار وتأمين الحصص V.standby | standby | sbCan |
 | 46 | `src/schedule/daily-board.js` | app34.js | 24 | اللوحة اليومية V.board + رابط الشاشة board.html | board | — |
 | 47 | `src/plan/prep.js` | app35.js | 33 | تحضير الدروس V.prep | prep | prepEditor prepGen |
 | 48 | `src/assess/smart-bank.js` | app36.js | 28 | بنك الأسئلة الذكي: بلوم، كشف التكرار، توليد من نص | — | bankSmart bloomOf dupOf genFromText qGenText smartQuiz |
@@ -102,4 +102,5 @@
 | 94 | `src/core/owner-text.js` | — | 1 | إخفاء عبارات المالك عن غيره: تنقية A.emptyBox و A.toast لغير المالك (A.ownerClean) | — | emptyBox ownerClean toast |
 | 95 | `src/core/search.js` | — | 20 | البحث الشامل لكل الحسابات (Ctrl+K) ضمن الصلاحيات | — | globalSearch |
 | 96 | `src/core/staff-work.js` | — | 20 | متابعة الموظفين وأعمالهم V.staffwork (للمالك) | staffwork | — |
-| 97 | `src/core/ui-pro.js` | — | 27 | الواجهة الاحترافية: السمات (كلاسيكي/عمق ثلاثي الأبعاد/زجاجي/زخارف دينا) وأيقونات القائمة التفاعلية، لوحة المعلم home2 (الأسبوع أعلى الصفحة + أيقونات)، أيقونات الإشعارات ونوع new، «ما الجديد»، A.announceNew عند تفعيل ميزة — يجب أن تبقى آخر وحدة (تغلّف V.my) | — | THEMES announceNew applyTheme |
+| 97 | `src/core/people-merge.js` | — | 15 | دمج الحسابات المكررة وحذف الموظفين/الطلاب بأمان (للمالك) A.peopleDups A.peopleRemove — sql/111b | — | peopleDups peopleRemove |
+| 98 | `src/core/ui-pro.js` | — | 27 | الواجهة الاحترافية: السمات (كلاسيكي/عمق ثلاثي الأبعاد/زجاجي/زخارف دينا) وأيقونات القائمة التفاعلية، لوحة المعلم home2 (الأسبوع أعلى الصفحة + أيقونات)، أيقونات الإشعارات ونوع new، «ما الجديد»، A.announceNew عند تفعيل ميزة — يجب أن تبقى آخر وحدة (تغلّف V.my) | — | THEMES announceNew applyTheme |

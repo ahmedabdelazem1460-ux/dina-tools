@@ -4,7 +4,7 @@
 (function () {
   const A = window.APP, V = window.VIEWS, { S, api, $, $$, esc, AR, I, DAYS } = A;
   A.I.studio = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11M15 9v11"/><circle cx="18" cy="4" r="2.4" fill="currentColor"/></svg>';
-  const TABS = [['bell', 'اليوم الدراسي والجدول الزمني', ''], ['nisab', 'النصاب', '١'], ['plan', 'التوزيع والقيود والتوليد', '٢'], ['timetable', 'الجدول المعتمد', '٣'], ['ttviews', 'عرض الجداول والإسنادات', ''], ['conflicts', 'تعارضات الأقسام', '٤'], ['ttdesign', 'تصميم الجداول وتصديرها', ''], ['live', 'جدول استثنائي للعرض', ''], ['standby', 'حصص الانتظار وتأمين الحصص', ''], ['builder', 'الأداة الكلاسيكية', '']];
+  const TABS = [['term2', 'إكمال جداول الفصل الثاني', ''], ['bell', 'اليوم الدراسي والجدول الزمني', ''], ['nisab', 'النصاب', '١'], ['plan', 'التوزيع والقيود والتوليد', '٢'], ['timetable', 'الجدول المعتمد', '٣'], ['ttviews', 'عرض الجداول والإسنادات', ''], ['conflicts', 'تعارضات الأقسام', '٤'], ['ttdesign', 'تصميم الجداول وتصديرها', ''], ['live', 'جدول استثنائي للعرض', ''], ['standby', 'حصص الانتظار وتأمين الحصص', ''], ['builder', 'الأداة الكلاسيكية', '']];
   const GW = ['أول', 'ثاني', 'ثالث', 'رابع', 'خامس', 'سادس'];
   const gIdx = c => { const g = String(c.grade_word || c.name || ''); return GW.findIndex(w => g.includes(w)); };
   const stg = c => { const s = String(c.stage || '') + ' ' + c.name; return /ابتدائ/.test(s) ? 'p' : /متوسط/.test(s) ? 'm' : /ثانوي/.test(s) ? 's' : ''; };
@@ -16,13 +16,14 @@
     root.innerHTML = `<div class="card st-head"><div class="head"><div class="grow"><h2>استوديو الجداول والأنصبة</h2><p class="sub" style="margin:2px 0 0">من النصاب إلى الجدول المعتمد في مكان واحد. لكل قسم جدوله الخاص، ويُكشف تعارض المعلم المشترك بين الأقسام تلقائياً. الأقسام تُضاف من «الإدارة ← المدرسة والأقسام».</p></div></div>
         <div class="st-secs" role="group" aria-label="القسم">${S.sections.map(s => `<button data-sec="${s.id}" class="${s.id === S.sectionId ? 'on' : ''}" aria-pressed="${s.id === S.sectionId}">${esc(s.name)}</button>`).join('')}</div>
         <ol class="st-steps">${TABS.map(([k, l, n]) => `<li><button data-t="${k}" class="${t === k ? 'on' : ''} ${n ? '' : 'aux'}" aria-current="${t === k ? 'step' : 'false'}">${n ? `<i>${n}</i>` : ''}${l}</button></li>`).join('')}</ol>
-        ${t === 'nisab' || t === 'plan' ? `<div class="st-bridge"><div><b>النصاب ← توزيع الحصص</b><span class="small muted">${ap[S.sectionId] ? `آخر اعتماد لهذا القسم: ${A.fmtDT(ap[S.sectionId])}` : 'لم يُعتمد النصاب لهذا القسم بعد.'} يُنقل عدد حصص كل مادة لكل صف من أداة النصاب إلى فصول «${esc(A.section().name)}» — وتبقى حرّاً في التعديل بعدها.</span></div><button class="btn sky sm" id="stApprove">اعتماد النصاب ونقله إلى التوزيع</button></div>` : ''}</div>
+        ${t === 'nisab' || t === 'plan' ? `<div class="st-bridge"><div><b>النصاب ← توزيع الحصص</b><span class="small muted">${ap[S.sectionId] ? `آخر اعتماد لهذا القسم: ${A.fmtDT(ap[S.sectionId])}` : 'لم يُعتمد النصاب لهذا القسم بعد.'} يُنقل عدد حصص كل مادة لكل صف من أداة النصاب إلى فصول «${esc(A.section().name)}» — وتبقى حرّاً في التعديل بعدها.</span></div><button class="btn sky sm" id="stApprove">نقل النصاب إلى التوزيع (الفصل الأول/الثاني)</button></div>` : ''}</div>
       <div id="stBody"></div>`;
     $$('[data-sec]', root).forEach(b => b.onclick = () => { if (b.dataset.sec === S.sectionId) return; const sel = $('#secSel'); if (sel) { sel.value = b.dataset.sec; sel.dispatchEvent(new Event('change')); } });
     $$('.st-steps [data-t]', root).forEach(b => b.onclick = () => { A.LS.set('studio_t', b.dataset.t); V.studio(root); });
-    const ab = $('#stApprove', root); if (ab) ab.onclick = () => approveNisab(root);
+    const ab = $('#stApprove', root); if (ab) ab.onclick = () => (A.nisabTransfer ? A.nisabTransfer({ root }) : approveNisab(root));
     const body = $('#stBody', root);
     if (t === 'conflicts') return conflicts(body);
+    if (t === 'term2') { if (A.term2View) return A.term2View(body, root); body.innerHTML = `<div class="card">${A.emptyBox('غير متاح')}</div>`; return; }
     const fn = V[t]; if (!fn) { body.innerHTML = `<div class="card">${A.emptyBox('غير متاح')}</div>`; return; }
     try { const r = fn(body); if (r && r.catch) r.catch(e => { body.innerHTML = `<div class="card">${A.emptyBox('تعذّر العرض', esc(e.message))}</div>`; }); } catch (e) { body.innerHTML = `<div class="card">${A.emptyBox('تعذّر العرض', esc(e.message))}</div>`; }
   };

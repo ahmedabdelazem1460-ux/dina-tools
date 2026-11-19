@@ -405,6 +405,7 @@
     return [...new Set(out)];
   }
   A._planState = () => P; A._lastGen = () => lastGen; A._planReload = () => { PSEC = null; P = null; };
+  A._planSave = () => save(true); A._planTab = t => { if (t) tab = t; return tab; }; A._planCap = cap;
   function tGen(box, root) {
     const cls = secClasses().filter(c => rowTot(c.id)); const miss = []; cls.forEach(c => allSubs().forEach(s => { if (H(c.id, s) && !T(c.id, s)) miss.push(1); }));
     const ld = {}; cls.forEach(c => allSubs().forEach(s => { const t = T(c.id, s); if (t) ld[t] = (ld[t] || 0) + H(c.id, s); }));

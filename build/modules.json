@@ -32,6 +32,7 @@
     {"src": "src/core/home.js", "old": "app18.js", "about": "الصفحة الرئيسية V.home"},
     {"src": "src/schedule/studio.js", "old": "app19.js", "about": "استوديو الجداول والأنصبة V.studio (حاوية تبويبات)"},
     {"src": "src/schedule/saved-versions.js", "old": "app20.js", "about": "النسخ المحفوظة والحفظ السحابي للنصاب والتوزيع"},
+    {"src": "src/schedule/term-bridge.js", "about": "ربط أدوات الجداول: نقل النصاب إلى التوزيع بمعالج (الفصل الأول/الثاني، مطابقة الفصول والمواد)، اقتراح المعلمين من إسناد الفصل الأول، استيراد معلمي المنصة للأداة الكلاسيكية، طباعة التوزيع والجداول A4 طولي/عرضي، ودليل إكمال جداول الفصل الثاني"},
     {"src": "src/schedule/bell.js", "old": "app21.js", "about": "اليوم الدراسي والجدول الزمني V.bell + A.bell + التحكم في الجدول المعتمد pin + فحص التوقيت"},
     {"src": "src/schedule/import-timetable.js", "old": "app22.js", "about": "استيراد الجداول الجاهزة (Excel/CSV/PDF من aSc)"},
     {"src": "src/schedule/approve-timetable.js", "old": "app23.js", "about": "اعتماد الجدول مع معاينة الأثر"},

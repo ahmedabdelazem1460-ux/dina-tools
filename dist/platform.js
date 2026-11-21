@@ -6498,6 +6498,339 @@ ${S.me.full_name}`;
 })();
 }catch(e){console.error('[dina] src/assess/records.js',e)}
 
+/* ==== src/schedule/tt-engine.js ==== */
+;try{
+/* منصة دينا — محرك الجداول الموحّد DinaTT (مستقل، بلا APP)
+   يستخدمه «التوزيع والقيود والتوليد» (distribution.js). مبدأه: القيود الإلزامية أولاً ثم تحسين التفضيلية،
+   وكل قيد له مستوى قوة (إلزامي/قوي/مفضّل/متوقف) ووزن ٠–١٠ يحددهما مدير الجدول.
+
+   المدخل X:
+   { D, Pn, cls:[{id,name}], hours:{cid:{sid:n}}, teachers:{cid:{sid:tid}}, locks:{cid:{'d-p':sid}},
+     subj:{sid:{doubles, periods:[p], off:['d-p'], offDays:[d], pref:['d-p'], time:'early|late|mid|avoidFirst|avoidLast', maxDay, room, core}},
+     blocks:{tid:['d-p']}, tlim:{tid:{maxDay,minDay,maxGaps,maxDays,maxConsec,maxLast,first:'avoid|prefer',last:'avoid|prefer',offDays:[d],pref:['d-p'],quota}},
+     classOff:{cid:['d-p']}, cpref:{cid:['d-p']}, reserved:['d-p'], rooms:[{id,name,cap,off:['d-p']}],
+     joint:[{id, sid, classes:[cid], n, subs:{cid:sid}}],   // مشتركة (مادة واحدة) أو متوازية (subs: مادة لكل فصل) في الوقت نفسه
+     maxDay, gapsDef, consecDef, lastDef, rules:{key:{lv,w}}, ext:{tid:{'d-p':'اسم القسم'}},
+     start:{cid:[sid|null]} (جدول سابق يُبدأ منه)، keep:[cid] (فصول تبقى كما في start)، nm:{s(sid),t(tid)} }
+   الواجهة: DinaTT.solve(X, opt) ← Promise(R)، DinaTT.check(R)، R.alts(gi,k)، R.swap(gi,a,b)، R.grid، R.cid، R.cards */
+(function (g) {
+  'use strict';
+  const LV = { h: 100, s: 10, p: 2, o: 0 };
+  const LVN = { h: 'إلزامي', s: 'قوي', p: 'مفضّل', o: 'متوقف' };
+  // [المسمى، المجموعة، المستوى الافتراضي، الوزن الافتراضي، الشرح، قابل للتعديل]
+  const RULES = {
+    tClash: ['عدم تعارض المعلم', 'الإلزامية', 'h', 10, 'لا يُسند للمعلم حصتان في الوقت نفسه (الحصة المشتركة لا تُعد تعارضاً)', 0],
+    room: ['سعة القاعات والمعامل', 'الإلزامية', 'h', 10, 'لا يزيد عدد الفصول في القاعة/المعمل عن سعتها، ولا تُستخدم في أوقات إغلاقها', 1],
+    tBlock: ['أوقات عدم إتاحة المعلم وأيام إجازته', 'الإلزامية', 'h', 10, 'لا حصص للمعلم في الأوقات المحجوبة أو أيام إجازته', 1],
+    ext: ['المعلم المشترك بين الأقسام', 'الإلزامية', 'h', 10, 'مراعاة حصص المعلم في الأقسام والمراحل الأخرى (من جداولها المعتمدة)', 1],
+    sOff: ['الأوقات الممنوعة للمادة', 'الإلزامية', 'h', 10, 'الحصص المسموح بها للمادة وأوقاتها وأيامها الممنوعة', 1],
+    cOff: ['الأوقات المغلقة للفصل والمحجوزة', 'الإلزامية', 'h', 10, 'خارج الدوام، نشاط، خروج مبكر، أو خانة محجوزة لكل الفصول', 0],
+    dbl: ['الحصص المزدوجة', 'الإلزامية', 'h', 10, 'حصتان متتاليتان في اليوم نفسه للمواد المحددة', 0],
+    tMaxDay: ['أقصى حصص المعلم يومياً', 'المعلم', 's', 6, 'الحد الأعلى لحصص المعلم في اليوم الواحد', 1],
+    tDays: ['أقصى أيام عمل المعلم', 'المعلم', 's', 6, 'جمع حصص المعلم في عدد أيام محدد', 1],
+    tConsec: ['عدم تكديس الحصص المتتالية', 'المعلم', 's', 5, 'ألا يُدرّس المعلم أكثر من الحد متتالياً', 1],
+    tGaps: ['تقليل فراغات المعلم', 'المعلم', 'p', 5, 'تقليل الفترات الفارغة بين حصص المعلم في اليوم', 1],
+    tMinDay: ['أدنى حصص المعلم في يوم عمله', 'المعلم', 'p', 3, 'ألا يأتي المعلم ليوم بحصة واحدة', 1],
+    tEdge: ['رغبات المعلم في الحصة الأولى والأخيرة', 'المعلم', 'p', 4, 'تجنّب أو تفضيل الحصص الأولى والأخيرة لكل معلم', 1],
+    tLast: ['عدالة الحصص الأخيرة', 'المعلم', 'p', 3, 'ألا تزيد الحصص الأخيرة للمعلم أسبوعياً عن الحد', 1],
+    fTeach: ['توزيع المعلم على أيام الأسبوع', 'المعلم', 'p', 2, 'تقارب عدد حصص المعلم بين أيام عمله', 1],
+    pref: ['الأوقات المفضّلة (معلم/مادة/فصل)', 'التوقيت', 'p', 4, 'وضع الحصص في الأوقات المفضّلة قدر الإمكان', 1],
+    time: ['توقيت المادة والحصص العملية', 'التوقيت', 'p', 4, 'أول اليوم، آخره، وسطه، أو تجنّب الأولى/الأخيرة', 1],
+    core: ['المواد الأساسية في النصف الأول', 'التوقيت', 'p', 4, 'الرياضيات والعلوم واللغة العربية… في الحصص الأولى', 1],
+    emptyLast: ['الحصص الفارغة في آخر اليوم', 'التوقيت', 's', 6, 'لا فراغ في وسط يوم الفصل', 1],
+    sMax: ['عدم تكرار المادة في اليوم', 'توزيع المواد', 's', 6, 'أقصى عدد حصص للمادة في اليوم الواحد', 1],
+    fSubj: ['توزيع المادة على أيام مختلفة', 'توزيع المواد', 's', 5, 'نشر حصص المادة على أكبر عدد من الأيام', 1],
+    fGap: ['التوزيع المتباعد', 'توزيع المواد', 'p', 3, 'تجنّب أيام متتالية للمادة قليلة الحصص', 1],
+    adj: ['تجنّب حصتين متتاليتين للمادة', 'توزيع المواد', 'p', 3, 'إلا المزدوجة', 1],
+    fCls: ['التوازن اليومي للفصل', 'توزيع المواد', 'p', 3, 'تقارب عدد حصص الفصل بين الأيام', 1]
+  };
+  const CLS_R = ['sOff', 'cOff', 'sMax', 'fSubj', 'fGap', 'adj', 'time', 'core', 'pref', 'fCls', 'emptyLast'];
+  const TCH_R = ['tClash', 'tBlock', 'ext', 'tMaxDay', 'tMinDay', 'tGaps', 'tDays', 'tConsec', 'tEdge', 'tLast', 'pref', 'fTeach'];
+  const PRESETS = {
+    balanced: ['متوازن (افتراضي)', {}],
+    strict: ['صارم: كل قيود المعلم إلزامية', { tMaxDay: { lv: 'h' }, tDays: { lv: 'h' }, tConsec: { lv: 'h' }, sMax: { lv: 'h' }, tGaps: { lv: 's' } }],
+    teacher: ['راحة المعلم أولاً', { tGaps: { lv: 's', w: 8 }, tConsec: { lv: 's', w: 8 }, tEdge: { lv: 's', w: 7 }, tMinDay: { lv: 's', w: 5 }, fTeach: { lv: 'p', w: 5 } }],
+    student: ['مصلحة الطالب أولاً', { core: { lv: 's', w: 8 }, fSubj: { lv: 's', w: 8 }, sMax: { lv: 'h' }, fGap: { lv: 's', w: 5 }, adj: { lv: 's', w: 5 }, time: { lv: 's', w: 6 } }],
+    loose: ['مرن: أسرع توليد بأقل القيود', { tGaps: { lv: 'o' }, tMinDay: { lv: 'o' }, tEdge: { lv: 'o' }, fGap: { lv: 'o' }, fTeach: { lv: 'o' }, fCls: { lv: 'o' }, core: { lv: 'o' } }]
+  };
+  const ruleCfg = (X, k) => { const d = RULES[k], u = (X.rules || {})[k] || {}; const lv = d[5] && u.lv && LV[u.lv] !== undefined ? u.lv : d[2]; const w = d[5] && u.w !== undefined && u.w !== '' ? Math.max(0, Math.min(10, +u.w)) : d[3]; return { lv, w }; };
+  const weights = X => { const W = {}; Object.keys(RULES).forEach(k => { const c = ruleCfg(X, k); W[k] = LV[c.lv] * c.w / 5; }); W.tClash = Math.max(W.tClash, 100); return W; };
+  const isHard = (X, k) => k === 'tClash' || ruleCfg(X, k).lv === 'h';
+  const set = a => new Set(a || []);
+  const num = v => v === '' || v === undefined || v === null || isNaN(+v) ? null : +v;
+
+  function Model(X) {
+    const D = X.D, Pn = X.Pn, N = D * Pn, cls = X.cls, W = weights(X), self = this;
+    const ci = Object.fromEntries(cls.map((c, i) => [c.id, i]));
+    const nm = X.nm || {}, sN = s => (nm.s ? nm.s(s) : s), tN = t => (nm.t ? nm.t(t) : t);
+    const S = X.subj || {}, TL = X.tlim || {};
+    const reserved = set(X.reserved);
+    const coff = cls.map(c => { const s = set((X.classOff || {})[c.id]); reserved.forEach(k => s.add(k)); return s; });
+    const cpref = cls.map(c => set((X.cpref || {})[c.id]));
+    const rooms = Object.fromEntries((X.rooms || []).map(r => [r.id, { cap: Math.max(1, +r.cap || 1), off: set(r.off), name: r.name }]));
+    // ---- البطاقات ----
+    const cards = []; const jcards = {};
+    const jointOf = {}; (X.joint || []).forEach(j => j.classes.forEach(c => { const sid = (j.subs && j.subs[c]) || j.sid; jointOf[c + '|' + sid] = j; }));
+    const tOf = (gi, s) => s ? (((X.teachers || {})[cls[gi].id] || {})[s] || '') : '';
+    cls.forEach((c, gi) => Object.entries((X.hours || {})[c.id] || {}).forEach(([s, h0]) => {
+      let h = +h0 || 0; if (!h) return; const j = jointOf[c.id + '|' + s];
+      const jn = j ? Math.min(h, j.n ? +j.n : h) : 0; const dbl = Math.min(+((S[s] || {}).doubles) || 0, Math.floor(h / 2));
+      let jd = 0, js = 0, left = jn;
+      for (let k = 0; k < dbl; k++) { const jk = j && left >= 2 ? j.id + ':d' + (jd++) : null; if (jk) left -= 2; cards.push({ gi, sid: s, len: 2, j: jk }); h -= 2; }
+      for (let k = 0; k < h; k++) { const jk = j && left >= 1 ? j.id + ':s' + (js++) : null; if (jk) left--; cards.push({ gi, sid: s, len: 1, j: jk }); }
+    }));
+    const prepCard = (cd, i) => { cd.id = i; cd.t = tOf(cd.gi, cd.sid); cd.room = rooms[(S[cd.sid] || {}).room] ? S[cd.sid].room : ''; cd.unit = cd.j || ('c' + cd.gi); };
+    cards.forEach(prepCard);
+    const rebuildJ = () => { Object.keys(jcards).forEach(k => delete jcards[k]); cards.forEach(cd => { if (cd.j) (jcards[cd.j] = jcards[cd.j] || []).push(cd.id); }); Object.entries(jcards).forEach(([k, l]) => { if (l.length < 2) { l.forEach(i => { cards[i].j = null; cards[i].unit = 'c' + cards[i].gi; }); delete jcards[k]; } }); };
+    rebuildJ();
+    const tids = [...new Set(cards.map(c => c.t).filter(Boolean))];
+    const TI = {}; tids.forEach(t => {
+      const l = TL[t] || {}, b = set((X.blocks || {})[t]); (l.offDays || []).forEach(d => { for (let p = 0; p < Pn; p++) b.add(d + '-' + p); });
+      TI[t] = { b, ext: (X.ext || {})[t] || {}, pref: set(l.pref), maxDay: num(l.maxDay), minDay: num(l.minDay), maxGaps: num(l.maxGaps) ?? num(X.gapsDef) ?? 1, maxDays: num(l.maxDays), maxConsec: num(l.maxConsec) ?? num(X.consecDef) ?? 4, maxLast: num(l.maxLast) ?? num(X.lastDef), first: l.first || '', last: l.last || '' };
+    });
+    const SI = {}; Object.keys(Object.assign({}, ...cls.map(c => (X.hours || {})[c.id] || {}))).forEach(s => {
+      const c = S[s] || {}, off = set(c.off); (c.offDays || []).forEach(d => { for (let p = 0; p < Pn; p++) off.add(d + '-' + p); });
+      const al = c.periods && c.periods.length ? set(c.periods.map(Number)) : null;
+      SI[s] = { off, al, pref: set(c.pref), time: c.time || '', core: !!c.core, maxDay: num(c.maxDay) ?? num(X.maxDay) ?? 2 };
+    });
+    // ---- الحالة ----
+    const G = cls.map(() => new Array(N).fill(-1)), FIX = cls.map((c, gi) => Array.from({ length: N }, (_, k) => coff[gi].has(Math.floor(k / Pn) + '-' + (k % Pn))));
+    const pos = new Array(cards.length).fill(-1);
+    const occT = {}; tids.forEach(t => occT[t] = Array.from({ length: N }, () => new Map()));
+    const occR = {}; Object.keys(rooms).forEach(r => occR[r] = Array.from({ length: N }, () => new Map()));
+    const inc = (m, u, d) => { const v = (m.get(u) || 0) + d; if (v > 0) m.set(u, v); else m.delete(u); };
+    const occ = (i, d) => { const cd = cards[i], p = pos[i]; if (p < 0) return; for (let q = 0; q < cd.len; q++) { if (cd.t) inc(occT[cd.t][p + q], cd.unit, d); if (cd.room) inc(occR[cd.room][p + q], cd.unit, d); } };
+    const putCard = (i, k) => { const cd = cards[i]; for (let q = 0; q < cd.len; q++) G[cd.gi][k + q] = i; pos[i] = k; occ(i, 1); };
+    const takeCard = i => { const cd = cards[i]; occ(i, -1); for (let q = 0; q < cd.len; q++) G[cd.gi][pos[i] + q] = -1; pos[i] = -1; };
+    // ---- التكاليف ----
+    const DAYS = nm.days || ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'], dn = d => DAYS[d] || ('يوم ' + (d + 1)), dp = (d, p) => dn(d) + ' الحصة ' + (p + 1);
+    function classEval(gi, cnt) {
+      const row = G[gi]; let c = 0; const add = (k, n, msg) => { if (!n) return; c += W[k] * n; if (cnt) { (cnt[k] = cnt[k] || []).push([n, msg]); } };
+      const sess = {}, dayN = new Array(D).fill(0);
+      for (let k = 0; k < N; k++) {
+        const id = row[k], d = Math.floor(k / Pn), p = k % Pn, dk = d + '-' + p;
+        if (id < 0) { if (W.emptyLast && !coff[gi].has(dk)) { for (let q = k + 1; q < (d + 1) * Pn; q++) if (row[q] >= 0) { add('emptyLast', 1, cnt && `${cls[gi].name}: حصة فارغة وسط يوم ${dp(d, p)}`); break; } } continue; }
+        const cd = cards[id], si = SI[cd.sid]; dayN[d]++;
+        if (coff[gi].has(dk)) add('cOff', 1, cnt && `${cls[gi].name}: ${sN(cd.sid)} في وقت مغلق ${dp(d, p)}`);
+        if (si.off.has(dk) || (si.al && !si.al.has(p))) add('sOff', 1, cnt && `${sN(cd.sid)} (${cls[gi].name}) في وقت ممنوع ${dp(d, p)}`);
+        if (si.pref.size && !si.pref.has(dk)) add('pref', 0.5, cnt && `${sN(cd.sid)} (${cls[gi].name}) خارج أوقاتها المفضّلة ${dp(d, p)}`);
+        if (cpref[gi].size && !cpref[gi].has(dk)) add('pref', 0.3, cnt && `${cls[gi].name}: حصة خارج الأوقات المفضّلة للفصل ${dp(d, p)}`);
+        const t = si.time, h = Pn / 2; let tv = 0;
+        if (t === 'early') tv = p >= Math.ceil(h) ? p / Pn : 0; else if (t === 'late') tv = p < Math.floor(h) ? (Pn - p) / Pn : 0; else if (t === 'mid') tv = p === 0 || p === Pn - 1 ? 1 : 0; else if (t === 'avoidFirst') tv = p === 0 ? 1 : 0; else if (t === 'avoidLast') tv = p === Pn - 1 ? 1 : 0;
+        if (tv) add('time', tv, cnt && `${sN(cd.sid)} (${cls[gi].name}) في توقيت غير مناسب ${dp(d, p)}`);
+        if (si.core && p >= Math.ceil(h)) add('core', p / Pn, cnt && `${sN(cd.sid)} (${cls[gi].name}) مادة أساسية في آخر اليوم ${dp(d, p)}`);
+        if (pos[id] === k) { const m = sess[cd.sid] = sess[cd.sid] || new Array(D).fill(0); m[d]++; }
+        if (p > 0 && row[k - 1] >= 0 && row[k - 1] !== id && cards[row[k - 1]].sid === cd.sid) add('adj', 1, cnt && `${sN(cd.sid)} (${cls[gi].name}) حصتان متتاليتان ${dp(d, p)}`);
+      }
+      Object.entries(sess).forEach(([s, m]) => {
+        const n = m.reduce((a, b) => a + b, 0), used = m.filter(Boolean).length, lim = Math.max(1, SI[s].maxDay);
+        m.forEach((v, d) => { if (v > lim) add('sMax', v - lim, cnt && `${sN(s)} (${cls[gi].name}) ${v} مرات يوم ${dn(d)}`); });
+        const ideal = Math.min(n, D); if (used < ideal) add('fSubj', ideal - used, cnt && `${sN(s)} (${cls[gi].name}) في ${used} أيام من ${ideal}`);
+        if (n > 1 && n <= Math.ceil(D / 2)) for (let d = 1; d < D; d++) if (m[d] && m[d - 1]) add('fGap', 1, cnt && `${sN(s)} (${cls[gi].name}) في يومين متتاليين ${dn(d - 1)}`);
+      });
+      if (W.fCls) { const act = dayN.filter((v, d) => true); const mx = Math.max(...act), mn = Math.min(...act); if (mx - mn > 1) add('fCls', mx - mn - 1, cnt && `${cls[gi].name}: تفاوت حصص الأيام (${mn}–${mx})`); }
+      return c;
+    }
+    function teacherEval(t, cnt) {
+      const o = occT[t], I = TI[t]; let c = 0; const add = (k, n, msg) => { if (!n) return; c += W[k] * n; if (cnt) (cnt[k] = cnt[k] || []).push([n, msg]); };
+      const days = []; let lastN = 0;
+      for (let d = 0; d < D; d++) {
+        const ps = [];
+        for (let p = 0; p < Pn; p++) { const k = d * Pn + p, u = o[k].size; if (!u) continue; ps.push(p); const dk = d + '-' + p;
+          if (u > 1) add('tClash', u - 1, cnt && `${tN(t)}: ${u} فصول في الوقت نفسه ${dp(d, p)}`);
+          if (I.b.has(dk)) add('tBlock', u, cnt && `${tN(t)} غير متاح ${dp(d, p)}`);
+          if (I.ext[dk]) add('ext', u, cnt && `${tN(t)} لديه حصة في ${I.ext[dk]} ${dp(d, p)}`);
+          if (I.pref.size && !I.pref.has(dk)) add('pref', 0.5, cnt && `${tN(t)} خارج أوقاته المفضّلة ${dp(d, p)}`);
+          if (p === Pn - 1) lastN++; }
+        if (!ps.length) continue; days.push(ps.length);
+        if (I.maxDay && ps.length > I.maxDay) add('tMaxDay', ps.length - I.maxDay, cnt && `${tN(t)}: ${ps.length} حصص يوم ${dn(d)} (الحد ${I.maxDay})`);
+        if (I.minDay && ps.length < I.minDay) add('tMinDay', I.minDay - ps.length, cnt && `${tN(t)}: ${ps.length} حصة فقط يوم ${dn(d)}`);
+        const gaps = ps[ps.length - 1] - ps[0] + 1 - ps.length; if (gaps > I.maxGaps) add('tGaps', gaps - I.maxGaps, cnt && `${tN(t)}: ${gaps} فراغات يوم ${dn(d)}`);
+        let run = 1, mr = 1; for (let i = 1; i < ps.length; i++) { run = ps[i] === ps[i - 1] + 1 ? run + 1 : 1; if (run > mr) mr = run; }
+        if (mr > I.maxConsec) add('tConsec', mr - I.maxConsec, cnt && `${tN(t)}: ${mr} حصص متتالية يوم ${dn(d)}`);
+        if (I.first === 'avoid' && ps[0] === 0) add('tEdge', 1, cnt && `${tN(t)} في الحصة الأولى (لا يفضّلها) يوم ${dn(d)}`);
+        if (I.first === 'prefer' && ps[0] !== 0) add('tEdge', 0.5, cnt && `${tN(t)} لا يبدأ بالحصة الأولى (يفضّلها) يوم ${dn(d)}`);
+        if (I.last === 'avoid' && ps[ps.length - 1] === Pn - 1) add('tEdge', 1, cnt && `${tN(t)} في الحصة الأخيرة (لا يفضّلها) يوم ${dn(d)}`);
+        if (I.last === 'prefer' && ps[ps.length - 1] !== Pn - 1) add('tEdge', 0.5, cnt && `${tN(t)} لا ينتهي بالحصة الأخيرة (يفضّلها) يوم ${dn(d)}`);
+      }
+      if (I.maxDays && days.length > I.maxDays) add('tDays', days.length - I.maxDays, cnt && `${tN(t)}: يعمل ${days.length} أيام (الحد ${I.maxDays})`);
+      if (I.maxLast !== null && lastN > I.maxLast) add('tLast', lastN - I.maxLast, cnt && `${tN(t)}: ${lastN} حصص أخيرة أسبوعياً (الحد ${I.maxLast})`);
+      if (days.length > 1) { const mx = Math.max(...days), mn = Math.min(...days); if (mx - mn > 2) add('fTeach', mx - mn - 2, cnt && `${tN(t)}: تفاوت أيامه (${mn}–${mx})`); }
+      return c;
+    }
+    function roomEval(r, cnt) {
+      const o = occR[r], R = rooms[r]; let c = 0;
+      for (let k = 0; k < N; k++) { const u = o[k].size; if (!u) continue; const d = Math.floor(k / Pn), p = k % Pn; let n = Math.max(0, u - R.cap) + (R.off.has(d + '-' + p) ? u : 0);
+        if (n) { c += W.room * n; if (cnt) (cnt.room = cnt.room || []).push([n, `${R.name}: ${u} فصول (السعة ${R.cap}) ${dp(d, p)}`]); } }
+      return c;
+    }
+    const cc = new Array(cls.length).fill(0), tc = {}, rc = {};
+    const total = () => cc.reduce((a, b) => a + b, 0) + Object.values(tc).reduce((a, b) => a + b, 0) + Object.values(rc).reduce((a, b) => a + b, 0);
+    const recalcAll = () => { cls.forEach((c, gi) => cc[gi] = classEval(gi)); tids.forEach(t => tc[t] = teacherEval(t)); Object.keys(rooms).forEach(r => rc[r] = roomEval(r)); };
+    // ---- التبادل ----
+    const startOf = (gi, k) => { const id = G[gi][k]; return id < 0 ? k : pos[id]; };
+    const rangeOk = (gi, s, len) => { if (s < 0 || s % Pn + len > Pn) return false; for (let q = 0; q < len; q++) { if (FIX[gi][s + q]) return false; const id = G[gi][s + q]; if (id >= 0 && (pos[id] < s || pos[id] + cards[id].len > s + len)) return false; } return true; };
+    function plan(gi, a, b, len) {
+      if (a === b || Math.abs(a - b) < len) return null;
+      const set0 = [gi], seen = new Set(set0);
+      for (let i = 0; i < set0.length; i++) { const g2 = set0[i]; if (!rangeOk(g2, a, len) || !rangeOk(g2, b, len)) return null;
+        for (let q = 0; q < len; q++) [G[g2][a + q], G[g2][b + q]].forEach(id => { if (id >= 0 && cards[id].j) jcards[cards[id].j].forEach(x => { const g3 = cards[x].gi; if (!seen.has(g3)) { seen.add(g3); set0.push(g3); } }); }); }
+      return set0;
+    }
+    function doSwap(gs, a, b, len) {
+      const moved = []; gs.forEach(g2 => { for (let q = 0; q < len; q++) [G[g2][a + q], G[g2][b + q]].forEach(id => { if (id >= 0 && !moved.includes(id)) moved.push(id); }); });
+      moved.forEach(i => occ(i, -1));
+      gs.forEach(g2 => { for (let q = 0; q < len; q++) { const t = G[g2][a + q]; G[g2][a + q] = G[g2][b + q]; G[g2][b + q] = t; } });
+      moved.forEach(i => { const p = pos[i]; pos[i] = p >= a && p < a + len ? p - a + b : p - b + a; occ(i, 1); });
+      return moved;
+    }
+    function affected(gs, moved) { const T = new Set(), R = new Set(); moved.forEach(i => { if (cards[i].t) T.add(cards[i].t); if (cards[i].room) R.add(cards[i].room); }); return { gs, T: [...T], R: [...R] }; }
+    const sumAff = f => f.gs.reduce((a, g2) => a + cc[g2], 0) + f.T.reduce((a, t) => a + tc[t], 0) + f.R.reduce((a, r) => a + rc[r], 0);
+    function trySwap(gi, a, b, len, keep) {
+      const gs = plan(gi, a, b, len); if (!gs) return null;
+      let mv = []; gs.forEach(g2 => { for (let q = 0; q < len; q++) [G[g2][a + q], G[g2][b + q]].forEach(id => { if (id >= 0) mv.push(id); }); });
+      if (!mv.length) return null;
+      const f = affected(gs, mv), before = sumAff(f), old = { cc: f.gs.map(x => cc[x]), tc: f.T.map(t => tc[t]), rc: f.R.map(r => rc[r]) };
+      doSwap(gs, a, b, len); f.gs.forEach(x => cc[x] = classEval(x)); f.T.forEach(t => tc[t] = teacherEval(t)); f.R.forEach(r => rc[r] = roomEval(r));
+      const delta = sumAff(f) - before;
+      const undo = () => { doSwap(gs, a, b, len); f.gs.forEach((x, i) => cc[x] = old.cc[i]); f.T.forEach((t, i) => tc[t] = old.tc[i]); f.R.forEach((r, i) => rc[r] = old.rc[i]); };
+      if (!keep) undo();
+      return { delta, undo, gs };
+    }
+    // ---- البناء الأولي ----
+    const keep = set(X.keep);
+    function initial(noise) {
+      for (let gi = 0; gi < cls.length; gi++) G[gi].fill(-1); pos.fill(-1);
+      tids.forEach(t => occT[t].forEach(m => m.clear())); Object.keys(occR).forEach(r => occR[r].forEach(m => m.clear()));
+      cls.forEach((c, gi) => { for (let k = 0; k < N; k++) FIX[gi][k] = coff[gi].has(Math.floor(k / Pn) + '-' + (k % Pn)); });
+      const used = new Set();
+      // ١) فصول تبقى كما هي (التوليد الجزئي) ثم المقفل
+      const fromStart = (gi, k, sid, fix) => { const id = cards.findIndex((cd, i) => !used.has(i) && cd.gi === gi && cd.sid === sid && cd.len === 1 && !cd.j); if (id < 0 || G[gi][k] >= 0) return; putCard(id, k); used.add(id); if (fix) FIX[gi][k] = true; };
+      cls.forEach((c, gi) => {
+        const st = X.start && X.start[c.id];
+        const fx = keep.has(c.id);
+        if (st && (fx || X.warm)) {
+          // الحصص المزدوجة والمشتركة تُعاد كما هي إن وُجدت متتالية في الجدول السابق
+          for (let k = 0; k < N; k++) { const sid = st[k]; if (!sid || G[gi][k] >= 0) continue;
+            const dId = cards.findIndex((cd, i) => !used.has(i) && cd.gi === gi && cd.sid === sid && cd.len === 2 && !cd.j);
+            if (dId >= 0 && k % Pn < Pn - 1 && st[k + 1] === sid && G[gi][k + 1] < 0) { putCard(dId, k); used.add(dId); if (fx) FIX[gi][k] = FIX[gi][k + 1] = true; continue; }
+            const any = cards.findIndex((cd, i) => !used.has(i) && cd.gi === gi && cd.sid === sid && cd.len === 1 && (fx || !cd.j));
+            if (any >= 0) { const cd = cards[any]; if (cd.j && fx) { cd.j = null; cd.unit = 'c' + gi; } if (cd.j) continue; putCard(any, k); used.add(any); if (fx) FIX[gi][k] = true; } }
+        }
+        Object.entries((X.locks || {})[c.id] || {}).forEach(([dk, sid]) => { const [d, p] = dk.split('-').map(Number); fromStart(gi, d * Pn + p, sid, true); });
+      });
+      rebuildJ(); recalcAll();
+      // ٢) المجموعات بالترتيب: المشتركة، المزدوجة، الأكثر تقييداً
+      const groups = []; const gseen = new Set();
+      cards.forEach((cd, i) => { if (used.has(i) || gseen.has(i)) return; const grp = cd.j ? jcards[cd.j].filter(x => !used.has(x)) : [i]; grp.forEach(x => gseen.add(x)); if (grp.length) groups.push(grp); });
+      const hard = grp => grp.reduce((a, i) => { const cd = cards[i]; return a + (cd.t && TI[cd.t] ? TI[cd.t].b.size + Object.keys(TI[cd.t].ext).length : 0) + (SI[cd.sid].al ? 6 : 0) + SI[cd.sid].off.size; }, 0);
+      groups.sort((x, y) => (y.length > 1) - (x.length > 1) || cards[y[0]].len - cards[x[0]].len || hard(y) - hard(x) || Math.random() - .5);
+      const queue = groups.slice(); let unplaced = [];
+      while (queue.length) {
+        const grp = queue.shift(), len = cards[grp[0]].len; let best = -1, bc = Infinity;
+        for (let k = 0; k < N; k++) { if (!grp.every(i => { const gi = cards[i].gi; if (k % Pn + len > Pn) return false; for (let q = 0; q < len; q++) if (G[gi][k + q] >= 0 || FIX[gi][k + q]) return false; return true; })) continue;
+          grp.forEach(i => putCard(i, k)); const gsx = [...new Set(grp.map(i => cards[i].gi))], f = affected(gsx, grp);
+          const c0 = sumAff(f); let c1 = gsx.reduce((a, x) => a + classEval(x), 0) + f.T.reduce((a, t) => a + teacherEval(t), 0) + f.R.reduce((a, r) => a + roomEval(r), 0);
+          grp.forEach(i => takeCard(i)); const sc = c1 - c0 + Math.random() * noise; if (sc < bc) { bc = sc; best = k; } }
+        if (best >= 0) { grp.forEach(i => putCard(i, best)); const gsx = [...new Set(grp.map(i => cards[i].gi))]; gsx.forEach(x => cc[x] = classEval(x)); affected(gsx, grp).T.forEach(t => tc[t] = teacherEval(t)); affected(gsx, grp).R.forEach(r => rc[r] = roomEval(r)); continue; }
+        if (len === 2) { // تُفكّ المزدوجة إلى مفردتين
+          const add = []; grp.forEach(i => { const cd = cards[i]; cd.len = 1; cd.split = true; const n = Object.assign({}, cd, { j: cd.j ? cd.j + 'b' : null }); n.unit = n.j || ('c' + n.gi); cards.push(n); prepCard(n, cards.length - 1); n.unit = n.j || ('c' + n.gi); pos.push(-1); add.push(n.id); });
+          rebuildJ(); queue.unshift(add); queue.unshift(grp); continue; }
+        if (grp.length > 1) { grp.forEach(i => { cards[i].j = null; cards[i].unit = 'c' + cards[i].gi; cards[i].jbroken = true; queue.unshift([i]); }); continue; }
+        unplaced.push(grp[0]);
+      }
+      rebuildJ(); recalcAll(); self.unplaced = unplaced;
+    }
+    // ---- التحسين ----
+    async function anneal(ms, onStep, stop) {
+      const t0 = Date.now(); let cur = total(), best = cur, bestG = null, it = 0, hot = [], T0 = 6;
+      const snapshot = () => ({ G: G.map(r => r.slice()), pos: pos.slice(), j: cards.map(c => c.j) });
+      bestG = snapshot();
+      const refreshHot = () => { const s = new Set(); cls.forEach((c, gi) => { if (cc[gi] > 0.01) s.add(gi); }); tids.forEach(t => { if (tc[t] > 0.01) cards.forEach(cd => { if (cd.t === t) s.add(cd.gi); }); }); Object.keys(rc).forEach(r => { if (rc[r] > 0.01) cards.forEach(cd => { if (cd.room === r) s.add(cd.gi); }); }); hot = [...s]; };
+      refreshHot();
+      while (Date.now() - t0 < ms && best > 0.001 && !(stop && stop())) {
+        for (let n = 0; n < 1500; n++) {
+          it++; if (it % 3000 === 0) refreshHot();
+          const gi = hot.length && Math.random() < 0.75 ? hot[Math.floor(Math.random() * hot.length)] : Math.floor(Math.random() * cls.length);
+          const ka = Math.floor(Math.random() * N); if (FIX[gi][ka]) continue; const sa = startOf(gi, ka), id = G[gi][ka], len = id >= 0 ? cards[id].len : 1;
+          const dd = Math.floor(Math.random() * D), pb = Math.floor(Math.random() * (Pn - len + 1)), sb = dd * Pn + pb;
+          const r = trySwap(gi, sa, sb, len, true); if (!r) continue;
+          const frac = (Date.now() - t0) / ms, temp = T0 * Math.pow(0.002, frac) + 0.01;
+          if (r.delta <= 0 || Math.random() < Math.exp(-r.delta / temp)) { cur += r.delta; if (cur < best - 1e-9) { best = cur; bestG = snapshot(); } } else r.undo();
+        }
+        if (onStep) onStep(Math.min(1, (Date.now() - t0) / ms), best);
+        await new Promise(res => setTimeout(res, 0));
+      }
+      // استعادة الأفضل
+      for (let gi = 0; gi < cls.length; gi++) G[gi] = bestG.G[gi]; bestG.pos.forEach((p, i) => pos[i] = p); bestG.j.forEach((j, i) => { cards[i].j = j; cards[i].unit = j || ('c' + cards[i].gi); });
+      rebuildJ(); tids.forEach(t => occT[t].forEach(m => m.clear())); Object.keys(occR).forEach(r => occR[r].forEach(m => m.clear())); cards.forEach((c, i) => occ(i, 1)); recalcAll();
+      return { it, cost: total() };
+    }
+    Object.assign(this, { coff, X, D, Pn, N, cls, ci, cards, jcards, G, FIX, pos, W, tids, TI, SI, rooms, occT, occR, cc, tc, rc, total, recalcAll, initial, anneal, trySwap, startOf, rangeOk, plan, classEval, teacherEval, roomEval, tOf, sN, tN });
+  }
+
+  // ---- التقرير ----
+  function check(M) {
+    const X = M.X, cnt = {}; M.cls.forEach((c, gi) => M.classEval(gi, cnt)); M.tids.forEach(t => M.teacherEval(t, cnt)); Object.keys(M.rooms).forEach(r => M.roomEval(r, cnt));
+    const byRule = {}; let hard = 0, soft = 0, softCost = 0;
+    Object.keys(RULES).forEach(k => { const L = cnt[k] || []; const n = L.reduce((a, x) => a + x[0], 0); byRule[k] = { n: Math.round(n * 10) / 10, items: L.map(x => x[1]), lv: k === 'tClash' ? 'h' : ruleCfg(X, k).lv }; });
+    // المزدوجة المفكوكة والمشتركة المكسورة وغير الموضوعة
+    const split = M.cards.filter(c => c.split && !String(c.j || '').endsWith('b')); byRule.dbl.n = split.length; byRule.dbl.items = split.map(c => `${M.sN(c.sid)} (${M.cls[c.gi].name}): تعذّرت الحصة المزدوجة فوُضعت حصتين منفصلتين`);
+    const jb = M.cards.filter(c => c.jbroken); if (jb.length) { byRule.dbl.items.push(...jb.map(c => `${M.sN(c.sid)} (${M.cls[c.gi].name}): تعذّر جمع الحصة المشتركة في وقت واحد`)); byRule.dbl.n += jb.length; }
+    const un = M.unplaced || []; byRule.cOff.items.push(...un.map(i => `${M.sN(M.cards[i].sid)} (${M.cls[M.cards[i].gi].name}): لا توجد خانة متاحة`)); byRule.cOff.n += un.length;
+    Object.entries(byRule).forEach(([k, r]) => { if (!r.n) return; if (r.lv === 'h') hard += r.n; else if (r.lv !== 'o') { soft += r.n; softCost += r.n * M.W[k]; } });
+    const nCards = M.cards.length || 1;
+    let score = Math.round(100 * nCards / (nCards + softCost / 3)); if (hard) score = Math.min(score, 59);
+    // مؤشرات
+    const req = M.cards.reduce((a, c) => a + c.len, 0), placed = M.cards.reduce((a, c, i) => a + (M.pos[i] >= 0 ? c.len : 0), 0);
+    const tl = {}; M.tids.forEach(t => { const o = M.occT[t]; const days = []; let first = 0, last = 0, gaps = 0, mr = 0, load = 0;
+      for (let d = 0; d < M.D; d++) { const ps = []; for (let p = 0; p < M.Pn; p++) if (o[d * M.Pn + p].size) ps.push(p); days.push(ps.length); load += ps.length; if (!ps.length) continue; if (ps[0] === 0) first++; if (ps[ps.length - 1] === M.Pn - 1) last++; gaps += ps[ps.length - 1] - ps[0] + 1 - ps.length; let r = 1; mr = Math.max(mr, 1); for (let i = 1; i < ps.length; i++) { r = ps[i] === ps[i - 1] + 1 ? r + 1 : 1; mr = Math.max(mr, r); } }
+      const q = num(((X.tlim || {})[t] || {}).quota);
+      tl[t] = { load, days, first, last, gaps, maxRun: mr, workDays: days.filter(Boolean).length, quota: q, classes: new Set(M.cards.filter(c => c.t === t).map(c => c.gi)).size, subjects: new Set(M.cards.filter(c => c.t === t).map(c => c.sid)).size, cost: M.tc[t] }; });
+    const loads = Object.values(tl).map(x => x.load); const avg = loads.reduce((a, b) => a + b, 0) / (loads.length || 1);
+    const cv = loads.length ? Math.sqrt(loads.reduce((a, b) => a + (b - avg) * (b - avg), 0) / loads.length) / (avg || 1) : 0;
+    const gapsAll = Object.values(tl).reduce((a, x) => a + x.gaps, 0);
+    const ru = {}; Object.entries(M.rooms).forEach(([r, R]) => { let used = 0; for (let k = 0; k < M.N; k++) used += M.occR[r][k].size; ru[r] = { name: R.name, used, avail: M.N * R.cap - R.off.size * R.cap, cap: R.cap }; });
+    const roomUse = Object.values(ru).length ? Math.round(100 * Object.values(ru).reduce((a, x) => a + x.used, 0) / Math.max(1, Object.values(ru).reduce((a, x) => a + x.avail, 0))) : null;
+    const cap = M.cls.reduce((a, c, gi) => a + M.FIX[gi].filter(x => !x).length, 0);
+    const idx = { score, complete: Math.round(100 * placed / Math.max(1, req)), fair: Math.max(0, Math.round(100 * (1 - cv))), gaps: Math.max(0, Math.round(100 - 100 * gapsAll / Math.max(1, loads.reduce((a, b) => a + b, 0)))), rooms: roomUse, util: Math.round(100 * placed / Math.max(1, cap)) };
+    const issues = [], notes = []; Object.entries(byRule).forEach(([k, r]) => { if (!r.n) return; (r.lv === 'h' ? issues : r.lv === 'o' ? [] : notes).push(...r.items.map(x => ({ k, x }))); });
+    return { hard, soft, score, byRule, idx, teachers: tl, rooms: ru, issues, notes, req, placed };
+  }
+
+  async function solve(X, opt) {
+    opt = opt || {}; const ms = opt.time || 4000, R = Math.max(1, opt.restarts || 1); let best = null, bestCost = Infinity, bestSnap = null;
+    let M = null;
+    for (let r = 0; r < R; r++) {
+      M = new Model(X); M.initial(r ? 3 : 0.5);
+      if (opt.onStep) opt.onStep(r / R, null, 'init');
+      await M.anneal(ms / R, (f, c) => opt.onStep && opt.onStep((r + f) / R, c), opt.stop);
+      const c = M.total(); if (c < bestCost) { bestCost = c; best = M; }
+      if (c < 0.001 || (opt.stop && opt.stop())) break;
+    }
+    return wrap(best);
+  }
+  function wrap(M) {
+    M.cls.forEach((c, gi) => { const lk = (M.X.locks || {})[c.id] || {}; for (let k = 0; k < M.N; k++) { const dk = Math.floor(k / M.Pn) + '-' + (k % M.Pn); M.FIX[gi][k] = M.coff[gi].has(dk) || (!!lk[dk] && M.G[gi][k] >= 0); } });
+    const R = { M, D: M.D, Pn: M.Pn, N: M.N, cls: M.cls, ci: M.ci, cards: M.cards, jcards: M.jcards, cid: M.G, fixed: M.FIX };
+    R.grid = M.G.map(r => r.map(id => id >= 0 ? M.cards[id].sid : null));
+    R.tch = (gi, s) => M.tOf(gi, s);
+    R.cost = M.total();
+    R.refresh = () => { R.grid = M.G.map(r => r.map(id => id >= 0 ? M.cards[id].sid : null)); R.cid = M.G; R.cost = M.total(); R.report = check(M); R.issues = R.report.issues.map(i => i.x); return R; };
+    // تبادل يدوي مع حساب التأثير
+    R.swap = (gi, a, b) => { const sa = M.startOf(gi, a), ia = M.G[gi][a], ib = M.G[gi][b], la = ia >= 0 ? M.cards[ia].len : 1, lb = ib >= 0 ? M.cards[ib].len : 1, sb = M.startOf(gi, b); const before = check(M);
+      let r = M.trySwap(gi, sa, sb, la, true); if (!r && lb !== la) r = M.trySwap(gi, sa, sb, Math.max(la, lb), true); if (!r) return null; R.refresh(); return { delta: r.delta, before, after: R.report, undo: () => { r.undo(); R.refresh(); }, classes: r.gs }; };
+    // أفضل البدائل لخانة: تقييم كل تبادل ممكن في الفصل نفسه
+    R.alts = (gi, a) => { const id = M.G[gi][a]; const sa = M.startOf(gi, a), len = id >= 0 ? M.cards[id].len : 1, out = [];
+      for (let b = 0; b < M.N; b++) { if (b % M.Pn + len > M.Pn) continue; if (M.G[gi][b] >= 0 && M.startOf(gi, b) !== b) continue; const r = M.trySwap(gi, sa, b, len, false); if (r) out.push({ k: b, delta: Math.round(r.delta * 10) / 10, multi: r.gs.length > 1 }); }
+      return out.sort((x, y) => x.delta - y.delta); };
+    R.lock = (gi, k, on) => { if (M.X.cls[gi]) M.FIX[gi][k] = !!on; };
+    R.refresh(); return R;
+  }
+  g.DinaTT = { RULES, LV, LVN, PRESETS, CLS_R, TCH_R, ruleCfg, isHard, solve, check, Model, wrap, VERSION: 2 };
+})(typeof window !== 'undefined' ? window : globalThis);
+}catch(e){console.error('[dina] src/schedule/tt-engine.js',e)}
+
 /* ==== src/schedule/distribution.js ==== */
 ;try{
 /* توزيع الحصص والجدول المرن — مصفوفة (فصل × مادة) قابلة للتعديل الكامل لكل قسم، معلم لكل خلية، قيود، وتوليد جدول يُرسل مسودةً للمراجعة */
@@ -6505,6 +6838,36 @@ ${S.me.full_name}`;
   const A = window.APP, V = window.VIEWS, { S, api, $, $$, esc, AR, I } = A;
   A.I.plan = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 4v16M15 4v16"/></svg>';
   const uid = () => Math.random().toString(36).slice(2, 9);
+  if (!document.getElementById('ttpro-css')) { const st = document.createElement('style'); st.id = 'ttpro-css'; st.textContent = `
+  .pl-bk.pf{background:#e8f6ee;border-color:#9fd4b3;color:#2E8B57}
+  .pl-dayb{background:none;border:0;font:inherit;font-weight:800;color:var(--navy);cursor:pointer;padding:2px 4px;border-radius:6px}
+  .pl-dayb:hover,.pl-dayb:focus-visible{background:#eef4fb;outline:2px solid var(--sky)}
+  .pl-f{display:inline-flex;align-items:center;gap:6px;flex-wrap:nowrap}
+  .pl-pw td,.pl-pw th{vertical-align:middle}
+  .tt-prog{margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:14px;background:#f7fafd}
+  .tt-bar{height:10px;border-radius:99px;background:#e3ebf5;overflow:hidden;margin-top:8px}
+  .tt-bar i{display:block;height:100%;background:linear-gradient(90deg,#005499,#3AB1DB);border-radius:99px;transition:width .25s}
+  .tt-sum{display:flex;gap:16px;align-items:center;margin-top:12px;flex-wrap:wrap}
+  .tt-g{width:112px;height:112px;border-radius:50%;flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;background:conic-gradient(var(--c) calc(var(--p)*1%),#e3ebf5 0);position:relative;box-shadow:0 6px 18px rgba(8,43,90,.14)}
+  .tt-g::before{content:'';position:absolute;inset:10px;border-radius:50%;background:var(--card,#fff)}
+  .tt-g b,.tt-g span{position:relative}.tt-g b{font-size:30px;color:var(--navy);line-height:1}.tt-g span{font-size:11px;color:var(--muted)}
+  .tt-kp{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
+  .tt-kp>div{border:1px solid var(--border);border-radius:12px;padding:8px 10px;background:linear-gradient(180deg,#fff,#f5f8fc);box-shadow:0 2px 6px rgba(8,43,90,.06)}
+  .tt-kp span{display:block;font-size:12px;color:var(--muted)}.tt-kp b{font-size:18px;color:var(--navy)}
+  .tt-kp2{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+  .tt-rules{margin-top:10px;border:1px solid var(--border);border-radius:12px;padding:8px 12px;background:#fff}
+  .tt-rules>summary,.tt-rule>summary{cursor:pointer;padding:4px 0}
+  .tt-rule{border-top:1px dashed var(--border);padding:2px 0}.tt-rule ul{margin:4px 0 6px;max-height:220px;overflow:auto}
+  .tt-imp{margin-top:10px}.tt-alt .ok{color:#2E8B57;font-weight:800}.tt-alt .bad{color:#b42318;font-weight:800}
+  .pl-gc{position:relative}.pl-gc.fx{background:repeating-linear-gradient(45deg,#f4f6f9,#f4f6f9 6px,#eceff4 6px,#eceff4 12px);cursor:not-allowed}
+  .pl-gc.alt-good{background:#e3f4ea;box-shadow:inset 0 0 0 2px #2E8B57}.pl-gc.alt-ok{background:#f2f8fd}.pl-gc.alt-warn{background:#fff6e5}.pl-gc.alt-bad{background:#fdeceb;opacity:.75}
+  .alt-d{position:absolute;top:2px;inset-inline-start:4px;font-size:10px;font-weight:800;color:var(--muted)}
+  .pl-gc.alt-good .alt-d{color:#2E8B57}.pl-gc.alt-bad .alt-d{color:#b42318}
+  .tt-clash{background:#fdeceb;box-shadow:inset 0 0 0 2px #b42318}
+  .pl-rh{margin:16px 0 6px;color:var(--navy)}.pl-rp td,.pl-rp th{text-align:center}.pl-rp td:first-child{text-align:start;font-weight:700}
+  @media (prefers-reduced-motion:reduce){.tt-bar i{transition:none}}
+  @media (max-width:700px){.tt-g{width:90px;height:90px}.tt-g b{font-size:24px}.pl-f{flex-wrap:wrap}}`; document.head.appendChild(st); }
+
   const can = () => S.me.is_owner || A.anyPerm('structure', 'timetable_edit', 'tt_builder');
   A.canPlan = can;
 
@@ -6563,7 +6926,7 @@ ${S.me.full_name}`;
     root.innerHTML = '<div class="spinner"></div>';
     try { if (PSEC !== S.sectionId || !P) await load(); } catch (e) { root.innerHTML = `<div class="card">${A.emptyBox('تعذّر التحميل', esc(e.message))}</div>`; return; }
     const sec = A.section();
-    const tabs = [['hours', 'الحصص لكل فصل'], ['teachers', 'المعلمون'], ['rules', 'القيود'], ['load', 'أحمال المعلمين'], ['gen', 'توليد الجدول']];
+    const tabs = [['hours', 'الحصص لكل فصل'], ['teachers', 'المعلمون'], ['rules', 'القيود'], ['load', 'أحمال المعلمين'], ['gen', 'توليد الجدول'], ['rep', 'التقارير والتحليلات']];
     root.innerHTML = `<div class="card"><div class="head"><div class="grow"><h2>توزيع الحصص والجدول المرن</h2>
         <p class="sub" style="margin:2px 0 0">${esc(sec.name)} · ${AR(sec.days)} أيام × ${AR(sec.periods)} حصص = ${AR(cap())} حصة أسبوعياً لكل فصل. عدّل المواد والمجموعات والحصص والمعلمين بحرية، ثم ولّد الجدول ليصل مسودةً تراجعها وتعدّلها وتعتمدها.</p></div>
         <span class="small muted" id="plSt" role="status" aria-live="polite">${dirty ? 'تعديلات غير محفوظة' : 'محفوظ'}</span></div>
@@ -6582,7 +6945,7 @@ ${S.me.full_name}`;
     $('#plX', root).onclick = exportX;
     $('#plGen', root).onclick = () => { tab = 'gen'; V.plan(root); };
     const box = $('#plB', root);
-    ({ hours: tHours, teachers: tTeach, rules: tRules, load: tLoad, gen: tGen })[tab](box, root);
+    (({ hours: tHours, teachers: tTeach, rules: tRules, load: tLoad, gen: tGen, rep: tRep })[tab] || tHours)(box, root);
   };
 
   // ---------- الحصص ----------
@@ -6726,66 +7089,170 @@ ${S.me.full_name}`;
     $('#bGo', box).onclick = () => { const s = $('#bS', box).value, t = $('#bT', box).value; cls.forEach(c => { if (H(c.id, s)) { (P.teachers[c.id] = P.teachers[c.id] || {})[s] = t; if (!t) delete P.teachers[c.id][s]; } }); touch(); V.plan(root); };
     bindHead(box, root);
   }
-  // ---------- القيود (على طريقة aSc: المعلم، الفصل، المادة، القاعات، الحصص المشتركة، التثبيت) ----------
-  const ens = () => { P.subj = P.subj || {}; P.rooms = P.rooms || []; P.classOff = P.classOff || {}; P.tlim = P.tlim || {}; P.locks = P.locks || {}; P.joint = P.joint || []; P.blocks = P.blocks || {}; };
-  const grid = (sel, onClick, label) => { const sec = A.section(); return `<div class="scroll"><table class="tbl pl-blk"><thead><tr><th></th>${Array.from({ length: sec.periods }, (_, p) => `<th>${AR(p + 1)}</th>`).join('')}</tr></thead><tbody>${Array.from({ length: sec.days }, (_, d) => `<tr><th>${A.DAYS[d]}</th>${Array.from({ length: sec.periods }, (_, p) => { const k = d + '-' + p, on = sel.has(k); return `<td><button class="pl-bk ${on ? 'on' : ''}" data-${onClick}="${k}" aria-pressed="${on}" aria-label="${A.DAYS[d]} الحصة ${p + 1} ${label}">${on ? '×' : ''}</button></td>`; }).join('')}</tr>`).join('')}</tbody></table></div>`; };
+  // ---------- القيود (محرك موحّد DinaTT: إلزامية وتفضيلية بمستوى قوة ووزن لكل قيد) ----------
+  const ens = () => { P.subj = P.subj || {}; P.rooms = P.rooms || []; P.classOff = P.classOff || {}; P.cpref = P.cpref || {}; P.tlim = P.tlim || {}; P.locks = P.locks || {}; P.joint = P.joint || []; P.blocks = P.blocks || {}; P.rules = P.rules || {}; P.profiles = P.profiles || []; P.reserved = P.reserved || []; P.log = P.log || []; };
+  const TT = () => window.DinaTT;
+  const DEFCORE = 'العربية، لغتي، الرياضيات، العلوم، الإنجليزية، English، Math، Science، Arabic';
+  const logIt = (what) => { ens(); P.log.unshift({ at: new Date().toISOString(), by: S.me.id, what }); if (P.log.length > 300) P.log.length = 300; };
+  const dayLbl = d => A.DAYS[d] || ('يوم ' + AR(d + 1));
+  // شبكة ثلاثية: فارغ ← × ممنوع ← ✓ مفضّل ← فارغ  (st: Map 'd-p' → 'x'|'p')
+  const tri = (st, attr, lbl) => { const sec = A.section(); return `<div class="scroll"><table class="tbl pl-blk"><thead><tr><th></th>${Array.from({ length: sec.periods }, (_, p) => `<th>${AR(p + 1)}</th>`).join('')}</tr></thead><tbody>${Array.from({ length: sec.days }, (_, d) => `<tr><th><button class="pl-dayb" data-${attr}-day="${d}" title="تطبيق على اليوم كله">${dayLbl(d)}</button></th>${Array.from({ length: sec.periods }, (_, p) => { const k = d + '-' + p, v = st.get(k) || ''; return `<td><button class="pl-bk ${v === 'x' ? 'on' : v === 'p' ? 'pf' : ''}" data-${attr}="${k}" aria-label="${dayLbl(d)} الحصة ${p + 1} ${lbl}: ${v === 'x' ? 'ممنوع' : v === 'p' ? 'مفضّل' : 'محايد'}">${v === 'x' ? '×' : v === 'p' ? '✓' : ''}</button></td>`; }).join('')}</tr>`).join('')}</tbody></table></div>
+    <p class="small muted" style="margin:4px 0 0">اضغط الخانة: <b>×</b> ممنوع ← <b style="color:#2E8B57">✓</b> مفضّل ← محايد. اضغط اسم اليوم لتطبيق الحالة على اليوم كله.</p>`; };
+  const bindTri = (B, attr, get, setv, redraw) => {
+    $$(`[data-${attr}]`, B).forEach(b => b.onclick = () => { const k = b.getAttribute('data-' + attr), v = get().get(k) || '', nv = v === '' ? 'x' : v === 'x' ? 'p' : ''; const m = get(); if (nv) m.set(k, nv); else m.delete(k); setv(m); touch(); redraw(); });
+    $$(`[data-${attr}-day]`, B).forEach(b => b.onclick = () => { const d = +b.getAttribute('data-' + attr + '-day'), sec = A.section(), m = get(); const ks = Array.from({ length: sec.periods }, (_, p) => d + '-' + p); const v = m.get(ks[0]) || '', nv = v === '' ? 'x' : v === 'x' ? 'p' : ''; ks.forEach(k => nv ? m.set(k, nv) : m.delete(k)); setv(m); touch(); redraw(); });
+  };
+  const mapOf = (xs, ps) => { const m = new Map(); (ps || []).forEach(k => m.set(k, 'p')); (xs || []).forEach(k => m.set(k, 'x')); return m; };
+  const split2 = m => ({ x: [...m].filter(([, v]) => v === 'x').map(([k]) => k), p: [...m].filter(([, v]) => v === 'p').map(([k]) => k) });
+  const sel = (id, opts, v, lab, w) => `<label class="small pl-f">${lab} <select class="in" id="${id}" style="max-width:${w || 110}px">${opts.map(([a, b]) => `<option value="${a}" ${String(v ?? '') === String(a) ? 'selected' : ''}>${b}</option>`).join('')}</select></label>`;
+  const nOpts = (arr) => [['', '—'], ...arr.map(n => [n, AR(n)])];
+  const tidsOf = () => [...new Set(Object.values(P.teachers).flatMap(m => Object.values(m)).filter(Boolean))].sort((a, b) => String(A.personName(a)).localeCompare(String(A.personName(b)), 'ar'));
+  const copyDialog = (title, items, cur, onApply) => {
+    const m = A.modal(`<h3>${esc(title)}</h3><p class="small muted">اختر من تُنسخ إليهم القيود نفسها (تستبدل قيودهم الحالية من النوع نفسه).</p>
+      <div class="row" style="gap:6px;margin-bottom:6px"><button class="btn ghost sm" id="cpA">تحديد الكل</button><button class="btn ghost sm" id="cpN">إلغاء التحديد</button></div>
+      <div class="perm-grid" style="max-height:50vh;overflow:auto">${items.filter(([v]) => v !== cur).map(([v, l]) => `<label class="chk small"><input type="checkbox" value="${v}"> ${esc(l)}</label>`).join('')}</div>
+      <div class="acts"><button class="btn" id="cpGo">نسخ</button></div>`);
+    m.el.querySelector('#cpA').onclick = () => m.el.querySelectorAll('input').forEach(i => i.checked = true);
+    m.el.querySelector('#cpN').onclick = () => m.el.querySelectorAll('input').forEach(i => i.checked = false);
+    m.el.querySelector('#cpGo').onclick = () => { const ids = [...m.el.querySelectorAll('input:checked')].map(i => i.value); if (!ids.length) return; onApply(ids); m.close(); touch(); A.toast(`نُسخت القيود إلى ${AR(ids.length)}`, 'ok'); };
+  };
   function tRules(box, root) {
     ens(); const sec = A.section(), subs = allSubs();
-    const tids = [...new Set(Object.values(P.teachers).flatMap(m => Object.values(m)).filter(Boolean))];
+    const tids = tidsOf();
     let who = A.LS.get('pl_bt'); if (!tids.includes(who)) who = tids[0];
     let cw = A.LS.get('pl_bc'); if (!secClasses().some(c => c.id === cw)) cw = (secClasses()[0] || {}).id;
-    let rs = A.LS.get('pl_rs') || 'subj';
-    const tabs = [['subj', 'المواد'], ['teach', 'المعلمون'], ['cls', 'الفصول'], ['rooms', 'القاعات'], ['joint', 'حصص مشتركة'], ['gen', 'قواعد عامة']];
+    let rs = A.LS.get('pl_rs') || 'power';
+    const nB = Object.values(P.blocks).reduce((a, l) => a + (l || []).length, 0), nT = Object.keys(P.tlim).filter(t => Object.values(P.tlim[t] || {}).some(v => v !== '' && v !== undefined && !(Array.isArray(v) && !v.length))).length;
+    const tabs = [['power', 'قوة القيود والأوزان'], ['subj', 'المواد'], ['teach', `المعلمون${nB || nT ? ` (${AR(nT || 0)})` : ''}`], ['cls', 'الفصول'], ['rooms', `القاعات والمعامل${P.rooms.length ? ` (${AR(P.rooms.length)})` : ''}`], ['joint', `المشتركة والمتوازية${P.joint.length ? ` (${AR(P.joint.length)})` : ''}`], ['gen', 'قواعد عامة']];
     box.innerHTML = `<div class="chip-filter" id="rsT" style="margin-top:12px">${tabs.map(([k, l]) => `<button data-v="${k}" class="${rs === k ? 'on' : ''}">${l}</button>`).join('')}</div><div id="rsB" class="sec-box"></div>`;
     $$('#rsT button', box).forEach(b => b.onclick = () => { A.LS.set('pl_rs', b.dataset.v); tRules(box, root); });
-    const B = $('#rsB', box);
-    if (rs === 'subj') {
-      B.innerHTML = `<b>قيود المواد</b><p class="small muted" style="margin:2px 0 8px">الحصص المزدوجة (حصتان متتاليتان في اليوم نفسه)، الحصص المسموح بها للمادة، والقاعة الخاصة بها (المعمل، المسبح، الصالة) فلا يُجدول فيها فصلان في الوقت نفسه.</p>
-        <div class="scroll"><table class="tbl"><thead><tr><th>المادة</th><th>حصص مزدوجة أسبوعياً</th><th>الحصص المسموح بها</th><th>القاعة</th></tr></thead><tbody>${subs.map(s => { const c = P.subj[s] || {}, al = new Set(c.periods || []); return `<tr><td><b>${esc(sName(s))}</b></td><td><select class="in" data-dbl="${s}" style="max-width:90px">${[0, 1, 2, 3].map(n => `<option value="${n}" ${(+c.doubles || 0) === n ? 'selected' : ''}>${n ? AR(n) : '—'}</option>`).join('')}</select></td>
+    const B = $('#rsB', box), redraw = () => tRules(box, root);
+    if (!TT()) { B.innerHTML = '<p class="small muted">محرك القيود لم يُحمَّل. حدّث الصفحة.</p>'; return; }
+    if (rs === 'power') {
+      const R = TT().RULES, groups = [...new Set(Object.values(R).map(r => r[1]))], rep = lastGen && lastGen.report;
+      B.innerHTML = `<div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><div class="grow"><b>قوة القيود وأوزانها</b><p class="small muted" style="margin:2px 0 0"><b>إلزامي</b> لا يُخالَف إلا عند الاستحالة ويُعرض خطأً، <b>قوي</b> يُحترم غالباً، <b>مفضّل</b> يُحسّن قدر الإمكان، <b>متوقف</b> لا يُحسب. الوزن (٠–١٠) يحدد الأولوية بين القيود من المستوى نفسه.</p></div>
+          <div class="row" style="gap:6px;flex-wrap:wrap"><select class="in" id="pwP" style="max-width:240px" aria-label="ملف جاهز">${Object.entries(TT().PRESETS).map(([k, [l]]) => `<option value="${k}">${esc(l)}</option>`).join('')}</select><button class="btn ghost sm" id="pwA">تطبيق</button><button class="btn ghost sm" id="pwR">الافتراضي</button></div></div>
+        <div class="row" style="gap:6px;margin:8px 0;flex-wrap:wrap"><b class="small">ملفاتك المحفوظة:</b>${P.profiles.map(p => `<span class="pill st-empty" style="display:inline-flex;gap:6px;align-items:center">${esc(p.name)} <button class="btn ghost sm" data-pfa="${p.id}" style="padding:0 6px">تطبيق</button><button class="btn bad sm" data-pfd="${p.id}" style="padding:0 6px" aria-label="حذف ${esc(p.name)}">×</button></span>`).join('') || '<span class="small muted">لا يوجد</span>'}<button class="btn ghost sm" id="pwS">${I.plus} حفظ الإعداد الحالي باسم</button></div>
+        ${groups.map(gname => `<h4 style="margin:12px 0 4px;color:var(--navy)">${esc(gname)}</h4><div class="scroll"><table class="tbl pl-pw"><thead><tr><th>القيد</th><th style="width:130px">المستوى</th><th style="width:190px">الوزن</th>${rep ? '<th style="width:80px">في آخر توليد</th>' : ''}</tr></thead><tbody>
+          ${Object.entries(R).filter(([, r]) => r[1] === gname).map(([k, r]) => { const c = TT().ruleCfg({ rules: P.rules }, k), n = rep ? (rep.byRule[k] || {}).n || 0 : 0; return `<tr><td><b>${esc(r[0])}</b><div class="small muted">${esc(r[4])}</div></td>
+            <td>${r[5] ? `<select class="in" data-lv="${k}" aria-label="مستوى ${esc(r[0])}">${Object.entries(TT().LVN).map(([v, l]) => `<option value="${v}" ${c.lv === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` : `<span class="pill st-approved">${TT().LVN[c.lv]} دائماً</span>`}</td>
+            <td>${r[5] ? `<div class="row" style="gap:6px;flex-wrap:nowrap"><input type="range" min="0" max="10" step="1" value="${c.w}" data-w="${k}" aria-label="وزن ${esc(r[0])}" style="flex:1"><b data-wv="${k}" style="min-width:22px;text-align:center">${AR(c.w)}</b></div>` : '—'}</td>
+            ${rep ? `<td>${n ? `<span class="pill ${c.lv === 'h' ? 'st-returned' : 'st-submitted'}">${AR(n)}</span>` : '<span class="pill st-approved">✓</span>'}</td>` : ''}</tr>`; }).join('')}</tbody></table></div>`).join('')}`;
+      $$('[data-lv]', B).forEach(x => x.onchange = () => { (P.rules[x.dataset.lv] = P.rules[x.dataset.lv] || {}).lv = x.value; if (x.dataset.lv === 'adj') P.noDouble = x.value !== 'o'; if (x.dataset.lv === 'emptyLast') P.emptyLast = x.value !== 'o'; touch(); });
+      $$('[data-w]', B).forEach(x => x.oninput = () => { (P.rules[x.dataset.w] = P.rules[x.dataset.w] || {}).w = +x.value; $(`[data-wv="${x.dataset.w}"]`, B).textContent = AR(+x.value); touch(); });
+      $('#pwA', B).onclick = () => { const pr = TT().PRESETS[$('#pwP', B).value]; P.rules = JSON.parse(JSON.stringify(pr[1])); logIt('تطبيق ملف القيود: ' + pr[0]); touch(); redraw(); };
+      $('#pwR', B).onclick = () => { P.rules = {}; touch(); redraw(); };
+      $('#pwS', B).onclick = () => { const n = prompt('اسم ملف القيود (مثلاً: جدول رمضان)'); if (!n) return; P.profiles.push({ id: uid(), name: n.trim(), rules: JSON.parse(JSON.stringify(P.rules)) }); touch(); redraw(); };
+      $$('[data-pfa]', B).forEach(b => b.onclick = () => { const p = P.profiles.find(x => x.id === b.dataset.pfa); if (!p) return; P.rules = JSON.parse(JSON.stringify(p.rules)); logIt('تطبيق ملف القيود: ' + p.name); touch(); redraw(); });
+      $$('[data-pfd]', B).forEach(b => b.onclick = () => { P.profiles = P.profiles.filter(x => x.id !== b.dataset.pfd); touch(); redraw(); });
+    } else if (rs === 'subj') {
+      const times = [['', '—'], ['early', 'أول اليوم'], ['mid', 'وسط اليوم'], ['late', 'آخر اليوم'], ['avoidFirst', 'ليست الأولى'], ['avoidLast', 'ليست الأخيرة']];
+      const coreN = (P.coreList ?? DEFCORE).split(/[،,]/).map(x => A.normKey(x.trim())).filter(Boolean), isCore = s => { const c = P.subj[s] || {}; return c.core !== undefined ? !!c.core : coreN.some(n => A.normKey(sName(s)).includes(n)); };
+      B.innerHTML = `<b>قيود المواد</b><p class="small muted" style="margin:2px 0 8px">المزدوجة (حصتان متتاليتان)، أقصى حصص في اليوم، التوقيت (للحصص العملية والرياضة مثلاً)، المادة الأساسية، القاعة أو المعمل، والحصص المسموح بها. «أوقات وأيام» للمنع والتفضيل بالتفصيل.</p>
+        <div class="scroll"><table class="tbl pl-sj"><thead><tr><th>المادة</th><th>مزدوجة أسبوعياً</th><th>أقصى يومياً</th><th>التوقيت</th><th>أساسية</th><th>القاعة/المعمل</th><th>الحصص المسموح بها</th><th></th></tr></thead><tbody>${subs.map(s => { const c = P.subj[s] || {}, al = new Set(c.periods || []), nx = (c.off || []).length + (c.offDays || []).length + (c.pref || []).length; return `<tr><td><b>${esc(sName(s))}</b></td>
+          <td><select class="in" data-dbl="${s}" style="max-width:80px">${[0, 1, 2, 3].map(n => `<option value="${n}" ${(+c.doubles || 0) === n ? 'selected' : ''}>${n ? AR(n) : '—'}</option>`).join('')}</select></td>
+          <td><select class="in" data-smx="${s}" style="max-width:80px">${nOpts([1, 2, 3, 4]).map(([v, l]) => `<option value="${v}" ${String(c.maxDay ?? '') === String(v) ? 'selected' : ''}>${v === '' ? 'العام' : l}</option>`).join('')}</select></td>
+          <td><select class="in" data-stm="${s}" style="max-width:120px">${times.map(([v, l]) => `<option value="${v}" ${(c.time || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
+          <td><input type="checkbox" data-scr="${s}" ${isCore(s) ? 'checked' : ''} aria-label="${esc(sName(s))} مادة أساسية"></td>
+          <td><select class="in" data-room="${s}" style="max-width:150px"><option value="">—</option>${P.rooms.map(r => `<option value="${r.id}" ${c.room === r.id ? 'selected' : ''}>${esc(r.name)}${+r.cap > 1 ? ` (${AR(r.cap)})` : ''}</option>`).join('')}</select></td>
           <td><div class="row" style="gap:3px;flex-wrap:nowrap">${Array.from({ length: sec.periods }, (_, p) => `<button class="pl-pp ${!al.size || al.has(p) ? 'on' : ''}" data-pp="${s}|${p}" aria-pressed="${!al.size || al.has(p)}" title="الحصة ${p + 1}">${AR(p + 1)}</button>`).join('')}</div></td>
-          <td><select class="in" data-room="${s}" style="max-width:150px"><option value="">—</option>${P.rooms.map(r => `<option value="${r.id}" ${c.room === r.id ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></td></tr>`; }).join('')}</tbody></table></div>`;
+          <td><button class="btn ghost sm" data-sdt="${s}">أوقات وأيام${nx ? ` (${AR(nx)})` : ''}</button></td></tr>`; }).join('')}</tbody></table></div>
+        <div class="row" style="gap:6px;margin-top:8px"><button class="btn ghost sm" id="sjCp">نسخ قيود مادة إلى مواد أخرى</button></div>`;
       $$('[data-dbl]', B).forEach(x => x.onchange = () => { (P.subj[x.dataset.dbl] = P.subj[x.dataset.dbl] || {}).doubles = +x.value; touch(); });
+      $$('[data-smx]', B).forEach(x => x.onchange = () => { (P.subj[x.dataset.smx] = P.subj[x.dataset.smx] || {}).maxDay = x.value === '' ? '' : +x.value; touch(); });
+      $$('[data-stm]', B).forEach(x => x.onchange = () => { (P.subj[x.dataset.stm] = P.subj[x.dataset.stm] || {}).time = x.value; touch(); });
+      $$('[data-scr]', B).forEach(x => x.onchange = () => { (P.subj[x.dataset.scr] = P.subj[x.dataset.scr] || {}).core = x.checked; touch(); });
       $$('[data-room]', B).forEach(x => x.onchange = () => { (P.subj[x.dataset.room] = P.subj[x.dataset.room] || {}).room = x.value; touch(); });
       $$('[data-pp]', B).forEach(b => b.onclick = () => { const [s, p] = b.dataset.pp.split('|'); const c = P.subj[s] = P.subj[s] || {}; let L = new Set(c.periods && c.periods.length ? c.periods : Array.from({ length: sec.periods }, (_, i) => i)); L.has(+p) ? L.delete(+p) : L.add(+p); c.periods = L.size === sec.periods ? [] : [...L].sort(); b.classList.toggle('on'); b.setAttribute('aria-pressed', b.classList.contains('on')); touch(); });
+      $$('[data-sdt]', B).forEach(b => b.onclick = () => subjSlots(b.dataset.sdt, redraw));
+      $('#sjCp', B).onclick = () => { const it = subs.map(s => [s, sName(s)]); const m = A.modal(`<h3>نسخ قيود مادة</h3><div class="field"><label for="sjF">من المادة</label><select class="in" id="sjF">${it.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')}</select></div><div class="acts"><button class="btn" id="sjN">التالي</button></div>`);
+        m.el.querySelector('#sjN').onclick = () => { const f = m.el.querySelector('#sjF').value; m.close(); copyDialog('نسخ قيود «' + sName(f) + '»', it, f, ids => { ids.forEach(s => P.subj[s] = JSON.parse(JSON.stringify(P.subj[f] || {}))); redraw(); }); }; };
     } else if (rs === 'teach') {
       if (!tids.length) { B.innerHTML = '<p class="small muted">عيّن المعلمين أولاً من تبويب «المعلمون».</p>'; return; }
-      const lim = P.tlim[who] || {}, bl = new Set(P.blocks[who] || []);
-      B.innerHTML = `<b>قيود المعلم</b><div class="row" style="gap:10px;margin:8px 0"><select class="in" id="rT" style="max-width:240px">${tids.map(t => `<option value="${t}" ${t === who ? 'selected' : ''}>${esc(A.personName(t))}</option>`).join('')}</select>
-          <label class="small">أقصى حصص في اليوم <select class="in" id="rMx" style="max-width:80px"><option value="">—</option>${[3, 4, 5, 6, 7].map(n => `<option ${+lim.maxDay === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
-          <label class="small">أقصى فراغات بين حصصه يومياً <select class="in" id="rGp" style="max-width:80px"><option value="">—</option>${[0, 1, 2, 3].map(n => `<option ${lim.maxGaps !== undefined && lim.maxGaps !== '' && +lim.maxGaps === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div>
-        <p class="small muted">اضغط الخانة لتعليمها «غير متاح».</p>${grid(bl, 'tb', 'غير متاح')}`;
-      $('#rT', B).onchange = e => { A.LS.set('pl_bt', e.target.value); tRules(box, root); };
-      $('#rMx', B).onchange = e => { (P.tlim[who] = P.tlim[who] || {}).maxDay = e.target.value ? +e.target.value : ''; touch(); };
-      $('#rGp', B).onchange = e => { (P.tlim[who] = P.tlim[who] || {}).maxGaps = e.target.value === '' ? '' : +e.target.value; touch(); };
-      $$('[data-tb]', B).forEach(b => b.onclick = () => { const L = new Set(P.blocks[who] || []); L.has(b.dataset.tb) ? L.delete(b.dataset.tb) : L.add(b.dataset.tb); P.blocks[who] = [...L]; b.classList.toggle('on'); b.textContent = b.classList.contains('on') ? '×' : ''; touch(); });
+      const lim = P.tlim[who] = P.tlim[who] || {}, ld = {}; secClasses().forEach(c => allSubs().forEach(s => { const t = T(c.id, s); if (t) ld[t] = (ld[t] || 0) + H(c.id, s); }));
+      const getM = () => mapOf(P.blocks[who], lim.pref), setM = m => { const z = split2(m); P.blocks[who] = z.x; lim.pref = z.p; };
+      const edge = [['', '—'], ['avoid', 'يتجنّبها'], ['prefer', 'يفضّلها']];
+      B.innerHTML = `<b>قيود المعلم</b><div class="row" style="gap:8px;margin:8px 0;flex-wrap:wrap"><select class="in" id="rT" style="max-width:260px" aria-label="المعلم">${tids.map(t => `<option value="${t}" ${t === who ? 'selected' : ''}>${esc(A.personName(t))} (${AR(ld[t] || 0)})</option>`).join('')}</select>
+          <button class="btn ghost sm" id="rCp">نسخ قيوده إلى معلمين آخرين</button><button class="btn ghost sm" id="rClr">مسح قيوده</button></div>
+        <div class="row pl-fs" style="gap:10px;flex-wrap:wrap;margin-bottom:8px">
+          <label class="small pl-f">النصاب الأسبوعي <input class="in" id="rQ" inputmode="numeric" style="max-width:70px" value="${lim.quota ?? ''}" placeholder="${AR(ld[who] || 0)}"></label>
+          ${sel('rMx', nOpts([2, 3, 4, 5, 6, 7, 8]), lim.maxDay, 'أقصى حصص يومياً')}${sel('rMn', nOpts([1, 2, 3]), lim.minDay, 'أدنى حصص في يوم عمله')}
+          ${sel('rGp', nOpts([0, 1, 2, 3, 4]), lim.maxGaps, 'أقصى فراغات يومياً')}${sel('rCs', nOpts([2, 3, 4, 5, 6]), lim.maxConsec, 'أقصى متتالية')}
+          ${sel('rDy', nOpts(Array.from({ length: sec.days }, (_, i) => i + 1)), lim.maxDays, 'أقصى أيام عمل')}${sel('rLs', nOpts([0, 1, 2, 3, 4, 5]), lim.maxLast, 'أقصى حصص أخيرة أسبوعياً')}
+          ${sel('rFi', edge, lim.first, 'الحصة الأولى')}${sel('rLa', edge, lim.last, 'الحصة الأخيرة')}</div>
+        <div class="row" style="gap:10px;margin-bottom:8px;flex-wrap:wrap"><b class="small">أيام إجازته:</b>${Array.from({ length: sec.days }, (_, d) => `<label class="chk small"><input type="checkbox" data-tod="${d}" ${(lim.offDays || []).includes(d) ? 'checked' : ''}> ${dayLbl(d)}</label>`).join('')}</div>
+        ${tri(getM(), 'tb', 'المعلم')}`;
+      $('#rT', B).onchange = e => { A.LS.set('pl_bt', e.target.value); redraw(); };
+      const num = v => v === '' ? '' : +v;
+      [['rMx', 'maxDay'], ['rMn', 'minDay'], ['rGp', 'maxGaps'], ['rCs', 'maxConsec'], ['rDy', 'maxDays'], ['rLs', 'maxLast']].forEach(([id, k]) => $('#' + id, B).onchange = e => { lim[k] = num(e.target.value); touch(); });
+      $('#rFi', B).onchange = e => { lim.first = e.target.value; touch(); }; $('#rLa', B).onchange = e => { lim.last = e.target.value; touch(); };
+      $('#rQ', B).onchange = e => { const v = String(e.target.value).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).trim(); lim.quota = v === '' ? '' : Math.max(0, parseInt(v, 10) || 0); touch(); };
+      $$('[data-tod]', B).forEach(x => x.onchange = () => { const L = new Set(lim.offDays || []); x.checked ? L.add(+x.dataset.tod) : L.delete(+x.dataset.tod); lim.offDays = [...L].sort(); touch(); });
+      bindTri(B, 'tb', getM, setM, redraw);
+      $('#rClr', B).onclick = () => { P.tlim[who] = {}; P.blocks[who] = []; touch(); redraw(); };
+      $('#rCp', B).onclick = () => copyDialog('نسخ قيود ' + A.personName(who), tids.map(t => [t, A.personName(t)]), who, ids => { ids.forEach(t => { const q = (P.tlim[t] || {}).quota; P.tlim[t] = JSON.parse(JSON.stringify(lim)); P.tlim[t].quota = q; P.blocks[t] = (P.blocks[who] || []).slice(); }); redraw(); });
     } else if (rs === 'cls') {
-      const bl = new Set(P.classOff[cw] || []);
-      B.innerHTML = `<b>أوقات مغلقة للفصل</b><p class="small muted" style="margin:2px 0 8px">مثل حصة نشاط أو خروج مبكر: لا تُجدول فيها أي مادة لهذا الفصل.</p><select class="in" id="rC" style="max-width:240px;margin-bottom:8px">${secClasses().map(c => `<option value="${c.id}" ${c.id === cw ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>${grid(bl, 'cb', 'مغلقة')}`;
-      $('#rC', B).onchange = e => { A.LS.set('pl_bc', e.target.value); tRules(box, root); };
-      $$('[data-cb]', B).forEach(b => b.onclick = () => { const L = new Set(P.classOff[cw] || []); L.has(b.dataset.cb) ? L.delete(b.dataset.cb) : L.add(b.dataset.cb); P.classOff[cw] = [...L]; b.classList.toggle('on'); b.textContent = b.classList.contains('on') ? '×' : ''; touch(); });
+      const getM = () => mapOf(P.classOff[cw], P.cpref[cw]), setM = m => { const z = split2(m); P.classOff[cw] = z.x; P.cpref[cw] = z.p; };
+      B.innerHTML = `<b>أوقات الفصل</b><p class="small muted" style="margin:2px 0 8px"><b>×</b> وقت مغلق (نشاط، خروج مبكر، خارج دوام هذا الصف) لا تُجدول فيه أي مادة، و<b>✓</b> وقت مفضّل لحصص الفصل.</p>
+        <div class="row" style="gap:8px;margin-bottom:8px"><select class="in" id="rC" style="max-width:240px" aria-label="الفصل">${secClasses().map(c => `<option value="${c.id}" ${c.id === cw ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select><button class="btn ghost sm" id="rCc">نسخ إلى فصول أخرى</button></div>${tri(getM(), 'cb', 'الفصل')}`;
+      $('#rC', B).onchange = e => { A.LS.set('pl_bc', e.target.value); redraw(); };
+      bindTri(B, 'cb', getM, setM, redraw);
+      $('#rCc', B).onclick = () => copyDialog('نسخ أوقات ' + ((A.cls(cw) || {}).name || ''), secClasses().map(c => [c.id, c.name]), cw, ids => { ids.forEach(c => { P.classOff[c] = (P.classOff[cw] || []).slice(); P.cpref[c] = (P.cpref[cw] || []).slice(); }); redraw(); });
     } else if (rs === 'rooms') {
-      B.innerHTML = `<b>القاعات الخاصة</b><p class="small muted" style="margin:2px 0 8px">أضف القاعات المشتركة (معمل العلوم، معمل الحاسب، المسبح، الصالة)، ثم اربط كل مادة بقاعتها من «المواد». لا يُجدول فصلان في القاعة نفسها في الوقت نفسه.</p>
-        <div class="row" style="gap:8px;margin-bottom:8px"><input class="in" id="rN" placeholder="اسم القاعة" style="max-width:240px"><button class="btn sm" id="rAdd">${I.plus} إضافة</button></div>
-        ${P.rooms.map(r => `<div class="row" style="justify-content:space-between;border-top:1px dashed var(--border);padding:6px 0"><span><b>${esc(r.name)}</b> <span class="small muted">· ${esc(allSubs().filter(s => (P.subj[s] || {}).room === r.id).map(sName).join('، ') || 'بلا مواد')}</span></span><button class="btn bad sm" data-rr="${r.id}" aria-label="حذف القاعة">×</button></div>`).join('') || '<p class="small muted">لا توجد قاعات بعد.</p>'}`;
-      $('#rAdd', B).onclick = () => { const n = $('#rN', B).value.trim(); if (!n) return; P.rooms.push({ id: uid(), name: n }); touch(); tRules(box, root); };
-      $$('[data-rr]', B).forEach(b => b.onclick = () => { P.rooms = P.rooms.filter(r => r.id !== b.dataset.rr); Object.values(P.subj).forEach(c => { if (c.room === b.dataset.rr) c.room = ''; }); touch(); tRules(box, root); });
+      B.innerHTML = `<b>القاعات والمعامل والصالات</b><p class="small muted" style="margin:2px 0 8px">أضف القاعات المشتركة (المعامل، المختبرات، الملاعب، الصالات)، وحدّد سعة كل منها (عدد الفصول في الوقت نفسه)، وأوقات إغلاقها، ثم اربط كل مادة بقاعتها من «المواد».</p>
+        <div class="row" style="gap:8px;margin-bottom:8px;flex-wrap:wrap"><input class="in" id="rN" placeholder="اسم القاعة" style="max-width:220px"><input class="in" id="rK" placeholder="النوع (معمل، ملعب…)" style="max-width:160px"><label class="small">السعة <input class="in" id="rCap" inputmode="numeric" value="1" style="max-width:60px"></label><button class="btn sm" id="rAdd">${I.plus} إضافة</button></div>
+        ${P.rooms.length ? `<div class="scroll"><table class="tbl"><thead><tr><th>القاعة</th><th>النوع</th><th>السعة</th><th>المواد</th><th>الإغلاق</th><th></th></tr></thead><tbody>${P.rooms.map(r => `<tr><td><input class="in" data-rn="${r.id}" value="${esc(r.name)}" aria-label="اسم القاعة"></td><td><input class="in" data-rk="${r.id}" value="${esc(r.kind || '')}" style="max-width:130px" aria-label="النوع"></td>
+          <td><select class="in" data-rc="${r.id}" style="max-width:70px">${[1, 2, 3, 4, 5, 6].map(n => `<option ${(+r.cap || 1) === n ? 'selected' : ''}>${n}</option>`).join('')}</select></td>
+          <td class="small">${esc(allSubs().filter(s => (P.subj[s] || {}).room === r.id).map(sName).join('، ') || '—')}</td>
+          <td><button class="btn ghost sm" data-ro="${r.id}">أوقات الإغلاق${(r.off || []).length ? ` (${AR(r.off.length)})` : ''}</button></td><td><button class="btn bad sm" data-rr="${r.id}" aria-label="حذف القاعة">×</button></td></tr>`).join('')}</tbody></table></div>` : '<p class="small muted">لا توجد قاعات بعد.</p>'}`;
+      $('#rAdd', B).onclick = () => { const n = $('#rN', B).value.trim(); if (!n) return; P.rooms.push({ id: uid(), name: n, kind: $('#rK', B).value.trim(), cap: Math.max(1, parseInt($('#rCap', B).value, 10) || 1) }); touch(); redraw(); };
+      $$('[data-rn]', B).forEach(x => x.onchange = () => { const r = P.rooms.find(z => z.id === x.dataset.rn); r.name = x.value.trim() || r.name; touch(); });
+      $$('[data-rk]', B).forEach(x => x.onchange = () => { P.rooms.find(z => z.id === x.dataset.rk).kind = x.value.trim(); touch(); });
+      $$('[data-rc]', B).forEach(x => x.onchange = () => { P.rooms.find(z => z.id === x.dataset.rc).cap = +x.value; touch(); });
+      $$('[data-ro]', B).forEach(b => b.onclick = () => { const r = P.rooms.find(z => z.id === b.dataset.ro); slotsDialog('أوقات إغلاق ' + r.name, new Set(r.off || []), v => { r.off = v; touch(); redraw(); }); });
+      $$('[data-rr]', B).forEach(b => b.onclick = () => { P.rooms = P.rooms.filter(r => r.id !== b.dataset.rr); Object.values(P.subj).forEach(c => { if (c.room === b.dataset.rr) c.room = ''; }); touch(); redraw(); });
     } else if (rs === 'joint') {
-      B.innerHTML = `<b>حصص مشتركة</b><p class="small muted" style="margin:2px 0 8px">مادة تُدرَّس لعدة فصول في الوقت نفسه (دمج فصلين، مسبح، نشاط مشترك). تُوضع حصصها معاً في الخانة نفسها لكل الفصول المختارة.</p>
-        <div class="row" style="gap:8px;align-items:flex-start;margin-bottom:8px"><select class="in" id="jS" style="max-width:200px">${subs.map(s => `<option value="${s}">${esc(sName(s))}</option>`).join('')}</select>
-          <div class="perm-grid" id="jC" style="flex:1">${secClasses().map(c => `<label class="chk small"><input type="checkbox" value="${c.id}"> ${esc(c.name)}</label>`).join('')}</div><button class="btn sm" id="jAdd">${I.plus} ربط</button></div>
-        ${P.joint.map(j => `<div class="row" style="justify-content:space-between;border-top:1px dashed var(--border);padding:6px 0"><span><b>${esc(sName(j.sid))}</b> <span class="small muted">· ${esc(j.classes.map(c => (A.cls(c) || {}).name || '').join('، '))}</span></span><button class="btn bad sm" data-jr="${j.id}" aria-label="إلغاء الربط">×</button></div>`).join('') || '<p class="small muted">لا توجد حصص مشتركة.</p>'}`;
-      $('#jAdd', B).onclick = () => { const sid = $('#jS', B).value, cl = $$('#jC input:checked', B).map(i => i.value); if (cl.length < 2) { A.toast('اختر فصلين على الأقل', 'warn'); return; } const hs = cl.map(c => H(c, sid)); if (new Set(hs).size > 1 || !hs[0]) { A.toast('يجب أن يكون عدد حصص المادة متساوياً وغير صفر في الفصول المختارة', 'warn'); return; } P.joint.push({ id: uid(), sid, classes: cl }); touch(); tRules(box, root); };
-      $$('[data-jr]', B).forEach(b => b.onclick = () => { P.joint = P.joint.filter(j => j.id !== b.dataset.jr); touch(); tRules(box, root); });
+      B.innerHTML = `<b>الحصص المشتركة والمتوازية</b><p class="small muted" style="margin:2px 0 8px"><b>مشتركة:</b> مادة واحدة لعدة فصول في الوقت نفسه (دمج فصلين، مسبح، نشاط). <b>متوازية:</b> فصول تدرس في الوقت نفسه مواد مختلفة (المسارات، الاختياري، تقسيم المجموعات). يمكن أن تكون بعض حصص المادة فقط مشتركة.</p>
+        <div class="chip-filter" id="jM" style="margin:6px 0">${[['same', 'مشتركة (مادة واحدة)'], ['par', 'متوازية (مواد مختلفة)']].map(([k, l]) => `<button data-v="${k}" class="${(A.LS.get('pl_jm') || 'same') === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+        <div id="jF"></div>
+        ${P.joint.map(j => { const par = j.subs && Object.keys(j.subs).length; return `<div class="row" style="justify-content:space-between;border-top:1px dashed var(--border);padding:6px 0;gap:8px"><span><span class="pill ${par ? 'st-submitted' : 'st-approved'}">${par ? 'متوازية' : 'مشتركة'}</span> <b>${par ? esc(j.classes.map(c => `${(A.cls(c) || {}).name || ''}: ${sName(j.subs[c])}`).join(' | ')) : esc(sName(j.sid)) + ' <span class="small muted">· ' + esc(j.classes.map(c => (A.cls(c) || {}).name || '').join('، ')) + '</span>'}</b> <span class="small muted">${j.n ? `· ${AR(j.n)} حصص مشتركة` : '· كل الحصص'}</span></span><button class="btn bad sm" data-jr="${j.id}" aria-label="إلغاء الربط">×</button></div>`; }).join('') || '<p class="small muted">لا توجد حصص مشتركة أو متوازية.</p>'}`;
+      $$('#jM button', B).forEach(b => b.onclick = () => { A.LS.set('pl_jm', b.dataset.v); redraw(); });
+      const F = $('#jF', B), mode = A.LS.get('pl_jm') || 'same';
+      if (mode === 'same') {
+        F.innerHTML = `<div class="row" style="gap:8px;align-items:flex-start;flex-wrap:wrap"><select class="in" id="jS" style="max-width:200px" aria-label="المادة">${subs.map(s => `<option value="${s}">${esc(sName(s))}</option>`).join('')}</select><label class="small">عدد الحصص المشتركة <select class="in" id="jN" style="max-width:90px"><option value="">كلها</option>${[1, 2, 3, 4, 5, 6].map(n => `<option value="${n}">${AR(n)}</option>`).join('')}</select></label>
+          <div class="perm-grid" id="jC" style="flex:1;min-width:240px">${secClasses().map(c => `<label class="chk small"><input type="checkbox" value="${c.id}"> ${esc(c.name)}</label>`).join('')}</div><button class="btn sm" id="jAdd">${I.plus} ربط</button></div>`;
+        $('#jAdd', F).onclick = () => { const sid = $('#jS', F).value, n = +$('#jN', F).value || 0, cl = $$('#jC input:checked', F).map(i => i.value); if (cl.length < 2) { A.toast('اختر فصلين على الأقل', 'warn'); return; } const hs = cl.map(c => H(c, sid)); if (hs.some(h => !h)) { A.toast('المادة بلا حصص في بعض الفصول المختارة', 'warn'); return; } if (!n && new Set(hs).size > 1) { A.toast('عدد الحصص مختلف بين الفصول: حدّد «عدد الحصص المشتركة»', 'warn'); return; } if (n && hs.some(h => h < n)) { A.toast('العدد أكبر من حصص المادة في بعض الفصول', 'warn'); return; } P.joint.push({ id: uid(), sid, classes: cl, n: n || '' }); touch(); redraw(); };
+      } else {
+        F.innerHTML = `<div class="scroll"><table class="tbl"><thead><tr><th>الفصل</th><th>المادة في الوقت نفسه</th></tr></thead><tbody>${secClasses().map(c => `<tr><td><label class="chk small"><input type="checkbox" data-pc="${c.id}"> ${esc(c.name)}</label></td><td><select class="in" data-ps="${c.id}" style="max-width:220px"><option value="">—</option>${subs.filter(s => H(c.id, s)).map(s => `<option value="${s}">${esc(sName(s))} (${AR(H(c.id, s))})</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div>
+          <div class="row" style="gap:8px;margin-top:6px"><label class="small">عدد الحصص المتوازية <select class="in" id="jN2" style="max-width:90px">${[1, 2, 3, 4, 5, 6].map(n => `<option value="${n}">${AR(n)}</option>`).join('')}</select></label><button class="btn sm" id="jAdd2">${I.plus} ربط</button></div>`;
+        $('#jAdd2', F).onclick = () => { const cl = $$('[data-pc]:checked', F).map(i => i.dataset.pc), n = +$('#jN2', F).value; if (cl.length < 2) { A.toast('اختر فصلين على الأقل', 'warn'); return; } const sb = {}; for (const c of cl) { const s = $(`[data-ps="${c}"]`, F).value; if (!s) { A.toast('اختر مادة لكل فصل محدد', 'warn'); return; } if (H(c, s) < n) { A.toast(`حصص ${sName(s)} أقل من ${AR(n)}`, 'warn'); return; } sb[c] = s; } P.joint.push({ id: uid(), sid: sb[cl[0]], classes: cl, n, subs: sb }); touch(); redraw(); };
+      }
+      $$('[data-jr]', B).forEach(b => b.onclick = () => { P.joint = P.joint.filter(j => j.id !== b.dataset.jr); touch(); redraw(); });
     } else {
       B.innerHTML = `<b>قواعد عامة</b>
-        <div class="field" style="margin-top:8px"><label for="rM">أقصى عدد حصص للمادة نفسها في اليوم الواحد</label><select class="in" id="rM" style="max-width:120px">${[1, 2, 3, 4].map(n => `<option ${P.maxDay === n ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
-        <label class="chk"><input type="checkbox" id="rD" ${P.noDouble ? 'checked' : ''}> تجنّب حصتين متتاليتين للمادة نفسها (إلا المزدوجة)</label>
-        <label class="chk"><input type="checkbox" id="rE" ${P.emptyLast !== false ? 'checked' : ''}> الحصص الفارغة في آخر اليوم</label>
-        <p class="small muted">بعد التوليد: ثبّت أي حصة أو بادل بين حصتين يدوياً، ثم أعد التوليد للباقي — والمثبّت لا يتحرك.</p>`;
+        <div class="row pl-fs" style="gap:10px;flex-wrap:wrap;margin-top:8px">${sel('rM', [1, 2, 3, 4].map(n => [n, AR(n)]), P.maxDay || 2, 'أقصى حصص المادة يومياً')}${sel('rG', [0, 1, 2, 3].map(n => [n, AR(n)]), P.gapsDef ?? 1, 'فراغات المعلم المسموحة يومياً')}${sel('rC2', [2, 3, 4, 5, 6].map(n => [n, AR(n)]), P.consecDef ?? 4, 'أقصى حصص متتالية للمعلم')}${sel('rL', nOpts([1, 2, 3, 4, 5]), P.lastDef, 'أقصى حصص أخيرة للمعلم أسبوعياً')}</div>
+        <div class="field" style="margin-top:8px"><label for="rCore">المواد الأساسية (تُفضَّل أول اليوم) — أسماء مفصولة بفاصلة</label><input class="in" id="rCore" value="${esc(P.coreList ?? DEFCORE)}"></div>
+        <b class="small" style="display:block;margin-top:10px">خانات محجوزة لكل الفصول (اصطفاف، نشاط عام، اجتماع)</b>${(() => { const st = new Map((P.reserved || []).map(k => [k, 'x'])); return tri(st, 'rv', 'محجوزة'); })()}
+        <p class="small muted">بعد التوليد: ثبّت أي حصة، أو انقلها لترى أثرها فوراً، ثم أعد توليد الفصول التي تختارها فقط — والمثبّت لا يتحرك.</p>`;
       $('#rM', B).onchange = e => { P.maxDay = +e.target.value; touch(); };
-      $('#rD', B).onchange = e => { P.noDouble = e.target.checked; touch(); };
-      $('#rE', B).onchange = e => { P.emptyLast = e.target.checked; touch(); };
+      $('#rG', B).onchange = e => { P.gapsDef = +e.target.value; touch(); };
+      $('#rC2', B).onchange = e => { P.consecDef = +e.target.value; touch(); };
+      $('#rL', B).onchange = e => { P.lastDef = e.target.value === '' ? '' : +e.target.value; touch(); };
+      $('#rCore', B).onchange = e => { P.coreList = e.target.value; touch(); };
+      bindTri(B, 'rv', () => new Map((P.reserved || []).map(k => [k, 'x'])), m => { P.reserved = [...m].filter(([, v]) => v).map(([k]) => k); }, redraw);
     }
+  }
+  function slotsDialog(title, cur, onSave) {
+    const st = new Map([...cur].map(k => [k, 'x'])); const m = A.modal(`<h3>${esc(title)}</h3><div id="sdG"></div><div class="acts"><button class="btn" id="sdS">حفظ</button></div>`, { cls: 'wide' });
+    const draw = () => { m.el.querySelector('#sdG').innerHTML = tri(st, 'sd', ''); bindTri(m.el, 'sd', () => st, z => { [...z].forEach(([k, v]) => { if (v === 'p') z.delete(k); }); }, draw); };
+    draw(); m.el.querySelector('#sdS').onclick = () => { onSave([...st.keys()]); m.close(); };
+  }
+  function subjSlots(s, redraw) {
+    const sec = A.section(), c = P.subj[s] = P.subj[s] || {}; const st = mapOf(c.off, c.pref);
+    const m = A.modal(`<h3>أوقات «${esc(sName(s))}»</h3><div class="row" style="gap:10px;margin-bottom:8px;flex-wrap:wrap"><b class="small">أيام ممنوعة:</b>${Array.from({ length: sec.days }, (_, d) => `<label class="chk small"><input type="checkbox" data-sod="${d}" ${(c.offDays || []).includes(d) ? 'checked' : ''}> ${dayLbl(d)}</label>`).join('')}</div><div id="ssG"></div><div class="acts"><button class="btn" id="ssS">حفظ</button></div>`, { cls: 'wide' });
+    const draw = () => { m.el.querySelector('#ssG').innerHTML = tri(st, 'ss', ''); bindTri(m.el, 'ss', () => st, () => { }, draw); };
+    draw();
+    m.el.querySelector('#ssS').onclick = () => { const z = split2(st); c.off = z.x; c.pref = z.p; c.offDays = [...m.el.querySelectorAll('[data-sod]:checked')].map(i => +i.dataset.sod); touch(); m.close(); redraw(); };
   }
   // ---------- الأحمال ----------
   function tLoad(box) {
@@ -6794,172 +7261,199 @@ ${S.me.full_name}`;
     box.innerHTML = rows.length ? `<div class="scroll" style="margin-top:12px"><table class="tbl"><thead><tr><th>المعلم</th><th>الحصص الأسبوعية</th><th>التفاصيل</th></tr></thead><tbody>${rows.map(([t, r]) => `<tr><td><b>${t === '—' ? '<span style="color:var(--bad)">بلا معلم</span>' : esc(A.personName(t))}</b></td><td><span class="pill ${r.n > c0 ? 'st-returned' : r.n > 24 ? 'st-submitted' : 'st-approved'}">${AR(r.n)}</span></td><td class="small">${esc(r.items.join('، '))}</td></tr>`).join('')}</tbody></table></div><p class="small muted">أكثر من ${AR(c0)} حصة لمعلم واحد يستحيل جدولته؛ وأكثر من ٢٤ حمل مرتفع.</p>` : A.emptyBox('لا توجد حصص بعد');
   }
 
-  // ---------- المحرّك: بطاقات (مفردة/مزدوجة/مشتركة) + تبادلات داخل الفصل مع تحسين تدريجي ----------
-  function build() {
-    ens(); const sec = A.section(), D = sec.days, Pn = sec.periods, N = D * Pn, cls = secClasses().filter(c => rowTot(c.id));
-    const over = cls.filter(c => rowTot(c.id) + (P.classOff[c.id] || []).length > N); if (over.length) throw new Error('حصص أكثر من سعة الأسبوع (مع الأوقات المغلقة) في: ' + over.map(c => c.name).join('، '));
-    const ci = Object.fromEntries(cls.map((c, i) => [c.id, i]));
-    const cards = []; // {id, gi, sid, len, joint}
-    const jointOf = {}; P.joint.forEach(j => j.classes.forEach(c => { jointOf[c + '|' + j.sid] = j; }));
-    const jcards = {}; // جذر البطاقة المشتركة
-    cls.forEach((c, gi) => allSubs().forEach(s => { let h = H(c.id, s); if (!h) return; const dbl = Math.min(+((P.subj[s] || {}).doubles) || 0, Math.floor(h / 2)); const j = jointOf[c.id + '|' + s];
-      for (let k = 0; k < dbl; k++) { cards.push({ id: cards.length, gi, sid: s, len: 2, j: j ? j.id + ':d' + k : null }); h -= 2; }
-      for (let k = 0; k < h; k++) cards.push({ id: cards.length, gi, sid: s, len: 1, j: j ? j.id + ':s' + k : null }); }));
-    cards.forEach(cd => { if (cd.j) (jcards[cd.j] = jcards[cd.j] || []).push(cd.id); });
-    return { D, Pn, N, cls, ci, cards, jcards };
-  }
+  // ---------- المحرّك الموحّد DinaTT ----------
   // انشغال المعلم المشترك في الأقسام الأخرى (من جداولها المعتمدة) — يُمنع التعارض بين الأقسام
   let EXT = {};
   async function loadExt() {
     EXT = {}; const secs = (S.allSections || S.sections || []).filter(x => x.id !== S.sectionId);
-    for (const sc of secs) { let sl = []; try { sl = await api.approvedSlots(sc.id); } catch (_) {} sl.forEach(x => { if (x.teacher_id) (EXT[x.teacher_id] = EXT[x.teacher_id] || new Map()).set(x.day + '-' + x.period, sc.name); }); }
+    for (const sc of secs) { let sl = []; try { sl = await api.approvedSlots(sc.id); } catch (_) {} sl.forEach(x => { if (x.teacher_id) (EXT[x.teacher_id] = EXT[x.teacher_id] || {})[x.day + '-' + x.period] = sc.name; }); }
     return EXT;
   }
-  function solve(opt) {
-    const M = build(), { D, Pn, N, cls, cards, jcards } = M, mx = P.maxDay || 2;
-    const blk = Object.fromEntries(Object.entries(P.blocks || {}).map(([t, l]) => [t, new Set(l)]));
-    const coff = cls.map(c => new Set(P.classOff[c.id] || []));
-    const tch = (gi, s) => s ? T(cls[gi].id, s) : '';
-    const room = s => (P.subj[s] || {}).room || '';
-    const allow = s => { const l = (P.subj[s] || {}).periods; return l && l.length ? new Set(l) : null; };
-    const AL = {}; allSubs().forEach(s => AL[s] = allow(s));
-    const lockOf = cls.map(c => P.locks[c.id] || {});
-    let best = null;
-    for (let rs = 0; rs < (opt.restarts || 4); rs++) {
-      // G[gi][k] = رقم البطاقة أو -1، مع تثبيت المقفل أولاً
-      const G = cls.map(() => new Array(N).fill(-1)), fixed = cls.map(() => new Array(N).fill(false));
-      const placed = new Set();
-      const free = gi => { const f = []; for (let k = 0; k < N; k++) if (G[gi][k] < 0 && !coff[gi].has(Math.floor(k / Pn) + '-' + (k % Pn))) f.push(k); return f; };
-      // المقفل
-      cls.forEach((c, gi) => Object.entries(lockOf[gi]).forEach(([dk, sid]) => { const [d, p] = dk.split('-').map(Number), k = d * Pn + p; const cd = cards.find(x => x.gi === gi && x.sid === sid && x.len === 1 && !placed.has(x.id) && !x.j); if (cd && G[gi][k] < 0) { G[gi][k] = cd.id; fixed[gi][k] = true; placed.add(cd.id); } }));
-      const put = (cd, k) => { for (let q = 0; q < cd.len; q++) G[cd.gi][k + q] = cd.id; placed.add(cd.id); };
-      const canAt = (gi, k, len) => { if (k % Pn + len > Pn) return false; for (let q = 0; q < len; q++) { const kk = k + q; if (G[gi][kk] >= 0 || coff[gi].has(Math.floor(kk / Pn) + '-' + (kk % Pn))) return false; } return true; };
-      // المشتركة والمزدوجة أولاً
-      const order = cards.filter(c => !placed.has(c.id)).sort((a, b) => (b.j ? 2 : 0) + b.len - ((a.j ? 2 : 0) + a.len) || Math.random() - .5);
-      for (const cd of order) {
-        if (placed.has(cd.id)) continue;
-        const grp = cd.j ? jcards[cd.j].map(i => cards[i]) : [cd];
-        const ks = []; for (let k = 0; k < N; k++) if (grp.every(g => canAt(g.gi, k, g.len))) ks.push(k);
-        if (!ks.length) { const f = free(cd.gi); if (f.length) for (const g of grp) { const ff = free(g.gi).filter(k => canAt(g.gi, k, g.len)); if (ff.length) put(g, ff[Math.floor(Math.random() * ff.length)]); } continue; }
-        const k = ks[Math.floor(Math.random() * ks.length)]; grp.forEach(g => put(g, k));
-      }
-      // ما لم يُوضع (مزدوج لم يجد خانتين) يُفكّ إلى مفردات
-      cards.forEach(cd => { if (!placed.has(cd.id)) { const f = free(cd.gi); for (let q = 0; q < cd.len && f[q] !== undefined; q++) G[cd.gi][f[q]] = cd.id; placed.add(cd.id); } });
-      const C = id => id >= 0 ? cards[id] : null;
-      const startOf = (gi, k) => { const id = G[gi][k]; if (id < 0) return k; let s = k; while (s % Pn > 0 && G[gi][s - 1] === id) s--; return s; };
-      // تكلفة كاملة (تُحسب كاملة لكل مرشح — عدد الخانات صغير)
-      const cost = () => {
-        let c = 0; const tslot = new Map(), rslot = new Map();
-        for (let gi = 0; gi < G.length; gi++) { const row = G[gi]; const dayCnt = Array.from({ length: D }, () => ({}));
-          for (let k = 0; k < N; k++) { const cd = C(row[k]); const d = Math.floor(k / Pn), p = k % Pn;
-            if (!cd) { if (P.emptyLast !== false && p < Pn - 1) { for (let q = k + 1; q < (d + 1) * Pn; q++) if (row[q] >= 0) { c += 0.4; break; } } continue; }
-            const t = tch(gi, cd.sid), r = room(cd.sid);
-            if (t) { const key = k + '|' + t; const prev = tslot.get(key); if (prev !== undefined && !(cd.j && prev === cd.j)) c += 10; tslot.set(key, cd.j || 'x' + gi); if (blk[t] && blk[t].has(d + '-' + p)) c += 8; if (EXT[t] && EXT[t].has(d + '-' + p)) c += 10; }
-            if (r) { const key = k + '|' + r; const prev = rslot.get(key); if (prev !== undefined && !(cd.j && prev === cd.j)) c += 8; rslot.set(key, cd.j || 'x' + gi); }
-            if (AL[cd.sid] && !AL[cd.sid].has(p)) c += 5;
-            if (coff[gi].has(d + '-' + p)) c += 10;
-            if (k === startOf(gi, k)) dayCnt[d][cd.sid] = (dayCnt[d][cd.sid] || 0) + 1;
-            if (P.noDouble && p > 0 && row[k - 1] >= 0 && row[k - 1] !== row[k] && C(row[k - 1]).sid === cd.sid) c += 1;
-          }
-          dayCnt.forEach(m => Object.entries(m).forEach(([s, n]) => { const lim = Math.max(mx, 1); if (n > lim) c += 3 * (n - lim); }));
-        }
-        // حدود المعلم اليومية والفراغات
-        Object.entries(P.tlim || {}).forEach(([t, l]) => { if (!l) return; for (let d = 0; d < D; d++) { const ps = []; for (let p = 0; p < Pn; p++) { const k = d * Pn + p; for (let gi = 0; gi < G.length; gi++) { const cd = C(G[gi][k]); if (cd && tch(gi, cd.sid) === t) { ps.push(p); break; } } }
-          if (l.maxDay && ps.length > l.maxDay) c += 4 * (ps.length - l.maxDay);
-          if (l.maxGaps !== '' && l.maxGaps !== undefined && ps.length > 1) { const gaps = ps[ps.length - 1] - ps[0] + 1 - ps.length; if (gaps > l.maxGaps) c += 1.5 * (gaps - l.maxGaps); } } });
-        return c;
-      };
-      // نقلة: تبادل كتلتين بنفس الطول داخل فصل (مع سحب البطاقات المشتركة معاً)
-      const blockAt = (gi, k) => { const id = G[gi][k]; if (id < 0) return { s: k, len: 1, id: -1 }; const s = startOf(gi, k); return { s, len: C(id).len, id }; };
-      const swapIn = (gi, a, b, len) => { for (let q = 0; q < len; q++) { const t = G[gi][a + q]; G[gi][a + q] = G[gi][b + q]; G[gi][b + q] = t; } };
-      const okBlock = (gi, s, len) => { if (s % Pn + len > Pn) return false; for (let q = 0; q < len; q++) if (fixed[gi][s + q]) return false; const first = G[gi][s], last = G[gi][s + len - 1]; if (first >= 0 && startOf(gi, s) !== s) return false; if (last >= 0 && C(last).len === 2 && startOf(gi, s + len - 1) === s + len - 1 && len === 1) return false; return true; };
-      let cur = cost(); const it = opt.iters || 6000, T0 = 3;
-      for (let i = 0; i < it && cur > 0.01; i++) {
-        const gi = Math.floor(Math.random() * G.length), A1 = blockAt(gi, Math.floor(Math.random() * N)), len = A1.len;
-        const b = Math.floor(Math.random() * N); const B1 = { s: b - (b % Pn) + Math.min(b % Pn, Pn - len) };
-        if (A1.s === B1.s || !okBlock(gi, A1.s, len) || !okBlock(gi, B1.s, len)) continue;
-        if (Math.abs(A1.s - B1.s) < len) continue;
-        // البطاقات المشتركة في الكتلتين: تُنقل في كل فصولها
-        const js = new Set(); for (let q = 0; q < len; q++) [G[gi][A1.s + q], G[gi][B1.s + q]].forEach(id => { if (id >= 0 && C(id).j) js.add(C(id).j); });
-        const moves = [gi]; let bad = false;
-        js.forEach(j => jcards[j].forEach(id => { const g2 = cards[id].gi; if (!moves.includes(g2)) { if (!okBlock(g2, A1.s, len) || !okBlock(g2, B1.s, len)) bad = true; moves.push(g2); } }));
-        if (bad) continue;
-        moves.forEach(g => swapIn(g, A1.s, B1.s, len));
-        const nc = cost(), dl = nc - cur, temp = T0 * (1 - i / it) + 0.02;
-        if (dl <= 0 || Math.random() < Math.exp(-dl / temp)) cur = nc; else moves.forEach(g => swapIn(g, A1.s, B1.s, len));
-      }
-      if (!best || cur < best.cost) best = { cost: cur, G: G.map(r => r.slice()), fixed: fixed.map(r => r.slice()) };
-      if (best.cost < 0.01) break;
-    }
-    const res = { ...M, grid: best.G.map(r => r.map(id => id >= 0 ? cards[id].sid : null)), cid: best.G, fixed: best.fixed, cost: best.cost, tch };
-    res.issues = issuesOf(res); return res;
+  function toX(extra) {
+    ens(); const sec = A.section(), cls = secClasses().filter(c => rowTot(c.id)), subs = new Set(allSubs());
+    const N = sec.days * sec.periods, res = (P.reserved || []).length;
+    const over = cls.filter(c => rowTot(c.id) + new Set([...(P.classOff[c.id] || []), ...(P.reserved || [])]).size > N);
+    if (over.length) throw new Error('حصص أكثر من سعة الأسبوع (مع الأوقات المغلقة' + (res ? ' والمحجوزة' : '') + ') في: ' + over.map(c => c.name).join('، '));
+    const rules = JSON.parse(JSON.stringify(P.rules || {}));
+    if (!rules.adj && !P.noDouble) rules.adj = { lv: 'o' };
+    if (!rules.emptyLast && P.emptyLast === false) rules.emptyLast = { lv: 'o' };
+    const coreN = (P.coreList ?? DEFCORE).split(/[،,]/).map(x => A.normKey(x.trim())).filter(Boolean);
+    const subj = {}; subs.forEach(s => { const c = Object.assign({}, P.subj[s] || {}); if (c.core === undefined) c.core = coreN.some(n => A.normKey(sName(s)).includes(n)); subj[s] = c; });
+    const hours = {}; cls.forEach(c => { hours[c.id] = {}; Object.entries(P.hours[c.id] || {}).forEach(([s, h]) => { if (subs.has(s) && +h) hours[c.id][s] = +h; }); });
+    const joint = (P.joint || []).map(j => Object.assign({}, j, { classes: j.classes.filter(c => cls.some(x => x.id === c)) })).filter(j => j.classes.length > 1);
+    return Object.assign({ D: sec.days, Pn: sec.periods, cls: cls.map(c => ({ id: c.id, name: c.name })), hours, teachers: P.teachers, locks: P.locks, subj, blocks: P.blocks, tlim: P.tlim, classOff: P.classOff, cpref: P.cpref, reserved: P.reserved,
+      rooms: P.rooms, joint, maxDay: P.maxDay || 2, gapsDef: P.gapsDef ?? 1, consecDef: P.consecDef ?? 4, lastDef: P.lastDef, rules, ext: EXT, nm: { s: sName, t: t => A.personName(t), days: A.DAYS } }, extra || {});
   }
-  function issuesOf(g) {
-    const out = [], { D, Pn, N, cls } = g, tmap = {}, rmap = {};
-    g.grid.forEach((row, gi) => row.forEach((s, k) => { if (!s) return; const d = Math.floor(k / Pn), p = k % Pn, t = g.tch(gi, s), r = (P.subj[s] || {}).room, cd = g.cards[g.cid[gi][k]];
-      const key = cd && cd.j ? cd.j : 'x' + gi;
-      if (t) { const kk = k + '|' + t; (tmap[kk] = tmap[kk] || new Set()).add(key); if ((P.blocks[t] || []).includes(d + '-' + p)) out.push(`${A.personName(t)} غير متاح ${A.DAYS[d]} الحصة ${p + 1} (${cls[gi].name})`); if (EXT[t] && EXT[t].has(d + '-' + p)) out.push(`${A.personName(t)} لديه حصة في ${EXT[t].get(d + '-' + p)} ${A.DAYS[d]} الحصة ${p + 1} (${cls[gi].name})`); }
-      if (r) { const kk = k + '|' + r; (rmap[kk] = rmap[kk] || new Set()).add(key); }
-      const al = (P.subj[s] || {}).periods; if (al && al.length && !al.includes(p)) out.push(`${sName(s)} في حصة غير مسموحة: ${A.DAYS[d]} ${p + 1} (${cls[gi].name})`);
-      if ((P.classOff[cls[gi].id] || []).includes(d + '-' + p)) out.push(`${cls[gi].name}: حصة في وقت مغلق ${A.DAYS[d]} ${p + 1}`); }));
-    Object.entries(tmap).forEach(([kk, set]) => { if (set.size > 1) { const [k, t] = kk.split('|'); out.push(`تعارض: ${A.personName(t)} في ${A.DAYS[Math.floor(k / Pn)]} الحصة ${+k % Pn + 1}`); } });
-    Object.entries(rmap).forEach(([kk, set]) => { if (set.size > 1) { const [k, r] = kk.split('|'); out.push(`تعارض قاعة «${((P.rooms || []).find(x => x.id === r) || {}).name || ''}» ${A.DAYS[Math.floor(k / Pn)]} الحصة ${+k % Pn + 1}`); } });
-    return [...new Set(out)];
+  const QT = { q: [1800, 1, 'سريع'], n: [5000, 2, 'متوازن'], d: [12000, 3, 'دقيق'], x: [30000, 4, 'أقصى دقة (أبطأ)'] };
+  let RUN = null;
+  async function runGen(out, root, extra, label) {
+    if (!TT()) { A.toast('محرك القيود لم يُحمَّل — حدّث الصفحة', 'err'); return; }
+    if (dirty) await save(true); await loadExt();
+    const q = QT[P.gq || 'n'] || QT.n; let X; try { X = toX(extra); } catch (e) { A.toast(e.message, 'err'); return; }
+    out.innerHTML = `<div class="tt-prog" role="status" aria-live="polite"><div class="row" style="justify-content:space-between;gap:8px"><b id="gpL">يوزّع الحصص ويطبّق القيود الإلزامية…</b><button class="btn ghost sm" id="gpS">إيقاف واعتماد الأفضل</button></div><div class="tt-bar"><i id="gpB" style="width:2%"></i></div><p class="small muted" id="gpC" style="margin:4px 0 0">${esc(label || 'توليد كامل')} · الدقة: ${q[2]}</p></div>`;
+    RUN = { stop: false }; const me = RUN; $('#gpS', out).onclick = () => { me.stop = true; };
+    let R; try {
+      R = await TT().solve(X, { time: q[0], restarts: q[1], stop: () => me.stop, onStep: (f, c) => { const b = $('#gpB', out), l = $('#gpL', out); if (b) b.style.width = Math.max(2, Math.round(f * 100)) + '%'; if (l && c !== null && c !== undefined) l.textContent = c < 0.01 ? 'وُجد جدول يحقق كل القيود…' : c >= 100 ? 'يعالج القيود الإلزامية…' : 'يحسّن القيود التفضيلية…'; } });
+    } catch (e) { out.innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; return; }
+    RUN = null; lastGen = R; LAST = null; pick = null; logIt(`${label || 'توليد كامل'}: الجودة ${R.report.score}، إلزامية ${R.report.hard}`); touch(); const bx = out.closest('#plB'); if (bx) tGen(bx, root); else showGen(out, root);
   }
-  A._planState = () => P; A._lastGen = () => lastGen; A._planReload = () => { PSEC = null; P = null; };
-  A._planSave = () => save(true); A._planTab = t => { if (t) tab = t; return tab; }; A._planCap = cap;
+  const startGrid = () => { const st = {}; lastGen.cls.forEach((c, i) => st[c.id] = lastGen.grid[i].slice()); return st; };
   function tGen(box, root) {
-    const cls = secClasses().filter(c => rowTot(c.id)); const miss = []; cls.forEach(c => allSubs().forEach(s => { if (H(c.id, s) && !T(c.id, s)) miss.push(1); }));
+    ens(); const cls = secClasses().filter(c => rowTot(c.id)); const miss = []; cls.forEach(c => allSubs().forEach(s => { if (H(c.id, s) && !T(c.id, s)) miss.push(1); }));
     const ld = {}; cls.forEach(c => allSubs().forEach(s => { const t = T(c.id, s); if (t) ld[t] = (ld[t] || 0) + H(c.id, s); }));
-    const heavy = Object.entries(ld).filter(([, n]) => n > cap()); ens();
+    const heavy = Object.entries(ld).filter(([, n]) => n > cap());
     const nl = Object.values(P.locks).reduce((a, m) => a + Object.keys(m).length, 0);
-    box.innerHTML = `<div class="sec-box" style="margin-top:12px"><div class="row" style="justify-content:space-between;gap:10px"><div><b>توليد جدول ${AR(cls.length)} فصلاً من التوزيع</b>
-        <p class="small muted" style="margin:4px 0 0">يراعي: عدد الحصص، الحصص المزدوجة، الحصص المشتركة، تعارض المعلم والقاعة، أوقات عدم الإتاحة للمعلم والفصل، انشغال المعلم المشترك في الأقسام الأخرى، الحصص المسموح بها لكل مادة، أقصى ${AR(P.maxDay || 2)} حصص للمادة يومياً، حدود المعلم اليومية والفراغات${nl ? `، و${AR(nl)} حصة مثبّتة` : ''}.${miss.length ? ` <b style="color:#b54708">${AR(miss.length)} خلية بلا معلم.</b>` : ''}</p></div>
-        <button class="btn sky" id="gGo">توليد</button></div>${heavy.length ? `<div class="notice bad" style="margin-top:10px">لا يمكن جدولة معلم بأكثر من ${AR(cap())} حصة أسبوعياً: ${heavy.map(([t, n]) => `${esc(A.personName(t))} (${AR(n)})`).join('، ')}</div>` : ''}<div id="gOut"></div></div>`;
-    if (lastGen) showGen($('#gOut', box), root);
-    $('#gGo', box).onclick = e => A.run(e.currentTarget, async () => {
-      if (dirty) await save(true);
-      $('#gOut', box).innerHTML = '<div class="spinner"></div>'; await new Promise(r => setTimeout(r, 30));
-      await loadExt(); lastGen = solve({ restarts: 3, iters: 7000 }); showGen($('#gOut', box), root);
-    });
+    let pre = []; try { const R = TT() && TT().RULES; pre = R ? Object.keys(R).filter(k => TT().isHard({ rules: P.rules }, k)).map(k => R[k][0]) : []; } catch (_) { }
+    box.innerHTML = `<div class="sec-box" style="margin-top:12px"><div class="row" style="justify-content:space-between;gap:10px;flex-wrap:wrap"><div class="grow"><b>توليد جدول ${AR(cls.length)} فصلاً من التوزيع</b>
+        <p class="small muted" style="margin:4px 0 0">المحرك يطبّق القيود الإلزامية أولاً (${esc(pre.join('، '))}) ثم يحسّن التفضيلية حسب أوزانها${nl ? `، و${AR(nl)} حصة مثبّتة لا تتحرك` : ''}. غيّر قوة أي قيد من «القيود ← قوة القيود والأوزان».${miss.length ? ` <b style="color:#b54708">${AR(miss.length)} خلية بلا معلم.</b>` : ''}</p></div>
+        <div class="row" style="gap:6px;flex-wrap:wrap"><select class="in" id="gQ" aria-label="دقة التوليد" style="max-width:170px">${Object.entries(QT).map(([v, x]) => `<option value="${v}" ${(P.gq || 'n') === v ? 'selected' : ''}>${x[2]}</option>`).join('')}</select><button class="btn sky" id="gGo">توليد كامل</button>
+          ${lastGen ? `<button class="btn ghost sm" id="gPart">إعادة توليد فصول محددة</button><button class="btn ghost sm" id="gImp">تحسين الجدول الحالي</button>` : ''}</div></div>
+      ${heavy.length ? `<div class="notice bad" style="margin-top:10px">لا يمكن جدولة معلم بأكثر من ${AR(cap())} حصة أسبوعياً: ${heavy.map(([t, n]) => `${esc(A.personName(t))} (${AR(n)})`).join('، ')}</div>` : ''}<div id="gOut"></div></div>`;
+    const out = $('#gOut', box);
+    $('#gQ', box).onchange = e => { P.gq = e.target.value; touch(); };
+    if (lastGen) showGen(out, root);
+    $('#gGo', box).onclick = e => A.run(e.currentTarget, () => runGen(out, root, null, 'توليد كامل'));
+    const gi = $('#gImp', box); if (gi) gi.onclick = e => A.run(e.currentTarget, () => runGen(out, root, { start: startGrid(), warm: true }, 'تحسين الجدول الحالي'));
+    const gp = $('#gPart', box); if (gp) gp.onclick = () => {
+      const m = A.modal(`<h3>إعادة توليد جزء من الجدول</h3><p class="small muted">تبقى الفصول غير المحددة كما هي تماماً (بحصصها ومواعيدها)، ويُعاد توزيع المحددة فقط مع مراعاة معلميها في بقية الجدول.</p>
+        <div class="row" style="gap:6px;margin-bottom:6px;flex-wrap:wrap"><button class="btn ghost sm" id="ppA">الكل</button><button class="btn ghost sm" id="ppN">لا شيء</button><button class="btn ghost sm" id="ppBad">الفصول التي فيها مخالفات</button>
+          <select class="in" id="ppT" style="max-width:220px" aria-label="فصول معلم"><option value="">فصول معلم…</option>${tidsOf().map(t => `<option value="${t}">${esc(A.personName(t))}</option>`).join('')}</select></div>
+        <div class="perm-grid" style="max-height:46vh;overflow:auto">${lastGen.cls.map(c => `<label class="chk small"><input type="checkbox" value="${c.id}"> ${esc(c.name)}</label>`).join('')}</div>
+        <div class="acts"><button class="btn sky" id="ppGo">إعادة توليد المحدد</button></div>`);
+      const ins = () => [...m.el.querySelectorAll('.perm-grid input')];
+      m.el.querySelector('#ppA').onclick = () => ins().forEach(i => i.checked = true); m.el.querySelector('#ppN').onclick = () => ins().forEach(i => i.checked = false);
+      m.el.querySelector('#ppBad').onclick = () => { const M = lastGen.M; ins().forEach(i => { const g2 = lastGen.cls.findIndex(c => c.id === i.value); const bad = M.cc[g2] > 0.5 || M.cards.some(cd => cd.gi === g2 && cd.t && M.tc[cd.t] >= 100); i.checked = bad; }); };
+      m.el.querySelector('#ppT').onchange = e => { const t = e.target.value; if (!t) return; ins().forEach(i => { if (allSubs().some(s => T(i.value, s) === t && H(i.value, s))) i.checked = true; }); };
+      m.el.querySelector('#ppGo').onclick = () => { const on = new Set(ins().filter(i => i.checked).map(i => i.value)); if (!on.size) { A.toast('اختر فصلاً واحداً على الأقل', 'warn'); return; } m.close(); runGen(out, root, { start: startGrid(), keep: lastGen.cls.filter(c => !on.has(c.id)).map(c => c.id) }, `إعادة توليد ${on.size} فصل`); };
+    };
   }
-  let pick = null;
+  let pick = null, LAST = null;
+  const altTag = dl => dl < -0.05 ? ['يحسّن', 'ok', '▲'] : dl <= 0.05 ? ['بلا أثر', '', '='] : dl < 100 ? [dl <= 3 ? 'أسوأ قليلاً' : 'أسوأ', 'bad', '▼'] : ['يخالف قيداً إلزامياً', 'bad', '⛔'];
+  const ruleName = k => ((TT() && TT().RULES[k]) || [k])[0];
+  function impactHtml(sw) {
+    const a = sw.before, b = sw.after, ch = [];
+    Object.keys(b.byRule).forEach(k => { const x = (a.byRule[k] || {}).n || 0, y = (b.byRule[k] || {}).n || 0; if (Math.abs(x - y) > 0.05) ch.push(`<li>${esc(ruleName(k))}: ${AR(Math.round(x * 10) / 10)} ← ${AR(Math.round(y * 10) / 10)} ${y < x ? '<b style="color:#2E8B57">تحسّن</b>' : '<b style="color:#b42318">زاد</b>'}</li>`); });
+    return `<div class="notice ${b.hard > a.hard ? 'bad' : b.score >= a.score ? 'ok' : 'warn'} tt-imp"><div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><b>أثر التعديل: الجودة ${AR(a.score)} ← ${AR(b.score)} · الإلزامية ${AR(a.hard)} ← ${AR(b.hard)}${sw.classes.length > 1 ? ` · نُقلت معها الحصة المشتركة في ${AR(sw.classes.length - 1)} فصل` : ''}</b><button class="btn ghost sm" id="gUndo">تراجع</button></div>${ch.length ? `<ul class="small" style="margin:6px 0 0">${ch.join('')}</ul>` : '<p class="small" style="margin:4px 0 0">لا تغيير في القيود.</p>'}</div>`;
+  }
   function showGen(out, root) {
-    const g = lastGen; let view = A.LS.get('pl_gv') || 'class';
+    const g = lastGen, rep = g.report; let view = A.LS.get('pl_gv') || 'class';
     const tids = [...new Set(g.grid.flatMap((r, gi) => r.map(s => g.tch(gi, s)).filter(Boolean)))];
     let sel = A.LS.get(view === 'class' ? 'pl_gc' : 'pl_gt'); const opts = view === 'class' ? g.cls.map(c => [c.id, c.name]) : tids.map(t => [t, A.personName(t)]);
     if (!opts.some(o => o[0] === sel)) sel = (opts[0] || [])[0];
     const gi = g.cls.findIndex(c => c.id === sel);
+    let alts = null; if (view === 'class' && pick && pick.gi === gi) { alts = new Map(g.alts(gi, pick.k).map(x => [x.k, x])); }
     const cell = (d, p) => { const k = d * g.Pn + p;
-      if (view === 'class') { const s = g.grid[gi][k], t = g.tch(gi, s), lk = (P.locks[sel] || {})[d + '-' + p], cd = g.cards[g.cid[gi][k]]; return `<td class="pl-gc ${pick && pick.k === k ? 'pick' : ''} ${lk ? 'lk' : ''}" data-k="${k}" tabindex="0">${s ? `<b>${esc(sName(s))}</b>${cd && cd.len === 2 ? ' <span class="pill st-empty">مزدوجة</span>' : ''}${cd && cd.j ? ' <span class="pill st-submitted">مشتركة</span>' : ''}${t ? `<div class="small muted">${esc(A.personName(t))}</div>` : ''}` : '<span class="faint">—</span>'}${lk ? '<div class="small" style="color:var(--blue)">مثبّتة</div>' : ''}</td>`; }
-      const L = g.cls.map((c, i) => [c, g.grid[i][k]]).filter(([c, s], i) => s && g.tch(g.cls.indexOf(c), s) === sel); return `<td>${L.map(([c, s]) => `<b>${esc(sName(s))}</b><div class="small muted">${esc(c.name)}</div>`).join('') || '<span class="faint">—</span>'}</td>`; };
-    out.innerHTML = `<div class="notice ${g.issues.length ? 'warn' : 'ok'}" style="margin-top:10px">${g.issues.length ? `${AR(g.issues.length)} مشكلة متبقية — أعد التوليد، أو ثبّت/بادل يدوياً، أو خفّف القيود.<ul class="small" style="margin:6px 0 0">${g.issues.slice(0, 10).map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : 'جدول بلا تعارضات ويحقق كل القيود.'}</div>
+      if (view === 'class') { const s = g.grid[gi][k], t = g.tch(gi, s), lk = (P.locks[sel] || {})[d + '-' + p], cd = g.cards[g.cid[gi][k]], fx = g.fixed[gi][k] && !lk;
+        const al = alts && alts.get(k), dl = al ? al.delta : null, cls2 = al ? (dl < -0.05 ? 'alt-good' : dl <= 2.5 ? 'alt-ok' : dl < 100 ? 'alt-warn' : 'alt-bad') : '';
+        return `<td class="pl-gc ${pick && pick.k === k && pick.gi === gi ? 'pick' : ''} ${lk ? 'lk' : ''} ${fx ? 'fx' : ''} ${cls2}" data-k="${k}" tabindex="0" ${al ? `title="${altTag(dl)[0]}"` : ''}>${s ? `<b>${esc(sName(s))}</b>${cd && cd.len === 2 ? ' <span class="pill st-empty">مزدوجة</span>' : ''}${cd && cd.j ? ` <span class="pill st-submitted">${(P.joint.find(j => cd.j.startsWith(j.id)) || {}).subs ? 'متوازية' : 'مشتركة'}</span>` : ''}${t ? `<div class="small muted">${esc(A.personName(t))}</div>` : ''}` : `<span class="faint">${fx ? 'مغلقة' : '—'}</span>`}${lk ? '<div class="small" style="color:var(--blue)">مثبّتة</div>' : ''}${al && Math.abs(dl) > 0.05 ? `<span class="alt-d" aria-hidden="true">${altTag(dl)[2]}</span>` : ''}</td>`; }
+      const L = g.cls.map((c, i) => [c, g.grid[i][k], i]).filter(([c, s, i]) => s && g.tch(i, s) === sel); return `<td class="${L.length > 1 && new Set(L.map(([, , i]) => (g.cards[g.cid[i][k]] || {}).unit)).size > 1 ? 'tt-clash' : ''}">${L.map(([c, s]) => `<b>${esc(sName(s))}</b><div class="small muted">${esc(c.name)}</div>`).join('') || '<span class="faint">—</span>'}</td>`; };
+    const pc = rep.score >= 85 ? '#2E8B57' : rep.score >= 60 ? '#b54708' : '#b42318';
+    const ruleRows = Object.entries(rep.byRule).filter(([, r]) => r.n && r.lv !== 'o').sort((a, b) => (b[1].lv === 'h') - (a[1].lv === 'h') || b[1].n - a[1].n);
+    const altList = alts ? [...alts.values()].filter(x => x.delta < 100).slice(0, 6) : [];
+    out.innerHTML = `<div class="tt-sum"><div class="tt-g" style="--p:${rep.score};--c:${pc}"><b>${AR(rep.score)}</b><span>من ١٠٠</span></div><div class="grow">
+        <div class="notice ${rep.hard ? 'bad' : 'ok'}" style="margin:0 0 8px">${rep.hard ? `<b>لم يكتمل الجدول: ${AR(rep.hard)} مخالفة لقيود إلزامية.</b> أعد التوليد بدقة أعلى، أو ثبّت/انقل يدوياً، أو خفّف قوة القيد.` : `<b>تم إنشاء الجدول بنجاح</b> — لا مخالفة لأي قيد إلزامي${rep.soft ? `، و${AR(Math.round(rep.soft))} ملاحظة تفضيلية` : ' ويحقق كل القيود'}.`}</div>
+        <div class="tt-kp">${[['اكتمال الخطة', rep.idx.complete + '٪'], ['عدالة الأنصبة', rep.idx.fair + '٪'], ['قلة الفراغات', rep.idx.gaps + '٪'], ['استغلال القاعات', rep.idx.rooms === null ? '—' : rep.idx.rooms + '٪'], ['الحصص الموزعة', AR(rep.placed) + ' / ' + AR(rep.req)]].map(([l, v]) => `<div><span>${l}</span><b>${typeof v === 'string' ? v.replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]) : v}</b></div>`).join('')}</div></div></div>
+      ${ruleRows.length ? `<details class="tt-rules" ${rep.hard ? 'open' : ''}><summary><b>تفاصيل المخالفات حسب القيد (${AR(ruleRows.length)})</b></summary>${ruleRows.map(([k, r]) => `<details class="tt-rule"><summary><span class="pill ${r.lv === 'h' ? 'st-returned' : r.lv === 's' ? 'st-submitted' : 'st-empty'}">${TT().LVN[r.lv]}</span> ${esc(ruleName(k))} <b>(${AR(Math.round(r.n * 10) / 10)})</b></summary><ul class="small">${r.items.slice(0, 30).map(x => `<li>${esc(x)}</li>`).join('')}${r.items.length > 30 ? `<li class="muted">و${AR(r.items.length - 30)} أخرى…</li>` : ''}</ul></details>`).join('')}<p class="small muted" style="margin:6px 0 0"><button class="btn ghost sm" id="gPow">تعديل قوة القيود</button> <button class="btn ghost sm" id="gRep">التقارير والتحليلات</button></p></details>` : ''}
+      <div id="gImpct">${LAST ? impactHtml(LAST) : ''}</div>
       <div class="row" style="gap:8px;margin:10px 0;flex-wrap:wrap"><div class="chip-filter" id="gV" style="margin:0">${[['class', 'حسب الفصل'], ['teacher', 'حسب المعلم']].map(([k, l]) => `<button data-v="${k}" class="${view === k ? 'on' : ''}">${l}</button>`).join('')}</div>
         <select class="in" id="gC" style="max-width:220px" aria-label="اختيار">${opts.map(([v, l]) => `<option value="${v}" ${v === sel ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select><div class="grow"></div>
-        <button class="btn ghost sm" id="gRe">إعادة التوليد (المثبّت يبقى)</button><button class="btn ok" id="gSave">${I.send} إنشاء مسودة جدول للمراجعة</button></div>
-      ${view === 'class' ? '<p class="small muted" style="margin:0 0 6px">اضغط حصة ثم حصة أخرى لتبديلهما يدوياً. اضغط مرتين على الحصة نفسها لتثبيتها أو فكّ تثبيتها.</p>' : ''}
-      <div class="scroll"><table class="tbl pl-grid"><thead><tr><th></th>${Array.from({ length: g.Pn }, (_, p) => `<th>${AR(p + 1)}</th>`).join('')}</tr></thead><tbody>${Array.from({ length: g.D }, (_, d) => `<tr><th>${A.DAYS[d]}</th>${Array.from({ length: g.Pn }, (_, p) => cell(d, p)).join('')}</tr>`).join('')}</tbody></table></div>`;
+        <button class="btn ghost sm" id="gRe">إعادة التوليد (المثبّت يبقى)</button><button class="btn sky sm" id="gSave">إنشاء مسودة جدول</button></div>
+      ${view === 'class' ? `<p class="small muted" style="margin:0 0 6px">${pick ? '<b>اختر الخانة التي تنقل إليها الحصة.</b> الألوان تبيّن الأثر قبل النقل: الأخضر يحسّن الجدول، والأحمر يزيد المخالفات.' : 'اضغط حصة لترى أفضل الأماكن البديلة لها وأثر نقلها فوراً على كل الجدول.'}</p>` : ''}
+      ${pick && view === 'class' ? `<div class="tt-alt row" style="gap:6px;flex-wrap:wrap;margin-bottom:6px"><b class="small">أفضل البدائل:</b>${altList.map(x => `<button class="btn ghost sm" data-go="${x.k}">${dayLbl(Math.floor(x.k / g.Pn))} ح${AR(x.k % g.Pn + 1)} <span class="${altTag(x.delta)[1]}">${altTag(x.delta)[0]}</span></button>`).join('') || '<span class="small muted">لا توجد بدائل ممكنة (مزدوجة/مثبّتة/أوقات مغلقة)</span>'}<div class="grow"></div><button class="btn ghost sm" id="gLock">${(P.locks[sel] || {})[Math.floor(pick.k / g.Pn) + '-' + pick.k % g.Pn] ? 'إلغاء التثبيت' : 'تثبيت هذه الحصة'}</button><button class="btn ghost sm" id="gCan">إلغاء</button></div>` : ''}
+      <div class="scroll"><table class="tbl pl-gt"><thead><tr><th></th>${Array.from({ length: g.Pn }, (_, p) => `<th>${AR(p + 1)}</th>`).join('')}</tr></thead><tbody>${Array.from({ length: g.D }, (_, d) => `<tr><th>${dayLbl(d)}</th>${Array.from({ length: g.Pn }, (_, p) => cell(d, p)).join('')}</tr>`).join('')}</tbody></table></div>`;
     $$('#gV button', out).forEach(b => b.onclick = () => { A.LS.set('pl_gv', b.dataset.v); pick = null; showGen(out, root); });
     $('#gC', out).onchange = e => { A.LS.set(view === 'class' ? 'pl_gc' : 'pl_gt', e.target.value); pick = null; showGen(out, root); };
-    $$('.pl-gc', out).forEach(td => td.onclick = () => {
-      const k = +td.dataset.k, d = Math.floor(k / g.Pn), p = k % g.Pn, dk = d + '-' + p;
-      if (pick && pick.k === k) { ens(); const m = P.locks[sel] = P.locks[sel] || {}; const s = g.grid[gi][k]; if (m[dk]) delete m[dk]; else if (s) m[dk] = s; pick = null; touch(); showGen(out, root); return; }
-      if (!pick) { pick = { k }; showGen(out, root); return; }
-      const a = pick.k, b = k; pick = null; const ca = g.cards[g.cid[gi][a]], cb = g.cards[g.cid[gi][b]];
-      if ((ca && (ca.len === 2 || ca.j)) || (cb && (cb.len === 2 || cb.j))) { A.toast('المزدوجة والمشتركة تُنقل بإعادة التوليد أو بالتثبيت', 'warn'); showGen(out, root); return; }
-      [g.grid[gi][a], g.grid[gi][b]] = [g.grid[gi][b], g.grid[gi][a]]; [g.cid[gi][a], g.cid[gi][b]] = [g.cid[gi][b], g.cid[gi][a]];
-      g.issues = issuesOf(g); showGen(out, root);
-    });
-    $('#gRe', out).onclick = e => A.run(e.currentTarget, async () => { if (dirty) await save(true); await loadExt(); lastGen = solve({ restarts: 3, iters: 7000 }); showGen(out, root); });
+    const pw = $('#gPow', out); if (pw) pw.onclick = () => { A.LS.set('pl_rs', 'power'); tab = 'rules'; V.plan(root); };
+    const rp = $('#gRep', out); if (rp) rp.onclick = () => { tab = 'rep'; V.plan(root); };
+    const un = $('#gUndo', out); if (un) un.onclick = () => { if (LAST) { LAST.undo(); logIt('تراجع عن نقل حصة'); LAST = null; touch(); showGen(out, root); } };
+    const doMove = (k) => { const a = pick.k; pick = null; const sw = g.swap(gi, a, k); if (!sw) { A.toast('لا يمكن هذا النقل (حصة مزدوجة أو مشتركة لا تتسع، أو خانة مثبّتة/مغلقة)', 'warn'); showGen(out, root); return; }
+      LAST = sw; logIt(`نقل ${sName(g.grid[gi][k]) || 'فراغ'} (${g.cls[gi].name}) من ${dayLbl(Math.floor(a / g.Pn))} ح${a % g.Pn + 1} إلى ${dayLbl(Math.floor(k / g.Pn))} ح${k % g.Pn + 1}`); touch(); showGen(out, root); };
+    $$('[data-go]', out).forEach(b => b.onclick = () => doMove(+b.dataset.go));
+    const gc = $('#gCan', out); if (gc) gc.onclick = () => { pick = null; showGen(out, root); };
+    const gl = $('#gLock', out); if (gl) gl.onclick = () => { const k = pick.k, dk = Math.floor(k / g.Pn) + '-' + k % g.Pn; ens(); const m = P.locks[sel] = P.locks[sel] || {}; const s = g.grid[gi][k]; if (m[dk]) { delete m[dk]; g.lock(gi, k, false); } else if (s) { m[dk] = s; g.lock(gi, k, true); } pick = null; touch(); showGen(out, root); };
+    $$('.pl-gc', out).forEach(td => { const go = () => { const k = +td.dataset.k; if (!pick) { if (g.fixed[gi][k] && !(P.locks[sel] || {})[Math.floor(k / g.Pn) + '-' + k % g.Pn]) return; pick = { k, gi }; LAST = null; showGen(out, root); return; } if (pick.k === k) { pick = null; showGen(out, root); return; } doMove(k); };
+      td.onclick = go; td.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }; });
+    $('#gRe', out).onclick = e => A.run(e.currentTarget, () => { LAST = null; pick = null; return runGen(out, root, null, 'إعادة التوليد'); });
     $('#gSave', out).onclick = e => A.run(e.currentTarget, async () => {
-      const v = await api.createDraft({ section_id: S.sectionId, label: 'من توزيع الحصص — ' + new Date().toLocaleDateString('ar-SA-u-nu-latn'), source: 'توزيع الحصص', created_by: S.me.id });
+      if (g.report.hard && !(await A.confirmBox(`في الجدول ${AR(g.report.hard)} مخالفة لقيود إلزامية. إنشاء المسودة على أي حال؟`, 'إنشاء المسودة'))) return;
+      const v = await api.createDraft({ section_id: S.sectionId, label: 'من توزيع الحصص — ' + new Date().toLocaleDateString('ar-SA-u-nu-latn') + ` (جودة ${g.report.score})`, source: 'توزيع الحصص', created_by: S.me.id });
       const vs = await api.ttVersions(S.sectionId), ap = vs.find(x => x.status === 'approved'), ids = new Set(g.cls.map(x => x.id));
       if (ap) { const sl = (await api.ttSlots(ap.id)).filter(x => !ids.has(x.class_id)); if (sl.length) await api.replaceSlots(v.id, sl.map(({ class_id, day, period, subject_id, teacher_id }) => ({ class_id, day, period, subject_id, teacher_id }))); }
       const rows = []; g.cls.forEach((x, i) => g.grid[i].forEach((s, k) => rows.push({ class_id: x.id, day: Math.floor(k / g.Pn), period: k % g.Pn, subject_id: s || null, teacher_id: g.tch(i, s) || null })));
       for (let i = 0; i < rows.length; i += 400) await api.upsertSlots(v.id, rows.slice(i, i + 400));
+      logIt(`إنشاء مسودة جدول (جودة ${g.report.score}، إلزامية ${g.report.hard})`); await save(true);
       A.LS.set('tttab', 'drafts'); A.toast('أُنشئت مسودة الجدول — راجعها وعدّل ما تريد ثم اعتمدها', 'ok'); location.hash = '#/timetable';
     });
   }
+  // ---------- التقارير والتحليلات ----------
+  const pct = v => (v === null || v === undefined) ? '—' : AR(v) + '٪';
+  function repData() {
+    ens(); const g = lastGen, rep = g && g.report, cls = secClasses().filter(c => rowTot(c.id)), c0 = cap();
+    const asg = {}; cls.forEach(c => allSubs().forEach(s => { const t = T(c.id, s), h = H(c.id, s); if (!h) return; const k = t || '—'; const r = asg[k] = asg[k] || { n: 0, cls: new Set(), subs: new Set(), items: [] }; r.n += h; r.cls.add(c.id); r.subs.add(s); r.items.push(`${sName(s)} ${c.name} (${AR(h)})`); }));
+    const teachers = Object.entries(asg).filter(([t]) => t !== '—').map(([t, r]) => { const q = (P.tlim[t] || {}).quota, x = rep && rep.teachers[t];
+      return { t, name: A.personName(t), quota: q === '' || q === undefined ? null : +q, asg: r.n, placed: x ? x.load : null, diff: q === '' || q === undefined ? null : r.n - (+q), cls: r.cls.size, subs: r.subs.size, items: r.items, days: x ? x.days : null, first: x ? x.first : null, last: x ? x.last : null, gaps: x ? x.gaps : null, run: x ? x.maxRun : null, work: x ? x.workDays : null, util: q ? Math.round(100 * r.n / q) : null }; }).sort((a, b) => b.asg - a.asg);
+    const noT = asg['—'] ? asg['—'] : null;
+    const classes = cls.map(c => { const gi = g ? g.cls.findIndex(x => x.id === c.id) : -1; const req = rowTot(c.id);
+      const subs = allSubs().filter(s => H(c.id, s)).map(s => { let placed = null, days = null, maxD = null; if (gi >= 0) { const per = new Array(g.D).fill(0); g.grid[gi].forEach((x, k) => { if (x === s) per[Math.floor(k / g.Pn)]++; }); placed = per.reduce((a, b) => a + b, 0); days = per.filter(Boolean).length; maxD = Math.max(...per); } return { s, name: sName(s), req: H(c.id, s), placed, days, maxD, t: T(c.id, s) }; });
+      let placed = null, perDay = null, holes = null; if (gi >= 0) { perDay = Array.from({ length: g.D }, (_, d) => g.grid[gi].slice(d * g.Pn, (d + 1) * g.Pn).filter(Boolean).length); placed = perDay.reduce((a, b) => a + b, 0); holes = 0; for (let d = 0; d < g.D; d++) { const r = g.grid[gi].slice(d * g.Pn, (d + 1) * g.Pn); const lastF = r.map(Boolean).lastIndexOf(true); holes += r.slice(0, lastF + 1).filter(x => !x).length; } }
+      return { c, req, cap: c0, placed, perDay, holes, subs }; });
+    return { g, rep, teachers, noT, classes, c0 };
+  }
+  function tRep(box, root) {
+    const Dt = repData(), { g, rep } = Dt; let rt = A.LS.get('pl_rt') || 'sum';
+    const tabs = [['sum', 'لوحة المؤشرات'], ['teach', 'تقارير المعلمين'], ['cls', 'الفصول والمواد'], ['adm', 'تقارير الإدارة'], ['log', 'سجل التغييرات']];
+    box.innerHTML = `<div class="row" style="justify-content:space-between;gap:8px;margin-top:12px;flex-wrap:wrap"><div class="chip-filter" id="rpT" style="margin:0">${tabs.map(([k, l]) => `<button data-v="${k}" class="${rt === k ? 'on' : ''}">${l}</button>`).join('')}</div><div class="row" style="gap:6px"><button class="btn ghost sm" id="rpP">طباعة</button><button class="btn ghost sm" id="rpX">${I.down} Excel</button></div></div>
+      ${g ? '' : '<div class="notice warn" style="margin-top:10px">تقارير الأنصبة والخطة جاهزة من التوزيع. ولّد الجدول من «توليد الجدول» لتظهر تقارير التوزيع اليومي والتعارضات والقاعات والمؤشرات.</div>'}<div id="rpB" style="margin-top:10px"></div>`;
+    $$('#rpT button', box).forEach(b => b.onclick = () => { A.LS.set('pl_rt', b.dataset.v); tRep(box, root); });
+    const B = $('#rpB', box); const blocks = []; // [title, html, aoa]
+    const tbl = (head, rows) => `<div class="scroll"><table class="tbl pl-rp"><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(x => `<td>${x === null || x === undefined ? '—' : x}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${head.length}" class="muted">لا توجد بيانات</td></tr>`}</tbody></table></div>`;
+    const add = (title, head, rows, note) => { blocks.push([title, head, rows]); return `<h4 class="pl-rh">${esc(title)}</h4>${note ? `<p class="small muted" style="margin:0 0 6px">${note}</p>` : ''}${tbl(head, rows)}`; };
+    const st = (v, good) => v === null ? '—' : `<span class="pill ${good ? 'st-approved' : 'st-returned'}">${typeof v === 'number' ? AR(v) : v}</span>`;
+    let html = '';
+    if (rt === 'sum') {
+      const T2 = Dt.teachers, tot = T2.reduce((a, x) => a + x.asg, 0), withQ = T2.filter(x => x.quota !== null), def = withQ.filter(x => x.diff < 0), sur = withQ.filter(x => x.diff > 0);
+      const req = Dt.classes.reduce((a, x) => a + x.req, 0);
+      const kp = [['مؤشر كفاءة الجدول', rep ? AR(rep.score) + ' / ١٠٠' : '—'], ['المخالفات الإلزامية', rep ? AR(rep.hard) : '—'], ['اكتمال الخطة', rep ? pct(rep.idx.complete) : '—'], ['عدالة الأنصبة', rep ? pct(rep.idx.fair) : '—'], ['مؤشر الفراغات (قلّتها)', rep ? pct(rep.idx.gaps) : '—'], ['استغلال القاعات', rep ? pct(rep.idx.rooms) : '—'],
+        ['استقرار الجدول (تعديلات بعد التوليد)', AR((P.log || []).filter(l => /^نقل/.test(l.what)).length)], ['الحصص المطلوبة', AR(req)], ['حصص بلا معلم', AR(Dt.noT ? Dt.noT.n : 0)], ['معلمون بعجز في النصاب', withQ.length ? AR(def.length) : '—'], ['معلمون بزيادة على النصاب', withQ.length ? AR(sur.length) : '—'], ['عدد المعلمين', AR(T2.length)]];
+      html = `<div class="tt-kp tt-kp2">${kp.map(([l, v]) => `<div><span>${l}</span><b>${v}</b></div>`).join('')}</div>`;
+      blocks.push(['لوحة المؤشرات', ['المؤشر', 'القيمة'], kp]);
+      if (rep) html += add('ملخص القيود', ['القيد', 'المستوى', 'المخالفات'], Object.entries(rep.byRule).filter(([, r]) => r.lv !== 'o').map(([k, r]) => [esc(ruleName(k)), TT().LVN[r.lv], r.n ? st(Math.round(r.n * 10) / 10, false) : st('✓', true)]));
+    } else if (rt === 'teach') {
+      html = add('تقرير النصاب الأسبوعي', ['المعلم', 'النصاب المحدد', 'المسند', 'الموزّع في الجدول', 'الفرق', 'نسبة الاستغلال', `مقارنة بالحد (${AR(Dt.c0)})`], Dt.teachers.map(x => [esc(x.name), x.quota === null ? '—' : AR(x.quota), AR(x.asg), x.placed === null ? '—' : AR(x.placed), x.diff === null ? '—' : x.diff === 0 ? st('مكتمل', true) : x.diff > 0 ? st('زيادة ' + AR(x.diff), false) : st('عجز ' + AR(-x.diff), false), x.util === null ? '—' : pct(x.util), x.asg > Dt.c0 ? st('يتجاوز', false) : AR(Dt.c0 - x.asg) + ' متاحة']), 'حدّد النصاب لكل معلم من «القيود ← المعلمون». الفرق = المسند − النصاب.');
+      if (g) html += add('تقرير توزيع الحصص', ['المعلم', ...Array.from({ length: g.D }, (_, d) => dayLbl(d)), 'الأولى', 'الأخيرة', 'أطول تتابع', 'الفراغات', 'أيام العمل', 'أيام التفرغ'], Dt.teachers.map(x => [esc(x.name), ...(x.days || []).map(n => n ? AR(n) : '<span class="faint">·</span>'), AR(x.first), AR(x.last), AR(x.run), x.gaps ? st(x.gaps, false) : AR(0), AR(x.work), AR(g.D - x.work)]));
+      html += add('تقرير العبء التدريسي', ['المعلم', 'إجمالي الحصص', 'عدد المواد', 'عدد الفصول', 'الانحراف عن المتوسط', 'التفاصيل'], (() => { const avg = Dt.teachers.reduce((a, x) => a + x.asg, 0) / (Dt.teachers.length || 1); return Dt.teachers.map(x => [esc(x.name), AR(x.asg), AR(x.subs), AR(x.cls), (x.asg - avg >= 0 ? '+' : '') + AR(Math.round((x.asg - avg) * 10) / 10), `<span class="small">${esc(x.items.join('، '))}</span>`]); })());
+    } else if (rt === 'cls') {
+      html = add('مقارنة الحصص المطلوبة بالموزعة لكل فصل', ['الفصل', 'المطلوب', 'السعة', 'الموزّع', ...(g ? Array.from({ length: g.D }, (_, d) => dayLbl(d)) : []), 'فراغات وسط اليوم'], Dt.classes.map(x => [esc(x.c.name), AR(x.req), AR(x.cap), x.placed === null ? '—' : x.placed < x.req ? st(x.placed, false) : AR(x.placed), ...(x.perDay || []).map(n => AR(n)), x.holes === null ? '—' : x.holes ? st(x.holes, false) : AR(0)]));
+      const rows = []; Dt.classes.forEach(x => x.subs.forEach(s => rows.push([esc(x.c.name), esc(s.name), esc(A.personName(s.t) || '—'), AR(s.req), s.placed === null ? '—' : s.placed < s.req ? st(s.placed, false) : AR(s.placed), s.days === null ? '—' : AR(s.days), s.maxD === null ? '—' : s.maxD > (+((P.subj[s.s] || {}).maxDay) || P.maxDay || 2) ? st(s.maxD, false) : AR(s.maxD)])));
+      html += add('توزيع المواد وكشف التكرار في اليوم', ['الفصل', 'المادة', 'المعلم', 'المطلوب', 'الموزّع', 'عدد الأيام', 'أقصى تكرار في يوم'], rows);
+      const un = rows.filter(r => /st-returned/.test(String(r[4])));
+      html += add('المواد التي لم تستوفِ خطتها الأسبوعية', ['الفصل', 'المادة', 'المعلم', 'المطلوب', 'الموزّع'], un.map(r => r.slice(0, 5)));
+    } else if (rt === 'adm') {
+      const conf = rep ? rep.issues.map(i => [esc(ruleName(i.k)), esc(i.x)]) : [];
+      html = add('تقرير التعارضات (المخالفات الإلزامية)', ['القيد', 'التفصيل'], conf, rep ? (conf.length ? '' : 'لا توجد تعارضات.') : 'ولّد الجدول أولاً.');
+      const vac = []; secClasses().filter(c => rowTot(c.id)).forEach(c => allSubs().forEach(s => { if (H(c.id, s) && !T(c.id, s)) vac.push([esc(c.name), esc(sName(s)), AR(H(c.id, s))]); }));
+      html += add('تقرير الحصص الشاغرة (بلا معلم)', ['الفصل', 'المادة', 'الحصص'], vac);
+      const need = {}; vac.forEach((r, i) => { const s = r[1]; need[s] = (need[s] || 0) + (+String(r[2]).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)) || 0); });
+      const withQ = Dt.teachers.filter(x => x.quota !== null && x.diff !== 0);
+      html += add('تقرير العجز والزيادة', ['المعلم / المادة', 'النوع', 'الحصص', 'الملاحظة'], [...withQ.map(x => [esc(x.name), x.diff < 0 ? 'عجز في النصاب' : 'زيادة على النصاب', AR(Math.abs(x.diff)), x.diff < 0 ? 'يمكن إسناد حصص إضافية' : 'يحتاج تخفيف أو معلم مساند']), ...Object.entries(need).map(([s, n]) => [s, 'احتياج معلم', AR(n), `≈ ${AR(Math.ceil(n / 24))} معلم بنصاب ٢٤`])]);
+      if (rep) {
+        html += add('تقرير كفاءة توزيع المعلمين', ['المعلم', 'الحمل', 'الفراغات', 'الأولى/الأخيرة', 'أطول تتابع', 'تكلفة القيود'], Dt.teachers.map(x => [esc(x.name), AR(x.placed), AR(x.gaps), AR(x.first) + ' / ' + AR(x.last), AR(x.run), rep.teachers[x.t] && rep.teachers[x.t].cost > 0.05 ? st(Math.round(rep.teachers[x.t].cost * 10) / 10, false) : st('✓', true)]));
+        html += add('تقرير استغلال القاعات', ['القاعة', 'السعة', 'الحصص المستخدمة', 'المتاح', 'نسبة الاستغلال'], Object.values(rep.rooms).map(r => [esc(r.name), AR(r.cap), AR(r.used), AR(r.avail), pct(r.avail ? Math.round(100 * r.used / r.avail) : 0)]), Object.keys(rep.rooms).length ? '' : 'لا توجد قاعات مربوطة بمواد.');
+        html += add('تقرير الالتزام بالخطة الدراسية', ['الفصل', 'المطلوب', 'الموزّع', 'نسبة الاكتمال'], Dt.classes.map(x => [esc(x.c.name), AR(x.req), AR(x.placed), pct(Math.round(100 * x.placed / Math.max(1, x.req)))]));
+        html += add('تقرير التغطية اليومية', ['اليوم', 'فصول مكتملة اليوم', 'حصص فارغة وسط اليوم', 'إجمالي الحصص'], Array.from({ length: g.D }, (_, d) => { let full = 0, holes = 0, tot = 0; g.grid.forEach(r => { const row = r.slice(d * g.Pn, (d + 1) * g.Pn), lf = row.map(Boolean).lastIndexOf(true); const h = row.slice(0, lf + 1).filter(x => !x).length; holes += h; if (!h) full++; tot += row.filter(Boolean).length; }); return [dayLbl(d), AR(full) + ' / ' + AR(g.grid.length), holes ? st(holes, false) : AR(0), AR(tot)]; }));
+      }
+    } else {
+      html = add('سجل التغييرات على التوزيع والجدول', ['الوقت', 'بواسطة', 'التغيير'], (P.log || []).map(l => [A.fmtDT ? A.fmtDT(l.at) : l.at, esc(A.personName(l.by) || ''), esc(l.what)]), 'يسجّل التوليد وإعادته والنقل اليدوي والتراجع وتطبيق ملفات القيود وإنشاء المسودات.');
+      html += `<button class="btn ghost sm" id="rpClr" style="margin-top:6px">مسح السجل</button>`;
+    }
+    B.innerHTML = html;
+    const cl = $('#rpClr', B); if (cl) cl.onclick = async () => { if (!(await A.confirmBox('مسح سجل التغييرات؟', 'مسح', true))) return; P.log = []; touch(); tRep(box, root); };
+    const strip = h => String(h === null || h === undefined ? '' : h).replace(/<[^>]+>/g, '').trim();
+    $('#rpP', box).onclick = () => A.printDoc(tabs.find(t => t[0] === rt)[1] + ' — الجدول المدرسي', A.section().name + (rep ? ` · مؤشر الكفاءة ${AR(rep.score)}` : ''), `<div class="pl-print">${B.innerHTML.replace(/<button[^>]*>.*?<\/button>/g, '')}</div>`, rt === 'teach' || rt === 'cls');
+    $('#rpX', box).onclick = () => { const wb = XLSX.utils.book_new(); blocks.forEach(([t, h, rows], i) => { const ws = XLSX.utils.aoa_to_sheet([h.map(strip), ...rows.map(r => r.map(strip))]); ws['!views'] = [{ RTL: true }]; XLSX.utils.book_append_sheet(wb, ws, (String(i + 1) + ' ' + t).slice(0, 30).replace(/[\\/?*[\]:]/g, ' ')); }); XLSX.writeFile(wb, `تقارير الجدول - ${A.section().name}.xlsx`); };
+  }
+  A._planState = () => P; A._lastGen = () => lastGen; A._planReload = () => { PSEC = null; P = null; };
+  A._planSave = () => save(true); A._planTab = t => { if (t) tab = t; return tab; }; A._planCap = cap;
 
   function exportX() {
     const cls = secClasses(), subs = allSubs();

@@ -24552,6 +24552,8 @@ ${S.me.full_name}`;
   .pl-st{display:inline-block;font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px}
   .pl-st.on{background:#E5F4EA;color:#1D5E3B}.pl-st.off{background:#FFF4DC;color:#6B4510}
   .pl-bar{height:10px;border-radius:6px;background:#EEF2F7;overflow:hidden;margin-top:4px}.pl-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--sky))}
+  .pl-card .pc-kp{grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px}.pl-card .pc-kp div{padding:8px}.pl-card .pc-kp b{font-size:20px}
+  .pl-sc{overflow-x:auto;-webkit-overflow-scrolling:touch}.pl-sc .pl-tbl{min-width:520px}
   .pl-tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}.pl-tbl th,.pl-tbl td{border-bottom:1px solid var(--pale);padding:6px;text-align:start}.pl-tbl th{color:var(--muted);font-weight:800}
   .dm-opt{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
   .dm-cnt{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:10px 0}
@@ -24625,14 +24627,44 @@ ${S.me.full_name}`;
   A.PC_VIEWS.lk = async function (box) {
     if (!PA()) { box.innerHTML = ''; return; }
     const L = links();
-    box.innerHTML = `<div class="card"><div class="head"><div class="grow"><h3 style="margin:0">المنصات التابعة</h3><p class="sub" style="margin:2px 0 0">منصات مستقلة بقاعدة بيانات خاصة بها (مثل منصة دينا). ادخل بحسابك فيها مرة واحدة على هذا الجهاز، فتظهر مؤشراتها وتقاريرها هنا — <b>قراءة فقط</b>، ولا يُكتب أو يُضاف أي شيء في قاعدتها.</p></div><button class="btn ghost sm" id="plAdd">+ ربط منصة</button></div>
+    box.innerHTML = `<div class="card"><div class="head"><div class="grow"><h3 style="margin:0">المنصات التابعة</h3><p class="sub" style="margin:2px 0 0">منصات مستقلة بقاعدة بيانات خاصة بها (مثل منصة دينا). تظهر مؤشراتها وتقاريرها هنا عبر وسيط آمن (مفتاح قراءة محفوظ سراً في Cloudflare) دون حساب لك فيها — <b>قراءة فقط</b>، ولا يُكتب أو يُضاف أي شيء في قاعدتها. وإن لم يُضبط مفتاح منصة بعد، يمكنك الدخول بحسابك فيها.</p></div><button class="btn ghost sm" id="plAdd">+ ربط منصة</button></div>
       <div class="pl-cards">${L.map(l => `<div class="pl-card" data-l="${esc(l.id)}"><div class="row" style="justify-content:space-between;gap:6px;align-items:center"><h4>${esc(l.name)}</h4><span class="pl-st off" data-ls>…</span></div><div class="small muted" dir="ltr" style="text-align:start">${esc((l.url || '').replace(/^https?:\/\//, ''))}</div><div data-lb style="margin-top:10px">${A.emptyBox('جارٍ التحقق…')}</div></div>`).join('') || A.emptyBox('لا منصات مرتبطة')}</div></div>`;
     $('#plAdd', box).onclick = () => addDlg(box);
     L.forEach(l => card(box.querySelector(`[data-l="${CSS.escape(l.id)}"]`), l, box));
   };
 
-  async function card(el, l, box) {
+  // (أ) الاطلاع الكامل عبر الوسيط الآمن على Cloudflare (/api/link/<id>/overview) — بلا حساب في المنصة التابعة
+  async function viaServer(l, fresh) {
+    let ses = null; try { ses = await api.session(); } catch (_) { }
+    if (!ses || !ses.access_token) return { ok: false, code: 0 };
+    try {
+      const r = await fetch(`api/link/${encodeURIComponent(l.id)}/overview${fresh ? '?fresh=1' : ''}`, { headers: { authorization: 'Bearer ' + ses.access_token } });
+      const ct = r.headers.get('content-type') || ''; if (!/json/.test(ct)) return { ok: false, code: 404 };
+      const j = await r.json(); return r.ok ? { ok: true, data: j } : { ok: false, code: r.status, err: j && j.error };
+    } catch (_) { return { ok: false, code: 0 }; }
+  }
+  const pctOf = (a, b) => b ? Math.round(100 * a / b) : 0;
+  function fullHtml(o) {
+    const k = (v, t, c) => `<div class="${c || ''}"><b>${v == null ? '—' : AR(v)}</b><span>${t}</span></div>`;
+    return (o.schools || []).map(s => `<div class="sec-box" style="margin-top:8px"><b style="color:var(--navy)">${esc(s.name)}</b>
+      <div class="pc-kp" style="margin-top:8px">${k(s.staff, 'موظفاً')}${k(s.accounts, 'حساباً مفعّلاً')}${k(s.students, 'طالباً')}${k(s.logins, 'دخولاً (٣٠ يوماً)')}${k(s.att, 'رصد حضور اليوم')}${k(s.absent, 'غائباً اليوم', s.absent ? 'bad' : '')}${k(s.late, 'متأخراً اليوم')}${k(s.beh, 'سلوكاً (٧ أيام)')}${k(s.behNeg, 'سلوكاً سلبياً (٧ أيام)', s.behNeg ? 'bad' : '')}${k(s.quizzes, 'اختباراً إلكترونياً (٣٠ يوماً)')}${k(s.preps, 'تحضيراً (٣٠ يوماً)')}${k(s.forms, 'نموذجاً (٣٠ يوماً)')}${k(s.questions, 'سؤالاً في البنك')}</div>
+      <div class="pl-sc"><table class="pl-tbl"><thead><tr><th>القسم</th><th>الفصول</th><th>الأسبوع الحالي</th><th>إنجاز الخطط</th><th>معتمد</th><th>نُفّذ</th></tr></thead><tbody>${(s.sections || []).map(x => { const w = x.week; return `<tr><td>${esc(x.name)}</td><td>${AR(x.classes || 0)}</td><td>${w ? 'الأسبوع ' + esc(w.word) : '—'}</td><td>${w ? `${AR(pctOf(w.sent, w.total))}٪ <span class="small muted">(${AR(w.sent)} من ${AR(w.total)})</span><div class="pl-bar"><i style="width:${pctOf(w.sent, w.total)}%"></i></div>` : '—'}</td><td>${w ? AR(pctOf(w.approved, w.total)) + '٪' : '—'}</td><td>${w ? AR(pctOf(w.done, w.total)) + '٪' : '—'}</td></tr>`; }).join('')}</tbody></table></div>
+      ${(s.top || []).length ? `<table class="pl-tbl"><thead><tr><th>الأكثر إرسالاً للخطط (٧ أيام)</th><th>حصص</th></tr></thead><tbody>${s.top.map(t => `<tr><td>${esc(t.name)}</td><td>${AR(t.n)}</td></tr>`).join('')}</tbody></table>` : ''}</div>`).join('') +
+      `<div class="small muted" style="margin-top:6px">آخر تحديث ${esc(A.fmtDT ? A.fmtDT(o.at) : o.at)}${o.cached ? ' (محفوظ مؤقتاً — يتجدد كل ٥ دقائق)' : ''}</div>`;
+  }
+
+  async function card(el, l, box, fresh) {
     const sb = client(l), st = el.querySelector('[data-ls]'), b = el.querySelector('[data-lb]');
+    el.querySelectorAll('[data-lnote]').forEach(n => n.remove());
+    const sv = await viaServer(l, fresh);
+    if (sv.ok) {
+      st.textContent = 'اطلاع كامل — قراءة فقط'; st.className = 'pl-st on';
+      b.innerHTML = fullHtml(sv.data) + `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:10px">${l.url ? `<a class="btn ghost sm" href="${esc(l.url)}" target="_blank" rel="noopener">↗ فتح المنصة</a>` : ''}<button class="btn ghost sm" data-lfr>↻ تحديث الآن</button></div>`;
+      b.querySelector('[data-lfr]').onclick = ev => A.run(ev.currentTarget, () => card(el, l, box, true));
+      return;
+    }
+    const note = sv.code === 501 ? `<div class="pc-al w">الاطلاع الكامل بلا حساب جاهز، لكن مفتاح القراءة لهذه المنصة لم يُضف بعد في Cloudflare (<span dir="ltr">LINK_KEY_${esc(l.id)}</span>). حتى إضافته يمكنك الدخول بحسابك أدناه.</div>` : sv.code === 403 ? '<div class="pc-al e">الوسيط رفض الطلب: حسابك ليس مدير المنصة الأم.</div>' : sv.code === 502 ? '<div class="pc-al e">تعذّرت القراءة من قاعدة المنصة التابعة (تحقق من صحة المفتاح).</div>' : '';
+    if (note) el.querySelector('[data-lb]').insertAdjacentHTML('beforebegin', `<div data-lnote>${note}</div>`);
     const tools = `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:10px">${l.url ? `<a class="btn ghost sm" href="${esc(l.url)}" target="_blank" rel="noopener">↗ فتح المنصة</a>` : ''}${!l.preset ? '<button class="btn ghost sm" data-ldel>إزالة الربط</button>' : ''}</div>`;
     if (!sb) { st.textContent = 'غير متاح'; b.innerHTML = A.emptyBox('بيانات الاتصال غير مكتملة أو هي نفس هذه المنصة') + tools; bindTools(); return; }
     let ses = null; try { ses = (await sb.auth.getSession()).data.session; } catch (_) { }

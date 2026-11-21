@@ -14,3 +14,4 @@ tests
 build
 node_modules
 *.py
+worker

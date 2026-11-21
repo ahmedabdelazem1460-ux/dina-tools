@@ -1,6 +1,14 @@
-// نشر المنصة الأم على Cloudflare (Workers — ملفات ثابتة فقط). لا يخص منصة دينا (GitHub Pages).
+// نشر المنصة الأم على Cloudflare (Workers): ملفات ثابتة + وسيط /api/ للاطلاع على المنصات التابعة (قراءة فقط).
+// لا يخص منصة دينا (GitHub Pages). المفاتيح السرية تُضاف من لوحة Cloudflare: Settings ← Variables and Secrets (LINK_KEY_<id>).
 {
   "name": "almenasa",
+  "main": "worker/index.js",
   "compatibility_date": "2026-11-01",
-  "assets": { "directory": "./" }
+  "assets": { "directory": "./", "binding": "ASSETS", "run_worker_first": ["/api/*"] },
+  "vars": {
+    "CORE_URL": "https://jpdxzhpszcvzajmcjprm.supabase.co",
+    "CORE_KEY": "sb_publishable_PRSYVU-uzARBu1VejEvtjw_7jG7nnVT",
+    "LINKS": { "dina": { "name": "مدارس دينا العالمية", "url": "https://dwibkkrzykqgsgyrrggp.supabase.co", "site": "https://ahmedabdelazem1460-ux.github.io/dina-tools/" } }
+  },
+  "keep_vars": true
 }

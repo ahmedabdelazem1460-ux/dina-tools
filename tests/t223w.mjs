@@ -1,0 +1,31 @@
+// وسيط المنصات التابعة (worker/index.js) بمحاكاة fetch و Cache — node tests/t223w.mjs
+import w from '../worker/index.js';
+const calls = []; let admin = true;
+globalThis.caches = { default: { match: async () => null, put: async () => {} } };
+globalThis.fetch = async (url, o = {}) => {
+  url = String(url); calls.push({ url, h: o.headers || {}, m: o.method || 'GET' });
+  if (url.includes('/rpc/is_platform_admin')) return new Response(JSON.stringify(admin), { status: 200 });
+  const p = url.split('/rest/v1/')[1];
+  if (o.headers && o.headers.prefer) return new Response('[]', { status: 206, headers: { 'content-range': '0-0/' + (p.startsWith('plan_entries') ? 280 : 42) } });
+  if (p.startsWith('schools')) return new Response(JSON.stringify([{ id: 's1', name: 'مدارس دينا العالمية' }]));
+  if (p.startsWith('sections')) return new Response(JSON.stringify([{ id: 'a', name: 'قسم البنين', school_id: 's1' }, { id: 'b', name: 'قسم البنات', school_id: 's1' }]));
+  if (p.startsWith('weeks')) return new Response(JSON.stringify([{ id: 'w1', section_id: 'a', word: 'الثاني عشر', start_date: '2026-11-15' }]));
+  if (p.startsWith('plan_entries?select=teacher_id')) return new Response(JSON.stringify([{ teacher_id: 't1' }, { teacher_id: 't1' }, { teacher_id: 't2' }]));
+  if (p.startsWith('staff?select=id,full_name')) return new Response(JSON.stringify([{ id: 't1', full_name: 'أ. خالد' }, { id: 't2', full_name: 'أ. سارة' }]));
+  return new Response('[]');
+};
+const env = { CORE_URL: 'https://core.supabase.co', CORE_KEY: 'pk', LINKS: JSON.stringify({ dina: { name: 'دينا', url: 'https://dina.supabase.co' } }), LINK_KEY_dina: 'sb_secret_x', ASSETS: { fetch: async () => new Response('asset') } };
+const ctx = { waitUntil: () => {} };
+const R = {};
+const go = async (path, auth, e = env) => { const r = await w.fetch(new Request('https://x.dev' + path, { headers: auth ? { authorization: auth } : {} }), e, ctx); return [r.status, await r.json().catch(() => null)]; };
+R.noAuth = (await go('/api/link/dina/overview'))[0];
+admin = false; R.notAdmin = (await go('/api/link/dina/overview', 'Bearer t'))[0]; admin = true;
+R.unknown = (await go('/api/link/zzz/overview', 'Bearer t'))[0];
+R.noKey = (await go('/api/link/dina/overview', 'Bearer t', Object.assign({}, env, { LINK_KEY_dina: undefined })))[0];
+const [st, o] = await go('/api/link/dina/overview', 'Bearer t');
+R.ok = st; R.school = o.schools[0].name; R.staff = o.schools[0].staff; R.secs = o.schools[0].sections.map(s => [s.name, s.classes, s.week && s.week.total]); R.top = o.schools[0].top;
+R.writes = calls.filter(c => c.m !== 'GET' && !c.url.includes('is_platform_admin')).length;
+R.secretInAuthHeader = calls.some(c => String(c.h.authorization || '').includes('sb_secret'));
+R.dinaCalls = calls.filter(c => c.url.startsWith('https://dina')).length;
+R.asset = await (await w.fetch(new Request('https://x.dev/index.html'), env, ctx)).text();
+console.log(JSON.stringify(R, null, 1));

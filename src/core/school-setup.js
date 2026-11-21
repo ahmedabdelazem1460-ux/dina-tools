@@ -260,7 +260,7 @@
   }
 
   // =============== (٣) المدارس والاشتراكات (مدير المنصة) ===============
-  V.schools = async function (root) {
+  A.schoolsList = async function (root) {
     if (!own() || !A.isPlatformAdmin()) { root.innerHTML = ''; location.hash = '#/home'; return; }
     let L = []; try { L = await api.rpc('platform_schools', {}); } catch (e) { root.innerHTML = `<div class="card">${A.emptyBox('تعذّر التحميل', esc(e.message))}</div>`; return; }
     const base = location.origin + location.pathname.replace(/[^/]*$/, '') + '?join=';
@@ -271,12 +271,13 @@
         <div class="small" style="margin-top:4px">المدير: ${esc(o.name || '—')} <span dir="ltr">${esc(o.email || '')}</span> ${o.email ? (o.joined ? '<span class="su-st new">فعّل حسابه</span>' : '<span class="su-st bad">لم يفعّل</span>') : ''}</div>
         <div class="small" style="margin-top:2px">التجهيز: ${x.setup && x.setup.done === false ? '<span class="su-st bad">لم يكتمل</span>' : '<span class="su-st old">مكتمل/قديم</span>'} · الاشتراك: <b>${esc(p.kind || '—')}</b>${p.until ? ' حتى ' + esc(p.until) : ''}</div>
         ${code && !o.joined ? `<div class="row" style="gap:4px;margin-top:6px;flex-wrap:nowrap"><input class="in" readonly dir="ltr" value="${esc(base + code)}" style="min-height:34px;padding:4px 8px;font-size:12px"><button class="btn ghost sm" data-cp="${esc(base + code)}">نسخ</button></div>` : ''}
-        <div class="row" style="gap:6px;margin-top:8px"><button class="btn ghost sm" data-pl="${x.id}">الاشتراك والملاحظات</button></div></div>`; }).join('')}</div></div>`;
+        <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap" data-acts="${x.id}"><button class="btn ghost sm" data-pl="${x.id}">الاشتراك والملاحظات</button></div></div>`; }).join('')}</div></div>`;
     $$('[data-cp]', root).forEach(b => b.onclick = () => navigator.clipboard.writeText(b.dataset.cp).then(() => A.toast('نُسخ رابط التفعيل', 'ok')));
     $$('[data-pl]', root).forEach(b => b.onclick = () => { const x = L.find(s => s.id === b.dataset.pl), p = plan(x);
       const m = A.modal(`<h3>الاشتراك — ${esc(x.name)}</h3><div class="grid g2"><div class="field"><label for="pK">نوع الاشتراك</label><select class="in" id="pK">${['تجريبي', 'شهري', 'فصلي', 'سنوي', 'مجاني', 'موقوف'].map(k => `<option ${p.kind === k ? 'selected' : ''}>${k}</option>`).join('')}</select></div><div class="field"><label for="pU">ينتهي في</label><input class="in" id="pU" type="date" value="${esc(p.until || '')}"></div><div class="field"><label for="pP">المبلغ</label><input class="in" id="pP" value="${esc(p.price || '')}"></div><div class="field"><label for="pC">جهة التواصل</label><input class="in" id="pC" value="${esc(p.contact || '')}"></div></div><div class="field"><label for="pN">ملاحظات</label><textarea class="in" id="pN" rows="3">${esc(p.note || '')}</textarea></div><div class="acts"><button class="btn" id="pGo">حفظ</button></div>`);
-      m.el.querySelector('#pGo').onclick = ev => A.run(ev.currentTarget, async () => { await api.rpc('platform_school_plan', { p_school: x.id, p_plan: { kind: m.el.querySelector('#pK').value, until: m.el.querySelector('#pU').value, price: m.el.querySelector('#pP').value.trim(), contact: m.el.querySelector('#pC').value.trim(), note: m.el.querySelector('#pN').value.trim() } }); m.close(); A.toast('حُفظ', 'ok'); V.schools(root); }); });
+      m.el.querySelector('#pGo').onclick = ev => A.run(ev.currentTarget, async () => { await api.rpc('platform_school_plan', { p_school: x.id, p_plan: { kind: m.el.querySelector('#pK').value, until: m.el.querySelector('#pU').value, price: m.el.querySelector('#pP').value.trim(), contact: m.el.querySelector('#pC').value.trim(), note: m.el.querySelector('#pN').value.trim() } }); m.close(); A.toast('حُفظ', 'ok'); A.schoolsRefresh(); }); });
     $('#scNew', root).onclick = () => newSchool(root, base);
+    if (A.schoolCardActs) A.schoolCardActs(root, L);
   };
   function newSchool(root, base) {
     let secs = [{ name: 'قسم البنين', short_name: 'البنين' }, { name: 'قسم البنات', short_name: 'البنات' }];
@@ -297,7 +298,9 @@
       const r = await api.rpc('school_provision', { p: { name: v('#nN'), short: v('#nS'), nameEn: v('#nE'), term_label: v('#nT'), sections: secs.filter(s => s.name.trim()), owner: { name: v('#oN'), email: v('#oE'), title: v('#oT') }, plan: { kind: m.el.querySelector('#pK2').value, since: new Date().toISOString().slice(0, 10) } } });
       const link = base + r.code; m.el.innerHTML = `<h3>✓ أُنشئت المدرسة</h3><p>أرسل هذا الرابط لمدير المدرسة ليفعّل حسابه بكلمة مروره (البريد: <b dir="ltr">${esc(em)}</b>):</p><input class="in" readonly dir="ltr" value="${esc(link)}" onfocus="this.select()"><div class="acts"><button class="btn" id="cp">نسخ الرابط</button><a class="btn ghost" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent('رابط تفعيل حسابك في المنصة:\n' + link)}">واتساب</a></div>`;
       m.el.querySelector('#cp').onclick = () => navigator.clipboard.writeText(link).then(() => A.toast('نُسخ', 'ok'));
-      V.schools(root);
+      A.schoolsRefresh();
     });
   }
+  A.schoolsRefresh = () => V.schools && A._scRoot ? V.schools(A._scRoot) : null;
+  V.schools = root => { A._scRoot = root; return A.schoolsList(root); };
 })();

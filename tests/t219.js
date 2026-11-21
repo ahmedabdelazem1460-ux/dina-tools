@@ -50,7 +50,7 @@ const W = [375, 768, 1440];
   await p.screenshot({ path: 'p0/t219_go_1440.png', fullPage: true });
   // المدارس والاشتراكات
   R.navSchools = await p.evaluate(() => APP.NAV.find(n => n[0] === 'schools')[2]());
-  await p.evaluate(() => location.hash = '#/schools'); await p.waitForTimeout(1200); R.schoolCards = await p.$$eval('.sc-card', L => L.length);
+  await p.evaluate(() => { APP.LS.set('pc_t', 'sc'); location.hash = '#/schools'; }); await p.waitForTimeout(1500); R.schoolCards = await p.$$eval('.sc-card', L => L.length);
   await p.click('#scNew'); await p.waitForTimeout(300); await p.fill('#nN', 'مدارس الأفق'); await p.fill('#nS', 'الأفق'); await p.fill('#oN', 'سعد عبدالرحمن العتيبي'); await p.fill('#oE', 'saad@ofuq.example'); await p.click('#nGo'); await p.waitForTimeout(1000);
   R.provLink = await p.$eval('.modal input[readonly]', x => x.value).catch(() => null);
   await p.screenshot({ path: 'p0/t219_prov.png' });

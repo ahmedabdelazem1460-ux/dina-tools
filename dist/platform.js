@@ -24137,7 +24137,7 @@ ${S.me.full_name}`;
       <div class="acts" style="justify-content:flex-start"><button class="btn" id="sSv">حفظ الأقسام</button><button class="btn ghost" id="sNx">التالي: الفصول ←</button></div>`;
     const save = async () => {
       for (const s of L) { const p = {}; $$(`[data-id="${s.id}"]`, box).forEach(i => { let v = i.value.trim(); if (i.dataset.k === 'days' || i.dataset.k === 'periods') v = Math.max(1, parseInt(digits(v), 10) || (i.dataset.k === 'days' ? 5 : 7)); if (String(v) !== String(s[i.dataset.k] ?? '')) p[i.dataset.k] = v || null; }); if (Object.keys(p).length) { await api.updateSection(s.id, p); Object.assign(s, p); } }
-      const nn = $('#nN', box).value.trim(); if (nn) { const r = await api.addSection({ school_id: S.school.id, name: nn, short_name: $('#nS', box).value.trim() || null, days: +digits($('#nD', box).value) || 5, periods: +digits($('#nP', box).value) || 7, sort: S.sections.length }); if (r) S.sections.push(r); }
+      const nn = $('#nN', box).value.trim(); if (nn) { const r = await api.addSection({ school_id: S.school.id, name: nn, short_name: $('#nS', box).value.trim() || nn, days: +digits($('#nD', box).value) || 5, periods: +digits($('#nP', box).value) || 7, sort: S.sections.length }); if (r) S.sections.push(r); }
     };
     $('#sSv', box).onclick = ev => A.run(ev.currentTarget, async () => { await save(); A.toast('حُفظت الأقسام', 'ok'); sSec(box, next); });
     $('#sNx', box).onclick = ev => A.run(ev.currentTarget, async () => { await save(); next('cls'); });

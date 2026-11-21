@@ -83,3 +83,5 @@
 - `owner_vault` (school_id, key, data jsonb) للمالك فقط — مفاتيح `sbsig:<sigId>` = {img}.
 - RPC: `sb_approve(p_section, p_day, p_note)`، `sb_reopen(p_section, p_day)`، `sb_sign(p_id)` (NO_SIG / NOT_ALLOWED)، `sb_day(p_section, p_day)` → {day, sigs{subId: img}}، `sb_save_roster(p_section, p_roster, p_gen)`، `staff_work(p_from, p_to)` (مالك فقط، ≤٤٠٠ يوم) → [{s, c, d, n, l[]}].
 - `sections.standby`: max, per, perDay, roster, gen, excl[], rules{tid:{mode,perDay,perWeek,days,periods,why}}, prio first|after|off, coverDay, form{title, tsig e|paper, note, showRoster, sigs[{id,title,name,mode blank|auto,staff?}]}.
+
+- **اللجان (112):** `lijan_public(token)` و`lijan_find(token, q)` للعموم (anon) عبر `exam_committees.settings.share` {on, token ≥16, lookup}؛ `lijan_row` داخلية. لا تعيد أسماء الطلاب إلا لصاحب الرقم/الهوية، مع `portal_blocked`.

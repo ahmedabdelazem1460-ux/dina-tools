@@ -66,7 +66,7 @@
     const top = A.LS.get('pp_t') || 'exams';
     root.innerHTML = `<div class="pp-wrap"><div class="row" style="gap:8px;flex-wrap:wrap;margin:8px 0"><div class="chip-filter" id="ppT" style="margin:0"><button data-t="exams" class="${top === 'exams' ? 'on' : ''}">الاختبارات الورقية</button><button data-t="comm" class="${top === 'comm' ? 'on' : ''}">لجان الاختبارات</button></div></div><div id="ppB"><div class="spinner"></div></div></div>`;
     $$('#ppT button', root).forEach(b => b.onclick = () => { A.LS.set('pp_t', b.dataset.t); V.paper(root); });
-    if (top === 'comm') return committees($('#ppB', root), root);
+    if (top === 'comm') return V.lijan && A.lijanCan && A.lijanCan() ? V.lijan($('#ppB', root), { embed: true }) : committees($('#ppB', root), root);
     const all = (await api.list('paper_exams', { school_id: S.school.id }, { order: 'created_at', desc: true })).filter(e => (!e.section_id || e.section_id === S.sectionId) && canSee(e));
     const box = $('#ppB', root);
     box.innerHTML = `<div class="row" style="gap:8px;margin:6px 0 10px;flex-wrap:wrap"><input class="in" id="ppQ" placeholder="بحث باسم الاختبار" style="max-width:240px"><div class="grow"></div>

@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>لجان الاختبارات — مدارس دينا العالمية</title>
+<meta name="description" content="لجنة ابنك ومقعده وجدول الاختبارات والكروكي التفاعلي">
+<meta name="theme-color" content="#082B5A">
+<meta name="robots" content="noindex">
+<link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+<style>
+@font-face{font-family:'GE SS Two';font-weight:300;src:url(fonts/gess-two-light.woff2) format('woff2');font-display:swap}
+@font-face{font-family:'GE SS Two';font-weight:400 500;src:url(fonts/gess-two-medium.woff2) format('woff2');font-display:swap}
+@font-face{font-family:'GE SS Two';font-weight:600 900;src:url(fonts/gess-two-bold.woff2) format('woff2');font-display:swap}
+:root{--navy:#082B5A;--blue:#005499;--sky:#3AB1DB;--green:#2E8B57;--lime:#BADF93;--gold:#C9A44C;--pale:#E4EBF5;--bg:#EEF3FA;--ink:#082B5A;--muted:#4D6A8F;--border:#D5E1F0;--r:18px;--sh:0 1px 2px rgba(8,43,90,.06),0 8px 24px -8px rgba(8,43,90,.18)}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;font-family:'GE SS Two',Tahoma,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.6}
+button,input{font:inherit}
+.top{background:linear-gradient(135deg,#082B5A 0%,#0B3F8A 60%,#005499 100%);color:#fff;padding:18px 16px 54px;position:relative;overflow:hidden}
+.top::after{content:"";position:absolute;inset:auto -60px -90px auto;width:240px;height:240px;border-radius:50%;border:28px solid rgba(58,177,219,.18)}
+.top-in{max-width:1100px;margin:0 auto;display:flex;gap:14px;align-items:center;position:relative;z-index:1}
+.top img{height:52px}
+.top h1{margin:0;font-size:22px;line-height:1.3}.top h1 small{display:block;font-size:14px;font-weight:400;color:#BFD6EE}
+main{max-width:1100px;margin:-36px auto 40px;padding:0 12px;position:relative;z-index:2}
+.card{background:#fff;border-radius:var(--r);box-shadow:var(--sh);border:1px solid rgba(213,225,240,.8);padding:18px;margin-bottom:14px}
+h2{font-size:18px;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.msg{background:#FFF4DC;color:#6B4510;border-radius:14px;padding:10px 14px;margin-bottom:14px;font-weight:700;white-space:pre-line}
+.find{display:flex;gap:8px;flex-wrap:wrap}
+.find input{flex:1 1 220px;border:2px solid var(--border);border-radius:14px;padding:12px 14px;font-size:18px;direction:ltr;text-align:center;background:#FBFDFF;min-height:52px}
+.find input:focus{outline:none;border-color:var(--sky);box-shadow:0 0 0 4px rgba(58,177,219,.25)}
+.btn{border:0;border-radius:14px;padding:12px 18px;background:var(--navy);color:#fff;font-weight:800;cursor:pointer;min-height:48px}
+.btn.ghost{background:#fff;color:var(--navy);border:1.5px solid var(--border)}
+.btn:focus-visible,.tabs button:focus-visible,.rc:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+.hint{font-size:13px;color:var(--muted);margin:6px 0 0}
+.res{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:14px;margin-top:14px;align-items:center}
+@media(max-width:760px){.res{grid-template-columns:1fr}}
+.seat{background:linear-gradient(160deg,#0B3A78,var(--navy));color:#fff;border-radius:18px;padding:16px;text-align:center}
+.seat .n{font-size:52px;font-weight:900;line-height:1.1;direction:ltr;color:#F6E7B8}
+.seat .r{font-size:22px;font-weight:800}.seat .s{color:#BFD6EE;font-size:14px}
+.err{color:#B3261E;font-weight:700;margin-top:8px}
+.view{background:linear-gradient(180deg,#F7FAFE,#EAF1FA);border:1px solid var(--border);border-radius:16px;padding:6px;overflow:auto;text-align:center}
+.view svg{max-width:100%;height:auto}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.tabs button{border:1.5px solid var(--border);background:#fff;border-radius:20px;padding:6px 14px;font-weight:700;cursor:pointer;color:var(--navy)}
+.tabs button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.sched{width:100%;border-collapse:collapse}
+.sched th,.sched td{padding:10px 8px;border-bottom:1px solid #EEF2F8;text-align:center}
+.sched th{color:var(--muted);font-size:13px}
+.sched tr.today td{background:#E5F4EA;font-weight:800}
+.sched tr.past td{color:#93A6BF}
+@media(max-width:600px){.sched thead{display:none}.sched tr{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--border);border-radius:14px;margin-bottom:8px;padding:6px}.sched td{border:0;padding:3px 6px;text-align:start}.sched td:nth-child(3){grid-column:1/-1;font-size:17px;font-weight:800;color:var(--navy)}}
+.next{display:flex;gap:10px;align-items:center;background:#E8F5FB;border-radius:14px;padding:10px 14px;margin-bottom:10px;font-weight:700}
+.rooms{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.rc{border:1.5px solid var(--border);border-radius:16px;padding:12px;background:#fff;cursor:pointer;text-align:start;color:var(--ink)}
+.rc b{font-size:16px;display:block}.rc .rg{direction:ltr;text-align:right;font-weight:800;color:var(--blue)}.rc small{color:var(--muted);display:block}
+.rc.on{border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,164,76,.35)}
+.photo{width:100%;max-height:320px;object-fit:cover;border-radius:14px;margin-top:8px;border:1px solid var(--border)}
+.dlg{position:fixed;inset:0;background:rgba(8,43,90,.55);display:flex;align-items:flex-end;justify-content:center;z-index:50;padding:0}
+.dlg>div{background:#fff;border-radius:20px 20px 0 0;max-width:820px;width:100%;max-height:92vh;overflow:auto;padding:16px}
+@media(min-width:760px){.dlg{align-items:center;padding:20px}.dlg>div{border-radius:20px}}
+.x{float:left;border:0;background:#EEF3FA;border-radius:50%;width:40px;height:40px;font-size:22px;cursor:pointer;color:var(--navy)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:6px;justify-content:center}
+.legend i{display:inline-block;width:14px;height:10px;border-radius:3px;vertical-align:middle;margin-inline-end:4px}
+.foot{text-align:center;color:var(--muted);font-size:12px;margin-top:20px}
+.load{padding:40px;text-align:center;color:var(--muted)}
+.acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+@media(prefers-reduced-motion:no-preference){.lj-pin{animation:ljb 1.2s ease-in-out infinite}@keyframes ljb{50%{transform:translateY(-5px)}}.seat{animation:pop .4s ease-out}@keyframes pop{from{transform:scale(.96);opacity:.4}}}
+@media print{.top{padding:10px}.find,.acts,.tabs,.x{display:none!important}main{margin-top:0}.card{box-shadow:none;break-inside:avoid}}
+</style>
+</head>
+<body>
+<header class="top"><div class="top-in"><img src="assets/logo_white.svg" alt="مدارس دينا العالمية"><h1 id="hT">لجان الاختبارات<small id="hS">مدارس دينا العالمية</small></h1></div></header>
+<main id="app" aria-live="polite"><div class="card load">جارٍ التحميل…</div></main>
+<script src="config.js?v=1795230365"></script>
+<script src="lijan3d.js?v=1795230365"></script>
+<script>
+(function () {
+  const C = window.APP_CONFIG || {}, L = window.DinaLijan, esc = L.esc, AR = L.AR;
+  const P = new URLSearchParams(location.search), token = P.get('t') || '';
+  const app = document.getElementById('app');
+  const DAYN = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+  const st = { d: null, found: null, bld: 0, err: '' };
+  async function rpc(fn, body) {
+    const r = await fetch(`${C.supabaseUrl}/rest/v1/rpc/${fn}`, { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const t = await r.text(); let j = null; try { j = t ? JSON.parse(t) : null; } catch (_) { }
+    if (!r.ok) throw new Error((j && j.message) || 'تعذّر الاتصال — حاول لاحقاً'); return j;
+  }
+  const dayOf = d => { const x = new Date(d + 'T12:00:00'); return isNaN(x) ? '' : DAYN[x.getDay()]; };
+  const fmtD = d => { try { return new Date(d + 'T12:00:00').toLocaleDateString('ar-SA-u-ca-gregory-nu-arab', { day: 'numeric', month: 'long' }); } catch (_) { return d; } };
+  const today = new Date().toISOString().slice(0, 10);
+  const fName = f => ((st.d.map || {}).floorNames || {})[f] || (+f === 0 ? 'الدور الأرضي' : 'الدور ' + (['', 'الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس'][+f] || AR(f)));
+  // أرقام الجلوس داخل اللجنة تُشتق من أول رقم (البادئة + الرقم المتسلسل)
+  const labelsOf = r => { const m = /^(.*?)(\d+)$/.exec(String(r.first || '')); if (!m || !r.n) return Array.from({ length: r.n || 0 }, () => ''); const w = m[2].length, z = m[2][0] === '0'; return Array.from({ length: r.n }, (_, k) => m[1] + (z ? String(+m[2] + k).padStart(w, '0') : String(+m[2] + k))); };
+  const loc = r => [r.loc, ((st.d.map || {}).blds || []).length > 1 ? (st.d.map.blds[+r.b || 0] || '') : '', fName(+r.f || 0)].filter(Boolean).join(' — ');
+
+  async function start() {
+    if (!token) { app.innerHTML = `<div class="card load">الرابط غير مكتمل — اطلب الرابط من المدرسة.</div>`; return; }
+    try { st.d = await rpc('lijan_public', { p_token: token }); } catch (e) { app.innerHTML = `<div class="card load">${esc(e.message)}</div>`; return; }
+    document.getElementById('hT').firstChild.textContent = st.d.title || 'لجان الاختبارات';
+    document.getElementById('hS').textContent = [st.d.school, st.d.section].filter(Boolean).join(' — ');
+    document.title = (st.d.title || 'لجان الاختبارات') + ' — ' + (st.d.school || '');
+    render();
+    const q = P.get('q'); if (q) { const i = document.getElementById('fq'); if (i) { i.value = q; find(); } }
+  }
+  function render() {
+    const d = st.d, f = st.found, rooms = d.rooms || [], sch = d.sched || [];
+    const blds = ((d.map || {}).blds || ['']).map((b, i) => ({ b, i })).filter(x => rooms.some(r => +(r.b || 0) === x.i));
+    if (!blds.some(x => x.i === st.bld) && blds[0]) st.bld = blds[0].i;
+    const nx = sch.filter(x => x.d >= today).sort((a, b) => String(a.d + a.from).localeCompare(String(b.d + b.from)))[0];
+    app.innerHTML = `${d.msg ? `<div class="msg">${esc(d.msg)}</div>` : ''}
+      ${d.lookup !== 'none' ? `<section class="card" aria-labelledby="h1"><h2 id="h1">🔎 أين يجلس ابني؟</h2><form class="find" id="ff"><label for="fq" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">رقم الطالب أو رقم الهوية</label><input id="fq" inputmode="numeric" autocomplete="off" placeholder="رقم الطالب أو رقم الهوية"><button class="btn" type="submit">عرض اللجنة والمقعد</button></form><p class="hint">يظهر اسم الطالب ولجنته ومقعده لصاحب الرقم فقط.</p>${st.err ? `<div class="err" role="alert">${esc(st.err)}</div>` : ''}
+        ${f ? (() => { const r = rooms[f.room] || {}; return `<div class="res"><div class="seat"><div class="s">${esc(f.name)} · ${esc(f.cls || '')}</div><div class="r">${esc(r.name || '')}</div><div class="s">رقم الجلوس</div><div class="n">${esc(f.label)}</div><div class="s">${esc(loc(r))}</div>${r.notes ? `<div class="s" style="color:#F6E7B8;margin-top:4px">${esc(r.notes)}</div>` : ''}<div class="s" style="margin-top:6px">${r.door === 'l' ? 'عند الدخول تكون اللجنة على يسارك' : 'عند الدخول تكون اللجنة على يمينك'}</div></div>
+          <div class="view">${L.room(r, { count: r.n, highlight: f.k, id: 'f', sub: 'المقعد ' + f.label, labels: labelsOf(r).map((x, i) => i === f.k ? f.label : x) })}</div></div>${r.photo ? `<img class="photo" src="${esc(r.photo)}" alt="صورة ${esc(r.name)}" loading="lazy">` : ''}
+          <div class="acts"><button class="btn ghost" id="pr" type="button">🖨️ طباعة</button><button class="btn ghost" id="sh" type="button">مشاركة</button></div>`; })() : ''}</section>` : ''}
+      ${sch.length ? `<section class="card" aria-labelledby="h2"><h2 id="h2">🗓️ جدول الاختبارات</h2>${nx ? `<div class="next">⏰ الاختبار القادم: <span>${esc(nx.subj)} — ${esc(dayOf(nx.d))} ${esc(fmtD(nx.d))}${nx.from ? ' · ' + esc(nx.from) : ''}</span></div>` : ''}
+        <table class="sched"><thead><tr><th>اليوم</th><th>التاريخ</th><th>المادة</th><th>الصفوف</th><th>الوقت</th></tr></thead><tbody>${sch.map(x => `<tr class="${x.d === today ? 'today' : x.d && x.d < today ? 'past' : ''}"><td>${esc(dayOf(x.d))}</td><td>${esc(x.d ? fmtD(x.d) : '')}</td><td>${esc(x.subj || '')}${x.note ? `<small style="display:block;font-weight:400;color:var(--muted)">${esc(x.note)}</small>` : ''}</td><td>${esc(x.grades || 'الجميع')}</td><td dir="ltr">${esc([x.from, x.to].filter(Boolean).join(' – '))}</td></tr>`).join('')}</tbody></table></section>` : ''}
+      <section class="card" aria-labelledby="h3"><h2 id="h3">🏫 كروكي اللجان</h2>${blds.length > 1 ? `<div class="tabs" role="tablist">${blds.map(x => `<button role="tab" data-b="${x.i}" class="${x.i === st.bld ? 'on' : ''}" aria-selected="${x.i === st.bld}">${esc(x.b)}</button>`).join('')}</div>` : ''}
+        <div class="view" id="mv">${L.map(rooms, { building: st.bld, highlight: f ? f.room : null, marks: (d.map || {}).marks || [], clickable: true, floorName: fName, sub: rooms.map(r => r.n ? `${r.first}–${r.last}` : ''), label: 'كروكي اللجان ثلاثي الأبعاد' })}</div>
+        <div class="legend"><span><i style="background:#2E8B57"></i>الباب</span><span><i style="background:#F9F3E3;border:1px dashed #E2D2A6"></i>الممر</span>${f ? '<span><i style="background:#C9A44C"></i>لجنة ابنك</span>' : ''}<span>اضغط أي لجنة للتفاصيل</span></div></section>
+      <section class="card" aria-labelledby="h4"><h2 id="h4">📋 اللجان وأرقام الجلوس</h2><div class="rooms">${rooms.map((r, i) => `<button class="rc ${f && f.room === i ? 'on' : ''}" data-r="${i}" type="button"><b>${esc(r.name)}</b>${r.n ? `<span class="rg">${esc(r.first)} — ${esc(r.last)}</span>` : ''}<small>${esc(loc(r))}</small>${r.classes && r.classes.length ? `<small>${esc(r.classes.join('، '))}</small>` : ''}</button>`).join('')}</div></section>
+      <p class="foot">${esc(d.school || '')} · ${AR(d.total || 0)} طالباً في ${AR(rooms.length)} ${rooms.length > 2 && rooms.length < 11 ? 'لجان' : 'لجنة'}</p>`;
+    const ff = document.getElementById('ff'); if (ff) ff.onsubmit = e => { e.preventDefault(); find(); };
+    document.querySelectorAll('[data-b]').forEach(b => b.onclick = () => { st.bld = +b.dataset.b; render(); });
+    document.querySelectorAll('#mv .lj-room').forEach(g => { g.setAttribute('tabindex', '0'); g.setAttribute('role', 'button'); g.onclick = () => roomDlg(+g.dataset.i); g.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); roomDlg(+g.dataset.i); } }; });
+    document.querySelectorAll('[data-r]').forEach(b => b.onclick = () => roomDlg(+b.dataset.r));
+    const pr = document.getElementById('pr'); if (pr) pr.onclick = () => window.print();
+    const sh = document.getElementById('sh'); if (sh) sh.onclick = () => { const t = `${f.name}: ${rooms[f.room].name} — رقم الجلوس ${f.label}\n${location.href.split('&q=')[0]}`; if (navigator.share) navigator.share({ title: d.title, text: t }).catch(() => { }); else navigator.clipboard.writeText(t).then(() => alert('نُسخت المعلومات')); };
+  }
+  async function find() {
+    const i = document.getElementById('fq'), q = (i.value || '').trim(); st.err = '';
+    if (q.length < 3) { st.err = 'أدخل رقم الطالب أو رقم الهوية'; render(); return; }
+    try { const r = await rpc('lijan_find', { p_token: token, p_q: q }); if (!r) { st.found = null; st.err = 'لم نجد طالباً بهذا الرقم في هذه اللجان — تأكد من الرقم أو تواصل مع المدرسة.'; } else { st.found = r; st.bld = +((st.d.rooms[r.room] || {}).b || 0); } }
+    catch (e) { st.err = e.message; }
+    render(); const v = document.getElementById('fq'); if (v) v.value = q;
+    const s = document.querySelector('.seat'); if (s) s.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+  }
+  function roomDlg(i) {
+    const r = st.d.rooms[i], f = st.found && st.found.room === i ? st.found : null; if (!r) return;
+    const last = document.activeElement, w = document.createElement('div'); w.className = 'dlg'; w.setAttribute('role', 'dialog'); w.setAttribute('aria-modal', 'true'); w.setAttribute('aria-label', r.name);
+    w.innerHTML = `<div><button class="x" aria-label="إغلاق">×</button><h2>${esc(r.name)}</h2><p style="margin:0;color:var(--muted)">${esc(loc(r))}${r.n ? ` · ${AR(r.n)} طالباً · الأرقام <b dir="ltr">${esc(r.first)} — ${esc(r.last)}</b>` : ''}</p>
+      ${r.classes && r.classes.length ? `<p style="margin:4px 0">الفصول: ${esc(r.classes.join('، '))}</p>` : ''}${r.proctors && r.proctors.length ? `<p style="margin:4px 0">الملاحظون: ${esc(r.proctors.join('، '))}</p>` : ''}${r.notes ? `<p class="msg" style="margin:6px 0">${esc(r.notes)}</p>` : ''}
+      <p style="margin:4px 0;font-weight:700;color:var(--green)">🚪 ${r.door === 'l' ? 'عند الدخول تكون اللجنة على يسارك' : 'عند الدخول تكون اللجنة على يمينك'}</p>
+      <div class="view">${L.room(r, { count: r.n, highlight: f ? f.k : null, id: 'd', labels: labelsOf(r) })}</div>${r.photo ? `<img class="photo" src="${esc(r.photo)}" alt="صورة ${esc(r.name)}" loading="lazy">` : ''}</div>`;
+    const close = () => { w.remove(); document.removeEventListener('keydown', kd); if (last) last.focus(); }, kd = e => { if (e.key === 'Escape') close(); };
+    w.onclick = e => { if (e.target === w) close(); }; w.querySelector('.x').onclick = close; document.addEventListener('keydown', kd);
+    document.body.appendChild(w); w.querySelector('.x').focus();
+  }
+  start();
+})();
+</script>
+</body>
+</html>

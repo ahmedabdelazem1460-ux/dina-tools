@@ -7,7 +7,7 @@
   const GROUPS = [
     ['عملي اليومي', ['my', 'prep', 'assistant', 'records', 'hwf', 'myforms', 'myreports'], '#3AB1DB', '#005499', '🗓️'],
     ['داخل الصف', ['slides', 'poll', 'wboard', 'games', 'labs', 'resources'], '#5BC48A', '#2E8B57', '🍎'],
-    ['الاختبارات والتقويم', ['assess', 'qbank', 'paper', 'analysis', 'noor'], '#C2AEEB', '#7E62C2', '✅'],
+    ['الاختبارات والتقويم', ['assess', 'qbank', 'paper', 'lijan', 'analysis', 'noor'], '#C2AEEB', '#7E62C2', '✅'],
     ['الطلاب والرعاية', ['refer', 'attendance', 'compass', 'gifted', 'counsel', 'bhadmin', 'clarify', 'deputy', 'stucodes'], '#F2C66D', '#C98A12', '🧑‍🎓'],
     ['التواصل', ['notify', 'x_notif', 'x_app', 'posts', 'pitems', 'pview', 'board'], '#84B7E3', '#082B5A', '💬'],
     ['المتابعة والتخطيط', ['dash', 'classes', 'export', 'weeks', 'reports'], '#5E9BD3', '#082B5A', '📈'],

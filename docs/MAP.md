@@ -9,7 +9,7 @@
 | 1 | `tpl_consts.js` | — | 8 | ثوابت قوالب التصدير (TPL) | — | — |
 | 2 | `export.js` | — | 35 | قوالب تصدير الخطة الأسبوعية PDF/Word بهوية المدرسة | — | — |
 | 3 | `api.js` | — | 18 | طبقة البيانات Supabase: list/ins/upd/ups/del/rpc/subscribe | — | — |
-| 4 | `demo.js` | — | 46 | وضع التجربة ?demo=1: نفس واجهة api في الذاكرة | — | — |
+| 4 | `demo.js` | — | 47 | وضع التجربة ?demo=1: نفس واجهة api في الذاكرة | — | — |
 | 5 | `bellcore.js` | — | 17 | نواة التوقيت الموحّدة DinaBell (المنصة + board.html) | — | — |
 | 6 | `src/core/core.js` | app.js | 105 | الأساس: الحالة S، الدخول، التنقل NAV/route، «خطتي» V.my، لوحة المتابعة V.dash، المساعدات A.* | — | — |
 | 7 | `src/core/order.js` | — | 2 | ترتيب منطقي موحّد للمراحل والصفوف والفصول والمواد: A.cmpCls / A.cmpSubj / A.cmpEntrySG (عرض فقط) | — | clsRank cmpCls cmpEntrySG cmpSubj gradeOrd stageIdx subjRank |
@@ -108,5 +108,6 @@
 | 100 | `src/core/staff-work.js` | — | 20 | متابعة الموظفين وأعمالهم V.staffwork (للمالك) | staffwork | — |
 | 101 | `src/core/people-merge.js` | — | 15 | دمج الحسابات المكررة وحذف الموظفين/الطلاب بأمان (للمالك) A.peopleDups A.peopleRemove — sql/111b | — | peopleDups peopleRemove |
 | 102 | `src/core/school-setup.js` | — | 47 | المنتج متعدد المدارس: تطبيق هوية المدرسة DinaBrand بعد الدخول، «تجهيز المدرسة والهوية» V.setup للمالك (الهوية والشعارات والألوان والموقّعون، الأقسام، مولّد الفصول، استيراد المعلمين والطلاب من Excel/نور، الانطلاق)، و«المدارس والاشتراكات» V.schools لمدير المنصة (تجهيز مدرسة جديدة برابط تفعيل لمديرها) — sql/113 | setup | _scRoot isPlatformAdmin schoolsList schoolsRefresh |
-| 103 | `src/core/platform-console.js` | — | 29 | لوحة مالك المنصة V.schools (تغليف بتبويبات: نظرة عامة وتنبيهات، المدارس + الحالة والميزات ورابط تفعيل جديد، المستخدمون وآخر دخول، المشكلات: أخطاء تلقائية وبلاغات، تقارير الاستخدام)، تسجيل الأخطاء تلقائياً log_error، «الدعم الفني» V.support بمفتاح support، فرض إيقاف المدرسة وإخفاء أقسامها — sql/114 (للمنصة الأم فقط) | schools support | _scRoot schoolCardActs |
-| 104 | `src/core/ui-pro.js` | — | 27 | الواجهة الاحترافية: السمات (كلاسيكي/عمق ثلاثي الأبعاد/زجاجي/زخارف دينا) وأيقونات القائمة التفاعلية، لوحة المعلم home2 (الأسبوع أعلى الصفحة + أيقونات)، أيقونات الإشعارات ونوع new، «ما الجديد»، A.announceNew عند تفعيل ميزة — يجب أن تبقى آخر وحدة (تغلّف V.my) | — | THEMES announceNew applyTheme |
+| 103 | `src/core/platform-console.js` | — | 39 | لوحة مالك المنصة V.schools (تغليف بتبويبات: نظرة عامة وتنبيهات، المدارس + الحالة والميزات ورابط تفعيل جديد، المستخدمون وآخر دخول، المشكلات: أخطاء تلقائية وبلاغات، تقارير الاستخدام)، تسجيل الأخطاء تلقائياً log_error، «الدعم الفني» V.support بمفتاح support، فرض إيقاف المدرسة وإخفاء أقسامها — sql/114 (للمنصة الأم فقط) | schools support | PC_TABS PC_VIEWS _scRoot pcDrill schoolCardActs |
+| 104 | `src/core/platform-links.js` | — | 20 | امتداد لوحة مالك المنصة: «البيانات الوهمية» لكل مدرسة (platform_demo_seed/clear — sql/118) وتبويب «المنصات التابعة» للاطلاع على منصة مستقلة مثل دينا بقاعدتها (دخول بحساب المالك فيها، عدّ فقط، قراءة فقط)، وزر «العرض التجريبي» ?demo=1 | — | demoDlg schoolCardActs |
+| 105 | `src/core/ui-pro.js` | — | 27 | الواجهة الاحترافية: السمات (كلاسيكي/عمق ثلاثي الأبعاد/زجاجي/زخارف دينا) وأيقونات القائمة التفاعلية، لوحة المعلم home2 (الأسبوع أعلى الصفحة + أيقونات)، أيقونات الإشعارات ونوع new، «ما الجديد»، A.announceNew عند تفعيل ميزة — يجب أن تبقى آخر وحدة (تغلّف V.my) | — | THEMES announceNew applyTheme |

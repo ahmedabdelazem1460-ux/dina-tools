@@ -12,7 +12,9 @@
   const fmt = d => d ? (A.fmtDT ? A.fmtDT(d) : String(d).slice(0, 16)) : '—';
   const daysAgo = d => d ? Math.floor((Date.now() - new Date(d)) / 864e5) : null;
   const iso = d => d.toISOString().slice(0, 10);
-  const TABS = [['ov', 'نظرة عامة'], ['sc', 'المدارس'], ['us', 'المستخدمون'], ['pr', 'المشكلات'], ['rp', 'التقارير']];
+  // التبويبات قابلة للإضافة من وحدات لاحقة: A.PC_TABS.push([مفتاح، اسم]) و A.PC_VIEWS[مفتاح] = async (box, root) => …
+  const TABS = A.PC_TABS = [['ov', 'نظرة عامة'], ['sc', 'المدارس'], ['us', 'المستخدمون'], ['pr', 'المشكلات'], ['rp', 'التقارير']];
+  A.PC_VIEWS = A.PC_VIEWS || {};
   const MET = [['active_users', 'مستخدمون نشطون'], ['actions', 'عمليات'], ['plans', 'حصص خطط'], ['attendance', 'رصد حضور'], ['behaviors', 'سلوك'], ['quizzes', 'اختبارات إلكترونية'], ['questions', 'أسئلة'], ['forms', 'نماذج'], ['preps', 'تحضير'], ['exams', 'اختبارات ورقية'], ['errors', 'أخطاء'], ['reports', 'بلاغات']];
 
   // ---------- تسجيل الأخطاء تلقائياً ----------
@@ -31,7 +33,7 @@
   let blocked = false;
   setInterval(() => {
     if (!S.school || !S.me) return; const p = plat();
-    if (p.status === 'suspended' && !PA()) { if (!blocked) { blocked = true; const d = document.createElement('div'); d.id = 'pcBlock'; d.setAttribute('role', 'alertdialog'); d.style.cssText = 'position:fixed;inset:0;z-index:20000;background:rgba(8,43,90,.92);display:flex;align-items:center;justify-content:center;padding:20px;color:#fff;text-align:center'; d.innerHTML = `<div style="max-width:440px"><div style="font-size:42px">⏸️</div><h2 style="color:#fff">الحساب موقوف مؤقتاً</h2><p style="line-height:1.9">${esc(p.msg || 'يُرجى التواصل مع إدارة المنصة لتجديد الاشتراك. بياناتكم محفوظة كما هي.')}</p></div>`; document.body.appendChild(d); } }
+    if ((p.status === 'suspended' || p.status === 'archived') && !PA()) { if (!blocked) { blocked = true; const d = document.createElement('div'); d.id = 'pcBlock'; d.setAttribute('role', 'alertdialog'); d.style.cssText = 'position:fixed;inset:0;z-index:20000;background:rgba(8,43,90,.92);display:flex;align-items:center;justify-content:center;padding:20px;color:#fff;text-align:center'; d.innerHTML = `<div style="max-width:440px"><div style="font-size:42px">⏸️</div><h2 style="color:#fff">الحساب موقوف مؤقتاً</h2><p style="line-height:1.9">${esc(p.msg || 'يُرجى التواصل مع إدارة المنصة لتجديد الاشتراك. بياناتكم محفوظة كما هي.')}</p></div>`; document.body.appendChild(d); } }
     else if (blocked) { blocked = false; const d = document.getElementById('pcBlock'); if (d) d.remove(); }
   }, 1500);
 
@@ -67,36 +69,57 @@
   .pc-err{border:1px solid var(--border);border-radius:12px;padding:10px;margin-bottom:8px;background:#fff}
   .pc-err.res{opacity:.6}.pc-err code{font-size:12px;direction:ltr;display:block;white-space:pre-wrap;max-height:120px;overflow:auto;background:#F4F7FB;border-radius:8px;padding:6px;margin-top:6px}
   .pc-shot{max-width:100%;max-height:260px;border-radius:10px;border:1px solid var(--border);margin-top:6px}
+  .pc-num{border:0;background:none;font:inherit;color:inherit;cursor:pointer;padding:2px 4px;border-radius:6px;text-decoration:underline dotted 1px;text-underline-offset:3px}
+  .pc-num:hover,.pc-num:focus-visible{background:#E8F5FB;color:var(--blue);outline:none}
+  .pc-kp button{all:unset;display:block;cursor:pointer;width:100%}.pc-kp button:focus-visible{outline:3px solid var(--sky);border-radius:10px}
+  .pc-kp div:has(button):hover{border-color:var(--sky);transform:translateY(-1px)}
+  .pc-ch{width:100%;height:auto;display:block;margin-top:8px}.pc-ch .pcb{fill:var(--sky)}.pc-ch .pcb:hover{fill:var(--blue)}.pc-ch text{font:11px inherit;fill:#5A6B82}
+  .pc-mini{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px;margin-top:10px}
+  .pc-mini button{all:unset;cursor:pointer;background:#fff;border:1px solid var(--border);border-radius:12px;padding:8px}.pc-mini button:hover,.pc-mini button:focus-visible,.pc-mini button.on{border-color:var(--blue);box-shadow:0 0 0 2px rgba(58,177,219,.35)}
+  .pc-mini b{display:block;font-size:18px;color:var(--navy)}.pc-mini span{font-size:11.5px;color:var(--muted)}.pc-mini button{padding:6px 8px}
+  .sc-card.pc-arch{opacity:.62}.pc-hidearch .sc-card.pc-arch{display:none}
+  @media (prefers-reduced-motion:reduce){.pc-kp div{transition:none!important;transform:none!important}}
   `; document.head.appendChild(s); }
 
   const prevSchools = V.schools;
   V.schools = async function (root) {
     if (!own() || !PA()) { root.innerHTML = ''; location.hash = '#/home'; return; }
     A._scRoot = root; const t = A.LS.get('pc_t') || 'ov';
-    root.innerHTML = `<div class="card" style="padding-bottom:6px"><div class="head" style="margin-bottom:0"><div class="grow"><h2 style="margin:0">لوحة مالك المنصة</h2><p class="sub" style="margin:2px 0 0">كل المدارس ومستخدموها ومشكلاتها وتقاريرها في مكان واحد — لك وحدك. كل إجراء دعم يُسجَّل ويراه مالك المدرسة.</p></div></div>
+    root.innerHTML = `<div class="card" style="padding-bottom:6px"><div class="head" style="margin-bottom:0"><div class="grow"><h2 style="margin:0">لوحة مالك المنصة</h2><p class="sub" style="margin:2px 0 0">كل المدارس ومستخدموها ومشكلاتها وتقاريرها في مكان واحد — لك وحدك. كل إجراء دعم يُسجَّل ويراه مالك المدرسة.</p></div><a class="btn ghost sm" href="index.html?demo=1" target="_blank" rel="noopener" title="نسخة كاملة ببيانات وهمية تعمل داخل المتصفح فقط — لا تستهلك القاعدة ولا تحفظ شيئاً">🧪 العرض التجريبي</a></div>
       <div class="pc-tabs" role="tablist">${TABS.map(([k, n]) => `<button role="tab" aria-selected="${k === t}" class="${k === t ? 'on' : ''}" data-t="${k}">${n}<span class="bd" data-bd="${k}" hidden></span></button>`).join('')}</div></div><div id="pcB"></div>`;
     $$('[data-t]', root).forEach(b => b.onclick = () => { A.LS.set('pc_t', b.dataset.t); V.schools(root); });
     const box = $('#pcB', root);
     badges(root);
     if (t === 'sc') return A.schoolsList ? A.schoolsList(box) : (prevSchools && prevSchools(box));
-    return ({ ov, us, pr, rp }[t] || ov)(box, root);
+    return (A.PC_VIEWS[t] || { ov, us, pr, rp }[t] || ov)(box, root);
   };
   async function badges(root) { try { const [e, r] = await Promise.all([api.rpc('platform_errors_list', { p_days: 30 }), api.rpc('platform_reports_list', { p_status: null })]); const n = (e || []).filter(x => !x.resolved).length + (r || []).filter(x => x.status !== 'done').length; const b = root.querySelector('[data-bd="pr"]'); if (b && n) { b.hidden = false; b.textContent = AR(n); } } catch (_) { } }
 
   // أزرار إضافية على بطاقة كل مدرسة
   A.schoolCardActs = (root, L) => {
     $$('[data-acts]', root).forEach(row => { const id = row.dataset.acts, x = L.find(s => s.id === id); if (!x) return;
-      row.insertAdjacentHTML('beforeend', `<button class="btn ghost sm" data-us="${id}">المستخدمون</button><button class="btn ghost sm" data-st="${id}">الحالة والميزات</button><button class="btn ghost sm" data-ol="${id}">رابط تفعيل جديد للمدير</button>${((x.platform || {}).status === 'suspended') ? '<span class="su-st bad">موقوفة</span>' : ''}`);
+      const ps = (x.platform || {}).status || 'active', card = row.closest('.sc-card');
+      if (card && ps === 'archived') card.classList.add('pc-arch');
+      row.insertAdjacentHTML('beforeend', `<button class="btn ghost sm" data-dd="${id}" data-m="">📈 الإحصاءات</button><button class="btn ghost sm" data-us="${id}">المستخدمون</button><button class="btn ghost sm" data-st="${id}">الحالة والميزات</button><button class="btn ghost sm" data-ol="${id}">رابط تفعيل جديد للمدير</button>
+        ${x.mine ? '' : ps === 'archived' ? `<button class="btn ghost sm" data-qs="${id}" data-v="active">↩ استعادة من الأرشيف</button>` : `<button class="btn ${ps === 'suspended' ? 'ok' : 'ghost'} sm" data-qs="${id}" data-v="${ps === 'suspended' ? 'active' : 'suspended'}">${ps === 'suspended' ? '▶ تشغيل' : '⏸ إيقاف'}</button><button class="btn ghost sm" data-qs="${id}" data-v="archived">🗄 أرشفة</button>`}
+        ${ps === 'suspended' ? '<span class="su-st bad">موقوفة</span>' : ps === 'archived' ? '<span class="su-st bad">مؤرشفة</span>' : ''}`);
     });
+    const nArch = L.filter(x => (x.platform || {}).status === 'archived').length, cards = root.querySelector('.sc-cards');
+    if (cards && !root.querySelector('#pcArchT')) { const sh = A.LS.get('pc_arch') === 1; cards.classList.toggle('pc-hidearch', !sh); cards.insertAdjacentHTML('beforebegin', `<div class="row" style="gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center"><span class="small muted">${AR(L.length - nArch)} مدرسة فعّالة/موقوفة${nArch ? ` · ${AR(nArch)} مؤرشفة` : ''}</span>${nArch ? `<label class="chk small"><input type="checkbox" id="pcArchT" ${sh ? 'checked' : ''}> إظهار المؤرشفة</label>` : ''}</div>`); const t = root.querySelector('#pcArchT'); if (t) t.onchange = () => { A.LS.set('pc_arch', t.checked ? 1 : 0); cards.classList.toggle('pc-hidearch', !t.checked); }; }
+    bindDrill(root, L, iso(new Date(Date.now() - 29 * 864e5)), iso(new Date()));
+    $$('[data-qs]', root).forEach(b => b.onclick = () => A.run(b, async () => { const x = L.find(s => s.id === b.dataset.qs), v = b.dataset.v;
+      const MSG = { suspended: `إيقاف «${esc(x.name)}»؟ تظهر لكل مستخدميها رسالة الإيقاف ولا يستطيعون العمل، وتبقى بياناتهم محفوظة كما هي.`, archived: `أرشفة «${esc(x.name)}»؟ تُوقف وتختفي من القائمة (مع إمكانية الاستعادة في أي وقت). البيانات لا تُحذف.`, active: `تشغيل «${esc(x.name)}» من جديد؟` };
+      if (!(await A.confirmBox(MSG[v], v === 'active' ? 'تشغيل' : v === 'archived' ? 'أرشفة' : 'إيقاف'))) return;
+      await api.rpc('platform_school_set', { p_school: x.id, p_platform: { status: v } }); A.toast(v === 'active' ? 'عادت المدرسة للعمل' : v === 'archived' ? 'أُرشفت المدرسة' : 'أُوقفت المدرسة', 'ok'); A.schoolsRefresh(); }));
     $$('[data-us]', root).forEach(b => b.onclick = () => { A.LS.set('pc_t', 'us'); A.LS.set('pc_us', b.dataset.us); V.schools(A._scRoot); });
     $$('[data-st]', root).forEach(b => b.onclick = () => stateDlg(L.find(s => s.id === b.dataset.st)));
     $$('[data-ol]', root).forEach(b => b.onclick = () => A.run(b, async () => { if (!(await A.confirmBox('إنشاء رابط تفعيل جديد لمدير هذه المدرسة؟ يتوقف الرابط السابق.', 'إنشاء'))) return; const c = await api.rpc('platform_owner_link', { p_school: b.dataset.ol }); const link = location.origin + location.pathname.replace(/[^/]*$/, '') + '?join=' + c; await navigator.clipboard.writeText(link).catch(() => { }); A.modal(`<h3>رابط التفعيل الجديد</h3><input class="in" readonly dir="ltr" value="${esc(link)}" onfocus="this.select()"><p class="small muted">نُسخ الرابط. أرسله لمدير المدرسة.</p>`); }));
   };
   function stateDlg(x) {
-    const p = Object.assign({ status: 'active', features: {} }, (x.platform || x.plat || {}));
+    const p = Object.assign({ status: 'active', features: {} }, (x.platform || x.plat || {})); // الحفظ يدمج مع الموجود (sql/119) فلا تضيع علامة البيانات الوهمية
     const items = (A.NAV || []).filter(n => !['home', 'schools', 'setup', 'support'].includes(n[0]));
     const m = A.modal(`<h3>الحالة والميزات — ${esc(x.name)}</h3>
-      <div class="field"><label>حالة المدرسة</label><div class="row" style="gap:12px"><label class="chk"><input type="radio" name="pst" value="active" ${p.status !== 'suspended' ? 'checked' : ''}> فعّالة</label><label class="chk"><input type="radio" name="pst" value="suspended" ${p.status === 'suspended' ? 'checked' : ''}> موقوفة (تظهر لهم رسالة، والبيانات محفوظة)</label></div></div>
+      <div class="field"><label>حالة المدرسة</label><div class="row" style="gap:12px"><label class="chk"><input type="radio" name="pst" value="active" ${!['suspended', 'archived'].includes(p.status) ? 'checked' : ''}> فعّالة</label><label class="chk"><input type="radio" name="pst" value="suspended" ${p.status === 'suspended' ? 'checked' : ''}> موقوفة (تظهر لهم رسالة، والبيانات محفوظة)</label>${x.mine ? '' : `<label class="chk"><input type="radio" name="pst" value="archived" ${p.status === 'archived' ? 'checked' : ''}> مؤرشفة (موقوفة ومخفية من القائمة)</label>`}</div></div>
       <div class="field"><label for="pMsg">رسالة الإيقاف</label><input class="in" id="pMsg" value="${esc(p.msg || '')}" placeholder="يُرجى التواصل مع إدارة المنصة لتجديد الاشتراك."></div>
       <b>الأقسام الظاهرة في منصتهم</b><p class="small muted" style="margin:2px 0 6px">أزل العلامة لإخفاء القسم عن كل حسابات هذه المدرسة (حسب باقة الاشتراك مثلاً).</p>
       <div class="perm-grid" style="max-height:40vh;overflow:auto">${items.map(n => `<label class="chk small"><input type="checkbox" data-f="${n[0]}" ${(p.features || {})[n[0]] === false ? '' : 'checked'}> ${esc(n[1])}</label>`).join('')}</div>
@@ -120,9 +143,36 @@
     const eo = E.filter(e => !e.resolved), ro = R.filter(r => r.status !== 'done');
     if (eo.length) al.push(['e', `${AR(eo.length)} خطأ غير معالج خلال ٧ أيام (تكرر ${AR(eo.reduce((a, e) => a + e.n, 0))} مرة)`]);
     if (ro.length) al.push(['w', `${AR(ro.length)} بلاغ من المستخدمين بانتظار الرد`]);
-    box.innerHTML = `<div class="pc-kp"><div><span>المدارس</span><b>${AR(L.length)}</b></div><div><span>الموظفون</span><b>${AR(sum('staff'))}</b></div><div><span>فعّلوا حساباتهم</span><b>${AR(sum('accounts'))}</b></div><div><span>الطلاب</span><b>${AR(sum('students'))}</b></div><div class="${act ? 'ok' : ''}"><span>نشطون هذا الأسبوع</span><b>${AR(act)}</b></div><div class="${eo.length ? 'bad' : 'ok'}"><span>أخطاء مفتوحة</span><b>${AR(eo.length)}</b></div><div class="${ro.length ? 'bad' : 'ok'}"><span>بلاغات مفتوحة</span><b>${AR(ro.length)}</b></div></div>
+    const kb = (go, t, v, c) => `<div class="${c || ''}"><button data-go="${go}" title="عرض التفاصيل"><span>${t}</span><b>${AR(v)}</b></button></div>`;
+    box.innerHTML = `<div class="pc-kp">${kb('sc', 'المدارس', L.filter(x => (x.platform || {}).status !== 'archived').length)}${kb('us', 'الموظفون', sum('staff'))}${kb('us:never', 'فعّلوا حساباتهم', sum('accounts'))}${kb('sc', 'الطلاب', sum('students'))}${kb('rp', 'نشطون هذا الأسبوع', act, act ? 'ok' : '')}${kb('pr:err', 'أخطاء مفتوحة', eo.length, eo.length ? 'bad' : 'ok')}${kb('pr:rep', 'بلاغات مفتوحة', ro.length, ro.length ? 'bad' : 'ok')}</div>
       <div class="card" style="margin-top:0"><b>تنبيهات تحتاج انتباهك</b><div style="margin-top:8px">${al.map(([c, t]) => `<div class="pc-al ${c}">${c === 'e' ? '⛔' : c === 'w' ? '⚠️' : 'ℹ️'} <span>${esc(t)}</span></div>`).join('') || '<div class="pc-al i">✓ لا تنبيهات — كل شيء على ما يرام</div>'}</div></div>
-      <div class="card"><b>الاستخدام في آخر ٧ أيام</b><div class="scroll" style="margin-top:8px"><table class="tbl"><thead><tr><th>المدرسة</th>${MET.map(m => `<th>${m[1]}</th>`).join('')}</tr></thead><tbody>${U.map(u => `<tr><td><b>${esc(u.name)}</b></td>${MET.map(m => `<td style="${m[0] === 'errors' && u.errors ? 'color:#B3261E;font-weight:800' : ''}">${AR(u[m[0]] || 0)}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${MET.length + 1}">${A.emptyBox('لا بيانات')}</td></tr>`}</tbody></table></div></div>`;
+      <div class="card"><b>الاستخدام في آخر ٧ أيام</b><div class="scroll" style="margin-top:8px"><table class="tbl"><thead><tr><th>المدرسة</th>${MET.map(m => `<th>${m[1]}</th>`).join('')}</tr></thead><tbody>${U.map(u => `<tr><td><button class="pc-num" data-dd="${u.id}" data-m=""><b>${esc(u.name)}</b></button></td>${MET.map(m => `<td style="${m[0] === 'errors' && u.errors ? 'color:#B3261E;font-weight:800' : ''}"><button class="pc-num" data-dd="${u.id}" data-m="${m[0]}">${AR(u[m[0]] || 0)}</button></td>`).join('')}</tr>`).join('') || `<tr><td colspan="${MET.length + 1}">${A.emptyBox('لا بيانات')}</td></tr>`}</tbody></table></div><p class="small muted" style="margin:6px 0 0">اضغط أي رقم أو اسم مدرسة لعرض المنحنى اليومي والتفاصيل.</p></div>`;
+    $$('[data-go]', box).forEach(b => b.onclick = () => { const [t, s2] = b.dataset.go.split(':'); if (t === 'pr' && s2) A.LS.set('pc_pr', s2); if (t === 'us') A.LS.set('pc_uf', s2 || 'all'); A.LS.set('pc_t', t); V.schools(A._scRoot); });
+    bindDrill(box, U, iso(from), iso(to));
+  }
+
+  // ----- التفاصيل التفاعلية: منحنى يومي لمدرسة (كل المؤشرات أو مؤشر واحد) -----
+  function bindDrill(box, U, from, to) { $$('[data-dd]', box).forEach(b => b.onclick = () => drill((U.find(u => u.id === b.dataset.dd) || {}), b.dataset.m, from, to)); }
+  A.pcDrill = drill;
+  async function drill(u, metric, from, to) {
+    const m = A.modal(`<h3>${esc(u.name || '')}</h3><div id="ddB">${A.emptyBox('جارٍ التحميل…')}</div>`, { cls: 'wide' });
+    let D = [], cur = metric || 'actions', F = from, T = to;
+    const load = async () => { try { D = await api.rpc('platform_usage_daily', { p_school: u.id, p_from: F, p_to: T }); } catch (e) { m.el.querySelector('#ddB').innerHTML = A.emptyBox('تعذّر التحميل', esc(e.message)); return false; } return true; };
+    const chart = k => { const vals = D.map(d => +d[k] || 0), mx = Math.max(1, ...vals), n = vals.length, W = 640, H = 200, pb = 24, bw = Math.max(2, (W - 40) / n - 2);
+      return `<svg class="pc-ch" direction="ltr" style="direction:ltr" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc((MET.find(x => x[0] === k) || [])[1] || k)} يومياً">${[0, .5, 1].map(f => `<line x1="32" x2="${W}" y1="${(H - pb) * (1 - f) + 2}" y2="${(H - pb) * (1 - f) + 2}" stroke="#E6ECF3"/><text x="2" y="${(H - pb) * (1 - f) + 12}" text-anchor="start">${AR(Math.round(mx * f))}</text>`).join('')}
+        ${vals.map((v, i) => { const h = (H - pb - 4) * v / mx, x = W - 6 - (i + 1) * (bw + 2); return `<rect class="pcb" x="${x}" y="${H - pb - h + 2}" width="${bw}" height="${Math.max(h, v ? 2 : 0)}" rx="2"><title>${D[i].d}: ${v}</title></rect>${n <= 31 && (i % Math.ceil(n / 10) === 0) ? `<text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle">${AR(+D[i].d.slice(8))}/${AR(+D[i].d.slice(5, 7))}</text>` : ''}`; }).join('')}</svg>`; };
+    const draw = () => { const tot = k => D.reduce((a, d) => a + (+d[k] || 0), 0), days = D.length, k = cur, t = tot(k), peak = D.reduce((a, d) => (+d[k] || 0) > (+a[k] || 0) ? d : a, D[0] || {});
+      m.el.querySelector('#ddB').innerHTML = `<div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><div class="chip-filter" style="margin:0">${[[7, 'أسبوع'], [30, 'شهر'], [90, 'فصل']].map(([d, nm]) => `<button data-dq="${d}" class="${days === d ? 'on' : ''}">${nm}</button>`).join('')}</div><span class="small muted">${esc(F)} ← ${esc(T)}</span></div>
+        <h4 style="margin:12px 0 0">${esc((MET.find(x => x[0] === k) || [])[1] || k)} يوماً بيوم</h4>
+        <div class="small muted">المجموع ${AR(t)} · المتوسط ${AR(Math.round(t / Math.max(1, days) * 10) / 10)} يومياً${t ? ` · الأعلى ${AR(+peak[k] || 0)} في ${esc(peak.d || '')}` : ''}</div>${chart(k)}
+        <div class="small muted" style="margin-top:10px">اختر مؤشراً لعرض منحناه:</div><div class="pc-mini" style="margin-top:4px">${MET.map(([mk, nm]) => `<button data-mk="${mk}" class="${mk === k ? 'on' : ''}" aria-pressed="${mk === k}"><b>${AR(tot(mk))}</b><span>${nm}</span></button>`).join('')}</div>
+        <div class="acts"><button class="btn ghost sm" id="ddX">Excel</button>${u.id ? `<button class="btn ghost sm" id="ddU">مستخدمو المدرسة</button>` : ''}</div>`;
+      $$('[data-mk]', m.el).forEach(b => b.onclick = () => { cur = b.dataset.mk; draw(); });
+      $$('[data-dq]', m.el).forEach(b => b.onclick = async () => { T = iso(new Date()); F = iso(new Date(Date.now() - (+b.dataset.dq - 1) * 864e5)); if (await load()) draw(); });
+      m.el.querySelector('#ddX').onclick = () => { if (!window.XLSX) return; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['اليوم', ...MET.map(x => x[1])], ...D.map(d => [d.d, ...MET.map(x => +d[x[0]] || 0)])]), 'يومي'); wb.Workbook = { Views: [{ RTL: true }] }; XLSX.writeFile(wb, `${u.name || 'مدرسة'} يومي ${F} - ${T}.xlsx`); };
+      const us2 = m.el.querySelector('#ddU'); if (us2) us2.onclick = () => { m.close(); A.LS.set('pc_t', 'us'); A.LS.set('pc_us', u.id); V.schools(A._scRoot); };
+    };
+    if (await load()) draw();
   }
 
   // ----- المستخدمون -----
@@ -177,7 +227,8 @@
       const table = `<table><tr><th>المدرسة</th>${MET.map(m => `<th>${m[1]}</th>`).join('')}</tr>${U.map(u => `<tr><td style="text-align:right"><b>${esc(u.name)}</b></td>${MET.map(m => `<td>${AR(u[m[0]] || 0)}</td>`).join('')}</tr>`).join('')}<tr><th>المجموع</th>${MET.map(m => `<th>${AR(tot(m[0]))}</th>`).join('')}</tr></table>`;
       box.innerHTML = `<div class="card" style="margin-top:0"><div class="row" style="gap:10px;flex-wrap:wrap;align-items:flex-end"><div class="field" style="margin:0"><label for="rF">من</label><input class="in" type="date" id="rF" value="${from}"></div><div class="field" style="margin:0"><label for="rT">إلى</label><input class="in" type="date" id="rT" value="${to}"></div>
         <div class="chip-filter" style="margin:0">${[[7, 'أسبوع'], [30, 'شهر'], [90, 'فصل']].map(([d, n]) => `<button data-q="${d}">${n}</button>`).join('')}</div><div class="grow"></div><button class="btn ghost sm" id="rPr">طباعة</button><button class="btn ghost sm" id="rX">Excel</button></div>
-        <div class="scroll" style="margin-top:10px"><table class="tbl"><thead><tr><th>المدرسة</th>${MET.map(m => `<th>${m[1]}</th>`).join('')}</tr></thead><tbody>${U.map(u => `<tr><td><b>${esc(u.name)}</b></td>${MET.map(m => `<td><div style="display:flex;align-items:center;gap:6px"><span style="min-width:28px">${AR(u[m[0]] || 0)}</span><span style="flex:1;min-width:30px;height:6px;border-radius:4px;background:#EEF2F8"><i style="display:block;height:100%;border-radius:4px;width:${Math.round((+u[m[0]] || 0) / mx(m[0]) * 100)}%;background:${m[0] === 'errors' ? '#E0675A' : 'var(--sky)'}"></i></span></div></td>`).join('')}</tr>`).join('')}</tbody><tfoot><tr><th>المجموع</th>${MET.map(m => `<th>${AR(tot(m[0]))}</th>`).join('')}</tr></tfoot></table></div></div>`;
+        <div class="scroll" style="margin-top:10px"><table class="tbl"><thead><tr><th>المدرسة</th>${MET.map(m => `<th>${m[1]}</th>`).join('')}</tr></thead><tbody>${U.map(u => `<tr><td><button class="pc-num" data-dd="${u.id}" data-m=""><b>${esc(u.name)}</b></button></td>${MET.map(m => `<td><div style="display:flex;align-items:center;gap:6px"><button class="pc-num" data-dd="${u.id}" data-m="${m[0]}" style="min-width:28px">${AR(u[m[0]] || 0)}</button><span style="flex:1;min-width:30px;height:6px;border-radius:4px;background:#EEF2F8"><i style="display:block;height:100%;border-radius:4px;width:${Math.round((+u[m[0]] || 0) / mx(m[0]) * 100)}%;background:${m[0] === 'errors' ? '#E0675A' : 'var(--sky)'}"></i></span></div></td>`).join('')}</tr>`).join('')}</tbody><tfoot><tr><th>المجموع</th>${MET.map(m => `<th>${AR(tot(m[0]))}</th>`).join('')}</tr></tfoot></table></div></div>`;
+      bindDrill(box, U, from, to);
       const set = () => { A.LS.set('pc_rp', { from, to }); draw(); };
       $('#rF', box).onchange = e => { from = e.target.value; set(); }; $('#rT', box).onchange = e => { to = e.target.value; set(); };
       $$('[data-q]', box).forEach(b => b.onclick = () => { to = iso(new Date()); from = iso(new Date(Date.now() - (+b.dataset.q - 1) * 864e5)); set(); });

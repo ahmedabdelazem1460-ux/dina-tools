@@ -855,7 +855,10 @@ body.band .foot{background:#082B5A;color:#fff;border-top:0;height:56px}
         if (n === 'platform_report_set') { const r = (D.support_reports || []).find(x => x.id === a.p_id); if (r) Object.assign(r, { status: a.p_status, reply: a.p_reply }); return wait(null); }
         if (n === 'platform_users') return wait(D.staff.filter(x => x.school_id === a.p_school).map((x, i) => ({ id: x.id, name: x.full_name, email: x.email, owner: x.is_owner, active: x.active !== false, joined: !!x.user_id || x.is_owner, last_in: i % 3 ? new Date(Date.now() - i * 3 * 864e5).toISOString() : null, roles: D.memberships.filter(m => m.staff_id === x.id).map(m => m.role), acts30: (i * 7) % 40 })));
         if (n === 'platform_usage') return wait(D.schools.map((sc, i) => ({ id: sc.id, name: sc.name, active_users: 9 - i * 4, actions: 320 - i * 200, plans: 210 - i * 150, attendance: 140, behaviors: 12, quizzes: 4, questions: 60, forms: 9, preps: 30, exams: 2, errors: i ? 0 : 8, reports: (D.support_reports || []).length })));
-        if (n === 'platform_school_set') { const sc = D.schools.find(x => x.id === a.p_school); sc.settings = Object.assign({}, sc.settings, { platform: a.p_platform }); return wait(null); }
+        if (n === 'platform_demo_seed') { const sc = D.schools.find(x => x.id === a.p_school); const k = (a.p_opts || {}).classes_per_grade || 1, st = (a.p_opts || {}).students || 18, ns = D.sections.filter(x => x.school_id === sc.id).length || 1; const c = { classes: 9 * k * ns, teachers: 26 * ns, students: 9 * k * ns * st, weeks: 5 * ns, slots: 315 * k * ns, no_teacher: 0, entries: 1575 * k * ns, attendance: 1800 * ns, behaviors: 23 * ns }; sc.settings = Object.assign({}, sc.settings, { platform: Object.assign({}, (sc.settings || {}).platform, { demo: { on: true, at: new Date().toISOString(), counts: c } }) }); return wait(c); }
+        if (n === 'platform_demo_clear') { const sc = D.schools.find(x => x.id === a.p_school); const c = (((sc.settings || {}).platform || {}).demo || {}).counts || {}; sc.settings = Object.assign({}, sc.settings, { platform: Object.assign({}, (sc.settings || {}).platform, { demo: { on: false } }) }); return wait({ classes: c.classes, teachers: c.teachers, students: c.students, weeks: c.weeks }); }
+        if (n === 'platform_school_set') { const sc = D.schools.find(x => x.id === a.p_school); sc.settings = Object.assign({}, sc.settings, { platform: Object.assign({}, (sc.settings || {}).platform, a.p_platform) }); return wait(null); }
+        if (n === 'platform_usage_daily') { const out = [], f = new Date(a.p_from), t = new Date(a.p_to); let i = 0; for (let d = new Date(f); d <= t; d.setDate(d.getDate() + 1), i++) { const w = d.getDay() < 5 ? 1 : 0.1, r = k => Math.round((Math.sin(i * 1.7 + k) + 1.3) * w * (k + 3)); out.push({ d: d.toISOString().slice(0, 10), active_users: r(2), actions: r(9), plans: r(7), attendance: r(8), behaviors: r(1), quizzes: r(0), questions: r(2), forms: r(1), preps: r(3), exams: r(0), errors: i % 9 === 0 ? 1 : 0, reports: 0 }); } return wait(out); }
         if (n === 'platform_owner_link') return wait('OWN' + Math.random().toString(36).slice(2, 10).toUpperCase());
         if (n === 'school_provision') { const p = a.p || {}; if (!p.name || p.name.length < 3) throw new Error('اكتب اسم المدرسة'); if (!/@/.test((p.owner || {}).email || '')) throw new Error('بريد مدير المدرسة غير صحيح'); const sc = { id: uid(), name: p.name, term_label: p.term_label, settings: { brand: { name: p.name, short: p.short || p.name }, setup: { done: false }, plan: p.plan || {} } }; D.schools.push(sc); let first; (p.sections || []).forEach((x, i) => { const s2 = { id: uid(), school_id: sc.id, name: x.name, short_name: x.short_name, days: 5, periods: 7, sort: i }; D.sections.push(s2); first = first || s2.id; }); const st = { id: uid(), school_id: sc.id, full_name: p.owner.name, email: p.owner.email, is_owner: true, active: true }; D.staff.push(st); const code = 'OWN' + Math.random().toString(36).slice(2, 10).toUpperCase(); D.join_codes.push({ code, section_id: first, role: 'supervisor', active: true, uses: 0, owner_of: sc.id }); return wait({ school_id: sc.id, owner_id: st.id, code }); }
         if (n === 'edit_week_cell') { D.plan_entries = D.plan_entries || []; let e = D.plan_entries.find(x => x.week_id === a.p_week && x.class_id === a.p_class && x.day === a.p_day && x.period === a.p_period); if (!e) { e = { id: uid(), week_id: a.p_week, class_id: a.p_class, day: a.p_day, period: a.p_period, topic: '', homework: '', note: '', status: 'empty', exec_status: 'pending' }; D.plan_entries.push(e); } Object.assign(e, { subject_id: a.p_subject, teacher_id: a.p_teacher, override: true }); if (a.p_content === 'clear') Object.assign(e, { topic: '', homework: '', note: '', status: 'empty' }); if (a.p_teacher && !D.memberships.some(m => m.staff_id === a.p_teacher)) D.memberships.push({ id: uid(), staff_id: a.p_teacher, section_id: (D.weeks.find(w => w.id === a.p_week) || {}).section_id, role: 'teacher' }); return wait({ ...e }); } if (n === 'game_host') { const g = find('games', a.p_game); if (a.p_act === 'next') { if (g.qi + 1 >= g.questions.length) g.state = 'end'; else { g.state = 'question'; g.qi = (g.qi ?? -1) + 1; g.q_started_at = new Date().toISOString(); } } else if (a.p_act === 'reveal') g.state = 'reveal'; else if (a.p_act === 'end') g.state = 'end'; else if (a.p_act === 'restart') { g.state = 'lobby'; g.qi = -1; D.game_answers = (D.game_answers || []).filter(x => x.game_id !== g.id); } return wait({ state: g.state, qi: g.qi, at: g.q_started_at, now: new Date().toISOString() }); } if (n === 'student_codes_list') { D.student_codes = D.student_codes || []; return wait((D.students || []).filter(x => x.class_id === a.p_class && x.active !== false).map(x => { const c = D.student_codes.find(k => k.student_id === x.id) || {}; return { id: x.id, name: x.full_name, no: x.student_no, phone: x.guardian_phone || '0551234567', code: c.code || null, active: c.active, last: c.last_login || null, logins: c.logins || 0 }; })); } if (n === 'student_codes_gen') { D.student_codes = D.student_codes || []; let k = 0; (D.students || []).filter(x => x.class_id === a.p_class && (!a.p_student || x.id === a.p_student)).forEach(x => { if (!a.p_student && D.student_codes.some(c => c.student_id === x.id)) return; D.student_codes = D.student_codes.filter(c => c.student_id !== x.id); const r = () => Math.random().toString(36).slice(2, 6).toUpperCase().replace(/[01OIL]/g, 'K'); D.student_codes.push({ code: r() + '-' + r(), student_id: x.id, active: true, logins: 0 }); k++; }); return wait({ created: k }); } if (n === 'student_code_toggle') { const c = (D.student_codes || []).find(c => c.student_id === a.p_student); if (c) c.active = a.p_active; return wait(null); } if (n === 'save_duty') { upd('sections', a.p_section, { duty: a.p_duty }); return wait(a.p_duty); } if (n === 'duty_check') { D.duty_log = D.duty_log || []; const i = D.duty_log.findIndex(r => r.section_id === a.p_section && r.day === a.p_day && r.slot === a.p_slot && r.place === a.p_place && r.staff_id === a.p_staff); if (a.p_status === 'clear') { if (i >= 0) D.duty_log.splice(i, 1); return wait(null); } const row = { id: uid(), school_id: D.schools[0].id, section_id: a.p_section, day: a.p_day, slot: a.p_slot, place: a.p_place, staff_id: a.p_staff, status: a.p_status, sub_staff: a.p_sub, note: '', at: new Date().toISOString() }; if (i >= 0) D.duty_log[i] = row; else D.duty_log.push(row); return wait(row); } if (n === 'trash_list') return wait([{ batch: 1, deleted_at: new Date().toISOString(), deleted_by: null, main_tbl: 'weeks', main_label: 'الأسبوع التجريبي', n: 31, n_open: 31, tbls: { weeks: 1, plan_entries: 30 } }]); if (n === 'trash_restore') return wait({ restored: 31, failed: 0 }); if (n === 'trash_purge') return wait(1); if (n === 'calendar_apply') { let u = 0, c = 0; a.p_weeks.forEach(r => { const ws = D.weeks.filter(w => w.section_id === a.p_section && w.number === r.number); ws.forEach(w => { w.start_date = r.start; w.holidays = (w.holidays || []).filter(h => !h.auto && !r.holidays.some(x => x.day === h.day)).concat(r.holidays); u++; }); }); return wait({ updated: u, created: c, timetable: 0 }); } if (n === 'save_period_attendance') { const c = find('classes', a.p_class); D.period_attendance = D.period_attendance || []; const w = D.weeks.find(x => x.section_id === c.section_id && x.start_date <= a.p_day && a.p_day <= (() => { const d = new Date(x.start_date + 'T00:00:00'); d.setDate(d.getDate() + 6); return d.toISOString().slice(0, 10); })()); const di = new Date(a.p_day + 'T00:00:00').getDay(); const e = w && D.plan_entries.find(y => y.week_id === w.id && y.class_id === a.p_class && y.day === di && y.period === a.p_period) || {}; a.p_rows.forEach(r => { let x = D.period_attendance.find(y => y.student_id === r.s && y.day === a.p_day && y.period === a.p_period); if (!x) { x = { id: uid(), school_id: c.school_id || D.schools[0].id, section_id: c.section_id, class_id: a.p_class, student_id: r.s, day: a.p_day, period: a.p_period }; D.period_attendance.push(x); } Object.assign(x, { status: r.st, minutes: r.m ? +r.m : null, note: r.n || '', subject_id: e.subject_id || null, teacher_id: e.teacher_id || null, by_staff: (D._me || {}).id || null, updated_at: new Date().toISOString() }); }); return wait(a.p_rows.length); } if (n === 'week_quizzes') return wait(clone((D.quizzes || []).filter(z => z.week_id === a.p_week && z.status === 'published'))); if (n === 'sup_acknowledge') { const r = find('sup_records', a.p_id); Object.assign(r, { status: 'acknowledged', ack_at: new Date().toISOString(), ack_name: a.p_name, ack_signature: a.p_signature, ack_note: a.p_note }); } if (n === 'save_live_extra') { D.live_entries = D.live_entries || []; let r = D.live_entries.find(x => x.ds_id === a.p_ds && x.class_id === a.p_class && x.day === a.p_day && x.period === a.p_period); if (!r) { r = { ds_id: a.p_ds, class_id: a.p_class, day: a.p_day, period: a.p_period, topic: '', homework: '', note: '', link: '' }; D.live_entries.push(r); } r.extra = (a.p_extra || []).filter(x => (x.t || '').trim() || (x.u || '').trim()).slice(0, 12); return wait(clone(r)); } if (n === 'save_live_entry') { D.live_entries = D.live_entries || []; let r = D.live_entries.find(x => x.ds_id === a.p_ds && x.class_id === a.p_class && x.day === a.p_day && x.period === a.p_period); if (!r) { r = { ds_id: a.p_ds, class_id: a.p_class, day: a.p_day, period: a.p_period }; D.live_entries.push(r); } Object.assign(r, { topic: (a.p_topic || '').trim(), homework: (a.p_homework || '').trim(), note: (a.p_note || '').trim(), link: (a.p_link || '').trim(), updated_at: new Date().toISOString() }); return wait(clone(r)); } return wait(null); },
@@ -24299,7 +24302,9 @@ ${S.me.full_name}`;
   const fmt = d => d ? (A.fmtDT ? A.fmtDT(d) : String(d).slice(0, 16)) : '—';
   const daysAgo = d => d ? Math.floor((Date.now() - new Date(d)) / 864e5) : null;
   const iso = d => d.toISOString().slice(0, 10);
-  const TABS = [['ov', 'نظرة عامة'], ['sc', 'المدارس'], ['us', 'المستخدمون'], ['pr', 'المشكلات'], ['rp', 'التقارير']];
+  // التبويبات قابلة للإضافة من وحدات لاحقة: A.PC_TABS.push([مفتاح، اسم]) و A.PC_VIEWS[مفتاح] = async (box, root) => …
+  const TABS = A.PC_TABS = [['ov', 'نظرة عامة'], ['sc', 'المدارس'], ['us', 'المستخدمون'], ['pr', 'المشكلات'], ['rp', 'التقارير']];
+  A.PC_VIEWS = A.PC_VIEWS || {};
   const MET = [['active_users', 'مستخدمون نشطون'], ['actions', 'عمليات'], ['plans', 'حصص خطط'], ['attendance', 'رصد حضور'], ['behaviors', 'سلوك'], ['quizzes', 'اختبارات إلكترونية'], ['questions', 'أسئلة'], ['forms', 'نماذج'], ['preps', 'تحضير'], ['exams', 'اختبارات ورقية'], ['errors', 'أخطاء'], ['reports', 'بلاغات']];
 
   // ---------- تسجيل الأخطاء تلقائياً ----------
@@ -24318,7 +24323,7 @@ ${S.me.full_name}`;
   let blocked = false;
   setInterval(() => {
     if (!S.school || !S.me) return; const p = plat();
-    if (p.status === 'suspended' && !PA()) { if (!blocked) { blocked = true; const d = document.createElement('div'); d.id = 'pcBlock'; d.setAttribute('role', 'alertdialog'); d.style.cssText = 'position:fixed;inset:0;z-index:20000;background:rgba(8,43,90,.92);display:flex;align-items:center;justify-content:center;padding:20px;color:#fff;text-align:center'; d.innerHTML = `<div style="max-width:440px"><div style="font-size:42px">⏸️</div><h2 style="color:#fff">الحساب موقوف مؤقتاً</h2><p style="line-height:1.9">${esc(p.msg || 'يُرجى التواصل مع إدارة المنصة لتجديد الاشتراك. بياناتكم محفوظة كما هي.')}</p></div>`; document.body.appendChild(d); } }
+    if ((p.status === 'suspended' || p.status === 'archived') && !PA()) { if (!blocked) { blocked = true; const d = document.createElement('div'); d.id = 'pcBlock'; d.setAttribute('role', 'alertdialog'); d.style.cssText = 'position:fixed;inset:0;z-index:20000;background:rgba(8,43,90,.92);display:flex;align-items:center;justify-content:center;padding:20px;color:#fff;text-align:center'; d.innerHTML = `<div style="max-width:440px"><div style="font-size:42px">⏸️</div><h2 style="color:#fff">الحساب موقوف مؤقتاً</h2><p style="line-height:1.9">${esc(p.msg || 'يُرجى التواصل مع إدارة المنصة لتجديد الاشتراك. بياناتكم محفوظة كما هي.')}</p></div>`; document.body.appendChild(d); } }
     else if (blocked) { blocked = false; const d = document.getElementById('pcBlock'); if (d) d.remove(); }
   }, 1500);
 
@@ -24354,36 +24359,57 @@ ${S.me.full_name}`;
   .pc-err{border:1px solid var(--border);border-radius:12px;padding:10px;margin-bottom:8px;background:#fff}
   .pc-err.res{opacity:.6}.pc-err code{font-size:12px;direction:ltr;display:block;white-space:pre-wrap;max-height:120px;overflow:auto;background:#F4F7FB;border-radius:8px;padding:6px;margin-top:6px}
   .pc-shot{max-width:100%;max-height:260px;border-radius:10px;border:1px solid var(--border);margin-top:6px}
+  .pc-num{border:0;background:none;font:inherit;color:inherit;cursor:pointer;padding:2px 4px;border-radius:6px;text-decoration:underline dotted 1px;text-underline-offset:3px}
+  .pc-num:hover,.pc-num:focus-visible{background:#E8F5FB;color:var(--blue);outline:none}
+  .pc-kp button{all:unset;display:block;cursor:pointer;width:100%}.pc-kp button:focus-visible{outline:3px solid var(--sky);border-radius:10px}
+  .pc-kp div:has(button):hover{border-color:var(--sky);transform:translateY(-1px)}
+  .pc-ch{width:100%;height:auto;display:block;margin-top:8px}.pc-ch .pcb{fill:var(--sky)}.pc-ch .pcb:hover{fill:var(--blue)}.pc-ch text{font:11px inherit;fill:#5A6B82}
+  .pc-mini{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px;margin-top:10px}
+  .pc-mini button{all:unset;cursor:pointer;background:#fff;border:1px solid var(--border);border-radius:12px;padding:8px}.pc-mini button:hover,.pc-mini button:focus-visible,.pc-mini button.on{border-color:var(--blue);box-shadow:0 0 0 2px rgba(58,177,219,.35)}
+  .pc-mini b{display:block;font-size:18px;color:var(--navy)}.pc-mini span{font-size:11.5px;color:var(--muted)}.pc-mini button{padding:6px 8px}
+  .sc-card.pc-arch{opacity:.62}.pc-hidearch .sc-card.pc-arch{display:none}
+  @media (prefers-reduced-motion:reduce){.pc-kp div{transition:none!important;transform:none!important}}
   `; document.head.appendChild(s); }
 
   const prevSchools = V.schools;
   V.schools = async function (root) {
     if (!own() || !PA()) { root.innerHTML = ''; location.hash = '#/home'; return; }
     A._scRoot = root; const t = A.LS.get('pc_t') || 'ov';
-    root.innerHTML = `<div class="card" style="padding-bottom:6px"><div class="head" style="margin-bottom:0"><div class="grow"><h2 style="margin:0">لوحة مالك المنصة</h2><p class="sub" style="margin:2px 0 0">كل المدارس ومستخدموها ومشكلاتها وتقاريرها في مكان واحد — لك وحدك. كل إجراء دعم يُسجَّل ويراه مالك المدرسة.</p></div></div>
+    root.innerHTML = `<div class="card" style="padding-bottom:6px"><div class="head" style="margin-bottom:0"><div class="grow"><h2 style="margin:0">لوحة مالك المنصة</h2><p class="sub" style="margin:2px 0 0">كل المدارس ومستخدموها ومشكلاتها وتقاريرها في مكان واحد — لك وحدك. كل إجراء دعم يُسجَّل ويراه مالك المدرسة.</p></div><a class="btn ghost sm" href="index.html?demo=1" target="_blank" rel="noopener" title="نسخة كاملة ببيانات وهمية تعمل داخل المتصفح فقط — لا تستهلك القاعدة ولا تحفظ شيئاً">🧪 العرض التجريبي</a></div>
       <div class="pc-tabs" role="tablist">${TABS.map(([k, n]) => `<button role="tab" aria-selected="${k === t}" class="${k === t ? 'on' : ''}" data-t="${k}">${n}<span class="bd" data-bd="${k}" hidden></span></button>`).join('')}</div></div><div id="pcB"></div>`;
     $$('[data-t]', root).forEach(b => b.onclick = () => { A.LS.set('pc_t', b.dataset.t); V.schools(root); });
     const box = $('#pcB', root);
     badges(root);
     if (t === 'sc') return A.schoolsList ? A.schoolsList(box) : (prevSchools && prevSchools(box));
-    return ({ ov, us, pr, rp }[t] || ov)(box, root);
+    return (A.PC_VIEWS[t] || { ov, us, pr, rp }[t] || ov)(box, root);
   };
   async function badges(root) { try { const [e, r] = await Promise.all([api.rpc('platform_errors_list', { p_days: 30 }), api.rpc('platform_reports_list', { p_status: null })]); const n = (e || []).filter(x => !x.resolved).length + (r || []).filter(x => x.status !== 'done').length; const b = root.querySelector('[data-bd="pr"]'); if (b && n) { b.hidden = false; b.textContent = AR(n); } } catch (_) { } }
 
   // أزرار إضافية على بطاقة كل مدرسة
   A.schoolCardActs = (root, L) => {
     $$('[data-acts]', root).forEach(row => { const id = row.dataset.acts, x = L.find(s => s.id === id); if (!x) return;
-      row.insertAdjacentHTML('beforeend', `<button class="btn ghost sm" data-us="${id}">المستخدمون</button><button class="btn ghost sm" data-st="${id}">الحالة والميزات</button><button class="btn ghost sm" data-ol="${id}">رابط تفعيل جديد للمدير</button>${((x.platform || {}).status === 'suspended') ? '<span class="su-st bad">موقوفة</span>' : ''}`);
+      const ps = (x.platform || {}).status || 'active', card = row.closest('.sc-card');
+      if (card && ps === 'archived') card.classList.add('pc-arch');
+      row.insertAdjacentHTML('beforeend', `<button class="btn ghost sm" data-dd="${id}" data-m="">📈 الإحصاءات</button><button class="btn ghost sm" data-us="${id}">المستخدمون</button><button class="btn ghost sm" data-st="${id}">الحالة والميزات</button><button class="btn ghost sm" data-ol="${id}">رابط تفعيل جديد للمدير</button>
+        ${x.mine ? '' : ps === 'archived' ? `<button class="btn ghost sm" data-qs="${id}" data-v="active">↩ استعادة من الأرشيف</button>` : `<button class="btn ${ps === 'suspended' ? 'ok' : 'ghost'} sm" data-qs="${id}" data-v="${ps === 'suspended' ? 'active' : 'suspended'}">${ps === 'suspended' ? '▶ تشغيل' : '⏸ إيقاف'}</button><button class="btn ghost sm" data-qs="${id}" data-v="archived">🗄 أرشفة</button>`}
+        ${ps === 'suspended' ? '<span class="su-st bad">موقوفة</span>' : ps === 'archived' ? '<span class="su-st bad">مؤرشفة</span>' : ''}`);
     });
+    const nArch = L.filter(x => (x.platform || {}).status === 'archived').length, cards = root.querySelector('.sc-cards');
+    if (cards && !root.querySelector('#pcArchT')) { const sh = A.LS.get('pc_arch') === 1; cards.classList.toggle('pc-hidearch', !sh); cards.insertAdjacentHTML('beforebegin', `<div class="row" style="gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center"><span class="small muted">${AR(L.length - nArch)} مدرسة فعّالة/موقوفة${nArch ? ` · ${AR(nArch)} مؤرشفة` : ''}</span>${nArch ? `<label class="chk small"><input type="checkbox" id="pcArchT" ${sh ? 'checked' : ''}> إظهار المؤرشفة</label>` : ''}</div>`); const t = root.querySelector('#pcArchT'); if (t) t.onchange = () => { A.LS.set('pc_arch', t.checked ? 1 : 0); cards.classList.toggle('pc-hidearch', !t.checked); }; }
+    bindDrill(root, L, iso(new Date(Date.now() - 29 * 864e5)), iso(new Date()));
+    $$('[data-qs]', root).forEach(b => b.onclick = () => A.run(b, async () => { const x = L.find(s => s.id === b.dataset.qs), v = b.dataset.v;
+      const MSG = { suspended: `إيقاف «${esc(x.name)}»؟ تظهر لكل مستخدميها رسالة الإيقاف ولا يستطيعون العمل، وتبقى بياناتهم محفوظة كما هي.`, archived: `أرشفة «${esc(x.name)}»؟ تُوقف وتختفي من القائمة (مع إمكانية الاستعادة في أي وقت). البيانات لا تُحذف.`, active: `تشغيل «${esc(x.name)}» من جديد؟` };
+      if (!(await A.confirmBox(MSG[v], v === 'active' ? 'تشغيل' : v === 'archived' ? 'أرشفة' : 'إيقاف'))) return;
+      await api.rpc('platform_school_set', { p_school: x.id, p_platform: { status: v } }); A.toast(v === 'active' ? 'عادت المدرسة للعمل' : v === 'archived' ? 'أُرشفت المدرسة' : 'أُوقفت المدرسة', 'ok'); A.schoolsRefresh(); }));
     $$('[data-us]', root).forEach(b => b.onclick = () => { A.LS.set('pc_t', 'us'); A.LS.set('pc_us', b.dataset.us); V.schools(A._scRoot); });
     $$('[data-st]', root).forEach(b => b.onclick = () => stateDlg(L.find(s => s.id === b.dataset.st)));
     $$('[data-ol]', root).forEach(b => b.onclick = () => A.run(b, async () => { if (!(await A.confirmBox('إنشاء رابط تفعيل جديد لمدير هذه المدرسة؟ يتوقف الرابط السابق.', 'إنشاء'))) return; const c = await api.rpc('platform_owner_link', { p_school: b.dataset.ol }); const link = location.origin + location.pathname.replace(/[^/]*$/, '') + '?join=' + c; await navigator.clipboard.writeText(link).catch(() => { }); A.modal(`<h3>رابط التفعيل الجديد</h3><input class="in" readonly dir="ltr" value="${esc(link)}" onfocus="this.select()"><p class="small muted">نُسخ الرابط. أرسله لمدير المدرسة.</p>`); }));
   };
   function stateDlg(x) {
-    const p = Object.assign({ status: 'active', features: {} }, (x.platform || x.plat || {}));
+    const p = Object.assign({ status: 'active', features: {} }, (x.platform || x.plat || {})); // الحفظ يدمج مع الموجود (sql/119) فلا تضيع علامة البيانات الوهمية
     const items = (A.NAV || []).filter(n => !['home', 'schools', 'setup', 'support'].includes(n[0]));
     const m = A.modal(`<h3>الحالة والميزات — ${esc(x.name)}</h3>
-      <div class="field"><label>حالة المدرسة</label><div class="row" style="gap:12px"><label class="chk"><input type="radio" name="pst" value="active" ${p.status !== 'suspended' ? 'checked' : ''}> فعّالة</label><label class="chk"><input type="radio" name="pst" value="suspended" ${p.status === 'suspended' ? 'checked' : ''}> موقوفة (تظهر لهم رسالة، والبيانات محفوظة)</label></div></div>
+      <div class="field"><label>حالة المدرسة</label><div class="row" style="gap:12px"><label class="chk"><input type="radio" name="pst" value="active" ${!['suspended', 'archived'].includes(p.status) ? 'checked' : ''}> فعّالة</label><label class="chk"><input type="radio" name="pst" value="suspended" ${p.status === 'suspended' ? 'checked' : ''}> موقوفة (تظهر لهم رسالة، والبيانات محفوظة)</label>${x.mine ? '' : `<label class="chk"><input type="radio" name="pst" value="archived" ${p.status === 'archived' ? 'checked' : ''}> مؤرشفة (موقوفة ومخفية من القائمة)</label>`}</div></div>
       <div class="field"><label for="pMsg">رسالة الإيقاف</label><input class="in" id="pMsg" value="${esc(p.msg || '')}" placeholder="يُرجى التواصل مع إدارة المنصة لتجديد الاشتراك."></div>
       <b>الأقسام الظاهرة في منصتهم</b><p class="small muted" style="margin:2px 0 6px">أزل العلامة لإخفاء القسم عن كل حسابات هذه المدرسة (حسب باقة الاشتراك مثلاً).</p>
       <div class="perm-grid" style="max-height:40vh;overflow:auto">${items.map(n => `<label class="chk small"><input type="checkbox" data-f="${n[0]}" ${(p.features || {})[n[0]] === false ? '' : 'checked'}> ${esc(n[1])}</label>`).join('')}</div>
@@ -24407,9 +24433,36 @@ ${S.me.full_name}`;
     const eo = E.filter(e => !e.resolved), ro = R.filter(r => r.status !== 'done');
     if (eo.length) al.push(['e', `${AR(eo.length)} خطأ غير معالج خلال ٧ أيام (تكرر ${AR(eo.reduce((a, e) => a + e.n, 0))} مرة)`]);
     if (ro.length) al.push(['w', `${AR(ro.length)} بلاغ من المستخدمين بانتظار الرد`]);
-    box.innerHTML = `<div class="pc-kp"><div><span>المدارس</span><b>${AR(L.length)}</b></div><div><span>الموظفون</span><b>${AR(sum('staff'))}</b></div><div><span>فعّلوا حساباتهم</span><b>${AR(sum('accounts'))}</b></div><div><span>الطلاب</span><b>${AR(sum('students'))}</b></div><div class="${act ? 'ok' : ''}"><span>نشطون هذا الأسبوع</span><b>${AR(act)}</b></div><div class="${eo.length ? 'bad' : 'ok'}"><span>أخطاء مفتوحة</span><b>${AR(eo.length)}</b></div><div class="${ro.length ? 'bad' : 'ok'}"><span>بلاغات مفتوحة</span><b>${AR(ro.length)}</b></div></div>
+    const kb = (go, t, v, c) => `<div class="${c || ''}"><button data-go="${go}" title="عرض التفاصيل"><span>${t}</span><b>${AR(v)}</b></button></div>`;
+    box.innerHTML = `<div class="pc-kp">${kb('sc', 'المدارس', L.filter(x => (x.platform || {}).status !== 'archived').length)}${kb('us', 'الموظفون', sum('staff'))}${kb('us:never', 'فعّلوا حساباتهم', sum('accounts'))}${kb('sc', 'الطلاب', sum('students'))}${kb('rp', 'نشطون هذا الأسبوع', act, act ? 'ok' : '')}${kb('pr:err', 'أخطاء مفتوحة', eo.length, eo.length ? 'bad' : 'ok')}${kb('pr:rep', 'بلاغات مفتوحة', ro.length, ro.length ? 'bad' : 'ok')}</div>
       <div class="card" style="margin-top:0"><b>تنبيهات تحتاج انتباهك</b><div style="margin-top:8px">${al.map(([c, t]) => `<div class="pc-al ${c}">${c === 'e' ? '⛔' : c === 'w' ? '⚠️' : 'ℹ️'} <span>${esc(t)}</span></div>`).join('') || '<div class="pc-al i">✓ لا تنبيهات — كل شيء على ما يرام</div>'}</div></div>
-      <div class="card"><b>الاستخدام في آخر ٧ أيام</b><div class="scroll" style="margin-top:8px"><table class="tbl"><thead><tr><th>المدرسة</th>${MET.map(m => `<th>${m[1]}</th>`).join('')}</tr></thead><tbody>${U.map(u => `<tr><td><b>${esc(u.name)}</b></td>${MET.map(m => `<td style="${m[0] === 'errors' && u.errors ? 'color:#B3261E;font-weight:800' : ''}">${AR(u[m[0]] || 0)}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${MET.length + 1}">${A.emptyBox('لا بيانات')}</td></tr>`}</tbody></table></div></div>`;
+      <div class="card"><b>الاستخدام في آخر ٧ أيام</b><div class="scroll" style="margin-top:8px"><table class="tbl"><thead><tr><th>المدرسة</th>${MET.map(m => `<th>${m[1]}</th>`).join('')}</tr></thead><tbody>${U.map(u => `<tr><td><button class="pc-num" data-dd="${u.id}" data-m=""><b>${esc(u.name)}</b></button></td>${MET.map(m => `<td style="${m[0] === 'errors' && u.errors ? 'color:#B3261E;font-weight:800' : ''}"><button class="pc-num" data-dd="${u.id}" data-m="${m[0]}">${AR(u[m[0]] || 0)}</button></td>`).join('')}</tr>`).join('') || `<tr><td colspan="${MET.length + 1}">${A.emptyBox('لا بيانات')}</td></tr>`}</tbody></table></div><p class="small muted" style="margin:6px 0 0">اضغط أي رقم أو اسم مدرسة لعرض المنحنى اليومي والتفاصيل.</p></div>`;
+    $$('[data-go]', box).forEach(b => b.onclick = () => { const [t, s2] = b.dataset.go.split(':'); if (t === 'pr' && s2) A.LS.set('pc_pr', s2); if (t === 'us') A.LS.set('pc_uf', s2 || 'all'); A.LS.set('pc_t', t); V.schools(A._scRoot); });
+    bindDrill(box, U, iso(from), iso(to));
+  }
+
+  // ----- التفاصيل التفاعلية: منحنى يومي لمدرسة (كل المؤشرات أو مؤشر واحد) -----
+  function bindDrill(box, U, from, to) { $$('[data-dd]', box).forEach(b => b.onclick = () => drill((U.find(u => u.id === b.dataset.dd) || {}), b.dataset.m, from, to)); }
+  A.pcDrill = drill;
+  async function drill(u, metric, from, to) {
+    const m = A.modal(`<h3>${esc(u.name || '')}</h3><div id="ddB">${A.emptyBox('جارٍ التحميل…')}</div>`, { cls: 'wide' });
+    let D = [], cur = metric || 'actions', F = from, T = to;
+    const load = async () => { try { D = await api.rpc('platform_usage_daily', { p_school: u.id, p_from: F, p_to: T }); } catch (e) { m.el.querySelector('#ddB').innerHTML = A.emptyBox('تعذّر التحميل', esc(e.message)); return false; } return true; };
+    const chart = k => { const vals = D.map(d => +d[k] || 0), mx = Math.max(1, ...vals), n = vals.length, W = 640, H = 200, pb = 24, bw = Math.max(2, (W - 40) / n - 2);
+      return `<svg class="pc-ch" direction="ltr" style="direction:ltr" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc((MET.find(x => x[0] === k) || [])[1] || k)} يومياً">${[0, .5, 1].map(f => `<line x1="32" x2="${W}" y1="${(H - pb) * (1 - f) + 2}" y2="${(H - pb) * (1 - f) + 2}" stroke="#E6ECF3"/><text x="2" y="${(H - pb) * (1 - f) + 12}" text-anchor="start">${AR(Math.round(mx * f))}</text>`).join('')}
+        ${vals.map((v, i) => { const h = (H - pb - 4) * v / mx, x = W - 6 - (i + 1) * (bw + 2); return `<rect class="pcb" x="${x}" y="${H - pb - h + 2}" width="${bw}" height="${Math.max(h, v ? 2 : 0)}" rx="2"><title>${D[i].d}: ${v}</title></rect>${n <= 31 && (i % Math.ceil(n / 10) === 0) ? `<text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle">${AR(+D[i].d.slice(8))}/${AR(+D[i].d.slice(5, 7))}</text>` : ''}`; }).join('')}</svg>`; };
+    const draw = () => { const tot = k => D.reduce((a, d) => a + (+d[k] || 0), 0), days = D.length, k = cur, t = tot(k), peak = D.reduce((a, d) => (+d[k] || 0) > (+a[k] || 0) ? d : a, D[0] || {});
+      m.el.querySelector('#ddB').innerHTML = `<div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><div class="chip-filter" style="margin:0">${[[7, 'أسبوع'], [30, 'شهر'], [90, 'فصل']].map(([d, nm]) => `<button data-dq="${d}" class="${days === d ? 'on' : ''}">${nm}</button>`).join('')}</div><span class="small muted">${esc(F)} ← ${esc(T)}</span></div>
+        <h4 style="margin:12px 0 0">${esc((MET.find(x => x[0] === k) || [])[1] || k)} يوماً بيوم</h4>
+        <div class="small muted">المجموع ${AR(t)} · المتوسط ${AR(Math.round(t / Math.max(1, days) * 10) / 10)} يومياً${t ? ` · الأعلى ${AR(+peak[k] || 0)} في ${esc(peak.d || '')}` : ''}</div>${chart(k)}
+        <div class="small muted" style="margin-top:10px">اختر مؤشراً لعرض منحناه:</div><div class="pc-mini" style="margin-top:4px">${MET.map(([mk, nm]) => `<button data-mk="${mk}" class="${mk === k ? 'on' : ''}" aria-pressed="${mk === k}"><b>${AR(tot(mk))}</b><span>${nm}</span></button>`).join('')}</div>
+        <div class="acts"><button class="btn ghost sm" id="ddX">Excel</button>${u.id ? `<button class="btn ghost sm" id="ddU">مستخدمو المدرسة</button>` : ''}</div>`;
+      $$('[data-mk]', m.el).forEach(b => b.onclick = () => { cur = b.dataset.mk; draw(); });
+      $$('[data-dq]', m.el).forEach(b => b.onclick = async () => { T = iso(new Date()); F = iso(new Date(Date.now() - (+b.dataset.dq - 1) * 864e5)); if (await load()) draw(); });
+      m.el.querySelector('#ddX').onclick = () => { if (!window.XLSX) return; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['اليوم', ...MET.map(x => x[1])], ...D.map(d => [d.d, ...MET.map(x => +d[x[0]] || 0)])]), 'يومي'); wb.Workbook = { Views: [{ RTL: true }] }; XLSX.writeFile(wb, `${u.name || 'مدرسة'} يومي ${F} - ${T}.xlsx`); };
+      const us2 = m.el.querySelector('#ddU'); if (us2) us2.onclick = () => { m.close(); A.LS.set('pc_t', 'us'); A.LS.set('pc_us', u.id); V.schools(A._scRoot); };
+    };
+    if (await load()) draw();
   }
 
   // ----- المستخدمون -----
@@ -24464,7 +24517,8 @@ ${S.me.full_name}`;
       const table = `<table><tr><th>المدرسة</th>${MET.map(m => `<th>${m[1]}</th>`).join('')}</tr>${U.map(u => `<tr><td style="text-align:right"><b>${esc(u.name)}</b></td>${MET.map(m => `<td>${AR(u[m[0]] || 0)}</td>`).join('')}</tr>`).join('')}<tr><th>المجموع</th>${MET.map(m => `<th>${AR(tot(m[0]))}</th>`).join('')}</tr></table>`;
       box.innerHTML = `<div class="card" style="margin-top:0"><div class="row" style="gap:10px;flex-wrap:wrap;align-items:flex-end"><div class="field" style="margin:0"><label for="rF">من</label><input class="in" type="date" id="rF" value="${from}"></div><div class="field" style="margin:0"><label for="rT">إلى</label><input class="in" type="date" id="rT" value="${to}"></div>
         <div class="chip-filter" style="margin:0">${[[7, 'أسبوع'], [30, 'شهر'], [90, 'فصل']].map(([d, n]) => `<button data-q="${d}">${n}</button>`).join('')}</div><div class="grow"></div><button class="btn ghost sm" id="rPr">طباعة</button><button class="btn ghost sm" id="rX">Excel</button></div>
-        <div class="scroll" style="margin-top:10px"><table class="tbl"><thead><tr><th>المدرسة</th>${MET.map(m => `<th>${m[1]}</th>`).join('')}</tr></thead><tbody>${U.map(u => `<tr><td><b>${esc(u.name)}</b></td>${MET.map(m => `<td><div style="display:flex;align-items:center;gap:6px"><span style="min-width:28px">${AR(u[m[0]] || 0)}</span><span style="flex:1;min-width:30px;height:6px;border-radius:4px;background:#EEF2F8"><i style="display:block;height:100%;border-radius:4px;width:${Math.round((+u[m[0]] || 0) / mx(m[0]) * 100)}%;background:${m[0] === 'errors' ? '#E0675A' : 'var(--sky)'}"></i></span></div></td>`).join('')}</tr>`).join('')}</tbody><tfoot><tr><th>المجموع</th>${MET.map(m => `<th>${AR(tot(m[0]))}</th>`).join('')}</tr></tfoot></table></div></div>`;
+        <div class="scroll" style="margin-top:10px"><table class="tbl"><thead><tr><th>المدرسة</th>${MET.map(m => `<th>${m[1]}</th>`).join('')}</tr></thead><tbody>${U.map(u => `<tr><td><button class="pc-num" data-dd="${u.id}" data-m=""><b>${esc(u.name)}</b></button></td>${MET.map(m => `<td><div style="display:flex;align-items:center;gap:6px"><button class="pc-num" data-dd="${u.id}" data-m="${m[0]}" style="min-width:28px">${AR(u[m[0]] || 0)}</button><span style="flex:1;min-width:30px;height:6px;border-radius:4px;background:#EEF2F8"><i style="display:block;height:100%;border-radius:4px;width:${Math.round((+u[m[0]] || 0) / mx(m[0]) * 100)}%;background:${m[0] === 'errors' ? '#E0675A' : 'var(--sky)'}"></i></span></div></td>`).join('')}</tr>`).join('')}</tbody><tfoot><tr><th>المجموع</th>${MET.map(m => `<th>${AR(tot(m[0]))}</th>`).join('')}</tr></tfoot></table></div></div>`;
+      bindDrill(box, U, from, to);
       const set = () => { A.LS.set('pc_rp', { from, to }); draw(); };
       $('#rF', box).onchange = e => { from = e.target.value; set(); }; $('#rT', box).onchange = e => { to = e.target.value; set(); };
       $$('[data-q]', box).forEach(b => b.onclick = () => { to = iso(new Date()); from = iso(new Date(Date.now() - (+b.dataset.q - 1) * 864e5)); set(); });
@@ -24475,6 +24529,174 @@ ${S.me.full_name}`;
   }
 })();
 }catch(e){console.error('[dina] src/core/platform-console.js',e)}
+
+/* ==== src/core/platform-links.js ==== */
+;try{
+/* منصة دينا — امتداد لوحة مالك المنصة (للمنصة الأم فقط):
+   (١) «البيانات الوهمية» لكل مدرسة: توليد بيانات شبيهة بدينا ومسحها (RPC platform_demo_seed / platform_demo_clear — sql/118).
+   (٢) تبويب «المنصات التابعة»: الاطلاع على منصة مستقلة (دينا أو غيرها) بقاعدتها الخاصة — قراءة فقط.
+       يدخل المالك بحسابه في تلك المنصة مرة واحدة (جلسة منفصلة على هذا الجهاز)، فتُقرأ المؤشرات بصلاحياته هناك
+       بعدّ الصفوف فقط (بلا تنزيل بيانات) — لا يُكتب شيء في قاعدتها ولا تُضاف لها أي دالة.
+   الإعدادات: schools.settings.platform_links = [{id, name, url, db_url, db_key}] في مدرسة المالك (المنصة الأم). */
+(function () {
+  const A = window.APP, V = window.VIEWS; if (!A || !A.PC_TABS) return;
+  const { S, api, $, $$, esc } = A;
+  const AR = A.AR || (n => String(n));
+  const PA = () => !!(S.me && S.me.is_owner && A.isPlatformAdmin && A.isPlatformAdmin());
+  const iso = d => d.toISOString().slice(0, 10);
+
+  if (!document.getElementById('pl-css')) { const s = document.createElement('style'); s.id = 'pl-css'; s.textContent = `
+  .pl-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:12px}
+  .pl-card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:14px;box-shadow:var(--sh1)}
+  .pl-card h4{margin:0;color:var(--navy);font-size:18px}
+  .pl-st{display:inline-block;font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px}
+  .pl-st.on{background:#E5F4EA;color:#1D5E3B}.pl-st.off{background:#FFF4DC;color:#6B4510}
+  .pl-bar{height:10px;border-radius:6px;background:#EEF2F7;overflow:hidden;margin-top:4px}.pl-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--sky))}
+  .pl-tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}.pl-tbl th,.pl-tbl td{border-bottom:1px solid var(--pale);padding:6px;text-align:start}.pl-tbl th{color:var(--muted);font-weight:800}
+  .dm-opt{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+  .dm-cnt{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:10px 0}
+  .dm-cnt div{background:#F4F7FB;border-radius:12px;padding:8px;text-align:center}.dm-cnt b{display:block;font-size:22px;color:var(--navy)}.dm-cnt span{font-size:12px;color:var(--muted)}
+  `; document.head.appendChild(s); }
+
+  // =============== (١) البيانات الوهمية ===============
+  const CNT = [['classes', 'فصلاً'], ['teachers', 'معلماً'], ['students', 'طالباً'], ['weeks', 'أسبوعاً'], ['slots', 'حصة في الجدول'], ['entries', 'حصة في الخطط'], ['attendance', 'رصد حضور'], ['behaviors', 'سلوكاً']];
+  const cntHtml = c => `<div class="dm-cnt">${CNT.filter(([k]) => c && c[k] != null).map(([k, n]) => `<div><b>${AR(c[k])}</b><span>${n}</span></div>`).join('')}</div>`;
+  const prevActs = A.schoolCardActs;
+  A.schoolCardActs = (root, L) => {
+    if (prevActs) prevActs(root, L);
+    $$('[data-acts]', root).forEach(row => { const x = L.find(s => s.id === row.dataset.acts); if (!x) return;
+      const on = !!(((x.platform || {}).demo || {}).on);
+      row.insertAdjacentHTML('beforeend', `<button class="btn ghost sm" data-dm="${x.id}">🎲 بيانات وهمية${on ? ' <span class="su-st new">مفعّلة</span>' : ''}</button>`); });
+    $$('[data-dm]', root).forEach(b => b.onclick = () => demoDlg(L.find(s => s.id === b.dataset.dm)));
+  };
+  A.demoDlg = demoDlg;
+  function demoDlg(x) {
+    const dm = (x.platform || {}).demo || {};
+    if (dm.on) {
+      const m = A.modal(`<h3>البيانات الوهمية — ${esc(x.name)}</h3><p class="sub">أُنشئت ${esc(A.fmtDT ? A.fmtDT(dm.at) : String(dm.at || '').slice(0, 16))}. تظهر في المنصة كأنها بيانات مدرسة حقيقية (فصول، معلمون بلا حسابات، طلاب، جدول معتمد، خطط، حضور، سلوك).</p>${cntHtml(dm.counts)}
+        <div class="pc-al i">المسح يحذف ما أنشأته البيانات الوهمية فقط. أي شيء أضفته بنفسك يبقى كما هو (مادة أو فصل دراسي مستخدَم في بياناتك لا يُحذف).</div>
+        <div class="acts"><button class="btn bad" id="dmClr">مسح البيانات الوهمية</button></div>`);
+      m.el.querySelector('#dmClr').onclick = ev => A.run(ev.currentTarget, async () => {
+        if (!(await A.confirmBox(`مسح كل البيانات الوهمية من «${esc(x.name)}»؟ المسح مباشر ولا رجعة فيه (لا تمر بسلة المحذوفات).`, 'مسح'))) return;
+        const r = await api.rpc('platform_demo_clear', { p_school: x.id }); m.close();
+        A.toast(`مُسحت: ${AR(r.classes || 0)} فصلاً، ${AR(r.teachers || 0)} معلماً، ${AR(r.students || 0)} طالباً`, 'ok'); afterChange(x);
+      });
+      return;
+    }
+    const real = (+x.students || 0) > 0 || (+x.classes || 0) > 0;
+    const m = A.modal(`<h3>توليد بيانات وهمية — ${esc(x.name)}</h3>
+      <p class="sub">تملأ المدرسة ببيانات شبيهة بمدارس دينا لتجربة المنصة كاملة أو عرضها: فصول من الرابع الابتدائي إلى الثالث الثانوي لكل قسم، معلمون بتخصصاتهم (بلا حسابات دخول)، طلاب، جدول دراسي معتمد بلا تعارض، خطط أسابيع سابقة وحالية وقادمة بحالات مختلفة، حضور يومي وسلوك. يمكن مسحها كلها بزر واحد.</p>
+      ${real ? '<div class="pc-al w">⚠️ في هذه المدرسة بيانات حالية. ستُضاف البيانات الوهمية بجانبها ولن تُمس بياناتك، لكن يُفضّل استخدامها في المدارس التجريبية فقط.</div>' : ''}
+      <div class="dm-opt">
+        <div class="field"><label for="dmK">فصول لكل صف</label><select class="in" id="dmK"><option value="1">فصل واحد</option><option value="2">فصلان (أ، ب)</option><option value="3">ثلاثة فصول</option></select></div>
+        <div class="field"><label for="dmS">طلاب لكل فصل</label><select class="in" id="dmS">${[10, 15, 18, 20, 25, 30].map(n => `<option value="${n}" ${n === 18 ? 'selected' : ''}>${AR(n)}</option>`).join('')}</select></div>
+        <div class="field"><label for="dmW">أسابيع سابقة بخطط</label><select class="in" id="dmW">${[0, 1, 2, 3, 4, 6, 8].map(n => `<option value="${n}" ${n === 3 ? 'selected' : ''}>${AR(n)}</option>`).join('')}</select></div>
+        <div class="field"><label for="dmA">أيام حضور سابقة</label><select class="in" id="dmA">${[0, 5, 10, 15, 20].map(n => `<option value="${n}" ${n === 10 ? 'selected' : ''}>${AR(n)}</option>`).join('')}</select></div>
+      </div>
+      <p class="small muted" id="dmEst"></p>
+      <div class="acts"><button class="btn" id="dmGo">توليد البيانات</button></div>`, { cls: 'wide' });
+    const v = id => +m.el.querySelector(id).value;
+    const est = () => { const sec = Math.max(1, +x.sections || 1), c = 9 * v('#dmK') * sec; m.el.querySelector('#dmEst').textContent = `تقريباً: ${AR(c)} فصلاً، ${AR(c * v('#dmS'))} طالباً في ${AR(sec)} ${sec > 1 ? 'أقسام' : 'قسم'}. الحجم صغير جداً ولا يؤثر على حصة القاعدة.`; };
+    $$('select', m.el).forEach(s => s.onchange = est); est();
+    m.el.querySelector('#dmGo').onclick = ev => A.run(ev.currentTarget, async () => {
+      const c = await api.rpc('platform_demo_seed', { p_school: x.id, p_opts: { classes_per_grade: v('#dmK'), students: v('#dmS'), weeks_back: v('#dmW'), attendance_days: v('#dmA') } });
+      m.el.innerHTML = `<h3>✓ أُنشئت البيانات الوهمية</h3>${cntHtml(c)}${c.no_teacher ? `<div class="pc-al w">${AR(c.no_teacher)} حصة بلا معلم (يمكن إسنادها من استوديو الجداول).</div>` : ''}<p class="small muted">${x.mine ? 'أعد تحميل الصفحة لتظهر البيانات في منصتك.' : 'تظهر لمستخدمي هذه المدرسة عند دخولهم.'}</p><div class="acts">${x.mine ? '<button class="btn" id="dmRl">إعادة تحميل المنصة</button>' : '<button class="btn" id="dmOk">تم</button>'}</div>`;
+      const rl = m.el.querySelector('#dmRl'); if (rl) rl.onclick = () => location.reload();
+      const ok = m.el.querySelector('#dmOk'); if (ok) ok.onclick = () => m.close();
+      afterChange(x, true);
+    });
+  }
+  function afterChange(x, keepOpen) { if (A.schoolsRefresh) A.schoolsRefresh(); if (x.mine && !keepOpen) setTimeout(() => location.reload(), 600); }
+
+  // =============== (٢) المنصات التابعة ===============
+  A.PC_TABS.push(['lk', 'المنصات التابعة']);
+  // دينا مرتبطة دائماً كمنصة تابعة (من config.js — قاعدتها مستقلة)
+  const PRESET = () => { const DBS = window.APP_DBS || {}; return DBS.dina ? [{ id: 'dina', name: 'مدارس دينا العالمية', url: 'https://ahmedabdelazem1460-ux.github.io/dina-tools/', db_url: DBS.dina.supabaseUrl, db_key: DBS.dina.supabaseKey, preset: true }] : []; };
+  const links = () => { const own = ((S.school || {}).settings || {}).platform_links || []; const ids = new Set(own.map(l => l.id)); return PRESET().filter(p => !ids.has(p.id)).concat(own); };
+  const saveLinks = async L => { const st = Object.assign({}, (S.school || {}).settings || {}, { platform_links: L.filter(l => !l.preset) }); await api.updateSchool(S.school.id, { settings: st }); S.school.settings = st; };
+  const CL = {};
+  const client = l => {
+    if (CL[l.id]) return CL[l.id];
+    if (!window.supabase || !l.db_url || !l.db_key) return null;
+    if (l.db_url === (window.APP_CONFIG || {}).supabaseUrl) return null; // نفس قاعدة المنصة الحالية
+    return (CL[l.id] = window.supabase.createClient(l.db_url, l.db_key, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'dwp_link_' + l.id, detectSessionInUrl: false } }));
+  };
+
+  A.PC_VIEWS.lk = async function (box) {
+    if (!PA()) { box.innerHTML = ''; return; }
+    const L = links();
+    box.innerHTML = `<div class="card"><div class="head"><div class="grow"><h3 style="margin:0">المنصات التابعة</h3><p class="sub" style="margin:2px 0 0">منصات مستقلة بقاعدة بيانات خاصة بها (مثل منصة دينا). ادخل بحسابك فيها مرة واحدة على هذا الجهاز، فتظهر مؤشراتها وتقاريرها هنا — <b>قراءة فقط</b>، ولا يُكتب أو يُضاف أي شيء في قاعدتها.</p></div><button class="btn ghost sm" id="plAdd">+ ربط منصة</button></div>
+      <div class="pl-cards">${L.map(l => `<div class="pl-card" data-l="${esc(l.id)}"><div class="row" style="justify-content:space-between;gap:6px;align-items:center"><h4>${esc(l.name)}</h4><span class="pl-st off" data-ls>…</span></div><div class="small muted" dir="ltr" style="text-align:start">${esc((l.url || '').replace(/^https?:\/\//, ''))}</div><div data-lb style="margin-top:10px">${A.emptyBox('جارٍ التحقق…')}</div></div>`).join('') || A.emptyBox('لا منصات مرتبطة')}</div></div>`;
+    $('#plAdd', box).onclick = () => addDlg(box);
+    L.forEach(l => card(box.querySelector(`[data-l="${CSS.escape(l.id)}"]`), l, box));
+  };
+
+  async function card(el, l, box) {
+    const sb = client(l), st = el.querySelector('[data-ls]'), b = el.querySelector('[data-lb]');
+    const tools = `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:10px">${l.url ? `<a class="btn ghost sm" href="${esc(l.url)}" target="_blank" rel="noopener">↗ فتح المنصة</a>` : ''}${!l.preset ? '<button class="btn ghost sm" data-ldel>إزالة الربط</button>' : ''}</div>`;
+    if (!sb) { st.textContent = 'غير متاح'; b.innerHTML = A.emptyBox('بيانات الاتصال غير مكتملة أو هي نفس هذه المنصة') + tools; bindTools(); return; }
+    let ses = null; try { ses = (await sb.auth.getSession()).data.session; } catch (_) { }
+    if (!ses) {
+      st.textContent = 'لم تدخل بعد'; st.className = 'pl-st off';
+      b.innerHTML = `<p class="small" style="margin:0 0 6px">ادخل بحسابك في «${esc(l.name)}» (نفس بريد وكلمة مرور تلك المنصة). تُحفظ الجلسة على هذا الجهاز فقط.</p>
+        <form class="grid g2" data-lf autocomplete="on"><div class="field"><label>البريد</label><input class="in" name="e" type="email" dir="ltr" autocomplete="username" required></div><div class="field"><label>كلمة المرور</label><input class="in" name="p" type="password" dir="ltr" autocomplete="current-password" required></div><div><button class="btn sm" type="submit">دخول للاطلاع</button></div></form>` + tools;
+      b.querySelector('[data-lf]').onsubmit = ev => { ev.preventDefault(); const f = ev.currentTarget, btn = f.querySelector('button'); A.run(btn, async () => { const { error } = await sb.auth.signInWithPassword({ email: f.e.value.trim().toLowerCase(), password: f.p.value }); f.p.value = ''; if (error) throw new Error(/invalid/i.test(error.message) ? 'البريد أو كلمة المرور غير صحيحة' : error.message); card(el, l, box); }); };
+      bindTools(); return;
+    }
+    st.textContent = 'متصل — قراءة فقط'; st.className = 'pl-st on';
+    b.innerHTML = A.emptyBox('جارٍ جمع المؤشرات…');
+    try { b.innerHTML = await overview(sb, l) + tools + `<div class="row" style="gap:6px;margin-top:6px"><span class="small muted">الحساب: <span dir="ltr">${esc(ses.user.email || '')}</span></span><button class="btn ghost sm" data-lout>خروج من هذه المنصة</button></div>`; }
+    catch (e) { b.innerHTML = A.emptyBox('تعذّر جمع المؤشرات', esc(e.message || String(e))) + tools; }
+    const out = b.querySelector('[data-lout]'); if (out) out.onclick = async () => { try { await sb.auth.signOut({ scope: 'local' }); } catch (_) { } card(el, l, box); };
+    bindTools();
+    function bindTools() { const d = el.querySelector('[data-ldel]'); if (d) d.onclick = () => A.run(d, async () => { if (!(await A.confirmBox(`إزالة ربط «${esc(l.name)}»؟ لا يتأثر شيء في تلك المنصة.`, 'إزالة'))) return; try { await client(l) && client(l).auth.signOut({ scope: 'local' }); } catch (_) { } await saveLinks(links().filter(x => x.id !== l.id)); A.PC_VIEWS.lk(box); }); }
+  }
+
+  // مؤشرات منصة تابعة بعدّ الصفوف فقط (head + count) — بصلاحيات حساب المالك فيها
+  async function overview(sb, l) {
+    const n = async (t, f) => { try { let q = sb.from(t).select('*', { count: 'exact', head: true }); if (f) q = f(q); const { count, error } = await q; return error ? null : count; } catch (_) { return null; } };
+    const today = iso(new Date()), w7 = iso(new Date(Date.now() - 6 * 864e5)), d30 = new Date(Date.now() - 29 * 864e5).toISOString();
+    const [{ data: me }, { data: sc }] = await Promise.all([sb.from('staff').select('full_name,is_owner,school_id').eq('user_id', (await sb.auth.getUser()).data.user.id).maybeSingle(), sb.from('schools').select('id,name').limit(5)]);
+    if (!me) throw new Error('حسابك غير مرتبط بموظف في هذه المنصة');
+    const { data: secs } = await sb.from('sections').select('id,name').order('sort');
+    // الأسبوع الحالي لكل قسم
+    const { data: wks } = await sb.from('weeks').select('id,section_id,word,start_date').lte('start_date', today).order('start_date', { ascending: false }).limit(20);
+    const cur = {}; (wks || []).forEach(w => { if (!cur[w.section_id]) cur[w.section_id] = w; });
+    const wIds = Object.values(cur).map(w => w.id);
+    const [staff, accts, students, classes, logins, att, absent, beh, quizzes, questions, forms, plans, done] = await Promise.all([
+      n('staff', q => q.eq('active', true)), n('staff', q => q.eq('active', true).not('user_id', 'is', null)), n('students', q => q.eq('active', true)), n('classes', q => q.eq('active', true)),
+      n('login_events', q => q.gte('at', d30)), n('attendance', q => q.eq('day', today)), n('attendance', q => q.eq('day', today).eq('status', 'absent')), n('behaviors', q => q.gte('day', w7)),
+      n('quizzes', q => q.gte('created_at', d30)), n('questions'), n('form_tasks', q => q.gte('created_at', d30)),
+      wIds.length ? n('plan_entries', q => q.in('week_id', wIds)) : 0, wIds.length ? n('plan_entries', q => q.in('week_id', wIds).in('status', ['submitted', 'approved'])) : 0]);
+    const pct = plans ? Math.round(100 * done / plans) : 0;
+    const k = (v, t) => `<div><b>${v == null ? '—' : AR(v)}</b><span>${t}</span></div>`;
+    let top = '';
+    if (me.is_owner) { try {
+      // staff_work يعيد [{s: الموظف، c: النوع، d: اليوم، n: العدد}] — والأسماء من جدول الموظفين
+      const [{ data }, { data: ppl }] = await Promise.all([sb.rpc('staff_work', { p_from: w7, p_to: today }), sb.from('staff').select('id,full_name').eq('active', true)]);
+      const nm = {}; (ppl || []).forEach(p => nm[p.id] = p.full_name); const by = {};
+      (data || []).forEach(r => { if (!r.s) return; by[r.s] = (by[r.s] || 0) + (+r.n || 0); });
+      const T = Object.entries(by).filter(([, c]) => c > 0).sort((a, b) => b[1] - a[1]).slice(0, 5);
+      if (T.length) top = `<table class="pl-tbl"><thead><tr><th>الأكثر إنجازاً (٧ أيام)</th><th>أعمال</th></tr></thead><tbody>${T.map(([id, c]) => `<tr><td>${esc(nm[id] || '—')}</td><td>${AR(c)}</td></tr>`).join('')}</tbody></table>`;
+    } catch (_) { } }
+    return `<div class="small muted">${esc((sc || []).map(s => s.name).join('، '))} · ${esc((secs || []).map(s => s.name).join('، '))} · دخلت باسم ${esc(me.full_name)}${me.is_owner ? ' (مالك)' : ''}</div>
+      <div class="pc-kp" style="margin-top:8px">${k(staff, 'موظفاً')}${k(accts, 'حساباً مفعّلاً')}${k(students, 'طالباً')}${k(classes, 'فصلاً')}${k(logins, 'دخولاً (٣٠ يوماً)')}${k(att, 'رصد حضور اليوم')}${k(absent, 'غائباً اليوم')}${k(beh, 'سلوكاً (٧ أيام)')}${k(quizzes, 'اختباراً إلكترونياً (٣٠ يوماً)')}${k(questions, 'سؤالاً في البنك')}${k(forms, 'نموذجاً (٣٠ يوماً)')}</div>
+      <div class="small"><b>خطط الأسبوع الحالي</b> (${esc(Object.values(cur).map(w => 'الأسبوع ' + w.word).filter((v, i, a) => a.indexOf(v) === i).join('، ') || '—')}): ${AR(done)} من ${AR(plans)} حصة مُرسلة أو معتمدة (${AR(pct)}٪)</div><div class="pl-bar"><i style="width:${pct}%"></i></div>${top}`;
+  }
+
+  function addDlg(box) {
+    const m = A.modal(`<h3>ربط منصة تابعة</h3><p class="sub">لمنصة مستقلة بقاعدة بيانات خاصة. تحتاج رابط المنصة وبيانات الاتصال العامة لقاعدتها (من config.js الخاص بها). المفتاح العام آمن، والحماية في صلاحيات تلك القاعدة.</p>
+      <div class="field"><label for="lN">اسم المنصة</label><input class="in" id="lN"></div><div class="field"><label for="lU">رابط المنصة</label><input class="in" id="lU" dir="ltr" placeholder="https://"></div>
+      <div class="grid g2"><div class="field"><label for="lD">رابط القاعدة (supabaseUrl)</label><input class="in" id="lD" dir="ltr" placeholder="https://xxxx.supabase.co"></div><div class="field"><label for="lK">المفتاح العام (supabaseKey)</label><input class="in" id="lK" dir="ltr" placeholder="sb_publishable_…"></div></div>
+      <div class="acts"><button class="btn" id="lGo">ربط</button></div>`, { cls: 'wide' });
+    m.el.querySelector('#lGo').onclick = ev => A.run(ev.currentTarget, async () => {
+      const v = id => m.el.querySelector(id).value.trim(), l = { id: 'l' + Date.now().toString(36), name: v('#lN'), url: v('#lU'), db_url: v('#lD').replace(/\/+$/, ''), db_key: v('#lK') };
+      if (!l.name) throw new Error('اكتب اسم المنصة'); if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(l.db_url)) throw new Error('رابط القاعدة غير صحيح'); if (!/^(sb_publishable_|eyJ)/.test(l.db_key)) throw new Error('المفتاح العام غير صحيح (لا تضع المفتاح السري أبداً)');
+      await saveLinks(links().concat([l])); m.close(); A.toast('رُبطت المنصة', 'ok'); A.PC_VIEWS.lk(box);
+    });
+  }
+})();
+}catch(e){console.error('[dina] src/core/platform-links.js',e)}
 
 /* ==== src/core/ui-pro.js ==== */
 ;try{

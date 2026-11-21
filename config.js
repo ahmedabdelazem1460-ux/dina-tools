@@ -21,12 +21,14 @@
     try { if (localStorage.getItem('dwp_db') !== 'dina') db = 'core'; } catch (e) { db = 'core'; }
   }
   window.APP_CONFIG = { supabaseUrl: DBS[db].supabaseUrl, supabaseKey: DBS[db].supabaseKey, db: db };
+  window.APP_DBS = DBS; // للوحة مالك المنصة: الاطلاع على المنصات التابعة (قراءة فقط)
   // شارة صغيرة عند العمل على المنصة الأم حتى لا تختلط بمنصة دينا
   if (db === 'core') document.addEventListener('DOMContentLoaded', function () {
-    var b = document.createElement('a');
-    b.href = '?db=dina'; b.id = 'dbBadge'; b.className = 'nobrand';
-    b.textContent = 'المنصة الأم'; b.title = 'أنت متصل بقاعدة المنصة الأم — اضغط للعودة إلى قاعدة دينا';
-    b.setAttribute('style', 'position:fixed;bottom:8px;left:8px;z-index:10002;background:#2E8B57;color:#fff;font:600 12px/1 inherit;padding:6px 10px;border-radius:999px;text-decoration:none;opacity:.9');
-    document.body.appendChild(b);
+    var b = document.createElement('span');
+    b.id = 'dbBadge'; b.className = 'nobrand'; b.setAttribute('role', 'note');
+    b.textContent = 'المنصة الأم'; b.title = 'أنت متصل بقاعدة المنصة الأم (منفصلة تماماً عن قاعدة دينا)';
+    var st = document.createElement('style');
+    st.textContent = '#dbBadge{position:fixed;bottom:8px;left:8px;z-index:10002;background:#2E8B57;color:#fff;font:600 12px/1 inherit;padding:6px 10px;border-radius:999px;opacity:.92;pointer-events:none}@media (max-width:900px){#dbBadge{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 2px);left:50%;transform:translateX(-50%);font-size:10px;padding:3px 8px}}@media print{#dbBadge{display:none}}';
+    document.head.appendChild(st); document.body.appendChild(b);
   });
 })();

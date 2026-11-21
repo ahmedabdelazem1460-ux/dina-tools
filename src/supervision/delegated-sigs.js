@@ -11,7 +11,7 @@
   const { S, api, $, $$, esc, AR } = A;
   const own = () => !!(S.me && S.me.is_owner && !S.realMe);
   const KEY = 'dsigs';
-  const DEF = () => [{ id: 'pr', title: 'مدير المدرسة', name: 'إبراهيم حسن الفيفي', img: '', keys: 'مدير المدرسة، قائد المدرسة' }];
+  const DEF = () => [{ id: 'pr', title: 'مدير المدرسة', name: (window.DinaBrand ? DinaBrand.sig('principal') : ''), img: '', keys: 'مدير المدرسة، قائد المدرسة' }];
   let LIB = null, LIBUSER = null;
   async function load(force) {
     if (!own()) return [];

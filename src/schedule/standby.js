@@ -20,7 +20,8 @@
   if (!A.I.standby) A.I.standby = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><path d="M3 20v-1a6 6 0 0 1 9-5.2"/><path d="M16 13l2 2 4-4"/><rect x="13" y="16" width="0" height="0"/></svg>';
   if (A.NAV && !A.NAV.some(n => n[0] === 'standby')) { const i = A.NAV.findIndex(n => n[0] === 'timetable'); A.NAV.splice(i < 0 ? A.NAV.length : i + 1, 0, ['standby', 'حصص الانتظار', () => !!S.me && !S.me.is_owner && (can('view') || (A.tfeat && A.tfeat('sbsign')))]); }
 
-  const DEF_SIGS = () => [{ id: 'wk', title: 'وكيل المدرسة', name: 'أحمد رضوان المالكي', mode: 'blank' }, { id: 'ad', title: 'المدير الأكاديمي', name: 'أحمد عبد العظيم صلاح', mode: 'auto' }, { id: 'pr', title: 'مدير المدرسة', name: 'إبراهيم حسن الفيفي', mode: 'auto' }];
+  const SG = k => (window.DinaBrand ? DinaBrand.sig(k) : '');
+  const DEF_SIGS = () => [{ id: 'wk', title: 'وكيل المدرسة', name: SG('deputy'), mode: 'blank' }, { id: 'ad', title: 'المدير الأكاديمي', name: SG('academic'), mode: 'auto' }, { id: 'pr', title: 'مدير المدرسة', name: SG('principal'), mode: 'auto' }];
   const FORM_DEF = () => ({ title: 'نموذج تأمين حصص الانتظار', tsig: 'e', showRoster: false, note: '', sigs: DEF_SIGS() });
   const cfgOf = sec => { const c = Object.assign({ max: 24, per: 2, perDay: 2, excl: [], roster: {}, rules: {}, prio: 'first', coverDay: 2 }, sec.standby || {}); c.form = Object.assign(FORM_DEF(), c.form || {}); if (!Array.isArray(c.form.sigs)) c.form.sigs = DEF_SIGS(); c.rules = c.rules || {}; c.excl = c.excl || []; return c; };
   // قيود المعلم: mode normal|limit|last|never، perDay، perWeek، days[]، periods[]، why

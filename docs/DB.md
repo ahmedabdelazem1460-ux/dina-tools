@@ -85,3 +85,4 @@
 - `sections.standby`: max, per, perDay, roster, gen, excl[], rules{tid:{mode,perDay,perWeek,days,periods,why}}, prio first|after|off, coverDay, form{title, tsig e|paper, note, showRoster, sigs[{id,title,name,mode blank|auto,staff?}]}.
 
 - **اللجان (112):** `lijan_public(token)` و`lijan_find(token, q)` للعموم (anon) عبر `exam_committees.settings.share` {on, token ≥16, lookup}؛ `lijan_row` داخلية. لا تعيد أسماء الطلاب إلا لصاحب الرقم/الهوية، مع `portal_blocked`.
+- **المدارس (113):** `platform_admins`، `is_platform_admin()`، `school_provision(p)`، `platform_schools()`، `platform_school_plan(school, plan)`؛ `staff_guard` يستثني GUC `dwp.provision`. `schools.settings.brand` (الهوية) و`settings.setup` {done, doneAt} و`settings.plan` (الاشتراك).

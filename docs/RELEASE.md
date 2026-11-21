@@ -32,3 +32,7 @@ git checkout main && git merge dev && git push origin main
 ## لاحقاً (عند إنشاء المستودع الخاص)
 - يُنقل المستودع كاملاً بفرعيه إلى المستودع الخاص، ويُربط بـ Cloudflare Pages: الفرع `main` ← رابط منصة دينا، والفرع `dev` ← رابط معاينة خاص.
 - قاعدة بيانات تجريبية مستقلة للتطوير، و`config.js` يختار القاعدة حسب الرابط.
+
+## المستودعات (من 2026-11-21)
+- `almenasa` = `github.com/ahmedabdelazem1460-ux/Almenasa` (خاص) — الأساسي. `origin` = `dina-tools` (عام) — يخدم GitHub Pages لمنصة دينا حتى الانتقال.
+- العمل اليومي: `git push almenasa dev` (و`origin dev` اختيارياً). النقل لدينا: `git push almenasa main && git push origin main`.

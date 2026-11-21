@@ -1,0 +1,16 @@
+# ملفات لا تُنشر على الموقع (مصادر وتوثيق وترحيلات واختبارات)
+.git
+.gitignore
+.nojekyll
+.assetsignore
+wrangler.jsonc
+CLAUDE.md
+README.md
+index.dev.html
+src
+sql
+docs
+tests
+build
+node_modules
+*.py

@@ -24627,7 +24627,8 @@ ${S.me.full_name}`;
   A.PC_VIEWS.lk = async function (box) {
     if (!PA()) { box.innerHTML = ''; return; }
     const L = links();
-    box.innerHTML = `<div class="card"><div class="head"><div class="grow"><h3 style="margin:0">المنصات التابعة</h3><p class="sub" style="margin:2px 0 0">منصات مستقلة بقاعدة بيانات خاصة بها (مثل منصة دينا). تظهر مؤشراتها وتقاريرها هنا عبر وسيط آمن (مفتاح قراءة محفوظ سراً في Cloudflare) دون حساب لك فيها — <b>قراءة فقط</b>، ولا يُكتب أو يُضاف أي شيء في قاعدتها. وإن لم يُضبط مفتاح منصة بعد، يمكنك الدخول بحسابك فيها.</p></div><button class="btn ghost sm" id="plAdd">+ ربط منصة</button></div>
+    // nobrand: أسماء المنصات التابعة تبقى كما هي (لا يستبدل brand.js «دينا» باسم مدرسة المنصة الأم)
+    box.innerHTML = `<div class="card nobrand"><div class="head"><div class="grow"><h3 style="margin:0">المنصات التابعة</h3><p class="sub" style="margin:2px 0 0">منصات مستقلة بقاعدة بيانات خاصة بها (مثل منصة دينا). تظهر مؤشراتها وتقاريرها هنا عبر وسيط آمن (مفتاح قراءة محفوظ سراً في Cloudflare) دون حساب لك فيها — <b>قراءة فقط</b>، ولا يُكتب أو يُضاف أي شيء في قاعدتها. وإن لم يُضبط مفتاح منصة بعد، يمكنك الدخول بحسابك فيها.</p></div><button class="btn ghost sm" id="plAdd">+ ربط منصة</button></div>
       <div class="pl-cards">${L.map(l => `<div class="pl-card" data-l="${esc(l.id)}"><div class="row" style="justify-content:space-between;gap:6px;align-items:center"><h4>${esc(l.name)}</h4><span class="pl-st off" data-ls>…</span></div><div class="small muted" dir="ltr" style="text-align:start">${esc((l.url || '').replace(/^https?:\/\//, ''))}</div><div data-lb style="margin-top:10px">${A.emptyBox('جارٍ التحقق…')}</div></div>`).join('') || A.emptyBox('لا منصات مرتبطة')}</div></div>`;
     $('#plAdd', box).onclick = () => addDlg(box);
     L.forEach(l => card(box.querySelector(`[data-l="${CSS.escape(l.id)}"]`), l, box));

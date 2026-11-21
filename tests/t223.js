@@ -7,6 +7,8 @@ const { chromium } = require('playwright');
     r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'dina', at: new Date().toISOString(), schools: [{ name: 'مدارس دينا العالمية', staff: 96, accounts: 90, students: 812, logins: 1540, att: 790, absent: 22, late: 9, beh: 41, behNeg: 30, quizzes: 18, questions: 2400, forms: 37, preps: 120, sections: [{ name: 'قسم البنين', classes: 18, week: { word: 'الثاني عشر', total: 630, filled: 600, sent: 560, approved: 500, done: 410 } }, { name: 'قسم البنات', classes: 17, week: null }], top: [{ name: 'أ. خالد', n: 35 }, { name: 'أ. سارة', n: 28 }] }] }) }); });
   await p.goto('http://localhost:8766/index.html?demo=1'); await p.click('[data-demo="a.abdelazim@dinaschool.com"]'); await p.waitForTimeout(3000);
   await p.evaluate(() => { APP.api.session = async () => ({ access_token: 'tok123' }); APP_DBS.dina.supabaseUrl = 'https://other.supabase.co'; APP.LS.set('pc_t', 'lk'); location.hash = '#/schools'; }); await p.waitForTimeout(1800);
+  await p.evaluate(() => window.DinaBrand && DinaBrand.set({ name: 'المنصة التجريبية', short: 'التجريبية', platform: 'المنصة التجريبية' })); await p.waitForTimeout(1500);
+  R.nameKept = await p.$eval('.pl-card h4', x => x.textContent);
   R.state = await p.$eval('[data-ls]', x => x.textContent); R.auth = auth;
   R.kpis = await p.$$eval('.pl-card .pc-kp b', L => L.length); R.secRows = await p.$$eval('.pl-card .pl-tbl tbody tr', L => L.map(x => x.textContent.replace(/\s+/g, ' ').trim()));
   R.noLogin = !(await p.$('[data-lf]'));

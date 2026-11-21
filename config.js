@@ -21,6 +21,8 @@
     try { if (localStorage.getItem('dwp_db') !== 'dina') db = 'core'; } catch (e) { db = 'core'; }
   }
   window.APP_CONFIG = { supabaseUrl: DBS[db].supabaseUrl, supabaseKey: DBS[db].supabaseKey, db: db };
+  // هوية المنصة الأم قبل الدخول (شاشة الدخول وما قبل تحميل المدرسة) — بعد الدخول تُطبَّق هوية المدرسة نفسها
+  if (db === 'core') window.APP_CONFIG.brand = { name: 'المنصة', short: 'المنصة', nameEn: 'Almenasa', shortEn: 'Almenasa', app: 'المنصة', platform: 'المنصة — نظام إدارة المدارس' };
   window.APP_DBS = DBS; // للوحة مالك المنصة: الاطلاع على المنصات التابعة (قراءة فقط)
   // شارة صغيرة عند العمل على المنصة الأم حتى لا تختلط بمنصة دينا
   if (db === 'core') document.addEventListener('DOMContentLoaded', function () {

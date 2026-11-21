@@ -1,0 +1,44 @@
+<!doctype html><html dir="rtl"><head><meta charset="utf-8"><script src="../../omr.js"></script><script src="../../vendor/html2canvas.min.js"></script>
+<style>body{margin:0}#sheet{position:absolute;left:-3000px;top:0}</style></head><body><div id="sheet"></div>
+<script>
+const spec = { lang: 'ar', parts: [{ type: 'mcq', count: 30, options: 4 }, { type: 'tf', count: 10 }, { type: 'essay', count: 2, max: 5 }] };
+const qs = DinaOMR.expand(spec).qs;
+function rnd(s){ return () => (s = (s * 16807) % 2147483647) / 2147483647; }
+async function render(fill, extra) {
+  const el = document.getElementById('sheet'); el.innerHTML = `<style>${DinaOMR.PAGE_CSS}</style>` + DinaOMR.sheetHTML({ spec, idx: 37, model: 1, modelName: 'ب', name: 'طالب تجريبي', cls: 'رابع أ', nid: '1098765432', fill, ...(extra || {}) });
+  const pg = el.querySelector('.omr-page'); const cv = await html2canvas(pg, { scale: 1240 / pg.offsetWidth * 1.6, backgroundColor: '#fff', logging: false }); return cv;
+}
+function warp(src, o) {
+  const W = o.bg ? Math.round(src.width * 1.25) : src.width, H = o.bg ? Math.round(src.height * 1.2) : src.height;
+  const c = document.createElement('canvas'); const rot90 = o.rot90 ? 1 : 0; c.width = rot90 ? H : W; c.height = rot90 ? W : H; const x = c.getContext('2d');
+  x.fillStyle = o.bg || '#fff'; x.fillRect(0, 0, c.width, c.height); x.save(); x.translate(c.width / 2, c.height / 2); x.rotate(((o.deg || 0) + (rot90 ? 90 : 0)) * Math.PI / 180);
+  if (o.persp) x.transform(1, o.persp, o.persp * 0.6, 1, 0, 0); const s = o.scale || 1; x.scale(s, s);
+  x.filter = o.blur ? `blur(${o.blur}px)` : 'none'; x.drawImage(src, -src.width / 2, -src.height / 2); x.restore();
+  const d = x.getImageData(0, 0, c.width, c.height), a = d.data, R = rnd(7);
+  for (let y = 0; y < c.height; y++) for (let xx = 0; xx < c.width; xx++) { const i = (y * c.width + xx) * 4;
+    let f = 1; if (o.shadow) f *= 1 - o.shadow * (xx / c.width) * (y / c.height); if (o.dim) f *= o.dim;
+    const n = o.noise ? (R() - 0.5) * o.noise : 0; for (let k = 0; k < 3; k++) a[i + k] = Math.max(0, Math.min(255, a[i + k] * f + n + (o.gray || 0) * (1 - a[i + k] / 255))); }
+  x.putImageData(d, 0, 0); return c;
+}
+async function lighten(cv, amt) { // قلم خفيف: تفتيح البكسلات الداكنة داخل الدوائر فقط يتم بتعديل التعبئة
+  return cv; }
+window.bench = async function () {
+  const R = rnd(11), fill = qs.map((Q, i) => Q.teacher ? Math.floor(R() * Q.n) : (i % 9 === 8 ? -1 : Math.floor(R() * Q.n)));
+  const base = await render(fill);
+  const cases = { rot12: { deg: 12, scale: 0.86, bg: '#fff' }, rot90b: { rot90: 1, deg: 3 }, phoneShadow: { bg: '#3b3b3b', deg: -5, scale: 0.8, shadow: 0.8, noise: 30 }, far: { bg: '#a08f7a', scale: 0.55, deg: 2 }, clean: {}, rot3: { deg: 3 }, rot7: { deg: -7, scale: 0.9, bg: '#fff' }, persp: { persp: 0.04, deg: 2 }, shadow: { shadow: 0.65 }, dim: { dim: 0.55 }, noise: { noise: 70 }, blur: { blur: 1.6 }, gray: { gray: 90 }, upside: { deg: 180 }, rot90: { rot90: 1 }, phoneBg: { bg: '#6b5a48', deg: 4, scale: 0.92, shadow: 0.4 }, small: { scale: 0.5, bg: '#ffffff' } };
+  const out = {};
+  for (const [k, o] of Object.entries(cases)) { let cv = warp(base, o); if (false) { const c2 = document.createElement('canvas'); c2.width = Math.round(cv.width * o.scale); c2.height = Math.round(cv.height * o.scale); c2.getContext('2d').drawImage(cv, 0, 0, c2.width, c2.height); cv = c2; }
+    const t0 = performance.now(); const r = DinaOMR.readCanvas(cv); const ms = Math.round(performance.now() - t0);
+    if (!r.ok) { out[k] = { ok: false, err: r.error.slice(0, 40), ms }; continue; }
+    const { ans } = r.read(spec); let right = 0; ans.forEach((v, i) => { if (v === fill[i]) right++; });
+    out[k] = { ok: true, idx: r.id.idx, model: r.id.model, bc: r.barcode, acc: right + '/' + qs.length, ms };
+  }
+  // قلم خفيف: تفتيح التظليل إلى رمادي
+  const light = await render(fill); { const x = light.getContext('2d'), d = x.getImageData(0, 0, light.width, light.height), a = d.data; for (let i = 0; i < a.length; i += 4) { if (a[i] < 60 && a[i + 1] < 60) { a[i] = a[i + 1] = a[i + 2] = 150; } } x.putImageData(d, 0, 0); }
+  { const r = DinaOMR.readCanvas(light); if (!r.ok) out.lightPencil = { ok: false, err: r.error.slice(0, 40) }; else { const { ans } = r.read(spec); let right = 0; ans.forEach((v, i) => { if (v === fill[i]) right++; }); out.lightPencil = { ok: true, acc: right + '/' + qs.length }; } }
+  const ab = await render(qs.map(() => -1), { absent: true }); { const r = DinaOMR.readCanvas(ab); out.absentBox = r.ok ? r.absent : r.error; const r2 = DinaOMR.readCanvas(base); out.notAbsent = r2.ok ? !r2.absent : r2.error; }
+  { const r = DinaOMR.readCanvas(warp(base, { deg: 4, shadow: 0.5 })); const key = qs.map((Q, i) => i % 3 ? fill[i] : (fill[i] + 1) % Q.n); const img = DinaOMR.annotate(warp(base, { deg: 4, shadow: 0.5 }), r, spec, r.read(spec).ans, key, 700); out.annot = img.length; window.__annot = img; }
+  { const cv = warp(base, { deg: 5, shadow: 0.5, bg: '#777', scale: .9 }), r = DinaOMR.readCanvas(cv); const rc = DinaOMR.rectify(cv, r, 760).toDataURL('image/jpeg', 0.72); out.rectKB = Math.round(rc.length / 1024); const key = qs.map((Q, i) => i % 3 ? fill[i] : (fill[i] + 1) % Q.n); const an = await DinaOMR.annotateURL(rc, spec, r.read(spec).ans, key); out.annotChanged = an !== rc; window.__annot = an; }
+  return out;
+};
+</script></body></html>

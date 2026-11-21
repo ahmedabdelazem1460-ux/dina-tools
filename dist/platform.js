@@ -7490,11 +7490,14 @@ ${S.me.full_name}`;
    الورقة: أربع علامات زوايا سوداء، ترويسة مضغوطة (الاختبار والطالب)، باركود رقم الهوية تحت الاسم، شريط تعريف (ترتيب الطالب + النموذج)،
    ثم كتلة مستقلة لكل سؤال بعنوانه وترقيمه، والأسئلة المقالية في قسم خاص بالمعلم أسفل الورقة. */
 (function () {
+  const VBASE = (() => { try { const c = document.currentScript; if (c && c.src) return c.src.replace(/(dist\/)?[^/]*$/, ''); } catch (_) { } return ''; })();
   const W = 210, H = 297, MK = 8;
   const MARKS = [[10, 10], [W - 10 - MK, 10], [10, H - 10 - MK], [W - 10 - MK, H - 10 - MK]];
   const MC = MARKS.map(([x, y]) => [x + MK / 2, y + MK / 2]);
   // شريط التعريف: ١٢ بت لترتيب الطالب + ٢ للنموذج + ١ تحقق
   const ID_BITS = 15, ID_Y = 36.2, ID_X0 = 22, ID_STEP = 6.2, ID_S = 4;
+  // خانة «غائب» يظللها المراقب أو المعلم (بين شريط التعريف والباركود)
+  const ABS_S = 4, ABS_X = 118.6, ABS_Y = ID_Y, ABS_C = [ABS_X + ABS_S / 2, ABS_Y + ABS_S / 2];
   // باركود Code 39 لرقم الهوية (١٠ خانات ثابتة) — نقرؤه نحن من الصورة بمعرفة موضعه الدقيق
   const BC_N = 10, BC_NAR = 0.34, BC_WID = 0.9, BC_CELL = 7 * BC_NAR + 3 * BC_WID, BC_W = (BC_N + 2) * BC_CELL, BC_X1 = W - 22, BC_X0 = BC_X1 - BC_W, BC_Y = 35, BC_H = 6;
   const C39 = { '0': '000110100', '1': '100100001', '2': '001100001', '3': '101100000', '4': '000110001', '5': '100110000', '6': '001110000', '7': '000100101', '8': '100100100', '9': '001100100', '*': '010010100' };
@@ -7551,6 +7554,7 @@ ${S.me.full_name}`;
     h += `<div style="position:absolute;right:22mm;left:22mm;top:25.5mm;display:flex;gap:2.5mm;direction:${dir};font-size:9.5pt"><div style="flex:2.4;${box}">${T.name}: <b>${o.name || ''}</b></div><div style="flex:1;${box}">${T.cls}: <b>${o.cls || ''}</b></div>${o.seat ? `<div style="flex:1.3;${box}">${T.seat}: <b>${o.seat}</b></div>` : ''}<div style="width:20mm;${box};text-align:center">${T.model} <b>${o.modelName || 'A'}</b></div></div>`;
     // شريط التعريف + باركود رقم الهوية
     bits.forEach((b, i) => { const [x, y] = [ID_X0 + i * ID_STEP, ID_Y]; h += `<div style="position:absolute;left:${mm(x)};top:${mm(y)};width:${mm(ID_S)};height:${mm(ID_S)};box-sizing:border-box;border:0.3mm solid #000;${b ? 'background:#000' : ''}"></div>`; });
+    h += `<div style="position:absolute;left:${mm(ABS_X)};top:${mm(ABS_Y)};width:${mm(ABS_S)};height:${mm(ABS_S)};box-sizing:border-box;border:0.3mm solid #333;border-radius:50%;${o.absent ? 'background:#000' : ''}"></div><div style="position:absolute;left:${mm(ABS_X - 3)};top:${mm(ABS_Y + ABS_S + 0.3)};width:${mm(ABS_S + 6)};text-align:center;font-size:5.6pt;color:#333;white-space:nowrap">${en ? 'Absent' : 'غائب'}</div>`;
     if (nid) h += `<div style="position:absolute;left:${mm(BC_X0)};top:${mm(BC_Y)};width:${mm(BC_W)}">${barcodeSVG(nid)}<div style="font:700 7pt/1.15 Arial,sans-serif;letter-spacing:1.2pt;text-align:center;direction:ltr;margin-top:0.4mm">${nid}</div></div>`;
     else h += `<div style="position:absolute;left:${mm(BC_X0)};top:${mm(BC_Y)};width:${mm(BC_W)};height:${mm(BC_H + 2.6)};box-sizing:border-box;border:0.3mm dashed #9aa8bc;border-radius:1.2mm;font-size:7pt;color:#6b7aa3;text-align:center;line-height:${mm(BC_H + 2.2)};direction:${dir}">${en ? 'Write your name above — the teacher links this sheet' : 'ورقة احتياطية — اكتب اسمك أعلاه ويربطها المعلم'}</div>`;
     h += `<div style="position:absolute;right:22mm;left:22mm;top:44.2mm;font-size:6.6pt;color:#555;direction:${dir};text-align:${en ? 'left' : 'right'};white-space:nowrap;overflow:hidden">${T.ins}${o.legend ? ` <b style="color:#082B5A">${o.legend}</b>` : ''}</div>`;
@@ -7582,7 +7586,7 @@ ${S.me.full_name}`;
       const X0 = BC_X0 - 1, X1 = BC_X1 + 1, Ya = BC_Y + 1, Yb = BC_Y + BC_H - 1; const [ua, va] = Hs(X0, Ya), [ub, vb] = Hs(X1, Yb);
       const bx = Math.max(0, Math.floor(Math.min(ua, ub)) - 4), by = Math.max(0, Math.floor(Math.min(va, vb)) - 4), bw = Math.min(cv.width - bx, Math.ceil(Math.abs(ub - ua)) + 8), bh = Math.min(cv.height - by, Math.ceil(Math.abs(vb - va)) + 8);
       if (bw < 40 || bh < 4) return null;
-      const d = cv.getContext('2d', { willReadFrequently: true }).getImageData(bx, by, bw, bh).data, gv = (x, y) => { const xx = Math.round(x) - bx, yy = Math.round(y) - by; if (xx < 0 || yy < 0 || xx >= bw || yy >= bh) return 255; const i = (yy * bw + xx) * 4; return d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114; };
+      const d = cv.getContext('2d', { willReadFrequently: true }).getImageData(bx, by, bw, bh).data; if (th === null || th === undefined) { const gg = new Uint8Array(bw * bh); for (let i = 0; i < bw * bh; i++) gg[i] = (d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114) | 0; th = Math.min(otsu(gg), 190); } const gv = (x, y) => { const xx = Math.round(x) - bx, yy = Math.round(y) - by; if (xx < 0 || yy < 0 || xx >= bw || yy >= bh) return 255; const i = (yy * bw + xx) * 4; return d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114; };
       for (const yf of [0.5, 0.35, 0.65, 0.25, 0.75]) {
         const ym = BC_Y + BC_H * yf; let out = '', ok = true;
         for (let c = 0; c < BC_N + 2 && ok; c++) {
@@ -7598,42 +7602,115 @@ ${S.me.full_name}`;
     } catch (_) {}
     return null;
   }
+  // القراءة: تطبيع الإضاءة محلياً (ظلال الجوال)، اكتشاف علامات الزوايا في أي مكان من الصورة وبأي دوران (٠/٩٠/١٨٠/٢٧٠ وميل)،
+  // ثم تجربة ترتيبات الزوايا حتى يُفك شريط التعريف، وقياس التظليل نسبةً إلى خلفية الورقة نفسها مع درجة ثقة لكل سؤال.
   function readCanvas(cv) {
-    const TW = 1240, sc = TW / cv.width, w = TW, h = Math.round(cv.height * sc);
+    const TW = Math.min(1600, Math.max(1100, cv.width)), sc = TW / cv.width, w = TW, h = Math.round(cv.height * sc);
     const c2 = document.createElement('canvas'); c2.width = w; c2.height = h; const x2 = c2.getContext('2d', { willReadFrequently: true }); x2.fillStyle = '#fff'; x2.fillRect(0, 0, w, h); x2.drawImage(cv, 0, 0, w, h);
     const d = x2.getImageData(0, 0, w, h).data, g = new Uint8Array(w * h); for (let i = 0; i < w * h; i++) g[i] = (d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114) | 0;
-    const th = Math.min(otsu(g), 170), bin = new Uint8Array(w * h); for (let i = 0; i < w * h; i++) bin[i] = g[i] < th ? 1 : 0;
-    const pxmm = w / W, exp = (MK * pxmm) ** 2;
-    const find = (x0, y0, x1, y1, cx, cy) => {
-      const seen = new Uint8Array(w * h); let best = null;
-      for (let y = y0; y < y1; y += 2) for (let x = x0; x < x1; x += 2) { const i = y * w + x; if (!bin[i] || seen[i]) continue;
-        const st = [i]; seen[i] = 1; let n = 0, sx = 0, sy = 0, mnx = x, mxx = x, mny = y, mxy = y;
-        while (st.length) { const j = st.pop(), jx = j % w, jy = (j / w) | 0; n++; sx += jx; sy += jy; if (jx < mnx) mnx = jx; if (jx > mxx) mxx = jx; if (jy < mny) mny = jy; if (jy > mxy) mxy = jy; if (n > exp * 6) break;
-          for (const k of [j - 1, j + 1, j - w, j + w]) if (k >= 0 && k < w * h && !seen[k] && bin[k]) { const kx = k % w, ky = (k / w) | 0; if (kx >= x0 && kx < x1 && ky >= y0 && ky < y1) { seen[k] = 1; st.push(k); } } }
-        const bw = mxx - mnx + 1, bh = mxy - mny + 1, fill = n / (bw * bh), ar = bw / bh;
-        if (n > exp * 0.45 && n < exp * 3 && fill > 0.7 && ar > 0.6 && ar < 1.6) { const px = sx / n, py = sy / n, dist = Math.hypot(px - cx, py - cy); if (!best || dist < best.dist) best = { x: px, y: py, dist }; } }
-      return best;
-    };
-    const qw = (w * 0.3) | 0, qh = (h * 0.22) | 0;
-    const m = [find(0, 0, qw, qh, 0, 0), find(w - qw, 0, w, qh, w, 0), find(0, h - qh, qw, h, 0, h), find(w - qw, h - qh, w, h, w, h)];
-    if (m.some(x => !x)) return { ok: false, error: 'لم تُكتشف علامات الزوايا الأربع — تأكد أن الورقة كاملة وواضحة في المسح أو الصورة' };
-    const pts = m.map(p => [p.x, p.y]);
-    const sample = (H, x, y, rmm) => { const [u, v] = H(x, y), r = rmm * pxmm; let dark = 0, tot = 0; for (let yy = Math.round(v - r); yy <= Math.round(v + r); yy++) for (let xx = Math.round(u - r); xx <= Math.round(u + r); xx++) { if ((xx - u) ** 2 + (yy - v) ** 2 > r * r || xx < 0 || yy < 0 || xx >= w || yy >= h) continue; tot++; dark += bin[yy * w + xx]; } return tot ? dark / tot : 0; };
-    for (const order of [[0, 1, 2, 3], [3, 2, 1, 0]]) {
-      const H2 = homography(MC, order.map(i => pts[i])); if (!H2) continue;
-      const bits = Array.from({ length: ID_BITS }, (_, b) => sample(H2, ...idPos(b), ID_S * 0.32) > 0.5 ? 1 : 0);
-      const id = decode(bits); if (!id) continue;
-      const Hs = (x, y) => { const [u, v] = H2(x, y); return [u / sc, v / sc]; };
-      const bc = readBarcode(cv, Hs, th);
-      return { ok: true, H: H2, id, barcode: bc, gid: { digits: bc || '', bad: false }, read: (a, b) => { const L = layout(a, b), nq = L.qs.length, ans = [], conf = []; for (let q = 0; q < nq; q++) { const f = []; for (let k = 0; k < L.qs[q].n; k++) f.push(sample(H2, ...L.pos(q, k), R * 0.62)); const s = f.map((v, k) => [v, k]).sort((a, b) => b[0] - a[0]); const [m1, m2] = [s[0], s[1] || [0, -1]];
-          if (m1[0] < 0.33) ans.push(-1); else if (m2[0] > 0.33 && m2[0] > m1[0] * 0.72) ans.push(-2); else ans.push(m1[1]); conf.push(+m1[0].toFixed(2)); } return { ans, conf }; } };
+    // متوسط محلي بصورة تكاملية (نافذة ≈ ٤٪ من العرض) ← بكسل داكن إذا كان أغمق من محيطه بوضوح
+    const S = new Float64Array((w + 1) * (h + 1)); for (let y = 0; y < h; y++) { let row = 0; for (let x = 0; x < w; x++) { row += g[y * w + x]; S[(y + 1) * (w + 1) + x + 1] = S[y * (w + 1) + x + 1] + row; } }
+    const rad = Math.max(12, Math.round(w * 0.04)), mean = (x, y) => { const x0 = Math.max(0, x - rad), y0 = Math.max(0, y - rad), x1 = Math.min(w, x + rad + 1), y1 = Math.min(h, y + rad + 1); return (S[y1 * (w + 1) + x1] - S[y0 * (w + 1) + x1] - S[y1 * (w + 1) + x0] + S[y0 * (w + 1) + x0]) / ((x1 - x0) * (y1 - y0)); };
+    const gth = Math.min(otsu(g), 175), bin = new Uint8Array(w * h), bg = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x, m = mean(x, y); bg[i] = Math.min(255, m); bin[i] = (g[i] < m * 0.72 && g[i] < 215) || g[i] < Math.min(gth, 90) ? 1 : 0; }
+    // علامات الزوايا: مكونات متصلة مربعة ممتلئة (الكبيرة جداً — خلفية أو ظل — تُستبعد)
+    const cand = [], seen = new Uint8Array(w * h), minA = w * h * 0.00008, maxA = w * h * 0.012, cap = maxA * 4;
+    for (let y = 0; y < h; y += 2) for (let x = 0; x < w; x += 2) { const i0 = y * w + x; if (!bin[i0] || seen[i0]) continue;
+      const st = [i0]; seen[i0] = 1; let n = 0, sx = 0, sy = 0, mnx = x, mxx = x, mny = y, mxy = y, big = false;
+      while (st.length) { const j = st.pop(), jx = j % w, jy = (j / w) | 0; n++; sx += jx; sy += jy; if (jx < mnx) mnx = jx; if (jx > mxx) mxx = jx; if (jy < mny) mny = jy; if (jy > mxy) mxy = jy; if (n > cap) { big = true; }
+        if (!big) { if (jx > 0 && !seen[j - 1] && bin[j - 1]) { seen[j - 1] = 1; st.push(j - 1); } if (jx < w - 1 && !seen[j + 1] && bin[j + 1]) { seen[j + 1] = 1; st.push(j + 1); } if (jy > 0 && !seen[j - w] && bin[j - w]) { seen[j - w] = 1; st.push(j - w); } if (jy < h - 1 && !seen[j + w] && bin[j + w]) { seen[j + w] = 1; st.push(j + w); } } }
+      if (big || n < minA || n > maxA) continue; const bw = mxx - mnx + 1, bh = mxy - mny + 1, ar = bw / bh, fill = n / (bw * bh);
+      if (ar > 0.55 && ar < 1.8 && fill > 0.55) cand.push({ x: sx / n, y: sy / n, n, fill, side: Math.sqrt(n) }); }
+    if (cand.length < 4) return { ok: false, error: 'لم تُكتشف علامات الزوايا الأربع — تأكد أن الورقة كاملة وواضحة في المسح أو الصورة' };
+    // أفضل رباعي: مستطيل بنسبة أضلاع الورقة وعلامات متقاربة الحجم
+    const RAT = (MC[3][1] - MC[0][1]) / (MC[1][0] - MC[0][0]);
+    const top = cand.sort((a, b) => b.n * b.fill - a.n * a.fill).slice(0, 14), quads = [];
+    for (let a = 0; a < top.length; a++) for (let b = a + 1; b < top.length; b++) for (let c = b + 1; c < top.length; c++) for (let e = c + 1; e < top.length; e++) {
+      const P = [top[a], top[b], top[c], top[e]], cx = P.reduce((s, p) => s + p.x, 0) / 4, cy = P.reduce((s, p) => s + p.y, 0) / 4;
+      const o = P.slice().sort((p, q) => Math.atan2(p.y - cy, p.x - cx) - Math.atan2(q.y - cy, q.x - cx)); // ترتيب دائري
+      const L = i => Math.hypot(o[(i + 1) % 4].x - o[i].x, o[(i + 1) % 4].y - o[i].y), s = [L(0), L(1), L(2), L(3)];
+      const par = Math.abs(s[0] - s[2]) / Math.max(s[0], s[2]) + Math.abs(s[1] - s[3]) / Math.max(s[1], s[3]);
+      const r1 = (s[1] + s[3]) / (s[0] + s[2]), ratErr = Math.min(Math.abs(r1 - RAT), Math.abs(1 / r1 - RAT)) / RAT;
+      const sides = P.map(p => p.side), szErr = Math.max(...sides) / Math.min(...sides) - 1, span = (s[0] + s[1]) / (w + h);
+      const diag = Math.abs(Math.hypot(o[2].x - o[0].x, o[2].y - o[0].y) - Math.hypot(o[3].x - o[1].x, o[3].y - o[1].y)) / Math.hypot(o[2].x - o[0].x, o[2].y - o[0].y);
+      if (par > 0.5 || ratErr > 0.35 || szErr > 1.6 || span < 0.25) continue;
+      // حجم العلامة يناسب المسافة بينها (٨ مم من ١٨٢ مم)
+      const expSide = Math.min(s[0] + s[2], s[1] + s[3]) / 2 * (MK / (MC[1][0] - MC[0][0])), sideErr = Math.abs(Math.log(sides.reduce((x, y) => x + y, 0) / 4 / expSide));
+      if (sideErr > 0.9) continue;
+      quads.push({ o, score: par * 2 + ratErr * 3 + szErr * 0.6 + diag * 2 + sideErr - span * 0.4 });
+    }
+    if (!quads.length) return { ok: false, error: 'لم تُكتشف علامات الزوايا الأربع — تأكد أن الورقة كاملة وواضحة في المسح أو الصورة' };
+    quads.sort((a, b) => a.score - b.score);
+    const pxOf = H2 => { const a = H2(MC[0][0], MC[0][1]), b = H2(MC[1][0], MC[1][1]); return Math.hypot(b[0] - a[0], b[1] - a[1]) / (MC[1][0] - MC[0][0]); };
+    // نسبة الظلام داخل دائرة: البكسل الداكن نسبةً لخلفيته المحلية
+    const sampleRaw = (H, x, y, rmm, px) => { const [u, v] = H(x, y), r = rmm * px; let dark = 0, tot = 0, sum = 0; for (let yy = Math.round(v - r); yy <= Math.round(v + r); yy++) for (let xx = Math.round(u - r); xx <= Math.round(u + r); xx++) { if ((xx - u) ** 2 + (yy - v) ** 2 > r * r || xx < 0 || yy < 0 || xx >= w || yy >= h) continue; const i = yy * w + xx; tot++; const rel = g[i] / Math.max(40, bg[i]); dark += rel < 0.72 ? 1 : 0; sum += Math.max(0, 1 - rel); } return tot ? { f: dark / tot, s: sum / tot } : { f: 0, s: 0 }; };
+    for (const qd of quads.slice(0, 4)) {
+      const pts = qd.o.map(p => [p.x, p.y]);
+      // الترتيب الدائري (حسب الزاوية) يعطي: أعلى-يسار، أعلى-يمين، أسفل-يمين، أسفل-يسار لصورة معتدلة؛ نجرّب البدايات الأربع (الدوران) والانعكاس
+      for (const rev of [false, true]) for (let st = 0; st < 4; st++) {
+        const seq = [0, 1, 2, 3].map(k => pts[rev ? (st - k + 8) % 4 : (st + k) % 4]); // TL, TR, BR, BL
+        const H2 = homography(MC, [seq[0], seq[1], seq[3], seq[2]]); if (!H2) continue;
+        const px = pxOf(H2); if (!(px > 0.8)) continue;
+        // الضلع العلوي (١٨٢ مم) أقصر من الجانبي (٢٦٩ مم): يستبعد الترتيب المدوَّر ٩٠°
+        const top_ = Math.hypot(seq[1][0] - seq[0][0], seq[1][1] - seq[0][1]), side_ = Math.hypot(seq[2][0] - seq[1][0], seq[2][1] - seq[1][1]);
+        if (Math.abs(side_ / top_ - RAT) / RAT > 0.25) continue;
+        const fs = Array.from({ length: ID_BITS }, (_, b) => sampleRaw(H2, ...idPos(b), ID_S * 0.32, px).f);
+        if (fs.some(f => f > 0.3 && f < 0.7)) continue; // خانات التعريف يجب أن تكون سوداء تماماً أو بيضاء تماماً
+        const bits = fs.map(f => f > 0.5 ? 1 : 0);
+        const id = decode(bits); if (!id) continue;
+        // تحقق إضافي: إطار كل خانة تعريف بيضاء مطبوع (الحافة أغمق من المركز)
+        const frameOk = fs.every((f, b) => { if (f > 0.5) return true; const [cx, cy] = idPos(b), e = sampleRaw(H2, cx - ID_S / 2 + 0.15, cy, 0.35, px).f; return e > 0.12; });
+        if (!frameOk) continue;
+        const Hs = (x, y) => { const [u, v] = H2(x, y); return [u / sc, v / sc]; };
+        const bc = readBarcode(cv, Hs, null);
+        const absent = (() => { const a = sampleRaw(H2, ...ABS_C, ABS_S * 0.3, px); return a.f > 0.55; })();
+        // خط أساس الورقة: متوسط الدوائر غير المظللة يُحسب عند القراءة
+        const read = (a, b) => { const L = layout(a, b), nq = L.qs.length, raw = [];
+          for (let q = 0; q < nq; q++) { const f = []; for (let k = 0; k < L.qs[q].n; k++) { const r0 = sampleRaw(H2, ...L.pos(q, k), R * 0.62, px); f.push(r0.f * 0.7 + r0.s * 0.9); } raw.push(f); }
+          const flat = raw.flat().sort((x, y) => x - y), base = flat[Math.floor(flat.length * 0.35)] || 0, hi = flat[flat.length - 1] || 1;
+          const mark = Math.max(0.28, base + Math.max(0.16, (hi - base) * 0.38));
+          const ans = [], conf = [], unsure = [];
+          raw.forEach((f) => { const s = f.map((v, k) => [v, k]).sort((x, y) => y[0] - x[0]), m1 = s[0], m2 = s[1] || [0, -1];
+            let v; if (m1[0] < mark) v = -1; else if (m2[0] >= mark && m2[0] > m1[0] * 0.72) v = -2; else v = m1[1];
+            const c = v === -1 ? Math.min(1, (mark - m1[0]) / mark + 0.3) : v === -2 ? 0.4 : Math.min(1, (m1[0] - Math.max(m2[0], mark * 0.6)) / Math.max(0.05, m1[0]));
+            ans.push(v); conf.push(+c.toFixed(2)); unsure.push(v !== -2 && (Math.abs(m1[0] - mark) < 0.07 || (m2[0] > base + 0.12 && m2[0] > m1[0] * 0.55))); });
+          return { ans, conf, unsure, raw, base, mark }; };
+        const toImg = (xmm, ymm) => Hs(xmm, ymm);
+        return { ok: true, H: H2, id, barcode: bc, absent, gid: { digits: bc || '', bad: false }, read, toImg, pxmm: px / sc };
+      }
     }
     return { ok: false, error: 'تعذّرت قراءة شريط التعريف — قد تكون الورقة ليست من هذا الاختبار أو المسح غير واضح' };
   }
+  // تقويم الورقة: صورة قائمة بمقاس A4 تماماً (بلا ميل ولا منظور) — تُحفظ هكذا فتُرسم علامات التصحيح عليها مباشرة في أي وقت
+  function rectify(cv, r, wd) {
+    wd = wd || 700; const hh = Math.round(wd * H / W), k = W / wd, out = document.createElement('canvas'); out.width = wd; out.height = hh;
+    const sx = cv.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, cv.width, cv.height), sd = sx.data, o = out.getContext('2d'), od = o.createImageData(wd, hh), dd = od.data;
+    for (let y = 0; y < hh; y++) for (let x = 0; x < wd; x++) { const [u, v] = r.toImg((x + 0.5) * k, (y + 0.5) * k), j = (y * wd + x) * 4;
+      if (u < 0 || v < 0 || u >= cv.width - 1 || v >= cv.height - 1) { dd[j] = dd[j + 1] = dd[j + 2] = 255; dd[j + 3] = 255; continue; }
+      const x0 = u | 0, y0 = v | 0, fx = u - x0, fy = v - y0, i00 = (y0 * cv.width + x0) * 4, i10 = i00 + 4, i01 = i00 + cv.width * 4, i11 = i01 + 4;
+      for (let c = 0; c < 3; c++) dd[j + c] = (sd[i00 + c] * (1 - fx) + sd[i10 + c] * fx) * (1 - fy) + (sd[i01 + c] * (1 - fx) + sd[i11 + c] * fx) * fy; dd[j + 3] = 255; }
+    o.putImageData(od, 0, 0); return out;
+  }
+  // علامات التصحيح على ورقة مقوَّمة: دائرة خضراء على الإجابة الصحيحة، وحمراء على اختيار الطالب الخاطئ، وبرتقالية حول رقم الفارغ/المتعدد
+  function drawMarks(ctx, wd, spec, ans, key) {
+    if (!ans) return; const L = layout(spec), p = wd / W, rr = R * 1.3 * p, ring = (x, y, rad, col, fill) => { ctx.beginPath(); ctx.arc(x * p, y * p, rad, 0, Math.PI * 2); ctx.lineWidth = Math.max(1.5, rad * 0.26); ctx.strokeStyle = col; ctx.stroke(); if (fill) { ctx.fillStyle = fill; ctx.fill(); } };
+    L.qs.forEach((Q, q) => { if (Q.teacher) return; const a = ans ? ans[q] : -1, k = key ? key[q] : -1;
+      if (k >= 0 && k < Q.n) ring(...L.pos(q, k), rr, '#2E8B57', a === k ? 'rgba(46,139,87,.30)' : null);
+      if (a >= 0 && k >= 0 && a !== k) ring(...L.pos(q, a), rr, '#d92d20', 'rgba(217,45,32,.20)');
+      if (a === undefined || a < 0) ring(...L.num(q), rr * 1.2, '#f79009'); });
+  }
+  function annotate(cv, r, spec, ans, key, wd) { const c = rectify(cv, r, wd || 760); drawMarks(c.getContext('2d'), c.width, spec, ans, key); return c.toDataURL('image/jpeg', 0.72); }
+  // صورة محفوظة: إن كانت مقوَّمة (علامات الزوايا في أماكنها) تُرسم عليها العلامات، وإلا تُعاد كما هي
+  async function annotateURL(url, spec, ans, key) {
+    try { const im = new Image(); im.src = url; await im.decode(); const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0);
+      if (Math.abs(c.height / c.width - H / W) > 0.01) return url; const p = c.width / W;
+      const dark = MC.every(([mx, my]) => { const d = x.getImageData(Math.round(mx * p) - 2, Math.round(my * p) - 2, 5, 5).data; let s = 0; for (let i = 0; i < d.length; i += 4) s += d[i] + d[i + 1] + d[i + 2]; return s / (d.length / 4) / 3 < 110; });
+      if (!dark) return url; drawMarks(x, c.width, spec, ans, key); return c.toDataURL('image/jpeg', 0.8); } catch (_) { return url; }
+  }
   async function fileToCanvases(file) {
     if (/pdf$/i.test(file.type) || /\.pdf$/i.test(file.name)) {
-      if (!window.pdfjsLib) await new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'; s.onload = res; s.onerror = () => rej(new Error('تعذّر تحميل قارئ PDF')); document.head.appendChild(s); });
-      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      if (!window.pdfjsLib) await new Promise((res, rej) => { const s = document.createElement('script'); s.src = VBASE + 'vendor/pdf.min.js'; s.onload = res; s.onerror = () => rej(new Error('تعذّر تحميل قارئ PDF')); document.head.appendChild(s); });
+      pdfjsLib.GlobalWorkerOptions.workerSrc = VBASE + 'vendor/pdf.worker.min.js';
       const doc = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise, out = [];
       for (let p = 1; p <= doc.numPages; p++) { const pg = await doc.getPage(p), vp0 = pg.getViewport({ scale: 1 }), vp = pg.getViewport({ scale: 2600 / vp0.height }); const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height; await pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise; out.push({ cv: c, label: file.name + ' — ص' + p }); }
       return out;
@@ -7641,7 +7718,7 @@ ${S.me.full_name}`;
     const bmp = await createImageBitmap(file), c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height; c.getContext('2d').drawImage(bmp, 0, 0); return [{ cv: c, label: file.name }];
   }
   const thumb = (cv, wd = 620) => { const s = wd / cv.width, c = document.createElement('canvas'); c.width = wd; c.height = Math.round(cv.height * s); const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(cv, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.6); };
-  window.DinaOMR = { barcodeSVG, readBarcode, sheetHTML, PAGE_CSS, readCanvas, fileToCanvases, thumb, LET, LABELS, expand, capacity, encode, decode, layout };
+  window.DinaOMR = { annotate, annotateURL, rectify, drawMarks, ABS_C, barcodeSVG, readBarcode, sheetHTML, PAGE_CSS, readCanvas, fileToCanvases, thumb, LET, LABELS, expand, capacity, encode, decode, layout };
 })();
 }catch(e){console.error('[dina] omr.js',e)}
 
@@ -7897,36 +7974,67 @@ ${S.me.full_name}`;
     const bySk = Object.fromEntries(res.map(r => [r.skey, r]));
     box.innerHTML = `<div class="grid g2" style="align-items:start;margin-top:12px"><div class="sec-box"><b>تصحيح آلي من الأوراق الممسوحة</b><p class="small muted" style="margin:4px 0 8px">ارفع ملف PDF من الماسح أو صوراً (أو مجلداً كاملاً). يُتعرَّف على الطالب ونموذجه تلقائياً، ثم تراجع قبل الحفظ.</p>
         <label class="drop" id="gDrop" tabindex="0"><input type="file" id="gF" accept="application/pdf,image/*" multiple hidden><span>اسحب الملفات هنا أو <u>اختر ملفات</u></span><small>PDF أو صور (JPG/PNG)</small></label>
-        <label class="btn ghost sm" style="margin-top:8px">اختيار مجلد<input type="file" id="gD" webkitdirectory multiple hidden></label><div id="gOut" style="margin-top:10px"></div></div>
+        <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><label class="btn ghost sm">اختيار مجلد<input type="file" id="gD" webkitdirectory multiple hidden></label><button class="btn sky sm" id="gCam">📷 المسح بكاميرا الجوال</button></div><p class="small muted" style="margin:6px 0 0">القراءة تتحمل الميل والدوران والظلال وصور الجوال، وتُعرض كل ورقة مصححة للمراجعة قبل الحفظ.</p><div id="gOut" style="margin-top:10px"></div></div>
       <div class="sec-box"><b>استيراد نتائج جاهزة (Excel)</b><p class="small muted" style="margin:4px 0 8px">لاختبار صُحّح خارج المنصة أو نتائج من نظام آخر: عمود للاسم، وعمود للفصل (اختياري)، ثم عمود لكل سؤال — إما إجابة الطالب بالحرف (أ ب ج د / A B C D / ص خ / T F) أو درجته في السؤال. سطر باسم «المفتاح» أو KEY يُعتمد مفتاحاً للنموذج A.</p>
         <div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn ghost sm" id="gTpl">${I.down} قالب Excel</button><label class="btn sm">استيراد ملف<input type="file" id="gX" accept=".xlsx,.xls,.csv" hidden></label></div><div id="gXo" class="small" style="margin-top:8px"></div>
         ${qs.some(Q => Q.teacher) ? `<hr style="border:0;border-top:1px dashed var(--border);margin:12px 0"><b>رصد درجات الأسئلة المقالية</b><p class="small muted" style="margin:4px 0 8px">إن لم تظلل الدرجات في الصف الرمادي بالورقة، اكتبها هنا بعد التصحيح اليدوي (تقبل الأنصاف مثل ٢٫٥). تُضاف لدرجة الطالب فوراً.</p><button class="btn ghost sm" id="gEs">فتح جدول رصد المقالي</button>` : ''}
         <hr style="border:0;border-top:1px dashed var(--border);margin:12px 0"><b>إدخال يدوي / غياب</b><p class="small muted" style="margin:4px 0 8px">اكتب الإجابات بالترتيب مفصولة بمسافات (مثل: أ ب ص خ هـ) واكتب «-» للفارغ، أو علّم الطالب غائباً.</p>
         <div class="scroll" style="max-height:380px"><table class="tbl"><thead><tr><th>الطالب</th><th>نموذج</th><th>الإجابات</th><th>غائب</th><th>الدرجة</th></tr></thead><tbody>${R.map(s => { const r = bySk[s.id]; return `<tr data-s="${s.id}"><td><b>${esc(s.full_name)}</b><div class="small muted">${esc(clsName(s.class_id))}</div></td><td><select class="in" data-m style="width:70px">${e.models.map(m => `<option ${r && r.model === m.name ? 'selected' : ''}>${m.name}</option>`).join('')}</select></td><td><input class="in" data-a dir="${isEn(e) ? 'ltr' : 'rtl'}" style="min-width:180px" value="${r && !r.marks ? esc(ansText(e, r.answers)) : ''}" ${r && r.marks ? 'placeholder="درجات مستوردة"' : ''}></td><td><input type="checkbox" data-ab ${r && r.absent ? 'checked' : ''} aria-label="غائب"></td><td class="small">${r ? (r.absent ? 'غائب' : AR(r.score) + ' / ' + AR(r.max_score)) : '—'}</td></tr>`; }).join('') || `<tr><td colspan="5">${A.emptyBox('لا يوجد طلاب في قاعدة البيانات لهذه الفصول', 'استخدم الاستيراد أو المسح مع الأوراق الاحتياطية.')}</td></tr>`}</tbody></table></div>
         ${R.length ? '<button class="btn sm" id="gSaveM" style="margin-top:8px">حفظ الإدخال اليدوي</button>' : ''}</div></div>`;
-    const out = $('#gOut', box), pending = [];
+    const out = $('#gOut', box), pending = [], seen = new Set();
+    // قراءة صفحة واحدة ← عنصر مراجعة: الطالب، النموذج، الإجابات، الغياب، الأسئلة غير المؤكدة، والورقة مقوَّمة
+    const ingest = (cv, label, bcIn) => { const r = DinaOMR.readCanvas(cv);
+      if (!r.ok) return { label, error: r.error, img: DinaOMR.thumb(cv, 360) };
+      const rd = r.read(specOf(e)), ans = rd.ans, M = matchStudent(R, r, bcIn || null), model = (e.models[r.id.model] || e.models[0]).name;
+      return { label, stu: M.stu, how: M.how, conflict: M.conflict, digits: M.digits, model, ans, absent: !!r.absent, unsure: rd.unsure.map((u, q) => u ? q : -1).filter(q => q >= 0),
+        img: DinaOMR.rectify(cv, r, 700).toDataURL('image/jpeg', 0.62), sig: r.id.idx + '|' + r.id.model + '|' + (r.barcode || '') }; };
     const handle = async files => {
-      out.innerHTML = '<div class="spinner"></div>'; pending.length = 0; let n = 0;
-      for (const f of files) { if (!/pdf|image/i.test(f.type) && !/\.(pdf|jpe?g|png)$/i.test(f.name)) continue; let pages = []; try { pages = await DinaOMR.fileToCanvases(f); } catch (err) { pending.push({ label: f.name, error: err.message }); continue; }
-        for (const pg of pages) { n++; out.innerHTML = `<div class="small muted">يقرأ الورقة ${AR(n)}…</div>`; await new Promise(r => setTimeout(r, 10)); const r = DinaOMR.readCanvas(pg.cv);
-          if (!r.ok) { pending.push({ label: pg.label, error: r.error, img: DinaOMR.thumb(pg.cv, 360) }); continue; }
-          let bc = null; if ((!r.gid || !r.gid.digits) && window.BarcodeDetector) { try { const det = new BarcodeDetector({ formats: ['code_39'] }); const f = await det.detect(pg.cv); bc = (f[0] || {}).rawValue || null; } catch (_) {} }
-          const { ans } = r.read(specOf(e)), M = matchStudent(R, r, bc), model = (e.models[r.id.model] || e.models[0]).name;
-          pending.push({ label: pg.label, stu: M.stu, how: M.how, conflict: M.conflict, digits: M.digits, model, ans, img: DinaOMR.thumb(pg.cv), blank: ans.filter(x => x === -1).length, multi: ans.filter(x => x === -2).length }); } }
+      out.innerHTML = '<div class="spinner"></div>'; let n = 0;
+      for (const f of files) { if (!/pdf|image/i.test(f.type) && !/\.(pdf|jpe?g|png|webp|heic)$/i.test(f.name)) continue; let pages = []; try { pages = await DinaOMR.fileToCanvases(f); } catch (err) { pending.push({ label: f.name, error: err.message }); continue; }
+        for (const pg of pages) { n++; out.innerHTML = `<div class="om-prog"><b>يقرأ الورقة ${AR(n)}…</b><div class="tt-bar"><i style="width:${Math.min(98, n * 3)}%"></i></div></div>`; await new Promise(r => setTimeout(r, 10));
+          let it = ingest(pg.cv, pg.label);
+          if (it.ans && (!it.stu) && window.BarcodeDetector) { try { const det = new BarcodeDetector({ formats: ['code_39'] }); const f2 = await det.detect(pg.cv); const bc = (f2[0] || {}).rawValue; if (bc) it = ingest(pg.cv, pg.label, bc); } catch (_) {} }
+          pending.push(it); } }
       drawPending();
     };
+    const keyFor = it => (e.models.find(m => m.name === it.model) || e.models[0] || { answers: [] }).answers;
+    const flags = it => { if (!it.ans) return ['err']; const f = []; if (!it.stu) f.push('nostu'); if (it.conflict) f.push('conf');
+      if (it.stu && pending.filter(p => p.ans && p.stu && p.stu.id === it.stu.id).length > 1) f.push('dup');
+      if (it.stu && bySk[it.stu.id]) f.push('old'); if (!it.absent && it.ans.some(x => x === -2)) f.push('multi'); if (!it.absent && (it.unsure || []).length) f.push('unsure'); if (it.absent) f.push('abs'); return f; };
+    const FL = { err: ['تعذّرت القراءة', 'bad'], nostu: ['حدّد الطالب', 'bad'], conf: ['تعارض في هوية الطالب', 'bad'], dup: ['ورقة مكررة للطالب', 'bad'], old: ['سبق تصحيحها (ستُستبدل)', 'warn'], multi: ['تظليل متعدد', 'warn'], unsure: ['أسئلة غير مؤكدة', 'warn'], abs: ['غائب', 'warn'] };
+    const needs = it => flags(it).some(f => ['err', 'nostu', 'conf', 'dup', 'multi', 'unsure'].includes(f));
+    let pf = 'all';
     const drawPending = () => {
-      const ok = pending.filter(p => p.ans), opts = s => `<option value="">— اختر الطالب —</option>` + R.map(x => `<option value="${x.id}" ${s && s.id === x.id ? 'selected' : ''}>${esc(x.full_name)} — ${esc(clsName(x.class_id))}</option>`).join('');
-      out.innerHTML = `<div class="small" style="margin-bottom:6px">${AR(ok.length)} ورقة مقروءة${pending.length - ok.length ? ` · <b style="color:var(--bad)">${AR(pending.length - ok.length)} تعذّرت</b>` : ''}</div>
-        <div class="scroll" style="max-height:420px"><table class="tbl"><thead><tr><th>الورقة</th><th>الطالب</th><th>نموذج</th><th>الدرجة</th><th>تنبيه</th></tr></thead><tbody>${pending.map((p, i) => p.ans ? `<tr><td class="small"><button class="link" data-v="${i}">${esc(p.label)}</button></td><td><select class="in" data-ps="${i}" style="max-width:200px">${opts(p.stu)}</select></td><td>${p.model}</td><td>${(() => { const [s, mx] = scoreOf(e, p.model, p.ans); return AR(s) + ' / ' + AR(mx); })()}</td><td class="small">${p.how ? `<span class="faint">رُبط بـ${p.how}</span> ` : p.digits ? `<b style="color:var(--warn)">هوية ${esc(p.digits)} غير موجودة في القاعدة</b> ` : '<b style="color:var(--warn)">اختر الطالب</b> '}${p.conflict ? '<b style="color:var(--bad)">تعارض بين الهوية وترتيب الورقة — تحقق</b> ' : ''}${p.blank ? `${AR(p.blank)} فارغ ` : ''}${p.multi ? `<b style="color:var(--bad)">${AR(p.multi)} مزدوج</b>` : ''}${bySk[(p.stu || {}).id] ? ' · يستبدل نتيجة سابقة' : ''}</td></tr>` : `<tr><td class="small">${esc(p.label)}</td><td colspan="4" class="small" style="color:var(--bad)">${esc(p.error)}</td></tr>`).join('')}</tbody></table></div>
-        ${ok.length ? '<button class="btn ok" id="gSave" style="margin-top:8px">حفظ النتائج</button>' : ''}`;
-      $$('[data-ps]', out).forEach(s => s.onchange = () => { pending[+s.dataset.ps].stu = R.find(x => x.id === s.value) || null; });
-      $$('[data-v]', out).forEach(b => b.onclick = () => { const p = pending[+b.dataset.v]; A.modal(`<h3>${esc(p.label)}</h3><img src="${p.img}" style="width:100%;border:1px solid var(--border);border-radius:8px" alt="صورة الورقة"><p class="small">الإجابات المقروءة: ${p.ans.map((x, q) => `${qN(e, q)}:${lab(e, q, x)}`).join(' ')}</p>`, { cls: 'wide' }); });
-      const sv = $('#gSave', out); if (sv) sv.onclick = ev => A.run(ev.currentTarget, async () => {
-        const rows = pending.filter(p => p.ans && p.stu).map(p => { const [score, mx] = scoreOf(e, p.model, p.ans); return { exam_id: e.id, student_id: p.stu.id, skey: p.stu.id, student_name: p.stu.full_name, class_id: p.stu.class_id, model: p.model, answers: p.ans, marks: null, score, max_score: mx, absent: false, sheet_img: p.img, updated_at: new Date().toISOString() }; });
+      const ok = pending.filter(p => p.ans), bad = pending.length - ok.length, rv = ok.filter(needs).length;
+      const list = pending.map((p, i) => [p, i]).filter(([p]) => pf === 'all' || (pf === 'rev' ? (!p.ans || needs(p)) : pf === 'ok' ? p.ans && !needs(p) : !p.ans));
+      out.innerHTML = `<div class="om-sum"><div><b>${AR(pending.length)}</b><span>ورقة</span></div><div class="ok"><b>${AR(ok.length - rv)}</b><span>جاهزة</span></div><div class="warn"><b>${AR(rv)}</b><span>تحتاج مراجعة</span></div><div class="bad"><b>${AR(bad)}</b><span>تعذّرت</span></div></div>
+        <div class="row" style="gap:6px;flex-wrap:wrap;margin:8px 0"><div class="chip-filter" id="pfT" style="margin:0">${[['all', 'الكل'], ['rev', 'تحتاج مراجعة'], ['ok', 'جاهزة'], ['bad', 'تعذّرت']].map(([k, l]) => `<button data-v="${k}" class="${pf === k ? 'on' : ''}">${l}</button>`).join('')}</div><div class="grow"></div>${rv ? '<button class="btn ghost sm" id="gRev">مراجعة الأوراق المعلّمة واحدة واحدة</button>' : ''}<button class="btn ghost sm" id="gClr">مسح القائمة</button></div>
+        <div class="om-grid">${list.map(([p, i]) => { const fl = flags(p), sc = p.ans ? (p.absent ? null : scoreOf(e, p.model, p.ans)) : null;
+          return `<div class="om-card ${!p.ans ? 'bad' : needs(p) ? 'warn' : 'ok'}"><button class="om-th" data-ov="${i}" aria-label="مراجعة ${esc(p.label)}"><img data-an="${i}" src="${p.img || ''}" alt="" loading="lazy"></button>
+            <div class="om-b">${p.ans ? `<select class="in" data-ps="${i}" aria-label="الطالب">${'<option value="">— اختر الطالب —</option>' + R.map(x => `<option value="${x.id}" ${p.stu && p.stu.id === x.id ? 'selected' : ''}>${esc(x.full_name)} — ${esc(clsName(x.class_id))}</option>`).join('')}</select>
+              <div class="row" style="justify-content:space-between;gap:6px;margin-top:4px"><span class="small muted">نموذج ${esc(p.model)}${p.how ? ' · ' + esc(p.how) : ''}</span><b>${sc ? AR(sc[0]) + ' / ' + AR(sc[1]) : p.absent ? 'غائب' : ''}</b></div>` : `<b class="small">${esc(p.label)}</b><div class="small" style="color:var(--bad)">${esc(p.error || '')}</div>`}
+              <div class="om-fl">${fl.filter(f => f !== 'err').map(f => `<span class="pill ${FL[f][1] === 'bad' ? 'st-returned' : 'st-submitted'}">${FL[f][0]}${f === 'unsure' ? ` (${AR(p.unsure.length)})` : f === 'multi' ? ` (${AR(p.ans.filter(x => x === -2).length)})` : ''}</span>`).join('')}</div>
+              ${p.ans ? `<button class="btn ghost sm" data-ov="${i}" style="margin-top:6px;width:100%">مراجعة وتعديل</button>` : `<button class="btn bad sm" data-rm="${i}" style="margin-top:6px">إزالة</button>`}</div></div>`; }).join('') || A.emptyBox('لا توجد أوراق في هذا التصنيف')}</div>
+        ${ok.length ? `<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn ok" id="gSave">حفظ النتائج (${AR(ok.filter(p => p.stu).length)})</button>${rv ? `<button class="btn ghost" id="gSaveOk">حفظ الجاهزة فقط (${AR(ok.filter(p => p.stu && !needs(p)).length)})</button>` : ''}</div>` : ''}`;
+      // العلامات على الصور (تُرسم بعد العرض)
+      $$('img[data-an]', out).forEach(im => { const p = pending[+im.dataset.an]; if (p && p.ans && p.img) DinaOMR.annotateURL(p.img, specOf(e), p.absent ? null : p.ans, keyFor(p)).then(u => { im.src = u; }); });
+      $$('#pfT button', out).forEach(b => b.onclick = () => { pf = b.dataset.v; drawPending(); });
+      $$('[data-ps]', out).forEach(s => s.onchange = () => { pending[+s.dataset.ps].stu = R.find(x => x.id === s.value) || null; pending[+s.dataset.ps].how = 'يدوي'; drawPending(); });
+      $$('[data-rm]', out).forEach(b => b.onclick = () => { pending.splice(+b.dataset.rm, 1); drawPending(); });
+      const openAt = i => { const idx = pending.map((p, k) => k).filter(k => pending[k].ans); sheetEditor(e, pending[i], R, { title: pending[i].label, onSave: async it => { Object.assign(pending[i], it, { unsure: [] }); drawPending(); },
+        nav: { prev: idx[idx.indexOf(i) - 1], next: idx[idx.indexOf(i) + 1], go: k => openAt(k) } }); };
+      $$('[data-ov]', out).forEach(b => b.onclick = () => { const i = +b.dataset.ov; if (pending[i] && pending[i].ans) openAt(i); });
+      const rvb = $('#gRev', out); if (rvb) rvb.onclick = () => { const i = pending.findIndex(p => p.ans && needs(p)); if (i >= 0) openAt(i); };
+      $('#gClr', out).onclick = () => { pending.length = 0; seen.clear(); out.innerHTML = ''; };
+      const save = only => ev => A.run(ev.currentTarget, async () => {
+        const L = pending.filter(p => p.ans && p.stu && (!only || !needs(p))); const dupIds = new Set(); L.forEach(p => { if (L.filter(x => x.stu.id === p.stu.id).length > 1) dupIds.add(p.stu.id); });
+        if (dupIds.size) throw new Error(`يوجد أكثر من ورقة للطالب نفسه (${AR(dupIds.size)}) — راجعها أولاً`);
+        const rows = L.map(p => { const [score, mx] = p.absent ? [0, scoreOf(e, p.model, [])[1]] : scoreOf(e, p.model, p.ans); return { exam_id: e.id, student_id: p.stu.id, skey: p.stu.id, student_name: p.stu.full_name, class_id: p.stu.class_id, model: p.model, answers: p.absent ? [] : p.ans, marks: null, score, max_score: mx, absent: !!p.absent, sheet_img: p.img, updated_at: new Date().toISOString() }; });
         if (!rows.length) throw new Error('حدّد الطالب لكل ورقة'); await upsRes(e, rows); A.toast(`حُفظت ${AR(rows.length)} نتيجة`, 'ok'); st.tab = 'results'; examView(root);
       });
+      const sv = $('#gSave', out); if (sv) sv.onclick = save(false); const so = $('#gSaveOk', out); if (so) so.onclick = save(true);
     };
+    const cam = $('#gCam', box); if (cam) cam.onclick = () => camScan(e, ingest, it => { if (seen.has(it.sig)) return false; seen.add(it.sig); pending.push(it); return true; }, () => drawPending());
     $('#gF', box).onchange = ev => handle([...ev.target.files]); $('#gD', box).onchange = ev => handle([...ev.target.files]);
     const dz = $('#gDrop', box); dz.onclick = () => $('#gF', box).click(); dz.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); $('#gF', box).click(); } };
     dz.ondragover = ev => { ev.preventDefault(); dz.classList.add('over'); }; dz.ondragleave = () => dz.classList.remove('over'); dz.ondrop = ev => { ev.preventDefault(); dz.classList.remove('over'); handle([...ev.dataTransfer.files]); };
@@ -7962,6 +8070,74 @@ ${S.me.full_name}`;
     }); };
   }
 
+  // ---------- محرر ورقة الطالب: الورقة المصححة بجانب شبكة الإجابات (تعديل بالنقر) ----------
+  if (!document.getElementById('omr-pro-css')) { const s = document.createElement('style'); s.id = 'omr-pro-css'; s.textContent = `
+  .om-prog{padding:10px;border:1px solid var(--border);border-radius:12px;background:#f7fafd}.om-prog .tt-bar{height:8px;border-radius:9px;background:#e3ebf5;overflow:hidden;margin-top:6px}.om-prog .tt-bar i{display:block;height:100%;background:linear-gradient(90deg,#005499,#3AB1DB)}
+  .om-sum{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.om-sum>div{border:1px solid var(--border);border-radius:12px;padding:6px 8px;text-align:center;background:#fff}.om-sum b{display:block;font-size:20px;color:var(--navy)}.om-sum span{font-size:12px;color:var(--muted)}
+  .om-sum .ok b{color:#2E8B57}.om-sum .warn b{color:#b54708}.om-sum .bad b{color:#b42318}
+  .om-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;max-height:620px;overflow:auto;padding:2px}
+  .om-card{border:1px solid var(--border);border-radius:14px;background:#fff;overflow:hidden;box-shadow:0 3px 10px rgba(8,43,90,.07);display:flex;flex-direction:column}
+  .om-card.ok{border-top:4px solid #2E8B57}.om-card.warn{border-top:4px solid #f79009}.om-card.bad{border-top:4px solid #d92d20}
+  .om-th{border:0;padding:0;background:#f4f6f9;cursor:zoom-in;display:block;height:150px;overflow:hidden}.om-th img{width:100%;display:block;object-fit:cover;object-position:top}
+  .om-b{padding:8px}.om-b select{width:100%;font-size:12px}.om-fl{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}.om-fl .pill{font-size:10.5px}
+  .om-ed{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:14px;align-items:start}@media(max-width:860px){.om-ed{grid-template-columns:1fr}}
+  .om-img{position:sticky;top:0;border:1px solid var(--border);border-radius:12px;overflow:auto;max-height:72vh;background:#f4f6f9}.om-img img{width:100%;display:block;cursor:zoom-in}.om-img img.zm{width:200%;max-width:none;cursor:zoom-out}
+  .om-qs{max-height:66vh;overflow:auto;padding-inline-end:4px}.om-q{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:10px;border:1px solid transparent}.om-q.un{background:#fff7e6;border-color:#f7c46c}.om-q.wr{background:#fdf0ef}.om-q.rt{background:#effaf3}
+  .om-q b{min-width:28px;text-align:center;color:var(--navy)}.om-o{width:32px;height:32px;border-radius:50%;border:2px solid #9aa8bc;background:#fff;font:inherit;font-weight:800;color:#34465f;cursor:pointer}
+  .om-o.k{border-color:#2E8B57;box-shadow:0 0 0 2px #BADF93}.om-o.on{background:#082B5A;border-color:#082B5A;color:#fff}.om-o.on.bad{background:#d92d20;border-color:#d92d20}.om-o.on.k{background:#2E8B57;border-color:#2E8B57}
+  .om-o:focus-visible{outline:3px solid #3AB1DB;outline-offset:2px}.om-st{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+  .om-leg{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:6px 0}.om-leg i{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:middle;margin-inline-end:4px}
+  .om-cam{position:relative;border-radius:14px;overflow:hidden;background:#000;aspect-ratio:3/4;max-height:62vh;margin:0 auto}.om-cam video{width:100%;height:100%;object-fit:cover}.om-cam .fr{position:absolute;inset:6%;border:3px dashed rgba(255,255,255,.7);border-radius:12px;pointer-events:none;transition:border-color .2s}
+  .om-cam.hit .fr{border:4px solid #2E8B57;box-shadow:0 0 0 999px rgba(46,139,87,.18)}.om-cam .msg{position:absolute;bottom:10px;inset-inline:10px;background:rgba(8,43,90,.8);color:#fff;border-radius:10px;padding:6px 10px;font-size:13px;text-align:center}
+  @media(prefers-reduced-motion:reduce){.om-cam .fr{transition:none}}`; document.head.appendChild(s); }
+  function sheetEditor(e, it0, R, o) {
+    const qs = QS(e), it = JSON.parse(JSON.stringify({ model: it0.model, ans: it0.ans || qs.map(() => -1), absent: !!it0.absent })), unsure = new Set(it0.unsure || []); let stu = it0.stu || null;
+    const key = () => (e.models.find(m => m.name === it.model) || e.models[0] || { answers: [] }).answers;
+    const m = A.modal(`<div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><h3 style="margin:0;padding-inline-end:36px">مراجعة الورقة${o.title ? ' — <span class="small muted">' + esc(o.title) + '</span>' : ''}</h3></div>
+      <div class="om-st"><label class="small grow" style="min-width:220px">الطالب <select class="in" id="seS"><option value="">— اختر الطالب —</option>${R.map(x => `<option value="${x.id}" ${stu && stu.id === x.id ? 'selected' : ''}>${esc(x.full_name)} — ${esc(clsName(x.class_id))}</option>`).join('')}</select></label>
+        <label class="small">النموذج <select class="in" id="seM" style="width:80px">${e.models.map(x => `<option ${x.name === it.model ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>
+        <label class="chk"><input type="checkbox" id="seA" ${it.absent ? 'checked' : ''}> غائب</label><span class="pill st-approved" id="seSc" style="font-size:15px"></span></div>
+      <div class="om-leg"><span><i style="background:#2E8B57"></i>إجابة صحيحة</span><span><i style="background:#d92d20"></i>إجابة الطالب الخاطئة</span><span><i style="border:2px solid #f79009"></i>فارغ أو متعدد</span><span><i style="background:#fff7e6;border:1px solid #f7c46c;border-radius:3px"></i>قراءة غير مؤكدة — تحقق منها</span></div>
+      <div class="om-ed"><div class="om-img">${it0.img ? `<img id="seI" src="${it0.img}" alt="ورقة الطالب المصححة" title="اضغط للتكبير" tabindex="0">` : '<p class="small muted" style="padding:20px">لا توجد صورة لهذه الورقة (إدخال يدوي).</p>'}</div>
+        <div><div class="om-qs" id="seQ"></div></div></div>
+      <div class="acts" style="flex-wrap:wrap">${o.onDelete ? '<button class="btn bad" id="seD">حذف النتيجة</button>' : ''}${o.nav ? `<button class="btn ghost" id="seP" ${o.nav.prev === undefined ? 'disabled' : ''}>→ السابقة</button><button class="btn ghost" id="seN" ${o.nav.next === undefined ? 'disabled' : ''}>التالية ←</button>` : ''}<div class="grow"></div><button class="btn ghost" id="seX">إلغاء</button><button class="btn ok" id="seOk">${o.saveLabel || 'تأكيد الورقة'}</button></div>`, { cls: 'wide' });
+    const el = m.el, Q = el.querySelector('#seQ'); let tm = null;
+    const paint = () => { const k = key(); el.querySelector('#seSc').textContent = it.absent ? 'غائب' : (() => { const [s, mx] = scoreOf(e, it.model, it.ans); return `${AR(s)} / ${AR(mx)} (${AR(pct(s, mx))}٪)`; })();
+      Q.innerHTML = it.absent ? '<p class="small muted">الطالب غائب — لا تُحسب إجاباته.</p>' : qs.map((qq, q) => { const a = it.ans[q], kk = qq.teacher ? -1 : k[q], cls = unsure.has(q) ? 'un' : a < 0 || qq.teacher ? '' : a === kk ? 'rt' : 'wr';
+        return `<div class="om-q ${cls}"><b>${qN(e, q)}</b>${qq.lab.map((L, j) => `<button class="om-o ${a === j ? 'on' : ''} ${j === kk ? 'k' : ''} ${a === j && kk >= 0 && j !== kk ? 'bad' : ''}" data-q="${q}" data-o="${j}" aria-pressed="${a === j}" aria-label="س${q + 1} ${esc(L)}">${esc(L)}</button>`).join('')}${a === -2 ? '<span class="pill st-submitted">متعدد</span>' : ''}${unsure.has(q) ? '<span class="small" style="color:#b54708">تحقق</span>' : ''}</div>`; }).join('');
+      $$('[data-q]', Q).forEach(b => b.onclick = () => { const q = +b.dataset.q, j = +b.dataset.o; it.ans[q] = it.ans[q] === j ? -1 : j; unsure.delete(q); paint(); });
+      const im = el.querySelector('#seI'); if (im && it0.img) { clearTimeout(tm); tm = setTimeout(() => DinaOMR.annotateURL(it0.img, specOf(e), it.absent ? null : it.ans, key()).then(u => { im.src = u; }), 120); } };
+    const zi = el.querySelector('#seI'); if (zi) { const z = () => zi.classList.toggle('zm'); zi.onclick = z; zi.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); z(); } }; }
+    el.querySelector('#seS').onchange = ev => { stu = R.find(x => x.id === ev.target.value) || null; };
+    el.querySelector('#seM').onchange = ev => { it.model = ev.target.value; paint(); };
+    el.querySelector('#seA').onchange = ev => { it.absent = ev.target.checked; paint(); };
+    el.querySelector('#seX').onclick = () => m.close();
+    const commit = async () => { if (!stu && !o.allowNoStu) { A.toast('اختر الطالب', 'warn'); return false; } await o.onSave({ stu, model: it.model, ans: it.ans, absent: it.absent, how: stu && (!it0.stu || stu.id !== it0.stu.id) ? 'يدوي' : it0.how }); return true; };
+    el.querySelector('#seOk').onclick = ev => A.run(ev.currentTarget, async () => { if (await commit()) { m.close(); if (o.nav && o.nav.next !== undefined && o.autoNext !== false) o.nav.go(o.nav.next); } });
+    if (o.nav) { const go = k => async () => { if (k === undefined) return; await commit(); m.close(); o.nav.go(k); }; el.querySelector('#seP').onclick = go(o.nav.prev); el.querySelector('#seN').onclick = go(o.nav.next); }
+    const dl = el.querySelector('#seD'); if (dl) dl.onclick = ev => A.run(ev.currentTarget, async () => { if (!(await A.confirmBox('حذف نتيجة هذا الطالب في الاختبار؟', 'حذف', true))) return; await o.onDelete(); m.close(); });
+    paint();
+  }
+  // ---------- المسح بكاميرا الجوال: تُقرأ الورقة تلقائياً بمجرد ظهورها كاملة ----------
+  function camScan(e, ingest, add, done) {
+    const m = A.modal(`<h3>المسح بالكاميرا</h3><p class="small muted">وجّه الكاميرا إلى الورقة حتى تظهر علاماتها السوداء الأربع داخل الإطار. تُقرأ تلقائياً ويُسمع تنبيه، ثم ضع الورقة التالية.</p>
+      <div class="om-cam" id="cmB"><video id="cmV" playsinline muted autoplay></video><div class="fr"></div><div class="msg" id="cmM">يجهّز الكاميرا…</div></div>
+      <div class="row" style="justify-content:space-between;gap:8px;margin-top:8px;flex-wrap:wrap"><span><b id="cmN">٠</b> ورقة مقروءة · <span id="cmL" class="small muted"></span></span><div class="row" style="gap:6px"><select class="in" id="cmC" style="max-width:200px" aria-label="الكاميرا"></select><button class="btn ok" id="cmD">إنهاء ومراجعة</button></div></div>`, { cls: 'wide' });
+    const el = m.el, v = el.querySelector('#cmV'), msg = el.querySelector('#cmM'); let stream = null, timer = null, n = 0, busy = false, ac = null;
+    const beep = () => { try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); const o2 = ac.createOscillator(), g = ac.createGain(); o2.frequency.value = 880; g.gain.value = 0.15; o2.connect(g); g.connect(ac.destination); o2.start(); o2.stop(ac.currentTime + 0.15); } catch (_) { } if (navigator.vibrate) navigator.vibrate(80); };
+    const stop = () => { clearInterval(timer); if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; };
+    const start = async devId => { stop(); try { stream = await navigator.mediaDevices.getUserMedia({ video: devId ? { deviceId: { exact: devId }, width: { ideal: 1920 }, height: { ideal: 2560 } } : { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 2560 } }, audio: false }); v.srcObject = stream; await v.play().catch(() => { });
+        msg.textContent = 'ضع الورقة داخل الإطار';
+        const ds = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput'), cs = el.querySelector('#cmC'); cs.innerHTML = ds.map((d, i) => `<option value="${d.deviceId}" ${stream.getVideoTracks()[0].getSettings().deviceId === d.deviceId ? 'selected' : ''}>${esc(d.label || 'كاميرا ' + (i + 1))}</option>`).join(''); cs.onchange = () => start(cs.value);
+        timer = setInterval(tick, 450);
+      } catch (err) { msg.textContent = 'تعذّر تشغيل الكاميرا: اسمح للمتصفح باستخدامها، أو ارفع صور الأوراق بدلاً منها.'; } };
+    const tick = () => { if (busy || !v.videoWidth) return; busy = true; try { const c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight; c.getContext('2d').drawImage(v, 0, 0);
+        const it = ingest(c, 'كاميرا ' + (n + 1)); if (it.ans) { if (add(it)) { n++; beep(); el.querySelector('#cmN').textContent = AR(n); el.querySelector('#cmL').textContent = 'آخر ورقة: ' + (it.stu ? it.stu.full_name : 'طالب غير محدد'); const b = el.querySelector('#cmB'); b.classList.add('hit'); msg.textContent = '✓ قُرئت — ضع الورقة التالية'; setTimeout(() => b.classList.remove('hit'), 900); } else msg.textContent = 'هذه الورقة مقروءة من قبل — ضع الورقة التالية'; } } catch (_) { } busy = false; };
+    el.querySelector('#cmD').onclick = () => { stop(); m.close(); done(); };
+    const obs = new MutationObserver(() => { if (!document.body.contains(el)) { stop(); obs.disconnect(); } }); obs.observe(document.body, { childList: true, subtree: true });
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { msg.textContent = 'هذا المتصفح لا يدعم الكاميرا — ارفع صور الأوراق بدلاً منها.'; return; }
+    start();
+  }
   function essayDialog(e, R, res, done) {
     const qs = QS(e), eq = qs.map((Q, q) => [Q, q]).filter(([Q]) => Q.teacher);
     const rows = R.map(s => ({ s, r: res.find(x => x.skey === s.id) })).concat(res.filter(r => !r.student_id).map(r => ({ s: null, r })));
@@ -8016,14 +8192,25 @@ ${S.me.full_name}`;
         <div class="kpi"><div class="k">الأعلى / الأدنى</div><div class="v" style="font-size:22px">${AR(Z.mx)}٪ / ${AR(Z.mn)}٪</div><div class="d">الانحراف المعياري ${AR(Z.sd)}</div></div></div>
       <div class="grid g2" style="margin-top:12px;align-items:start"><div class="sec-box"><b>مستويات الطلاب</b><div class="lv-bar">${Z.levels.map(([l, n]) => n ? `<span style="flex:${n};background:${l[2]}" title="${l[0]}: ${n}"></span>` : '').join('')}</div><div class="row" style="gap:10px;flex-wrap:wrap;margin-top:6px">${Z.levels.map(([l, n]) => `<span class="small"><i class="lv-dot" style="background:${l[2]}"></i>${l[0]} <b>${AR(n)}</b></span>`).join('')}</div></div>
         <div class="sec-box"><b>متوسط كل قسم</b>${Z.parts.map((pp, i) => `<div style="margin-top:6px"><div class="row" style="justify-content:space-between"><span class="small">القسم ${AR(i + 1)}: ${QT[pp.type]} (${AR(pp.count)} س · ${AR(pp.max)} درجة)</span><b>${AR(pp.avg)}٪</b></div>${A.bar(pp.avg, 100)}</div>`).join('')}</div></div>
-      <div class="grid g2" style="margin-top:12px;align-items:start"><div class="sec-box"><div class="row" style="justify-content:space-between"><b>توزيع الدرجات</b><span class="row" style="gap:6px"><button class="btn ghost sm" id="rPng">PNG</button><button class="btn ghost sm" id="rX">${I.down} Excel</button></span></div><div id="rH"></div></div>
+      <div class="grid g2" style="margin-top:12px;align-items:start"><div class="sec-box"><div class="row" style="justify-content:space-between"><b>توزيع الدرجات</b><span class="row" style="gap:6px"><button class="btn ghost sm" id="rPng">PNG</button><button class="btn ghost sm" id="rX">${I.down} Excel</button><button class="btn ghost sm" id="rPa">${I.print || ""} الأوراق المصححة</button></span></div><div id="rH"></div></div>
         <div class="sec-box"><b>مقارنة الفصول</b><div class="scroll"><table class="tbl"><thead><tr><th>الفصل</th><th>حاضر</th><th>غائب</th><th>المتوسط</th><th>النجاح</th></tr></thead><tbody>${Z.classes.map(x => `<tr><td><b>${esc(clsName(x.c) || 'بلا فصل')}</b></td><td>${AR(x.n)}</td><td>${AR(x.abs)}</td><td>${AR(x.avg)}٪</td><td>${AR(pct(x.pass, x.n))}٪</td></tr>`).join('') || `<tr><td colspan="5">${A.emptyBox('لا توجد نتائج')}</td></tr>`}</tbody></table></div></div></div>
-      <div class="scroll" style="margin-top:12px"><table class="tbl"><thead><tr><th>#</th><th>الطالب</th><th>الفصل</th><th>النموذج</th>${specOf(e).parts.length > 1 ? specOf(e).parts.map((pp, i) => `<th class="small">ق${AR(i + 1)}</th>`).join('') : ''}<th>الدرجة</th><th>المستوى</th><th>النسبة</th><th>الحضور</th><th></th></tr></thead><tbody>${all.sort((a, b) => pct(b.score, b.max_score) - pct(a.score, a.max_score)).map((r, i) => `<tr><td>${AR(i + 1)}</td><td><b>${esc(r.student_name)}</b>${r.student_id ? '' : ' <span class="pill st-empty" title="غير مرتبط بطالب في قاعدة البيانات">غير مرتبط</span>'}</td><td>${esc(clsName(r.class_id))}</td><td>${r.model}</td>${specOf(e).parts.length > 1 ? partScores(e, r).map(([a, b]) => `<td class="small">${r.absent ? '—' : AR(a) + '/' + AR(b)}</td>`).join('') : ''}<td>${r.absent ? '—' : AR(r.score) + ' / ' + AR(r.max_score)}</td><td class="small">${r.absent ? '—' : levelOf(pct(r.score, r.max_score))[0]}</td><td>${r.absent ? '—' : `<span class="pill ${pct(r.score, r.max_score) >= 80 ? 'st-approved' : pct(r.score, r.max_score) >= 50 ? 'st-submitted' : 'st-returned'}">${AR(pct(r.score, r.max_score))}٪</span>`}</td><td>${r.absent ? '<span class="pill st-returned">غائب</span>' : 'حاضر'}</td><td>${r.sheet_img ? `<button class="btn ghost sm" data-img="${r.id}">الورقة</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="12">${A.emptyBox('لا توجد نتائج بعد', 'صحّح الأوراق أو استورد النتائج من تبويب «التصحيح والاستيراد».')}</td></tr>`}</tbody></table></div>`;
+      <div class="scroll" style="margin-top:12px"><table class="tbl"><thead><tr><th>#</th><th>الطالب</th><th>الفصل</th><th>النموذج</th>${specOf(e).parts.length > 1 ? specOf(e).parts.map((pp, i) => `<th class="small">ق${AR(i + 1)}</th>`).join('') : ''}<th>الدرجة</th><th>المستوى</th><th>النسبة</th><th>الحضور</th><th></th></tr></thead><tbody>${all.sort((a, b) => pct(b.score, b.max_score) - pct(a.score, a.max_score)).map((r, i) => `<tr><td>${AR(i + 1)}</td><td><b>${esc(r.student_name)}</b>${r.student_id ? '' : ' <span class="pill st-empty" title="غير مرتبط بطالب في قاعدة البيانات">غير مرتبط</span>'}</td><td>${esc(clsName(r.class_id))}</td><td>${r.model}</td>${specOf(e).parts.length > 1 ? partScores(e, r).map(([a, b]) => `<td class="small">${r.absent ? '—' : AR(a) + '/' + AR(b)}</td>`).join('') : ''}<td>${r.absent ? '—' : AR(r.score) + ' / ' + AR(r.max_score)}</td><td class="small">${r.absent ? '—' : levelOf(pct(r.score, r.max_score))[0]}</td><td>${r.absent ? '—' : `<span class="pill ${pct(r.score, r.max_score) >= 80 ? 'st-approved' : pct(r.score, r.max_score) >= 50 ? 'st-submitted' : 'st-returned'}">${AR(pct(r.score, r.max_score))}٪</span>`}</td><td>${r.absent ? '<span class="pill st-returned">غائب</span>' : 'حاضر'}</td><td><button class="btn ghost sm" data-img="${r.id}">${r.sheet_img ? 'الورقة والتعديل' : 'تعديل'}</button></td></tr>`).join('') || `<tr><td colspan="12">${A.emptyBox('لا توجد نتائج بعد', 'صحّح الأوراق أو استورد النتائج من تبويب «التصحيح والاستيراد».')}</td></tr>`}</tbody></table></div>`;
     bindF(box, () => tResults(box, e, root));
     const cv = histCanvas(Z.bins); cv.style.cssText = 'width:100%;height:auto'; cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', 'توزيع الدرجات بفئات عشرية'); $('#rH', box).appendChild(cv);
     $('#rPng', box).onclick = () => { const a = document.createElement('a'); a.href = cv.toDataURL('image/png'); a.download = `توزيع الدرجات - ${e.title}.png`; a.click(); };
     $('#rX', box).onclick = () => exportXlsx(e, all, Z);
-    $$('[data-img]', box).forEach(b => b.onclick = () => { const r = all.find(y => y.id === b.dataset.img); A.modal(`<h3>${esc(r.student_name)}</h3><img src="${r.sheet_img}" style="width:100%;border-radius:8px" alt="ورقة الطالب">`, { cls: 'wide' }); });
+    const R0 = await roster(e);
+    $$('[data-img]', box).forEach(b => b.onclick = () => { const r = all.find(y => y.id === b.dataset.img), R1 = R0.length ? R0 : [];
+      const stu = R1.find(x => x.id === r.student_id) || (r.student_id ? { id: r.student_id, full_name: r.student_name, class_id: r.class_id } : null), R2 = stu && !R1.some(x => x.id === stu.id) ? [stu, ...R1] : R1;
+      sheetEditor(e, { stu, model: r.model, ans: r.absent ? QS(e).map(() => -1) : (r.answers || []), absent: r.absent, img: r.sheet_img, how: '' }, R2, { title: r.student_name, saveLabel: 'حفظ التعديل', allowNoStu: !r.student_id,
+        onSave: async it => { const ans = it.absent ? [] : it.ans, [score, mx] = it.absent ? [0, scoreOf(e, it.model, [])[1]] : scoreOf(e, it.model, ans, it.absent ? null : r.marks), s2 = it.stu || null;
+          if (s2 && s2.id !== r.student_id) { await api.del('paper_results', r.id); }
+          await upsRes(e, [{ exam_id: e.id, student_id: s2 ? s2.id : r.student_id, skey: s2 ? s2.id : r.skey, student_name: s2 ? s2.full_name : r.student_name, class_id: s2 ? s2.class_id : r.class_id, model: it.model, answers: ans, marks: it.absent ? null : r.marks, score, max_score: mx, absent: it.absent, sheet_img: r.sheet_img || null, updated_at: new Date().toISOString() }]);
+          cdel('re:' + e.id); A.toast('حُفظ التعديل', 'ok'); tResults(box, e, root); },
+        onDelete: async () => { await api.del('paper_results', r.id); cdel('re:' + e.id); A.toast('حُذفت النتيجة', 'ok'); tResults(box, e, root); } }); });
+    const pa = $('#rPa', box); if (pa) pa.onclick = ev => A.run(ev.currentTarget, async () => { const L = all.filter(r => r.sheet_img).sort((a, b) => clsName(a.class_id).localeCompare(clsName(b.class_id), 'ar') || a.student_name.localeCompare(b.student_name, 'ar')); if (!L.length) throw new Error('لا توجد صور أوراق');
+      const imgs = []; for (const r of L) imgs.push(await DinaOMR.annotateURL(r.sheet_img, specOf(e), r.absent ? null : r.answers, keyOf(e, r)));
+      A.printDoc('الأوراق المصححة: ' + e.title, `${AR(L.length)} ورقة · الأخضر الإجابة الصحيحة، والأحمر إجابة الطالب الخاطئة`, L.map((r, i) => `<div style="page-break-after:always;text-align:center"><div style="font-weight:800;margin:0 0 4px">${esc(r.student_name)} — ${esc(clsName(r.class_id))} · ${r.absent ? 'غائب' : `${r.score} / ${r.max_score} (${pct(r.score, r.max_score)}%)`}</div><img src="${imgs[i]}" style="max-width:100%;max-height:250mm"></div>`).join(''), false); });
   }
   function exportXlsx(e, all, Z) {
     const wb = XLSX.utils.book_new(), add = (rows, n) => { const ws = XLSX.utils.json_to_sheet(rows); ws['!views'] = [{ RTL: true }]; XLSX.utils.book_append_sheet(wb, ws, n); };
@@ -8032,6 +8219,7 @@ ${S.me.full_name}`;
     add(Z.skills.map(s => ({ المهارة: s.name, 'عدد الأسئلة': s.qs.length, 'الإتقان %': s.p })), 'المهارات');
     add(Z.parts.map((pp, i) => ({ القسم: i + 1, النوع: QT[pp.type], 'عدد الأسئلة': pp.count, 'الدرجة': pp.max, 'المتوسط %': pp.avg })).concat(Z.levels.map(([l, n]) => ({ القسم: '', النوع: 'مستوى: ' + l[0], 'عدد الأسئلة': n }))), 'الأقسام والمستويات');
     add(Z.classes.map(x => ({ الفصل: clsName(x.c), حاضر: x.n, غائب: x.abs, 'المتوسط %': x.avg, 'النجاح %': pct(x.pass, x.n) })), 'الفصول');
+    add(all.filter(r => !r.absent).map(r => Object.assign({ الطالب: r.student_name, الفصل: clsName(r.class_id), النموذج: r.model }, Object.fromEntries(QS(e).map((Q, q) => ['س' + qNum(e, q), r.answers && r.answers[q] >= 0 ? (okQ(e, r, q) ? '✓ ' : '✗ ') + Q.lab[r.answers[q]] : '—'])), { الدرجة: r.score })), 'فقرات الطلاب');
     XLSX.writeFile(wb, `تقرير ${e.title}.xlsx`);
   }
 

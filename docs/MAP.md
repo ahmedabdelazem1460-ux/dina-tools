@@ -32,8 +32,8 @@
 | 24 | `src/assess/records.js` | app14.js | 10 | سجل المتابعة (سجلات برو) داخل المنصة | records | — |
 | 25 | `src/schedule/tt-engine.js` | — | 34 | محرك الجداول الموحّد DinaTT: قيود إلزامية وتفضيلية بمستوى ووزن، مشتركة ومتوازية، سعة القاعات، توليد جزئي، بدائل التعديل وأثره | — | — |
 | 26 | `src/schedule/distribution.js` | app15.js | 95 | توزيع الحصص والجدول المرن V.plan | plan | _lastGen _planCap _planReload _planSave _planState _planTab canPlan |
-| 27 | `omr.js` | — | 22 | محرك ورقة التظليل والقراءة الآلية | — | — |
-| 28 | `src/assess/paper-exams.js` | app16.js | 106 | الاختبارات الورقية والتصحيح الآلي واللجان V.paper | paper | — |
+| 27 | `omr.js` | — | 32 | محرك ورقة التظليل والقراءة الآلية | — | — |
+| 28 | `src/assess/paper-exams.js` | app16.js | 127 | الاختبارات الورقية والتصحيح الآلي واللجان V.paper | paper | — |
 | 29 | `lijan3d.js` | — | 18 | محرك كروكي اللجان ثلاثي الأبعاد DinaLijan (مشترك مع lijan.html): خريطة المباني والأدوار، اللجنة من الداخل بالباب والسبورة والمقاعد، والمخطط العلوي للتحرير | — | — |
 | 30 | `src/assess/committees-pro.js` | — | 87 | اللجان والمقاعد V.lijan: توزيعات متعددة مسودة/معتمد، كشاف الأعداد لكل لجنة من كل صف/فصل بمؤشرات المتبقي، طرق التوزيع والترقيم والتثبيت، كروكي ثلاثي الأبعاد بالباب والصورة، جدول الاختبارات، ١٠ تقارير وExcel، ورابط أولياء الأمور lijan.html — مفتاح lijan ومنحة lijan (sql/112) | lijan | lijanCan lijanOpen |
 | 31 | `src/core/activity.js` | app17.js | 10 | النشاط والدخول (للمالك) | activity reports | — |

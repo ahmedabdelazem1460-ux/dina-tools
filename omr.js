@@ -2,11 +2,14 @@
    الورقة: أربع علامات زوايا سوداء، ترويسة مضغوطة (الاختبار والطالب)، باركود رقم الهوية تحت الاسم، شريط تعريف (ترتيب الطالب + النموذج)،
    ثم كتلة مستقلة لكل سؤال بعنوانه وترقيمه، والأسئلة المقالية في قسم خاص بالمعلم أسفل الورقة. */
 (function () {
+  const VBASE = (() => { try { const c = document.currentScript; if (c && c.src) return c.src.replace(/(dist\/)?[^/]*$/, ''); } catch (_) { } return ''; })();
   const W = 210, H = 297, MK = 8;
   const MARKS = [[10, 10], [W - 10 - MK, 10], [10, H - 10 - MK], [W - 10 - MK, H - 10 - MK]];
   const MC = MARKS.map(([x, y]) => [x + MK / 2, y + MK / 2]);
   // شريط التعريف: ١٢ بت لترتيب الطالب + ٢ للنموذج + ١ تحقق
   const ID_BITS = 15, ID_Y = 36.2, ID_X0 = 22, ID_STEP = 6.2, ID_S = 4;
+  // خانة «غائب» يظللها المراقب أو المعلم (بين شريط التعريف والباركود)
+  const ABS_S = 4, ABS_X = 118.6, ABS_Y = ID_Y, ABS_C = [ABS_X + ABS_S / 2, ABS_Y + ABS_S / 2];
   // باركود Code 39 لرقم الهوية (١٠ خانات ثابتة) — نقرؤه نحن من الصورة بمعرفة موضعه الدقيق
   const BC_N = 10, BC_NAR = 0.34, BC_WID = 0.9, BC_CELL = 7 * BC_NAR + 3 * BC_WID, BC_W = (BC_N + 2) * BC_CELL, BC_X1 = W - 22, BC_X0 = BC_X1 - BC_W, BC_Y = 35, BC_H = 6;
   const C39 = { '0': '000110100', '1': '100100001', '2': '001100001', '3': '101100000', '4': '000110001', '5': '100110000', '6': '001110000', '7': '000100101', '8': '100100100', '9': '001100100', '*': '010010100' };
@@ -63,6 +66,7 @@
     h += `<div style="position:absolute;right:22mm;left:22mm;top:25.5mm;display:flex;gap:2.5mm;direction:${dir};font-size:9.5pt"><div style="flex:2.4;${box}">${T.name}: <b>${o.name || ''}</b></div><div style="flex:1;${box}">${T.cls}: <b>${o.cls || ''}</b></div>${o.seat ? `<div style="flex:1.3;${box}">${T.seat}: <b>${o.seat}</b></div>` : ''}<div style="width:20mm;${box};text-align:center">${T.model} <b>${o.modelName || 'A'}</b></div></div>`;
     // شريط التعريف + باركود رقم الهوية
     bits.forEach((b, i) => { const [x, y] = [ID_X0 + i * ID_STEP, ID_Y]; h += `<div style="position:absolute;left:${mm(x)};top:${mm(y)};width:${mm(ID_S)};height:${mm(ID_S)};box-sizing:border-box;border:0.3mm solid #000;${b ? 'background:#000' : ''}"></div>`; });
+    h += `<div style="position:absolute;left:${mm(ABS_X)};top:${mm(ABS_Y)};width:${mm(ABS_S)};height:${mm(ABS_S)};box-sizing:border-box;border:0.3mm solid #333;border-radius:50%;${o.absent ? 'background:#000' : ''}"></div><div style="position:absolute;left:${mm(ABS_X - 3)};top:${mm(ABS_Y + ABS_S + 0.3)};width:${mm(ABS_S + 6)};text-align:center;font-size:5.6pt;color:#333;white-space:nowrap">${en ? 'Absent' : 'غائب'}</div>`;
     if (nid) h += `<div style="position:absolute;left:${mm(BC_X0)};top:${mm(BC_Y)};width:${mm(BC_W)}">${barcodeSVG(nid)}<div style="font:700 7pt/1.15 Arial,sans-serif;letter-spacing:1.2pt;text-align:center;direction:ltr;margin-top:0.4mm">${nid}</div></div>`;
     else h += `<div style="position:absolute;left:${mm(BC_X0)};top:${mm(BC_Y)};width:${mm(BC_W)};height:${mm(BC_H + 2.6)};box-sizing:border-box;border:0.3mm dashed #9aa8bc;border-radius:1.2mm;font-size:7pt;color:#6b7aa3;text-align:center;line-height:${mm(BC_H + 2.2)};direction:${dir}">${en ? 'Write your name above — the teacher links this sheet' : 'ورقة احتياطية — اكتب اسمك أعلاه ويربطها المعلم'}</div>`;
     h += `<div style="position:absolute;right:22mm;left:22mm;top:44.2mm;font-size:6.6pt;color:#555;direction:${dir};text-align:${en ? 'left' : 'right'};white-space:nowrap;overflow:hidden">${T.ins}${o.legend ? ` <b style="color:#082B5A">${o.legend}</b>` : ''}</div>`;
@@ -94,7 +98,7 @@
       const X0 = BC_X0 - 1, X1 = BC_X1 + 1, Ya = BC_Y + 1, Yb = BC_Y + BC_H - 1; const [ua, va] = Hs(X0, Ya), [ub, vb] = Hs(X1, Yb);
       const bx = Math.max(0, Math.floor(Math.min(ua, ub)) - 4), by = Math.max(0, Math.floor(Math.min(va, vb)) - 4), bw = Math.min(cv.width - bx, Math.ceil(Math.abs(ub - ua)) + 8), bh = Math.min(cv.height - by, Math.ceil(Math.abs(vb - va)) + 8);
       if (bw < 40 || bh < 4) return null;
-      const d = cv.getContext('2d', { willReadFrequently: true }).getImageData(bx, by, bw, bh).data, gv = (x, y) => { const xx = Math.round(x) - bx, yy = Math.round(y) - by; if (xx < 0 || yy < 0 || xx >= bw || yy >= bh) return 255; const i = (yy * bw + xx) * 4; return d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114; };
+      const d = cv.getContext('2d', { willReadFrequently: true }).getImageData(bx, by, bw, bh).data; if (th === null || th === undefined) { const gg = new Uint8Array(bw * bh); for (let i = 0; i < bw * bh; i++) gg[i] = (d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114) | 0; th = Math.min(otsu(gg), 190); } const gv = (x, y) => { const xx = Math.round(x) - bx, yy = Math.round(y) - by; if (xx < 0 || yy < 0 || xx >= bw || yy >= bh) return 255; const i = (yy * bw + xx) * 4; return d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114; };
       for (const yf of [0.5, 0.35, 0.65, 0.25, 0.75]) {
         const ym = BC_Y + BC_H * yf; let out = '', ok = true;
         for (let c = 0; c < BC_N + 2 && ok; c++) {
@@ -110,42 +114,115 @@
     } catch (_) {}
     return null;
   }
+  // القراءة: تطبيع الإضاءة محلياً (ظلال الجوال)، اكتشاف علامات الزوايا في أي مكان من الصورة وبأي دوران (٠/٩٠/١٨٠/٢٧٠ وميل)،
+  // ثم تجربة ترتيبات الزوايا حتى يُفك شريط التعريف، وقياس التظليل نسبةً إلى خلفية الورقة نفسها مع درجة ثقة لكل سؤال.
   function readCanvas(cv) {
-    const TW = 1240, sc = TW / cv.width, w = TW, h = Math.round(cv.height * sc);
+    const TW = Math.min(1600, Math.max(1100, cv.width)), sc = TW / cv.width, w = TW, h = Math.round(cv.height * sc);
     const c2 = document.createElement('canvas'); c2.width = w; c2.height = h; const x2 = c2.getContext('2d', { willReadFrequently: true }); x2.fillStyle = '#fff'; x2.fillRect(0, 0, w, h); x2.drawImage(cv, 0, 0, w, h);
     const d = x2.getImageData(0, 0, w, h).data, g = new Uint8Array(w * h); for (let i = 0; i < w * h; i++) g[i] = (d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114) | 0;
-    const th = Math.min(otsu(g), 170), bin = new Uint8Array(w * h); for (let i = 0; i < w * h; i++) bin[i] = g[i] < th ? 1 : 0;
-    const pxmm = w / W, exp = (MK * pxmm) ** 2;
-    const find = (x0, y0, x1, y1, cx, cy) => {
-      const seen = new Uint8Array(w * h); let best = null;
-      for (let y = y0; y < y1; y += 2) for (let x = x0; x < x1; x += 2) { const i = y * w + x; if (!bin[i] || seen[i]) continue;
-        const st = [i]; seen[i] = 1; let n = 0, sx = 0, sy = 0, mnx = x, mxx = x, mny = y, mxy = y;
-        while (st.length) { const j = st.pop(), jx = j % w, jy = (j / w) | 0; n++; sx += jx; sy += jy; if (jx < mnx) mnx = jx; if (jx > mxx) mxx = jx; if (jy < mny) mny = jy; if (jy > mxy) mxy = jy; if (n > exp * 6) break;
-          for (const k of [j - 1, j + 1, j - w, j + w]) if (k >= 0 && k < w * h && !seen[k] && bin[k]) { const kx = k % w, ky = (k / w) | 0; if (kx >= x0 && kx < x1 && ky >= y0 && ky < y1) { seen[k] = 1; st.push(k); } } }
-        const bw = mxx - mnx + 1, bh = mxy - mny + 1, fill = n / (bw * bh), ar = bw / bh;
-        if (n > exp * 0.45 && n < exp * 3 && fill > 0.7 && ar > 0.6 && ar < 1.6) { const px = sx / n, py = sy / n, dist = Math.hypot(px - cx, py - cy); if (!best || dist < best.dist) best = { x: px, y: py, dist }; } }
-      return best;
-    };
-    const qw = (w * 0.3) | 0, qh = (h * 0.22) | 0;
-    const m = [find(0, 0, qw, qh, 0, 0), find(w - qw, 0, w, qh, w, 0), find(0, h - qh, qw, h, 0, h), find(w - qw, h - qh, w, h, w, h)];
-    if (m.some(x => !x)) return { ok: false, error: 'لم تُكتشف علامات الزوايا الأربع — تأكد أن الورقة كاملة وواضحة في المسح أو الصورة' };
-    const pts = m.map(p => [p.x, p.y]);
-    const sample = (H, x, y, rmm) => { const [u, v] = H(x, y), r = rmm * pxmm; let dark = 0, tot = 0; for (let yy = Math.round(v - r); yy <= Math.round(v + r); yy++) for (let xx = Math.round(u - r); xx <= Math.round(u + r); xx++) { if ((xx - u) ** 2 + (yy - v) ** 2 > r * r || xx < 0 || yy < 0 || xx >= w || yy >= h) continue; tot++; dark += bin[yy * w + xx]; } return tot ? dark / tot : 0; };
-    for (const order of [[0, 1, 2, 3], [3, 2, 1, 0]]) {
-      const H2 = homography(MC, order.map(i => pts[i])); if (!H2) continue;
-      const bits = Array.from({ length: ID_BITS }, (_, b) => sample(H2, ...idPos(b), ID_S * 0.32) > 0.5 ? 1 : 0);
-      const id = decode(bits); if (!id) continue;
-      const Hs = (x, y) => { const [u, v] = H2(x, y); return [u / sc, v / sc]; };
-      const bc = readBarcode(cv, Hs, th);
-      return { ok: true, H: H2, id, barcode: bc, gid: { digits: bc || '', bad: false }, read: (a, b) => { const L = layout(a, b), nq = L.qs.length, ans = [], conf = []; for (let q = 0; q < nq; q++) { const f = []; for (let k = 0; k < L.qs[q].n; k++) f.push(sample(H2, ...L.pos(q, k), R * 0.62)); const s = f.map((v, k) => [v, k]).sort((a, b) => b[0] - a[0]); const [m1, m2] = [s[0], s[1] || [0, -1]];
-          if (m1[0] < 0.33) ans.push(-1); else if (m2[0] > 0.33 && m2[0] > m1[0] * 0.72) ans.push(-2); else ans.push(m1[1]); conf.push(+m1[0].toFixed(2)); } return { ans, conf }; } };
+    // متوسط محلي بصورة تكاملية (نافذة ≈ ٤٪ من العرض) ← بكسل داكن إذا كان أغمق من محيطه بوضوح
+    const S = new Float64Array((w + 1) * (h + 1)); for (let y = 0; y < h; y++) { let row = 0; for (let x = 0; x < w; x++) { row += g[y * w + x]; S[(y + 1) * (w + 1) + x + 1] = S[y * (w + 1) + x + 1] + row; } }
+    const rad = Math.max(12, Math.round(w * 0.04)), mean = (x, y) => { const x0 = Math.max(0, x - rad), y0 = Math.max(0, y - rad), x1 = Math.min(w, x + rad + 1), y1 = Math.min(h, y + rad + 1); return (S[y1 * (w + 1) + x1] - S[y0 * (w + 1) + x1] - S[y1 * (w + 1) + x0] + S[y0 * (w + 1) + x0]) / ((x1 - x0) * (y1 - y0)); };
+    const gth = Math.min(otsu(g), 175), bin = new Uint8Array(w * h), bg = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x, m = mean(x, y); bg[i] = Math.min(255, m); bin[i] = (g[i] < m * 0.72 && g[i] < 215) || g[i] < Math.min(gth, 90) ? 1 : 0; }
+    // علامات الزوايا: مكونات متصلة مربعة ممتلئة (الكبيرة جداً — خلفية أو ظل — تُستبعد)
+    const cand = [], seen = new Uint8Array(w * h), minA = w * h * 0.00008, maxA = w * h * 0.012, cap = maxA * 4;
+    for (let y = 0; y < h; y += 2) for (let x = 0; x < w; x += 2) { const i0 = y * w + x; if (!bin[i0] || seen[i0]) continue;
+      const st = [i0]; seen[i0] = 1; let n = 0, sx = 0, sy = 0, mnx = x, mxx = x, mny = y, mxy = y, big = false;
+      while (st.length) { const j = st.pop(), jx = j % w, jy = (j / w) | 0; n++; sx += jx; sy += jy; if (jx < mnx) mnx = jx; if (jx > mxx) mxx = jx; if (jy < mny) mny = jy; if (jy > mxy) mxy = jy; if (n > cap) { big = true; }
+        if (!big) { if (jx > 0 && !seen[j - 1] && bin[j - 1]) { seen[j - 1] = 1; st.push(j - 1); } if (jx < w - 1 && !seen[j + 1] && bin[j + 1]) { seen[j + 1] = 1; st.push(j + 1); } if (jy > 0 && !seen[j - w] && bin[j - w]) { seen[j - w] = 1; st.push(j - w); } if (jy < h - 1 && !seen[j + w] && bin[j + w]) { seen[j + w] = 1; st.push(j + w); } } }
+      if (big || n < minA || n > maxA) continue; const bw = mxx - mnx + 1, bh = mxy - mny + 1, ar = bw / bh, fill = n / (bw * bh);
+      if (ar > 0.55 && ar < 1.8 && fill > 0.55) cand.push({ x: sx / n, y: sy / n, n, fill, side: Math.sqrt(n) }); }
+    if (cand.length < 4) return { ok: false, error: 'لم تُكتشف علامات الزوايا الأربع — تأكد أن الورقة كاملة وواضحة في المسح أو الصورة' };
+    // أفضل رباعي: مستطيل بنسبة أضلاع الورقة وعلامات متقاربة الحجم
+    const RAT = (MC[3][1] - MC[0][1]) / (MC[1][0] - MC[0][0]);
+    const top = cand.sort((a, b) => b.n * b.fill - a.n * a.fill).slice(0, 14), quads = [];
+    for (let a = 0; a < top.length; a++) for (let b = a + 1; b < top.length; b++) for (let c = b + 1; c < top.length; c++) for (let e = c + 1; e < top.length; e++) {
+      const P = [top[a], top[b], top[c], top[e]], cx = P.reduce((s, p) => s + p.x, 0) / 4, cy = P.reduce((s, p) => s + p.y, 0) / 4;
+      const o = P.slice().sort((p, q) => Math.atan2(p.y - cy, p.x - cx) - Math.atan2(q.y - cy, q.x - cx)); // ترتيب دائري
+      const L = i => Math.hypot(o[(i + 1) % 4].x - o[i].x, o[(i + 1) % 4].y - o[i].y), s = [L(0), L(1), L(2), L(3)];
+      const par = Math.abs(s[0] - s[2]) / Math.max(s[0], s[2]) + Math.abs(s[1] - s[3]) / Math.max(s[1], s[3]);
+      const r1 = (s[1] + s[3]) / (s[0] + s[2]), ratErr = Math.min(Math.abs(r1 - RAT), Math.abs(1 / r1 - RAT)) / RAT;
+      const sides = P.map(p => p.side), szErr = Math.max(...sides) / Math.min(...sides) - 1, span = (s[0] + s[1]) / (w + h);
+      const diag = Math.abs(Math.hypot(o[2].x - o[0].x, o[2].y - o[0].y) - Math.hypot(o[3].x - o[1].x, o[3].y - o[1].y)) / Math.hypot(o[2].x - o[0].x, o[2].y - o[0].y);
+      if (par > 0.5 || ratErr > 0.35 || szErr > 1.6 || span < 0.25) continue;
+      // حجم العلامة يناسب المسافة بينها (٨ مم من ١٨٢ مم)
+      const expSide = Math.min(s[0] + s[2], s[1] + s[3]) / 2 * (MK / (MC[1][0] - MC[0][0])), sideErr = Math.abs(Math.log(sides.reduce((x, y) => x + y, 0) / 4 / expSide));
+      if (sideErr > 0.9) continue;
+      quads.push({ o, score: par * 2 + ratErr * 3 + szErr * 0.6 + diag * 2 + sideErr - span * 0.4 });
+    }
+    if (!quads.length) return { ok: false, error: 'لم تُكتشف علامات الزوايا الأربع — تأكد أن الورقة كاملة وواضحة في المسح أو الصورة' };
+    quads.sort((a, b) => a.score - b.score);
+    const pxOf = H2 => { const a = H2(MC[0][0], MC[0][1]), b = H2(MC[1][0], MC[1][1]); return Math.hypot(b[0] - a[0], b[1] - a[1]) / (MC[1][0] - MC[0][0]); };
+    // نسبة الظلام داخل دائرة: البكسل الداكن نسبةً لخلفيته المحلية
+    const sampleRaw = (H, x, y, rmm, px) => { const [u, v] = H(x, y), r = rmm * px; let dark = 0, tot = 0, sum = 0; for (let yy = Math.round(v - r); yy <= Math.round(v + r); yy++) for (let xx = Math.round(u - r); xx <= Math.round(u + r); xx++) { if ((xx - u) ** 2 + (yy - v) ** 2 > r * r || xx < 0 || yy < 0 || xx >= w || yy >= h) continue; const i = yy * w + xx; tot++; const rel = g[i] / Math.max(40, bg[i]); dark += rel < 0.72 ? 1 : 0; sum += Math.max(0, 1 - rel); } return tot ? { f: dark / tot, s: sum / tot } : { f: 0, s: 0 }; };
+    for (const qd of quads.slice(0, 4)) {
+      const pts = qd.o.map(p => [p.x, p.y]);
+      // الترتيب الدائري (حسب الزاوية) يعطي: أعلى-يسار، أعلى-يمين، أسفل-يمين، أسفل-يسار لصورة معتدلة؛ نجرّب البدايات الأربع (الدوران) والانعكاس
+      for (const rev of [false, true]) for (let st = 0; st < 4; st++) {
+        const seq = [0, 1, 2, 3].map(k => pts[rev ? (st - k + 8) % 4 : (st + k) % 4]); // TL, TR, BR, BL
+        const H2 = homography(MC, [seq[0], seq[1], seq[3], seq[2]]); if (!H2) continue;
+        const px = pxOf(H2); if (!(px > 0.8)) continue;
+        // الضلع العلوي (١٨٢ مم) أقصر من الجانبي (٢٦٩ مم): يستبعد الترتيب المدوَّر ٩٠°
+        const top_ = Math.hypot(seq[1][0] - seq[0][0], seq[1][1] - seq[0][1]), side_ = Math.hypot(seq[2][0] - seq[1][0], seq[2][1] - seq[1][1]);
+        if (Math.abs(side_ / top_ - RAT) / RAT > 0.25) continue;
+        const fs = Array.from({ length: ID_BITS }, (_, b) => sampleRaw(H2, ...idPos(b), ID_S * 0.32, px).f);
+        if (fs.some(f => f > 0.3 && f < 0.7)) continue; // خانات التعريف يجب أن تكون سوداء تماماً أو بيضاء تماماً
+        const bits = fs.map(f => f > 0.5 ? 1 : 0);
+        const id = decode(bits); if (!id) continue;
+        // تحقق إضافي: إطار كل خانة تعريف بيضاء مطبوع (الحافة أغمق من المركز)
+        const frameOk = fs.every((f, b) => { if (f > 0.5) return true; const [cx, cy] = idPos(b), e = sampleRaw(H2, cx - ID_S / 2 + 0.15, cy, 0.35, px).f; return e > 0.12; });
+        if (!frameOk) continue;
+        const Hs = (x, y) => { const [u, v] = H2(x, y); return [u / sc, v / sc]; };
+        const bc = readBarcode(cv, Hs, null);
+        const absent = (() => { const a = sampleRaw(H2, ...ABS_C, ABS_S * 0.3, px); return a.f > 0.55; })();
+        // خط أساس الورقة: متوسط الدوائر غير المظللة يُحسب عند القراءة
+        const read = (a, b) => { const L = layout(a, b), nq = L.qs.length, raw = [];
+          for (let q = 0; q < nq; q++) { const f = []; for (let k = 0; k < L.qs[q].n; k++) { const r0 = sampleRaw(H2, ...L.pos(q, k), R * 0.62, px); f.push(r0.f * 0.7 + r0.s * 0.9); } raw.push(f); }
+          const flat = raw.flat().sort((x, y) => x - y), base = flat[Math.floor(flat.length * 0.35)] || 0, hi = flat[flat.length - 1] || 1;
+          const mark = Math.max(0.28, base + Math.max(0.16, (hi - base) * 0.38));
+          const ans = [], conf = [], unsure = [];
+          raw.forEach((f) => { const s = f.map((v, k) => [v, k]).sort((x, y) => y[0] - x[0]), m1 = s[0], m2 = s[1] || [0, -1];
+            let v; if (m1[0] < mark) v = -1; else if (m2[0] >= mark && m2[0] > m1[0] * 0.72) v = -2; else v = m1[1];
+            const c = v === -1 ? Math.min(1, (mark - m1[0]) / mark + 0.3) : v === -2 ? 0.4 : Math.min(1, (m1[0] - Math.max(m2[0], mark * 0.6)) / Math.max(0.05, m1[0]));
+            ans.push(v); conf.push(+c.toFixed(2)); unsure.push(v !== -2 && (Math.abs(m1[0] - mark) < 0.07 || (m2[0] > base + 0.12 && m2[0] > m1[0] * 0.55))); });
+          return { ans, conf, unsure, raw, base, mark }; };
+        const toImg = (xmm, ymm) => Hs(xmm, ymm);
+        return { ok: true, H: H2, id, barcode: bc, absent, gid: { digits: bc || '', bad: false }, read, toImg, pxmm: px / sc };
+      }
     }
     return { ok: false, error: 'تعذّرت قراءة شريط التعريف — قد تكون الورقة ليست من هذا الاختبار أو المسح غير واضح' };
   }
+  // تقويم الورقة: صورة قائمة بمقاس A4 تماماً (بلا ميل ولا منظور) — تُحفظ هكذا فتُرسم علامات التصحيح عليها مباشرة في أي وقت
+  function rectify(cv, r, wd) {
+    wd = wd || 700; const hh = Math.round(wd * H / W), k = W / wd, out = document.createElement('canvas'); out.width = wd; out.height = hh;
+    const sx = cv.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, cv.width, cv.height), sd = sx.data, o = out.getContext('2d'), od = o.createImageData(wd, hh), dd = od.data;
+    for (let y = 0; y < hh; y++) for (let x = 0; x < wd; x++) { const [u, v] = r.toImg((x + 0.5) * k, (y + 0.5) * k), j = (y * wd + x) * 4;
+      if (u < 0 || v < 0 || u >= cv.width - 1 || v >= cv.height - 1) { dd[j] = dd[j + 1] = dd[j + 2] = 255; dd[j + 3] = 255; continue; }
+      const x0 = u | 0, y0 = v | 0, fx = u - x0, fy = v - y0, i00 = (y0 * cv.width + x0) * 4, i10 = i00 + 4, i01 = i00 + cv.width * 4, i11 = i01 + 4;
+      for (let c = 0; c < 3; c++) dd[j + c] = (sd[i00 + c] * (1 - fx) + sd[i10 + c] * fx) * (1 - fy) + (sd[i01 + c] * (1 - fx) + sd[i11 + c] * fx) * fy; dd[j + 3] = 255; }
+    o.putImageData(od, 0, 0); return out;
+  }
+  // علامات التصحيح على ورقة مقوَّمة: دائرة خضراء على الإجابة الصحيحة، وحمراء على اختيار الطالب الخاطئ، وبرتقالية حول رقم الفارغ/المتعدد
+  function drawMarks(ctx, wd, spec, ans, key) {
+    if (!ans) return; const L = layout(spec), p = wd / W, rr = R * 1.3 * p, ring = (x, y, rad, col, fill) => { ctx.beginPath(); ctx.arc(x * p, y * p, rad, 0, Math.PI * 2); ctx.lineWidth = Math.max(1.5, rad * 0.26); ctx.strokeStyle = col; ctx.stroke(); if (fill) { ctx.fillStyle = fill; ctx.fill(); } };
+    L.qs.forEach((Q, q) => { if (Q.teacher) return; const a = ans ? ans[q] : -1, k = key ? key[q] : -1;
+      if (k >= 0 && k < Q.n) ring(...L.pos(q, k), rr, '#2E8B57', a === k ? 'rgba(46,139,87,.30)' : null);
+      if (a >= 0 && k >= 0 && a !== k) ring(...L.pos(q, a), rr, '#d92d20', 'rgba(217,45,32,.20)');
+      if (a === undefined || a < 0) ring(...L.num(q), rr * 1.2, '#f79009'); });
+  }
+  function annotate(cv, r, spec, ans, key, wd) { const c = rectify(cv, r, wd || 760); drawMarks(c.getContext('2d'), c.width, spec, ans, key); return c.toDataURL('image/jpeg', 0.72); }
+  // صورة محفوظة: إن كانت مقوَّمة (علامات الزوايا في أماكنها) تُرسم عليها العلامات، وإلا تُعاد كما هي
+  async function annotateURL(url, spec, ans, key) {
+    try { const im = new Image(); im.src = url; await im.decode(); const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0);
+      if (Math.abs(c.height / c.width - H / W) > 0.01) return url; const p = c.width / W;
+      const dark = MC.every(([mx, my]) => { const d = x.getImageData(Math.round(mx * p) - 2, Math.round(my * p) - 2, 5, 5).data; let s = 0; for (let i = 0; i < d.length; i += 4) s += d[i] + d[i + 1] + d[i + 2]; return s / (d.length / 4) / 3 < 110; });
+      if (!dark) return url; drawMarks(x, c.width, spec, ans, key); return c.toDataURL('image/jpeg', 0.8); } catch (_) { return url; }
+  }
   async function fileToCanvases(file) {
     if (/pdf$/i.test(file.type) || /\.pdf$/i.test(file.name)) {
-      if (!window.pdfjsLib) await new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'; s.onload = res; s.onerror = () => rej(new Error('تعذّر تحميل قارئ PDF')); document.head.appendChild(s); });
-      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      if (!window.pdfjsLib) await new Promise((res, rej) => { const s = document.createElement('script'); s.src = VBASE + 'vendor/pdf.min.js'; s.onload = res; s.onerror = () => rej(new Error('تعذّر تحميل قارئ PDF')); document.head.appendChild(s); });
+      pdfjsLib.GlobalWorkerOptions.workerSrc = VBASE + 'vendor/pdf.worker.min.js';
       const doc = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise, out = [];
       for (let p = 1; p <= doc.numPages; p++) { const pg = await doc.getPage(p), vp0 = pg.getViewport({ scale: 1 }), vp = pg.getViewport({ scale: 2600 / vp0.height }); const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height; await pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise; out.push({ cv: c, label: file.name + ' — ص' + p }); }
       return out;
@@ -153,5 +230,5 @@
     const bmp = await createImageBitmap(file), c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height; c.getContext('2d').drawImage(bmp, 0, 0); return [{ cv: c, label: file.name }];
   }
   const thumb = (cv, wd = 620) => { const s = wd / cv.width, c = document.createElement('canvas'); c.width = wd; c.height = Math.round(cv.height * s); const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(cv, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.6); };
-  window.DinaOMR = { barcodeSVG, readBarcode, sheetHTML, PAGE_CSS, readCanvas, fileToCanvases, thumb, LET, LABELS, expand, capacity, encode, decode, layout };
+  window.DinaOMR = { annotate, annotateURL, rectify, drawMarks, ABS_C, barcodeSVG, readBarcode, sheetHTML, PAGE_CSS, readCanvas, fileToCanvases, thumb, LET, LABELS, expand, capacity, encode, decode, layout };
 })();
